@@ -62,6 +62,8 @@ export interface CustomAgentConfig {
   isolated: boolean;
 }
 
+export type JoinMode = 'async' | 'group' | 'smart';
+
 export interface AgentRecord {
   id: string;
   type: SubagentType;
@@ -75,6 +77,10 @@ export interface AgentRecord {
   session?: AgentSession;
   abortController?: AbortController;
   promise?: Promise<string>;
+  groupId?: string;
+  joinMode?: JoinMode;
+  /** Set when result was already consumed via get_subagent_result — suppresses completion notification. */
+  resultConsumed?: boolean;
 }
 
 export interface EnvInfo {

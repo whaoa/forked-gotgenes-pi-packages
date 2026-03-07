@@ -18,7 +18,8 @@ import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { AgentManager } from "./agent-manager.js";
 import { steerAgent, getAgentConversation, getDefaultMaxTurns, setDefaultMaxTurns, getGraceTurns, setGraceTurns } from "./agent-runner.js";
-import { SUBAGENT_TYPES, type SubagentType, type ThinkingLevel, type CustomAgentConfig } from "./types.js";
+import { SUBAGENT_TYPES, type SubagentType, type ThinkingLevel, type CustomAgentConfig, type JoinMode, type AgentRecord } from "./types.js";
+import { GroupJoinManager } from "./group-join.js";
 import { getAvailableTypes, getCustomAgentNames, getCustomAgentConfig, isValidType, registerCustomAgents, BUILTIN_TOOL_NAMES } from "./agent-types.js";
 import { loadCustomAgents } from "./custom-agents.js";
 import {
@@ -202,13 +203,11 @@ export default function (pi: ExtensionAPI) {
   // ---- Agent activity tracking + widget ----
   const agentActivity = new Map<string, AgentActivity>();
 
-  // Background completion: push notification into conversation
-  const manager = new AgentManager((record) => {
+  // ---- Individual nudge helper (async join mode) ----
+  function sendIndividualNudge(record: AgentRecord) {
     const displayName = getDisplayName(record.type);
     const duration = formatDuration(record.startedAt, record.completedAt);
-
     const status = getStatusLabel(record.status, record.error);
-
     const resultPreview = record.result
       ? record.result.length > 500
         ? record.result.slice(0, 500) + "\n...(truncated, use get_subagent_result for full output)"
@@ -218,7 +217,6 @@ export default function (pi: ExtensionAPI) {
     agentActivity.delete(record.id);
     widget.markFinished(record.id);
 
-    // Poke the main agent so it processes the result (queues as follow-up if busy)
     pi.sendUserMessage(
       `Background agent completed: ${displayName} (${record.description})\n` +
       `Agent ID: ${record.id} | Status: ${status} | Tool uses: ${record.toolUses} | Duration: ${duration}\n\n` +
@@ -226,10 +224,127 @@ export default function (pi: ExtensionAPI) {
       { deliverAs: "followUp" },
     );
     widget.update();
+  }
+
+  /** Format a single agent's summary for grouped notification. */
+  function formatAgentSummary(record: AgentRecord): string {
+    const displayName = getDisplayName(record.type);
+    const duration = formatDuration(record.startedAt, record.completedAt);
+    const status = getStatusLabel(record.status, record.error);
+    const resultPreview = record.result
+      ? record.result.length > 300
+        ? record.result.slice(0, 300) + "\n...(truncated)"
+        : record.result
+      : "No output.";
+    return `- ${displayName} (${record.description})\n  ID: ${record.id} | Status: ${status} | Tools: ${record.toolUses} | Duration: ${duration}\n  ${resultPreview}`;
+  }
+
+  // ---- Group join manager ----
+  const groupJoin = new GroupJoinManager(
+    (records, partial) => {
+      // Filter out agents whose results were already consumed via get_subagent_result
+      const unconsumed = records.filter(r => !r.resultConsumed);
+
+      for (const r of records) {
+        agentActivity.delete(r.id);
+        widget.markFinished(r.id);
+      }
+
+      // If all results were already consumed, skip the notification entirely
+      if (unconsumed.length === 0) {
+        widget.update();
+        return;
+      }
+
+      const total = unconsumed.length;
+      const label = partial ? `${total} agent(s) finished (partial — others still running)` : `${total} agent(s) finished`;
+      const summary = unconsumed.map(r => formatAgentSummary(r)).join("\n\n");
+
+      pi.sendUserMessage(
+        `Background agent group completed: ${label}\n\n${summary}\n\nUse get_subagent_result for full output.`,
+        { deliverAs: "followUp" },
+      );
+      widget.update();
+    },
+    30_000,
+  );
+
+  // Background completion: route through group join or send individual nudge
+  const manager = new AgentManager((record) => {
+    // Skip notification if result was already consumed via get_subagent_result
+    if (record.resultConsumed) {
+      agentActivity.delete(record.id);
+      widget.markFinished(record.id);
+      widget.update();
+      return;
+    }
+
+    // If this agent is pending batch finalization (debounce window still open),
+    // don't send an individual nudge — finalizeBatch will pick it up retroactively.
+    if (currentBatchAgents.some(a => a.id === record.id)) {
+      widget.update();
+      return;
+    }
+
+    const result = groupJoin.onAgentComplete(record);
+    if (result === 'pass') {
+      sendIndividualNudge(record);
+    }
+    // 'held' → do nothing, group will fire later
+    // 'delivered' → group callback already fired
+    widget.update();
   });
 
   // Live widget: show running agents above editor
   const widget = new AgentWidget(manager, agentActivity);
+
+  // ---- Join mode configuration ----
+  let defaultJoinMode: JoinMode = 'smart';
+  function getDefaultJoinMode(): JoinMode { return defaultJoinMode; }
+  function setDefaultJoinMode(mode: JoinMode) { defaultJoinMode = mode; }
+
+  // ---- Batch tracking for smart join mode ----
+  // Collects background agent IDs spawned in the current turn for smart grouping.
+  // Uses a debounced timer: each new agent resets the 100ms window so that all
+  // parallel tool calls (which may be dispatched across multiple microtasks by the
+  // framework) are captured in the same batch.
+  let currentBatchAgents: { id: string; joinMode: JoinMode }[] = [];
+  let batchFinalizeTimer: ReturnType<typeof setTimeout> | undefined;
+  let batchCounter = 0;
+
+  /** Finalize the current batch: if 2+ smart-mode agents, register as a group. */
+  function finalizeBatch() {
+    batchFinalizeTimer = undefined;
+    const batchAgents = [...currentBatchAgents];
+    currentBatchAgents = [];
+
+    const smartAgents = batchAgents.filter(a => a.joinMode === 'smart' || a.joinMode === 'group');
+    if (smartAgents.length >= 2) {
+      const groupId = `batch-${++batchCounter}`;
+      const ids = smartAgents.map(a => a.id);
+      groupJoin.registerGroup(groupId, ids);
+      // Retroactively process agents that already completed during the debounce window.
+      // Their onComplete fired but was deferred (agent was in currentBatchAgents),
+      // so we feed them into the group now.
+      for (const id of ids) {
+        const record = manager.getRecord(id);
+        if (!record) continue;
+        record.groupId = groupId;
+        if (record.completedAt != null && !record.resultConsumed) {
+          groupJoin.onAgentComplete(record);
+        }
+      }
+    } else {
+      // No group formed — send individual nudges for any agents that completed
+      // during the debounce window and had their notification deferred.
+      for (const { id } of batchAgents) {
+        const record = manager.getRecord(id);
+        if (record?.completedAt != null && !record.resultConsumed) {
+          sendIndividualNudge(record);
+        }
+      }
+    }
+  }
 
   // Grab UI context from first tool execution + clear lingering widget on new turn
   pi.on("tool_execution_start", async (_event, ctx) => {
@@ -288,7 +403,8 @@ Guidelines:
 - Use steer_subagent to send mid-run messages to a running background agent.
 - Use model to specify a different model (as "provider/modelId", or fuzzy e.g. "haiku", "sonnet").
 - Use thinking to control extended thinking level.
-- Use inherit_context if the agent needs the parent conversation history.`,
+- Use inherit_context if the agent needs the parent conversation history.
+- Use join_mode to control how background completion notifications are delivered. By default (smart), 2+ background agents spawned in the same turn are grouped into a single notification. Use "async" for individual notifications or "group" to force grouping.`,
     parameters: Type.Object({
       prompt: Type.String({
         description: "The task for the agent to perform.",
@@ -335,6 +451,12 @@ Guidelines:
         Type.Boolean({
           description: "If true, fork parent conversation into the agent. Default: false (fresh context).",
         }),
+      ),
+      join_mode: Type.Optional(
+        Type.Union([
+          Type.Literal("async"),
+          Type.Literal("group"),
+        ], { description: "Override join behavior for background agents. async: individual nudge on completion. group: hold and send one consolidated notification when all agents in the group complete. Default: smart (auto-groups 2+ background agents spawned in the same turn)." }),
       ),
     }),
 
@@ -520,10 +642,25 @@ Guidelines:
           ...bgCallbacks,
         });
 
+        // Determine join mode and track for batching
+        const joinMode: JoinMode = params.join_mode ?? defaultJoinMode;
+        const record = manager.getRecord(id);
+        if (record) record.joinMode = joinMode;
+
+        if (joinMode === 'async') {
+          // Explicit async — not part of any batch
+        } else {
+          // smart or group — add to current batch
+          currentBatchAgents.push({ id, joinMode });
+          // Debounce: reset timer on each new agent so parallel tool calls
+          // dispatched across multiple event loop ticks are captured together
+          if (batchFinalizeTimer) clearTimeout(batchFinalizeTimer);
+          batchFinalizeTimer = setTimeout(finalizeBatch, 100);
+        }
+
         agentActivity.set(id, bgState);
         widget.ensureTimer();
         widget.update();
-        const record = manager.getRecord(id);
         const isQueued = record?.status === "queued";
         return textResult(
           `Agent ${isQueued ? "queued" : "started"} in background.\n` +
@@ -668,6 +805,11 @@ Guidelines:
         output += `Error: ${record.error}`;
       } else {
         output += record.result ?? "No output.";
+      }
+
+      // Mark result as consumed — suppresses the completion notification
+      if (record.status !== "running" && record.status !== "queued") {
+        record.resultConsumed = true;
       }
 
       // Verbose: include full conversation
@@ -1090,6 +1232,7 @@ ${systemPrompt}
       `Max concurrency (current: ${manager.getMaxConcurrent()})`,
       `Default max turns (current: ${getDefaultMaxTurns()})`,
       `Grace turns (current: ${getGraceTurns()})`,
+      `Join mode (current: ${getDefaultJoinMode()})`,
     ]);
     if (!choice) return;
 
@@ -1125,6 +1268,17 @@ ${systemPrompt}
         } else {
           ctx.ui.notify("Must be a positive integer.", "warning");
         }
+      }
+    } else if (choice.startsWith("Join mode")) {
+      const val = await ctx.ui.select("Default join mode for background agents", [
+        "smart — auto-group 2+ agents in same turn (default)",
+        "async — always notify individually",
+        "group — always group background agents",
+      ]);
+      if (val) {
+        const mode = val.split(" ")[0] as JoinMode;
+        setDefaultJoinMode(mode);
+        ctx.ui.notify(`Default join mode set to ${mode}`, "info");
       }
     }
   }

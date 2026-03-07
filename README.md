@@ -13,7 +13,7 @@ https://github.com/user-attachments/assets/5d1331e8-6d02-420b-b30a-dcbf838b1660
 ## Features
 
 - **Claude Code look & feel** — same tool names, calling conventions, and UI patterns (`Agent`, `get_subagent_result`, `steer_subagent`) — feels native
-- **Parallel background agents** — spawn multiple agents that run concurrently with automatic queuing (configurable concurrency limit, default 4)
+- **Parallel background agents** — spawn multiple agents that run concurrently with automatic queuing (configurable concurrency limit, default 4) and smart group join (consolidated notifications)
 - **Live widget UI** — persistent above-editor widget with animated spinners, live tool activity, token counts, and colored status icons
 - **Custom agent types** — define agents in `.pi/agents/<name>.md` with YAML frontmatter: custom system prompts, model selection, thinking levels, tool restrictions
 - **Mid-run steering** — inject messages into running agents to redirect their work without restarting
@@ -162,6 +162,7 @@ Launch a sub-agent.
 | `resume` | string | no | Agent ID to resume a previous session |
 | `isolated` | boolean | no | No extension/MCP tools |
 | `inherit_context` | boolean | no | Fork parent conversation into agent |
+| `join_mode` | `"async"` \| `"group"` | no | Override join strategy for background completion notifications (default: smart) |
 
 ### `get_subagent_result`
 
@@ -194,7 +195,7 @@ The `/agents` command opens an interactive menu:
 Running agents (2) — 1 running, 1 done     ← only shown when agents exist
 Custom agents (3)                           ← submenu: edit or delete agents
 Create new agent                            ← manual wizard or AI-generated
-Settings                                    ← max concurrency, max turns, grace turns
+Settings                                    ← max concurrency, max turns, grace turns, join mode
 
 Built-in (always available):
   general-purpose · inherit
@@ -205,7 +206,7 @@ Built-in (always available):
 
 - **Custom agents submenu** — select an agent to edit (opens editor) or delete
 - **Create new agent** — choose project/personal location, then manual wizard (step-by-step prompts for name, tools, model, thinking, system prompt) or AI-generated (describe what the agent should do and a sub-agent writes the `.md` file)
-- **Settings** — configure max concurrency, default max turns, and grace turns at runtime
+- **Settings** — configure max concurrency, default max turns, grace turns, and join mode at runtime
 
 ## Graceful Max Turns
 
@@ -228,6 +229,22 @@ Background agents are subject to a configurable concurrency limit (default: 4). 
 
 Foreground agents bypass the queue — they block the parent anyway.
 
+## Join Strategies
+
+When background agents complete, they notify the main agent. The **join mode** controls how these notifications are delivered:
+
+| Mode | Behavior |
+|------|----------|
+| `smart` (default) | 2+ background agents spawned in the same turn are auto-grouped into a single consolidated notification. Solo agents notify individually. |
+| `async` | Each agent sends its own notification on completion (original behavior). Best when results need incremental processing. |
+| `group` | Force grouping even when spawning a single agent. Useful when you know more agents will follow. |
+
+**Timeout behavior:** When agents are grouped, a 30-second timeout starts after the first agent completes. If not all agents finish in time, a partial notification is sent with completed results and remaining agents continue with a shorter 15-second re-batch window for stragglers.
+
+**Configuration:**
+- Per-call: `Agent({ ..., join_mode: "async" })` overrides for that agent
+- Global default: `/agents` → Settings → Join mode
+
 ## Architecture
 
 ```
@@ -237,6 +254,7 @@ src/
   agent-types.ts      # Agent type registry (built-in + custom), tool factories
   agent-runner.ts     # Session creation, execution, graceful max_turns, steer/resume
   agent-manager.ts    # Agent lifecycle, concurrency queue, completion notifications
+  group-join.ts       # Group join manager: batched completion notifications with timeout
   custom-agents.ts    # Load custom agents from .pi/agents/*.md
   prompts.ts          # System prompts per agent type
   context.ts          # Parent conversation context for inherit_context

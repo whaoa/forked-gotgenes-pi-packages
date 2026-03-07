@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] - 2026-03-07
+
+### Added
+- **Background task join strategies** — smart grouping of background agent completion notifications
+  - `smart` (default): 2+ background agents spawned in the same turn are auto-grouped into a single consolidated notification instead of individual nudges
+  - `async`: each agent notifies individually on completion (previous behavior)
+  - `group`: force grouping even for solo agents
+  - 30s timeout after first completion delivers partial results; 15s straggler re-batch window for remaining agents
+- **`join_mode` parameter** on the `Agent` tool — override join strategy per agent (`"async"` or `"group"`)
+- **Join mode setting** in `/agents` → Settings — configure the default join mode at runtime
+- New `src/group-join.ts` — `GroupJoinManager` class for batched completion notifications
+
+### Changed
+- `AgentRecord` now includes optional `groupId`, `joinMode`, and `resultConsumed` fields
+- Background agent completion routing refactored: individual nudge logic extracted to `sendIndividualNudge()`, group delivery via `GroupJoinManager`
+
+### Fixed
+- **Debounce window race** — agents that complete during the 100ms batch debounce window are now deferred and retroactively fed into the group once it's registered, preventing split notifications (one individual + one partial group) and zombie groups
+- **Solo agent swallowed notification** — if only one agent was spawned (no group formed) but it completed during the debounce window, its deferred notification is now sent when the batch finalizes
+- **Duplicate notifications after polling** — calling `get_subagent_result` on a completed agent now marks its result as consumed, suppressing the subsequent completion notification (both individual and group)
+
 ## [0.2.5] - 2026-03-06
 
 ### Added
@@ -104,6 +125,7 @@ Initial release.
 - **Thinking level** — per-agent extended thinking control
 - **`/agent` and `/agents` commands**
 
+[0.2.6]: https://github.com/tintinweb/pi-subagents/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/tintinweb/pi-subagents/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/tintinweb/pi-subagents/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/tintinweb/pi-subagents/compare/v0.2.2...v0.2.3
