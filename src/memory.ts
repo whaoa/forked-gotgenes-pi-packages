@@ -7,8 +7,8 @@
  *   - "local"   → .pi/agent-memory-local/{agent-name}/
  */
 
-import { existsSync, readFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, mkdirSync, lstatSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { MemoryScope } from "./types.js";
 
@@ -16,10 +16,37 @@ import type { MemoryScope } from "./types.js";
 const MAX_MEMORY_LINES = 200;
 
 /**
- * Returns true if a name contains path traversal or shell-unsafe characters.
+ * Returns true if a name contains characters not allowed in agent/skill names.
+ * Uses a whitelist: only alphanumeric, hyphens, underscores, and dots (no leading dot).
  */
 export function isUnsafeName(name: string): boolean {
-  return name.includes("..") || name.includes("/") || name.includes("\\") || name.includes("\0");
+  if (!name || name.length > 128) return true;
+  return !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name);
+}
+
+/**
+ * Returns true if the given path is a symlink (defense against symlink attacks).
+ */
+export function isSymlink(filePath: string): boolean {
+  try {
+    return lstatSync(filePath).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safely read a file, rejecting symlinks.
+ * Returns undefined if the file doesn't exist, is a symlink, or can't be read.
+ */
+export function safeReadFile(filePath: string): string | undefined {
+  if (!existsSync(filePath)) return undefined;
+  if (isSymlink(filePath)) return undefined;
+  try {
+    return readFileSync(filePath, "utf-8");
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -42,29 +69,37 @@ export function resolveMemoryDir(agentName: string, scope: MemoryScope, cwd: str
 
 /**
  * Ensure the memory directory exists, creating it if needed.
+ * Refuses to create directories if any component in the path is a symlink
+ * to prevent symlink-based directory traversal attacks.
  */
 export function ensureMemoryDir(memoryDir: string): void {
+  // If the directory already exists, verify it's not a symlink
+  if (existsSync(memoryDir)) {
+    if (isSymlink(memoryDir)) {
+      throw new Error(`Refusing to use symlinked memory directory: ${memoryDir}`);
+    }
+    return;
+  }
   mkdirSync(memoryDir, { recursive: true });
 }
 
 /**
  * Read the first N lines of MEMORY.md from the memory directory, if it exists.
- * Returns undefined if no MEMORY.md exists.
+ * Returns undefined if no MEMORY.md exists or if the path is a symlink.
  */
 export function readMemoryIndex(memoryDir: string): string | undefined {
-  const memoryFile = join(memoryDir, "MEMORY.md");
-  if (!existsSync(memoryFile)) return undefined;
+  // Reject symlinked memory directories
+  if (isSymlink(memoryDir)) return undefined;
 
-  try {
-    const content = readFileSync(memoryFile, "utf-8");
-    const lines = content.split("\n");
-    if (lines.length > MAX_MEMORY_LINES) {
-      return lines.slice(0, MAX_MEMORY_LINES).join("\n") + "\n... (truncated at 200 lines)";
-    }
-    return content;
-  } catch {
-    return undefined;
+  const memoryFile = join(memoryDir, "MEMORY.md");
+  const content = safeReadFile(memoryFile);
+  if (content === undefined) return undefined;
+
+  const lines = content.split("\n");
+  if (lines.length > MAX_MEMORY_LINES) {
+    return lines.slice(0, MAX_MEMORY_LINES).join("\n") + "\n... (truncated at 200 lines)";
   }
+  return content;
 }
 
 /**

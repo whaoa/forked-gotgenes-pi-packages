@@ -166,10 +166,13 @@ export async function runAgent(
 
   let tools = getToolsForType(type, effectiveCwd);
 
-  // Persistent memory: detect write capability and branch accordingly
+  // Persistent memory: detect write capability and branch accordingly.
+  // Account for disallowedTools — a tool in the base set but on the denylist is not truly available.
   if (agentConfig?.memory) {
     const existingNames = new Set(tools.map(t => t.name));
-    const hasWriteTools = existingNames.has("write") || existingNames.has("edit");
+    const denied = agentConfig.disallowedTools ? new Set(agentConfig.disallowedTools) : undefined;
+    const effectivelyHas = (name: string) => existingNames.has(name) && !denied?.has(name);
+    const hasWriteTools = effectivelyHas("write") || effectivelyHas("edit");
 
     if (hasWriteTools) {
       // Read-write memory: add any missing memory tools (read/write/edit)

@@ -122,16 +122,21 @@ export class AgentManager {
 
     // Worktree isolation: create a temporary git worktree if requested
     let worktreeCwd: string | undefined;
+    let worktreeWarning = "";
     if (options.isolation === "worktree") {
       const wt = createWorktree(ctx.cwd, id);
       if (wt) {
         record.worktree = wt;
         worktreeCwd = wt.path;
+      } else {
+        worktreeWarning = "\n\n[WARNING: Worktree isolation was requested but failed (not a git repo, or no commits yet). Running in the main working directory instead.]";
       }
-      // If worktree creation fails (not a git repo, etc.), fall through to normal cwd
     }
 
-    const promise = runAgent(ctx, type, prompt, {
+    // Prepend worktree warning to prompt if isolation failed
+    const effectivePrompt = worktreeWarning ? worktreeWarning + "\n\n" + prompt : prompt;
+
+    const promise = runAgent(ctx, type, effectivePrompt, {
       pi,
       model: options.model,
       maxTurns: options.maxTurns,

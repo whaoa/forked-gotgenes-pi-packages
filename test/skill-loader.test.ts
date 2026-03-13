@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { preloadSkills } from "../src/skill-loader.js";
@@ -94,5 +94,29 @@ describe("preloadSkills", () => {
     expect(result).toHaveLength(2);
     expect(result[0].content).toContain("path traversal");
     expect(result[1].content).toContain("Good content");
+  });
+
+  it("rejects symlinked skill files", () => {
+    const dir = join(tmpDir, ".pi", "skills");
+    mkdirSync(dir, { recursive: true });
+    const secretFile = join(tmpDir, "secret.md");
+    writeFileSync(secretFile, "TOP SECRET CONTENT");
+    symlinkSync(secretFile, join(dir, "evil-skill.md"));
+    const result = preloadSkills(["evil-skill"], tmpDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].content).toContain("not found");
+    expect(result[0].content).not.toContain("TOP SECRET");
+  });
+
+  it("skips names with spaces (whitelist validation)", () => {
+    const result = preloadSkills(["my skill"], tmpDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].content).toContain("path traversal");
+  });
+
+  it("skips names starting with dot", () => {
+    const result = preloadSkills([".hidden"], tmpDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].content).toContain("path traversal");
   });
 });

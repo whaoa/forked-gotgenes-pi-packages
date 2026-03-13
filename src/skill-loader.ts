@@ -5,10 +5,9 @@
  * and returns their content for injection into the agent's system prompt.
  */
 
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { isUnsafeName } from "./memory.js";
+import { isUnsafeName, safeReadFile } from "./memory.js";
 
 export interface PreloadedSkill {
   name: string;
@@ -71,13 +70,9 @@ function tryReadSkillFile(dir: string, name: string): string | undefined {
 
   for (const ext of extensions) {
     const path = join(dir, name + ext);
-    if (existsSync(path)) {
-      try {
-        return readFileSync(path, "utf-8").trim();
-      } catch {
-        continue;
-      }
-    }
+    // safeReadFile rejects symlinks to prevent reading arbitrary files
+    const content = safeReadFile(path);
+    if (content !== undefined) return content.trim();
   }
 
   return undefined;

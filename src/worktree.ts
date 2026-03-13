@@ -33,9 +33,10 @@ export interface WorktreeCleanupResult {
  * Returns the worktree path, or undefined if not in a git repo.
  */
 export function createWorktree(cwd: string, agentId: string): WorktreeInfo | undefined {
-  // Verify we're in a git repo
+  // Verify we're in a git repo with at least one commit (HEAD must exist)
   try {
     execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, stdio: "pipe", timeout: 5000 });
+    execFileSync("git", ["rev-parse", "HEAD"], { cwd, stdio: "pipe", timeout: 5000 });
   } catch {
     return undefined;
   }
@@ -52,7 +53,7 @@ export function createWorktree(cwd: string, agentId: string): WorktreeInfo | und
       timeout: 30000,
     });
     return { path: worktreePath, branch };
-  } catch (err) {
+  } catch {
     // If worktree creation fails, return undefined (agent runs in normal cwd)
     return undefined;
   }
@@ -98,12 +99,25 @@ export function cleanupWorktree(
     });
 
     // Create a branch pointing to the worktree's HEAD.
-    // Use -f to overwrite if a stale branch from a previous run exists.
-    execFileSync("git", ["branch", "-f", worktree.branch], {
-      cwd: worktree.path,
-      stdio: "pipe",
-      timeout: 5000,
-    });
+    // If the branch already exists, append a suffix to avoid overwriting previous work.
+    let branchName = worktree.branch;
+    try {
+      execFileSync("git", ["branch", branchName], {
+        cwd: worktree.path,
+        stdio: "pipe",
+        timeout: 5000,
+      });
+    } catch {
+      // Branch already exists — use a unique suffix
+      branchName = `${worktree.branch}-${Date.now()}`;
+      execFileSync("git", ["branch", branchName], {
+        cwd: worktree.path,
+        stdio: "pipe",
+        timeout: 5000,
+      });
+    }
+    // Update branch name in worktree info for the caller
+    worktree.branch = branchName;
 
     // Remove the worktree (branch persists in main repo)
     removeWorktree(cwd, worktree.path);
