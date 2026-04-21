@@ -430,7 +430,7 @@ export default function (pi: ExtensionAPI) {
     manager.clearCompleted();           // preserve existing behavior
   });
 
-  pi.on("session_switch", () => { manager.clearCompleted(); });
+  pi.on("session_before_switch", () => { manager.clearCompleted(); });
 
   const { unsubPing: unsubPingRpc, unsubSpawn: unsubSpawnRpc, unsubStop: unsubStopRpc } = registerRpcHandlers({
     events: pi.events,
