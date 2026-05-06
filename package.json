@@ -17,6 +17,10 @@
     "name": "Chris Lasher"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gotgenes/pi-autoformat"
+  },
   "publishConfig": {
     "access": "public"
   },
