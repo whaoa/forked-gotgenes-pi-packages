@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.2](https://github.com/gotgenes/pi-autoformat/compare/v4.0.1...v4.0.2) (2026-05-06)
+
+
+### Miscellaneous Chores
+
+* update dependencies ([8e59b6c](https://github.com/gotgenes/pi-autoformat/commit/8e59b6c186411b247b409dc823b21bb22a8e8c69))
+
 ## [4.0.1](https://github.com/gotgenes/pi-autoformat/compare/v4.0.0...v4.0.1) (2026-05-06)
 
 
