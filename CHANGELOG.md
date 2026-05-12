@@ -7,11 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **Heads-up — behavior changes in skill preloading:**
+> - **`.txt` and extensionless flat skill files are no longer loaded.** Only `<name>.md` flat files and `<name>/SKILL.md` directory skills resolve now. Rename any `<name>.txt` or extensionless skill files to `<name>.md`.
+
 ### Added
+- **Pi-standard `<name>/SKILL.md` directory layout** is now discovered alongside flat `<name>.md` files. Top-level and nested matches both resolve via BFS — for skill `foo`, the loader checks `<root>/foo/SKILL.md`, then recursively descends looking for `*/.../foo/SKILL.md`. Recursion skips dotfile directories and `node_modules`; a directory that itself contains `SKILL.md` is treated as a single skill (Pi's "skills don't nest" rule).
+- **Five discovery roots**, checked in precedence order:
+  - `<cwd>/.pi/skills/` (project, Pi)
+  - `<cwd>/.agents/skills/` (project, [Agent Skills spec](https://agentskills.io/integrate-skills))
+  - `$PI_CODING_AGENT_DIR/skills/` — default `~/.pi/agent/skills/` (user, Pi)
+  - `~/.agents/skills/` (user, Agent Skills spec)
+  - `~/.pi/skills/` (legacy global, kept for backward compatibility)
+- **Symlink rejection broadened** to the new layouts: symlinked skill roots, nested skill directories, and `SKILL.md` files inside otherwise-real directories are all rejected (intentional deviation from Pi, which follows symlinks).
+- **Deterministic traversal order** — entries are sorted byte-order so collisions resolve identically across filesystems. Pi's iteration order is `readdirSync`-dependent.
 - **Resolved spawn args are now shown in the dedicated conversation viewer** ([#62](https://github.com/tintinweb/pi-subagents/issues/62)). Open `/subagent` → Running Agents → select an agent: a second header row displays the effective invocation — model override (when different from parent), `thinking: <level>`, `isolated`, `worktree`, `inherit context`, `background`, and `max turns: N`. Tags appear when the resolved value is notable (e.g. `isolated: true`), not just when the caller explicitly set it; `max turns` is the one exception and shows only when explicitly configured. Lets you verify the parent agent honored your spawn instructions without scrolling back through the chat. Snapshot stored on the new `AgentRecord.invocation` field. The same tag set is also surfaced on the `Agent` tool-call result render (which previously showed a narrower subset).
 - **`Shift+↑` / `Shift+↓` scroll a full page in the conversation viewer** — same behavior as `PgUp` / `PgDn`. Note: some terminal emulators intercept Shift+arrows for text selection or tab switching, in which case `PgUp`/`PgDn` remain available.
 
 ### Changed
+- **`.txt` and extensionless flat skill files are no longer loaded.** Pi only supports `.md`; we now match. **Migration:** rename any `<name>.txt` / `<name>` skill files to `<name>.md`.
 - **Conversation viewer no longer fills the full screen.** The overlay is now capped at 70% of terminal height (90% width unchanged), and the viewer's internal viewport mirrors that cap so the footer/scroll indicator can't be clipped.
 
 ## [0.7.1] - 2026-05-07
