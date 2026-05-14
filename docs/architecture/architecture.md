@@ -11,10 +11,11 @@ extensions can build on.
 2. **Composable by default** — other extensions can spawn agents, observe
    their lifecycle, and display their state without importing this package
    directly.
-3. **Typed API boundary** — a tiny, separately published API package
-   (`@earendil-works/pi-subagents-api`) carries the `SubagentsAPI` interface
-   and `Symbol.for()` accessors. Consumers depend on the API package, not on
-   the extension itself.
+3. **Typed API boundary** — this package exports a `SubagentsAPI` interface
+   and `Symbol.for()` accessors (`publishSubagentsAPI` /
+   `getSubagentsAPI`). Consumers declare this package as an optional peer
+   dependency and use dynamic import for compile-time types. The runtime
+   bridge is `Symbol.for()` on `globalThis` — no separate API package.
 4. **No scheduling** — in-process scheduling is removed from the core.
    Scheduling is a separate concern that any extension can implement by
    calling `spawn()` on the published API.
@@ -76,14 +77,23 @@ but it is undocumented and untyped.
 ## Target state
 
 ```text
-┌──────────────────────────────────────────────────────┐
-│  @earendil-works/pi-subagents-api  (tiny package)    │
-│                                                      │
-│  SubagentsAPI interface                              │
-│  publishSubagentsAPI() / getSubagentsAPI()           │
-│  SubagentRecord, SubagentStatus, LifetimeUsage types │
-│  Event channel constants                             │
-└────────────────────────┬─────────────────────────────┘
+  ┌────────────────────────────────────────────────────────┐
+  │  @earendil-works/pi-subagents  (this package)          │
+  │                                                        │
+  │  Exports:                                              │
+  │    SubagentsAPI interface                              │
+  │    publishSubagentsAPI() / getSubagentsAPI()           │
+  │    SubagentRecord, SubagentStatus, LifetimeUsage types │
+  │    Event channel constants                             │
+  │                                                        │
+  │  Core:                                                 │
+  │    Agent + get_subagent_result + steer_subagent tools  │
+  │    AgentManager, agent-runner, agent-types             │
+  │    publishSubagentsAPI(impl)  ← called at init         │
+  │                                                        │
+  │  Internal UI (widget, viewer, /agents menu)            │
+  │  ← moves to pi-subagents-ui later                     │
+  └──────────────────────┬─────────────────────────────────┘
                          │ Symbol.for("pi:service:subagents")
                          │
        ┌─────────────────┼──────────────────┐
@@ -97,17 +107,8 @@ but it is undocumented and untyped.
   └─────────┘
        │
        │  getSubagentsAPI()?.spawn(...)
+       │  (optional peer dep + dynamic import for types)
        ▼
-  ┌────────────────────────────────────────────────────┐
-  │  @earendil-works/pi-subagents  (this package)      │
-  │                                                    │
-  │  Core: Agent + get_subagent_result + steer_subagent│
-  │  AgentManager, agent-runner, agent-types           │
-  │  publishSubagentsAPI(impl)  ← called at init      │
-  │                                                    │
-  │  Internal UI (widget, viewer, /agents menu)        │
-  │  ← moves to pi-subagents-ui later                 │
-  └────────────────────────────────────────────────────┘
 ```
 
 ### What the core owns
@@ -155,14 +156,40 @@ to ~5,400 LOC, and `index.ts` shrinks from ~1,894 to ~1,300 LOC.
 
 ## SubagentsAPI
 
-The `@earendil-works/pi-subagents-api` package is a tiny (~100 LOC)
-package that carries:
+The `SubagentsAPI` interface, accessor functions, and serializable types
+are exported directly from this package (`@earendil-works/pi-subagents`).
+No separate API package is needed.
 
-1. The `SubagentsAPI` interface — the typed contract consumers depend on.
-2. `publishSubagentsAPI()` / `getSubagentsAPI()` — `Symbol.for()` +
-   `globalThis` accessors.
-3. Serializable record and event types — no dependency on `AgentSession` or
-   other pi internals.
+Consumers declare this package as an optional peer dependency:
+
+```json
+{
+  "peerDependencies": {
+    "@earendil-works/pi-subagents": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-subagents": { "optional": true }
+  }
+}
+```
+
+At runtime, consumers use dynamic import for type-safe access to the
+accessor functions:
+
+```typescript
+const { getSubagentsAPI } = await import("@earendil-works/pi-subagents");
+const api = getSubagentsAPI();
+if (api) {
+  api.spawn("Explore", "Check for stale TODOs");
+}
+```
+
+Pi's extension loader creates a fresh `jiti` instance per extension with
+`moduleCache: false`, so module-scoped singletons don't survive across
+extensions. The accessor functions use `Symbol.for()` on `globalThis`,
+which is process-global by spec, to bridge this gap. The dynamic import
+provides compile-time types; the `Symbol.for()` key is the actual
+runtime channel.
 
 ### Interface
 
@@ -222,12 +249,9 @@ export function getSubagentsAPI(): SubagentsAPI | undefined {
 }
 ```
 
-Pi's extension loader creates a fresh `jiti` instance per extension with
-`moduleCache: false`, so module-scoped singletons do not survive across
-extensions. `Symbol.for()` on `globalThis` is process-global by spec and
-works regardless of module system — it is the correct mechanism for
-cross-extension service publication until Pi gains a native service
-registry ([earendil-works/pi#4207]).
+If Pi gains a native service registry ([earendil-works/pi#4207]), these
+accessors can be updated to delegate to `pi.registerService()` /
+`pi.getService()` internally while keeping the same consumer API.
 
 ### Lifecycle events
 
@@ -245,13 +269,20 @@ events — no request IDs, no reply channels.
 ### Consumer example: scheduling extension
 
 ```typescript
-import { getSubagentsAPI } from "@earendil-works/pi-subagents-api";
+// package.json:
+// "peerDependencies": { "@earendil-works/pi-subagents": ">=2.0.0" }
+// "peerDependenciesMeta": { "@earendil-works/pi-subagents": { "optional": true } }
 
-// A hypothetical scheduling extension:
 export default function (pi) {
-  pi.on("session_start", (event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
+    let getSubagentsAPI;
+    try {
+      ({ getSubagentsAPI } = await import("@earendil-works/pi-subagents"));
+    } catch {
+      return; // pi-subagents not installed
+    }
     const api = getSubagentsAPI();
-    if (!api) return; // pi-subagents not installed
+    if (!api) return;
 
     setInterval(() => {
       api.spawn("Explore", "Check for stale TODOs", {
@@ -265,13 +296,16 @@ export default function (pi) {
 ### Consumer example: transcript extension
 
 ```typescript
-import { getSubagentsAPI } from "@earendil-works/pi-subagents-api";
-
 export default function (pi) {
-  pi.events.on("subagents:completed", (data) => {
+  pi.events.on("subagents:completed", async (data) => {
     const { id } = data as { id: string };
-    const api = getSubagentsAPI();
-    const record = api?.getRecord(id);
+    let getSubagentsAPI;
+    try {
+      ({ getSubagentsAPI } = await import("@earendil-works/pi-subagents"));
+    } catch {
+      return;
+    }
+    const record = getSubagentsAPI()?.getRecord(id);
     if (record?.result) {
       fs.appendFileSync("agent-log.jsonl", JSON.stringify(record) + "\n");
     }
@@ -302,10 +336,11 @@ rather than closing over module-level state.
 
 ## Phase plan
 
-### Phase 1: Publish `@earendil-works/pi-subagents-api`
+### Phase 1: Export `SubagentsAPI` from this package
 
-Create the API package with the `SubagentsAPI` interface, accessor
-functions, and serializable types. No behavioral changes to the core yet.
+Add the `SubagentsAPI` interface, serializable types, and `Symbol.for()`
+accessor functions as public exports of this package. No behavioral
+changes to the core yet.
 
 ### Phase 2: Remove scheduling
 
