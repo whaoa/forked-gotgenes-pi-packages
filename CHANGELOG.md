@@ -1,5 +1,36 @@
 # Changelog
 
+## [3.0.0](https://github.com/gotgenes/pi-github-tools/compare/v2.0.0...v3.0.0) (2026-05-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* gh(), git(), and ghJson() signatures changed from (...args: string[]) to (args: string[], signal?: AbortSignal). All internal call sites updated.
+
+### Features
+
+* add abort-aware sleep() ([#5](https://github.com/gotgenes/pi-github-tools/issues/5)) ([becfbd8](https://github.com/gotgenes/pi-github-tools/commit/becfbd87bd2e55b43ad81ca7e2eb8892f6d8af52))
+* forward AbortSignal from tool wrappers to lib functions ([#5](https://github.com/gotgenes/pi-github-tools/issues/5)) ([a2316d7](https://github.com/gotgenes/pi-github-tools/commit/a2316d7d4848c54cca9aa4c8893a2955bbd2e5eb))
+* gh/git/ghJson accept AbortSignal via args array ([#5](https://github.com/gotgenes/pi-github-tools/issues/5)) ([cedc0bf](https://github.com/gotgenes/pi-github-tools/commit/cedc0bf464da8233289797ad39f3b0a314a8d939))
+* thread AbortSignal through mergeReleasePR and closeIssue ([#5](https://github.com/gotgenes/pi-github-tools/issues/5)) ([ffcc075](https://github.com/gotgenes/pi-github-tools/commit/ffcc075c81d3d58db06313b01a564830e7e0014e))
+* thread AbortSignal through polling functions ([#5](https://github.com/gotgenes/pi-github-tools/issues/5)) ([e72407d](https://github.com/gotgenes/pi-github-tools/commit/e72407dc9c4f6deb07677ddfec89363f6224b8c2))
+
+
+### Bug Fixes
+
+* clean up abort listener on normal sleep resolve and protect bare git/ghJson calls ([#5](https://github.com/gotgenes/pi-github-tools/issues/5)) ([71f3103](https://github.com/gotgenes/pi-github-tools/commit/71f3103f0937de972a1a63c35706bb75e8d0d1ea))
+
+
+### Documentation
+
+* plan thread AbortSignal through polling chains ([#5](https://github.com/gotgenes/pi-github-tools/issues/5)) ([d97dbeb](https://github.com/gotgenes/pi-github-tools/commit/d97dbebd996b110606a7b4e7488221ec5defb81f))
+
+
+### Miscellaneous Chores
+
+* add plan/build/tdd-issue prompts and code-style/testing/markdown/design-review skills ([2604865](https://github.com/gotgenes/pi-github-tools/commit/260486541337ae25b882ea82f6cb382841f8fa46))
+* configure pi-autoformat commands to use pnpm, add markdownlint ([71ba7bb](https://github.com/gotgenes/pi-github-tools/commit/71ba7bb54e2e09755261ceaf79b845ae0c2c33a3))
+
 ## [2.0.0](https://github.com/gotgenes/pi-github-tools/compare/v1.0.2...v2.0.0) (2026-05-15)
 
 
