@@ -133,6 +133,23 @@ describe("findRun", () => {
     });
     expect(onProgress).toHaveBeenCalled();
   });
+
+  it("returns abort message when signal fires during sleep", async () => {
+    const controller = new AbortController();
+    // First poll: no match
+    mockGhJson([]);
+    // sleep rejects to simulate abort
+    mockSleep.mockRejectedValueOnce(new Error("The operation was aborted."));
+
+    const result = await findRun({
+      workflow: "ci",
+      expectedSha: sha,
+      timeout: 120,
+      signal: controller.signal,
+    });
+    expect(result).toContain("aborted:");
+    expect(result).toContain("cancelled by user");
+  });
 });
 
 describe("watchRun", () => {
@@ -216,6 +233,29 @@ describe("watchRun", () => {
       onProgress,
     });
     expect(onProgress).toHaveBeenCalled();
+  });
+
+  it("returns abort message when signal fires during sleep", async () => {
+    const controller = new AbortController();
+    // First poll: in progress
+    mockGhJson({
+      status: "in_progress",
+      conclusion: null,
+      name: "CI",
+      headSha: "abc1234",
+      jobs: [{ name: "build", status: "in_progress", conclusion: null }],
+    });
+    // sleep rejects to simulate abort
+    mockSleep.mockRejectedValueOnce(new Error("The operation was aborted."));
+
+    const result = await watchRun({
+      workflow: "ci",
+      runId: 100,
+      timeout: 300,
+      signal: controller.signal,
+    });
+    expect(result).toContain("aborted:");
+    expect(result).toContain("cancelled by user");
   });
 });
 

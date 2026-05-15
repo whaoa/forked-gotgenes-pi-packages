@@ -72,6 +72,7 @@ export interface FindRunArgs {
   expectedSha: string;
   timeout?: number;
   onProgress?: (line: string) => void;
+  signal?: AbortSignal;
 }
 
 export async function findRun(args: FindRunArgs): Promise<string> {
@@ -79,6 +80,7 @@ export async function findRun(args: FindRunArgs): Promise<string> {
   const expectedSha = args.expectedSha;
   const timeout = args.timeout ?? 120;
   const onProgress = args.onProgress;
+  const signal = args.signal;
 
   const shortExpected = expectedSha.substring(0, 7);
   let elapsed = 0;
@@ -88,9 +90,25 @@ export async function findRun(args: FindRunArgs): Promise<string> {
   while (true) {
     attempt++;
 
+    if (signal?.aborted) {
+      return [
+        "aborted: cancelled by user",
+        `  retries: ${attempt}`,
+        `  elapsed: ${elapsed}s`,
+      ].join("\n");
+    }
+
     const delay = findRetryDelay(attempt);
     if (delay > 0) {
-      await sleep(delay * 1000);
+      try {
+        await sleep(delay * 1000, signal);
+      } catch {
+        return [
+          "aborted: cancelled by user",
+          `  retries: ${attempt}`,
+          `  elapsed: ${elapsed}s`,
+        ].join("\n");
+      }
       elapsed += delay;
     }
 
@@ -100,16 +118,28 @@ export async function findRun(args: FindRunArgs): Promise<string> {
       );
     }
 
-    const runs = await ghJson<RunSummary[]>([
-      "run",
-      "list",
-      "--limit",
-      "5",
-      "--workflow",
-      workflowFile,
-      "--json",
-      "databaseId,url,status,conclusion,headSha,displayTitle,name",
-    ]);
+    let runs: RunSummary[];
+    try {
+      runs = await ghJson<RunSummary[]>(
+        [
+          "run",
+          "list",
+          "--limit",
+          "5",
+          "--workflow",
+          workflowFile,
+          "--json",
+          "databaseId,url,status,conclusion,headSha,displayTitle,name",
+        ],
+        signal,
+      );
+    } catch {
+      return [
+        "aborted: cancelled by user",
+        `  retries: ${attempt}`,
+        `  elapsed: ${elapsed}s`,
+      ].join("\n");
+    }
 
     if (runs.length > 0) {
       lastSeenRun = runs[0];
@@ -117,13 +147,10 @@ export async function findRun(args: FindRunArgs): Promise<string> {
 
     const matchingRun = runs.find((r) => r.headSha === expectedSha);
     if (matchingRun) {
-      const { jobs } = await ghJson<RunJobs>([
-        "run",
-        "view",
-        String(matchingRun.databaseId),
-        "--json",
-        "jobs",
-      ]);
+      const { jobs } = await ghJson<RunJobs>(
+        ["run", "view", String(matchingRun.databaseId), "--json", "jobs"],
+        signal,
+      );
       return formatFind(matchingRun, jobs);
     }
 
@@ -148,25 +175,47 @@ export interface WatchRunArgs {
   runId: number;
   timeout?: number;
   onProgress?: (line: string) => void;
+  signal?: AbortSignal;
 }
 
 export async function watchRun(args: WatchRunArgs): Promise<string> {
   const runId = args.runId;
   const timeout = args.timeout ?? 300;
   const onProgress = args.onProgress;
+  const signal = args.signal;
 
   const pollInterval = 15;
   let elapsed = 0;
   const progressLog: string[] = [];
 
   while (true) {
-    const run = await ghJson<WatchPoll>([
-      "run",
-      "view",
-      String(runId),
-      "--json",
-      "status,conclusion,name,headSha,jobs",
-    ]);
+    if (signal?.aborted) {
+      return [
+        "aborted: cancelled by user",
+        `  elapsed: ${elapsed}s`,
+        `  run_id: ${runId}`,
+      ].join("\n");
+    }
+
+    let run: WatchPoll;
+    try {
+      run = await ghJson<WatchPoll>(
+        [
+          "run",
+          "view",
+          String(runId),
+          "--json",
+          "status,conclusion,name,headSha,jobs",
+        ],
+        signal,
+      );
+    } catch {
+      return [
+        "aborted: cancelled by user",
+        `  elapsed: ${elapsed}s`,
+        `  run_id: ${runId}`,
+      ].join("\n");
+    }
 
     const progressLine = formatProgress(run.jobs, elapsed);
     progressLog.push(progressLine);
@@ -185,7 +234,15 @@ export async function watchRun(args: WatchRunArgs): Promise<string> {
       return [...progressLog, timeoutLine].join("\n");
     }
 
-    await sleep(pollInterval * 1000);
+    try {
+      await sleep(pollInterval * 1000, signal);
+    } catch {
+      return [
+        "aborted: cancelled by user",
+        `  elapsed: ${elapsed}s`,
+        `  run_id: ${runId}`,
+      ].join("\n");
+    }
     elapsed += pollInterval;
   }
 }

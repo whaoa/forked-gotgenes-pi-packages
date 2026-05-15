@@ -40,11 +40,13 @@ export interface ToolResult {
 export interface FindReleasePRArgs {
   timeout?: number;
   onProgress?: (line: string) => void;
+  signal?: AbortSignal;
 }
 
 export async function findReleasePR(args: FindReleasePRArgs): Promise<string> {
   const timeout = args.timeout ?? 120;
   const onProgress = args.onProgress;
+  const signal = args.signal;
 
   let elapsed = 0;
   let attempt = 0;
@@ -52,9 +54,25 @@ export async function findReleasePR(args: FindReleasePRArgs): Promise<string> {
   while (true) {
     attempt++;
 
+    if (signal?.aborted) {
+      return [
+        "aborted: cancelled by user",
+        `  retries: ${attempt}`,
+        `  elapsed: ${elapsed}s`,
+      ].join("\n");
+    }
+
     const delay = findRetryDelay(attempt);
     if (delay > 0) {
-      await sleep(delay * 1000);
+      try {
+        await sleep(delay * 1000, signal);
+      } catch {
+        return [
+          "aborted: cancelled by user",
+          `  retries: ${attempt}`,
+          `  elapsed: ${elapsed}s`,
+        ].join("\n");
+      }
       elapsed += delay;
     }
 
@@ -64,16 +82,28 @@ export async function findReleasePR(args: FindReleasePRArgs): Promise<string> {
       );
     }
 
-    const prs = await ghJson<ReleasePR[]>([
-      "pr",
-      "list",
-      "--label",
-      "autorelease: pending",
-      "--json",
-      "number,title,headRefName,url,mergeable,mergeStateStatus",
-      "--limit",
-      "5",
-    ]);
+    let prs: ReleasePR[];
+    try {
+      prs = await ghJson<ReleasePR[]>(
+        [
+          "pr",
+          "list",
+          "--label",
+          "autorelease: pending",
+          "--json",
+          "number,title,headRefName,url,mergeable,mergeStateStatus",
+          "--limit",
+          "5",
+        ],
+        signal,
+      );
+    } catch {
+      return [
+        "aborted: cancelled by user",
+        `  retries: ${attempt}`,
+        `  elapsed: ${elapsed}s`,
+      ].join("\n");
+    }
 
     if (prs.length > 0) {
       const pr = prs[0];
@@ -151,18 +181,32 @@ export async function mergeReleasePR(
 export interface WatchReleaseArgs {
   timeout?: number;
   onProgress?: (line: string) => void;
+  signal?: AbortSignal;
 }
 
 export async function watchRelease(args: WatchReleaseArgs): Promise<string> {
   const timeout = args.timeout ?? 180;
   const onProgress = args.onProgress;
+  const signal = args.signal;
 
   const pollInterval = 10;
   let elapsed = 0;
 
   while (true) {
-    await git(["fetch", "--tags"]);
-    const tagOutput = await git(["tag", "--points-at", "HEAD"]);
+    if (signal?.aborted) {
+      return ["aborted: cancelled by user", `  elapsed: ${elapsed}s`].join(
+        "\n",
+      );
+    }
+
+    try {
+      await git(["fetch", "--tags"], signal);
+    } catch {
+      return ["aborted: cancelled by user", `  elapsed: ${elapsed}s`].join(
+        "\n",
+      );
+    }
+    const tagOutput = await git(["tag", "--points-at", "HEAD"], signal);
     const tags = tagOutput
       .split("\n")
       .map((t) => t.trim())
@@ -170,7 +214,7 @@ export async function watchRelease(args: WatchReleaseArgs): Promise<string> {
 
     if (tags.length > 0) {
       const tag = tags[tags.length - 1]; // most recent tag
-      const headSha = await git(["rev-parse", "HEAD"]);
+      const headSha = await git(["rev-parse", "HEAD"], signal);
       return [
         `tag: ${tag}`,
         `version: ${tag.replace(/^v/, "")}`,
@@ -190,7 +234,13 @@ export async function watchRelease(args: WatchReleaseArgs): Promise<string> {
       onProgress(`waiting for release tag... (${elapsed}s elapsed)`);
     }
 
-    await sleep(pollInterval * 1000);
+    try {
+      await sleep(pollInterval * 1000, signal);
+    } catch {
+      return ["aborted: cancelled by user", `  elapsed: ${elapsed}s`].join(
+        "\n",
+      );
+    }
     elapsed += pollInterval;
   }
 }

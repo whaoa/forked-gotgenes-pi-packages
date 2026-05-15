@@ -70,6 +70,19 @@ describe("findReleasePR", () => {
     await findReleasePR({ timeout: 5, onProgress });
     expect(onProgress).toHaveBeenCalled();
   });
+
+  it("returns abort message when signal fires during sleep", async () => {
+    const controller = new AbortController();
+    mockGhJson([]);
+    mockSleep.mockRejectedValueOnce(new Error("The operation was aborted."));
+
+    const result = await findReleasePR({
+      timeout: 120,
+      signal: controller.signal,
+    });
+    expect(result).toContain("aborted:");
+    expect(result).toContain("cancelled by user");
+  });
 });
 
 describe("mergeReleasePR", () => {
@@ -205,5 +218,22 @@ describe("watchRelease", () => {
 
     const result = await watchRelease({ timeout: 0 });
     expect(result).toContain("timeout:");
+  });
+
+  it("returns abort message when signal fires during sleep", async () => {
+    const controller = new AbortController();
+    // git fetch --tags
+    mockCmd("");
+    // No tags
+    mockCmd("\n");
+    // sleep rejects to simulate abort
+    mockSleep.mockRejectedValueOnce(new Error("The operation was aborted."));
+
+    const result = await watchRelease({
+      timeout: 180,
+      signal: controller.signal,
+    });
+    expect(result).toContain("aborted:");
+    expect(result).toContain("cancelled by user");
   });
 });
