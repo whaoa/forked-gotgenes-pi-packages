@@ -1,6 +1,6 @@
 # Migration Guide
 
-How to migrate the 6 independent pi package repos into this pnpm workspace monorepo using `git subtree` to preserve full commit history.
+How to migrate the independent pi package repos into this pnpm workspace monorepo using `git subtree` to preserve full commit history.
 
 ## 1. Initialize the monorepo
 
@@ -18,14 +18,8 @@ The original commit metadata (author, date, message) is preserved.
 A merge commit ties each import into the monorepo.
 
 ```bash
-git subtree add --prefix=packages/pi-anthropic-auth \
-  https://github.com/gotgenes/pi-anthropic-auth.git main
-
 git subtree add --prefix=packages/pi-autoformat \
   https://github.com/gotgenes/pi-autoformat.git main
-
-git subtree add --prefix=packages/pi-coding-agent-catppuccin \
-  https://github.com/otahontas/pi-coding-agent-catppuccin.git main
 
 git subtree add --prefix=packages/pi-github-tools \
   https://github.com/gotgenes/pi-github-tools.git main
@@ -40,10 +34,6 @@ git subtree add --prefix=packages/pi-subagents \
 > **Note on interweaved history:** After import, `git log` shows commits from all packages mixed together chronologically.
 > Use `git log packages/pi-foo/` to see only one package's history.
 > This is cosmetic — there are no functional issues.
->
-> **Note on catppuccin:** pi-coding-agent-catppuccin is a fork from `otahontas`.
-> If you want to import from your own fork instead, change the URL.
-> The `main` ref may need to be `chore/catppuccin-text-cohesion` or whatever branch you want as the starting point.
 
 ## 3. Clean up per-package files replaced by root
 
@@ -61,81 +51,79 @@ for pkg in packages/*/; do
   # CI workflows replaced by monorepo workflow
   rm -rf "$pkg/.github"
 
-  # markdownlint — root config covers most packages
-  # (pi-subagents keeps its own since it also ignores README.md)
-  if [ "$(basename "$pkg")" != "pi-subagents" ]; then
-    rm -f "$pkg/.markdownlint-cli2.yaml"
-  fi
+  # markdownlint — root config covers all packages
+  rm -f "$pkg/.markdownlint-cli2.yaml"
 
   # .gitignore — root covers common patterns
-  # Review each to see if package-specific entries are needed
   rm -f "$pkg/.gitignore"
 done
 ```
 
 ## 4. Update each package's tsconfig.json
 
-Extend the shared base.
-Example for `packages/pi-autoformat/tsconfig.json`:
+All packages extend a shared `tsconfig.base.json` with unified settings:
+
+- **ES2023** target (Node ≥ 20)
+- **Bundler** module resolution (no `.js` extensions required in imports)
+- **strict: true** everywhere
+- **noEmit: true** (Pi loads TypeScript source directly — no build step)
+
+A typical package tsconfig only specifies its includes:
 
 ```json
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "types": ["node", "vitest/globals"]
-  },
-  "include": ["src", "test", "vitest.config.ts"]
+  "include": ["src", "test"]
 }
 ```
 
-Each package only needs to specify what differs from `tsconfig.base.json`.
+Packages that had `.js` extensions in relative imports (pi-autoformat, pi-anthropic-auth) had them stripped when switching to Bundler resolution.
 
 ## 5. Update biome configs
 
-Most packages can delete their `biome.json` entirely — the root config applies.
+Most packages delete their `biome.json` entirely — the root config applies via Biome's automatic parent directory discovery.
 
-Packages that need overrides (e.g. pi-subagents disables the formatter) keep a thin config:
+Packages that need overrides use the Biome v2 monorepo `"extends": "//"` syntax to inherit from root:
 
 ```json
 {
   "$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
-  "extends": ["../../biome.json"],
+  "extends": "//",
   "formatter": {
     "enabled": false
-  },
-  "files": {
-    "includes": ["src/**/*.ts", "test/**/*.ts"]
   }
 }
 ```
 
+The `"extends": "//"` microsyntax tells Biome to extend from the root configuration and implicitly sets `"root": false`.
+
 ## 6. Standardize package.json scripts
 
-Use these standardized scripts in each TypeScript package:
+Each package has these standardized scripts:
 
 ```json
 {
   "scripts": {
-    "build": "tsc",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint:md": "markdownlint-cli2 '*.md' 'docs/**/*.md'"
+    "lint": "biome check . && pnpm run lint:md",
+    "lint:md": "markdownlint-cli2 --config ../../.markdownlint-cli2.yaml '*.md' 'docs/**/*.md'"
   }
 }
 ```
 
-Biome linting is handled at the workspace root — packages don't need their own `lint` script for JS/TS/JSON.
-Only `lint:md` stays per-package since markdown file paths vary.
+**No `build` script** — Pi loads TypeScript source directly, so no package needs to emit JS.
+
+**`lint` and `lint:md` stay per-package** — linting is fast feedback for both agents and humans and should be available from the package working directory.
+The `--config` flag is necessary because markdownlint-cli2 doesn't walk above CWD to find config files.
 
 Remove `packageManager` from each package's `package.json` — it's set at the workspace root.
 
-## 7. Use pnpm catalog versions (optional)
+## 7. Use pnpm catalog versions
 
 `pnpm-workspace.yaml` defines a `catalog` for common devDependency versions.
-In each package's `package.json`, you can use:
+In each package's `package.json`, use `"catalog:"` as the version specifier:
 
 ```json
 {
@@ -155,7 +143,7 @@ Update once in the workspace file, all packages follow.
 
 ```bash
 pnpm install
-pnpm run build
+pnpm run check
 pnpm run lint
 pnpm run test
 ```
@@ -169,9 +157,20 @@ git commit -m "chore: consolidate configs into monorepo root"
 
 ## 10. Push and configure GitHub
 
-1. Create the `pi-packages` repo on GitHub.
-2. Push: `git remote add origin <url> && git push -u origin main`
-3. Add `NPM_TOKEN` to the repo's Actions secrets.
+1. Create the `pi-packages` repo on GitHub: `gh repo create gotgenes/pi-packages --public`
+2. Configure repo settings (Settings → Actions → General → Workflow permissions):
+   - Read and write permissions
+   - Allow GitHub Actions to create and approve pull requests
+3. Configure npm trusted publishing — for each package on npmjs.com, add a trusted publisher:
+   - Repository owner: `gotgenes`
+   - Repository: `pi-packages`
+   - Workflow filename: `ci.yml`
+   - Environment: *(leave blank)*
+4. Push: `git remote add origin <url> && git push -u origin main`
+
+Publishing uses OIDC provenance (no `NPM_TOKEN` secret needed).
+The `--provenance` flag attaches a signed build attestation to each publish.
+See `scripts/publish-released.sh` for the publish logic.
 
 ## 11. Migrate GitHub Issues
 
@@ -199,15 +198,12 @@ The script:
 2. Transfers each issue via `gh issue transfer`.
 3. Applies the package label to each transferred issue.
 
-> **Note:** Issues from `otahontas/pi-coding-agent-catppuccin` can only be transferred if you have admin access to that repo, or if the issue author transfers them.
-> You may need to re-create those manually.
-
 ## 12. Archive original repos
 
 After migration, archive the original repos to prevent new issues from being filed there:
 
 ```bash
-for repo in pi-anthropic-auth pi-autoformat pi-github-tools pi-permission-system pi-subagents; do
+for repo in pi-autoformat pi-github-tools pi-permission-system pi-subagents; do
   gh repo edit "gotgenes/$repo" --description "Moved to gotgenes/pi-packages"
   gh repo archive "gotgenes/$repo" --yes
 done
@@ -217,7 +213,7 @@ Archived repos remain readable (git history, old issues) but disallow new issues
 
 ## 13. Consolidate .pi/settings.json with self-providing pattern
 
-Each package currently has its own `.pi/settings.json` that references `npm:@gotgenes/pi-github-tools` and other packages.
+Each package previously had its own `.pi/settings.json` that referenced `npm:@gotgenes/pi-github-tools` and other packages.
 In the monorepo, a single root `.pi/settings.json` replaces all of them.
 
 Use the **self-providing pattern** to load local extensions while suppressing global npm duplicates.
@@ -229,14 +225,11 @@ Pi deduplicates by identity — npm package name and local absolute path are dif
     "./packages/pi-github-tools",
     "./packages/pi-autoformat",
     "./packages/pi-permission-system",
-    "./packages/pi-anthropic-auth",
     "./packages/pi-subagents",
-    "~/development/pi/pi-coding-agent-catppuccin",
 
     { "source": "npm:@gotgenes/pi-github-tools", "extensions": [] },
     { "source": "npm:@gotgenes/pi-autoformat", "extensions": [] },
     { "source": "npm:@gotgenes/pi-permission-system", "extensions": [] },
-    { "source": "npm:@gotgenes/pi-anthropic-auth", "extensions": [] },
     { "source": "npm:@gotgenes/pi-subagents", "extensions": [] },
 
     "npm:pi-prompt-template-model",
@@ -250,11 +243,11 @@ Pi deduplicates by identity — npm package name and local absolute path are dif
 - **npm entries with `"extensions": []`** claim the npm identity so global installs are suppressed (project entry wins dedup).
 - **Third-party packages** (`pi-prompt-template-model`, etc.) have no local counterpart, so they load normally.
 
-After setting up the root `.pi/settings.json`, delete the per-package `.pi/settings.json` files (or trim them to package-specific overrides only).
+After setting up the root `.pi/settings.json`, delete the per-package `.pi/settings.json` files.
 
 ## 14. Extract common AGENTS.md, skills, and prompt templates
 
-After the subtree imports, diff the AGENTS.md files and `.pi/` directories across packages to identify shared content.
+Diff the AGENTS.md files and `.pi/` directories across packages to identify shared content.
 
 **AGENTS.md:** Extract common instructions (coding standards, commit conventions, PR workflow, etc.) into a root `AGENTS.md`.
 Each package keeps a thin `AGENTS.md` with package-specific context only.
@@ -283,9 +276,9 @@ This step is best done in a new session inside the monorepo, with all package fi
 
 ## What each package keeps
 
-- `package.json` (simplified — no `packageManager`, can use `catalog:`)
+- `package.json` (simplified — no `packageManager`, uses `catalog:`)
 - `tsconfig.json` (extending `../../tsconfig.base.json`)
-- `biome.json` (only if overriding root — pi-subagents)
+- `biome.json` (only if overriding root — e.g. pi-subagents)
 - `README.md`, `CHANGELOG.md`, `LICENSE`
 - `AGENTS.md`
 - `src/`, `test/`, `docs/`
