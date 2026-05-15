@@ -132,20 +132,25 @@ export async function findReleasePR(args: FindReleasePRArgs): Promise<string> {
 export interface MergeReleasePRArgs {
   prNumber: number;
   method?: MergeMethod;
+  signal?: AbortSignal;
 }
 
 export async function mergeReleasePR(
   args: MergeReleasePRArgs,
 ): Promise<ToolResult> {
   const prNumber = args.prNumber;
+  const signal = args.signal;
 
-  const pr = await ghJson<PRState>([
-    "pr",
-    "view",
-    String(prNumber),
-    "--json",
-    "number,title,mergeable,mergeStateStatus",
-  ]);
+  const pr = await ghJson<PRState>(
+    [
+      "pr",
+      "view",
+      String(prNumber),
+      "--json",
+      "number,title,mergeable,mergeStateStatus",
+    ],
+    signal,
+  );
 
   if (pr.mergeable !== "MERGEABLE" || pr.mergeStateStatus !== "CLEAN") {
     return {
@@ -160,11 +165,11 @@ export async function mergeReleasePR(
   }
 
   const method = args.method ?? "merge";
-  await gh(["pr", "merge", String(prNumber), `--${method}`]);
+  await gh(["pr", "merge", String(prNumber), `--${method}`], signal);
 
-  await git(["pull", "--ff-only"]);
+  await git(["pull", "--ff-only"], signal);
 
-  const headSha = await git(["rev-parse", "HEAD"]);
+  const headSha = await git(["rev-parse", "HEAD"], signal);
 
   return {
     content: [

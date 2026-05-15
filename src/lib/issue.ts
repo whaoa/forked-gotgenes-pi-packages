@@ -9,6 +9,7 @@ export interface CloseIssueArgs {
   issueNumber: number;
   reason?: string;
   comment?: string;
+  signal?: AbortSignal;
 }
 
 export async function closeIssue(args: CloseIssueArgs): Promise<string> {
@@ -39,7 +40,7 @@ export async function closeIssue(args: CloseIssueArgs): Promise<string> {
     closeArgs.push("--comment", args.comment);
   }
 
-  await gh(closeArgs);
+  await gh(closeArgs, args.signal);
 
   return `Closed issue #${args.issueNumber} (reason: ${reason})`;
 }

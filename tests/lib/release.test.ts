@@ -167,6 +167,33 @@ describe("mergeReleasePR", () => {
     expect(result.isError).toBe(true);
     expect(result.content).toContain("not mergeable");
   });
+
+  it("threads signal to gh and git calls", async () => {
+    setupMergeMocks();
+    const controller = new AbortController();
+    await mergeReleasePR({ prNumber: 42, signal: controller.signal });
+    expect(mockRunCommand).toHaveBeenNthCalledWith(1, {
+      cmd: "gh",
+      args: [
+        "pr",
+        "view",
+        "42",
+        "--json",
+        "number,title,mergeable,mergeStateStatus",
+      ],
+      signal: controller.signal,
+    });
+    expect(mockRunCommand).toHaveBeenNthCalledWith(2, {
+      cmd: "gh",
+      args: ["pr", "merge", "42", "--merge"],
+      signal: controller.signal,
+    });
+    expect(mockRunCommand).toHaveBeenNthCalledWith(3, {
+      cmd: "git",
+      args: ["pull", "--ff-only"],
+      signal: controller.signal,
+    });
+  });
 });
 
 describe("watchRelease", () => {

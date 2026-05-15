@@ -65,4 +65,15 @@ describe("closeIssue", () => {
       closeIssue({ issueNumber: 42, reason: "invalid" }),
     ).rejects.toThrow(/Invalid reason/);
   });
+
+  it("threads signal to gh call", async () => {
+    mockGh();
+    const controller = new AbortController();
+    await closeIssue({ issueNumber: 42, signal: controller.signal });
+    expect(mockRunCommand).toHaveBeenCalledWith({
+      cmd: "gh",
+      args: ["issue", "close", "42", "--reason", "completed"],
+      signal: controller.signal,
+    });
+  });
 });
