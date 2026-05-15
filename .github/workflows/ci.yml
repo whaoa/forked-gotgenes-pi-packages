@@ -37,11 +37,7 @@ jobs:
       pull-requests: write
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
-      pi-anthropic-auth: ${{ steps.release.outputs['packages/pi-anthropic-auth--release_created'] }}
-      pi-autoformat: ${{ steps.release.outputs['packages/pi-autoformat--release_created'] }}
-      pi-github-tools: ${{ steps.release.outputs['packages/pi-github-tools--release_created'] }}
-      pi-permission-system: ${{ steps.release.outputs['packages/pi-permission-system--release_created'] }}
-      pi-subagents: ${{ steps.release.outputs['packages/pi-subagents--release_created'] }}
+      releases: ${{ toJSON(steps.release.outputs) }}
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
@@ -69,22 +65,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Publish pi-anthropic-auth
-        if: needs.release-please.outputs.pi-anthropic-auth == 'true'
-        run: pnpm --filter @gotgenes/pi-anthropic-auth publish --access public --no-git-checks --provenance
+      - name: Publish released packages
+        env:
+          RELEASES: ${{ needs.release-please.outputs.releases }}
+        run: |
+          publish_if_released() {
+            local path="$1" filter="$2"
+            if [ "$(echo "$RELEASES" | jq -r ".\"${path}--release_created\" // \"false\"")" = "true" ]; then
+              echo "::group::Publishing $filter"
+              pnpm --filter "$filter" publish --access public --no-git-checks --provenance
+              echo "::endgroup::"
+            fi
+          }
 
-      - name: Publish pi-autoformat
-        if: needs.release-please.outputs.pi-autoformat == 'true'
-        run: pnpm --filter @gotgenes/pi-autoformat publish --access public --no-git-checks --provenance
-
-      - name: Publish pi-github-tools
-        if: needs.release-please.outputs.pi-github-tools == 'true'
-        run: pnpm --filter @gotgenes/pi-github-tools publish --access public --no-git-checks --provenance
-
-      - name: Publish pi-permission-system
-        if: needs.release-please.outputs.pi-permission-system == 'true'
-        run: pnpm --filter @gotgenes/pi-permission-system publish --access public --no-git-checks --provenance
-
-      - name: Publish pi-subagents
-        if: needs.release-please.outputs.pi-subagents == 'true'
-        run: pnpm --filter @gotgenes/pi-subagents publish --access public --no-git-checks --provenance
+          publish_if_released "packages/pi-anthropic-auth" "@gotgenes/pi-anthropic-auth"
+          publish_if_released "packages/pi-autoformat" "@gotgenes/pi-autoformat"
+          publish_if_released "packages/pi-github-tools" "@gotgenes/pi-github-tools"
+          publish_if_released "packages/pi-permission-system" "@gotgenes/pi-permission-system"
+          publish_if_released "packages/pi-subagents" "@gotgenes/pi-subagents"
