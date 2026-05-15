@@ -22,10 +22,11 @@ export function registerReleasePrFind(pi: ExtensionAPI): void {
         }),
       ),
     }),
-    async execute(_toolCallId, params, _signal, onUpdate) {
+    async execute(_toolCallId, params, signal, onUpdate) {
       try {
         const content = await findReleasePR({
           timeout: params.timeout,
+          signal,
           onProgress: createProgressCallback(onUpdate),
         });
         return ok(content);

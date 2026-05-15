@@ -30,12 +30,13 @@ export function registerCiWatch(pi: ExtensionAPI): void {
         }),
       ),
     }),
-    async execute(_toolCallId, params, _signal, onUpdate) {
+    async execute(_toolCallId, params, signal, onUpdate) {
       try {
         const content = await watchRun({
           workflow: params.workflow,
           runId: params.run_id,
           timeout: params.timeout,
+          signal,
           onProgress: createProgressCallback(onUpdate),
         });
         return ok(content);

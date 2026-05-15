@@ -31,12 +31,13 @@ export function registerCiFind(pi: ExtensionAPI): void {
         }),
       ),
     }),
-    async execute(_toolCallId, params, _signal, onUpdate) {
+    async execute(_toolCallId, params, signal, onUpdate) {
       try {
         const content = await findRun({
           workflow: params.workflow,
           expectedSha: params.expected_sha,
           timeout: params.timeout,
+          signal,
           onProgress: createProgressCallback(onUpdate),
         });
         return ok(content);

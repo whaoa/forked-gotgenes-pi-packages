@@ -38,7 +38,7 @@ export function registerReleasePrMerge(pi: ExtensionAPI): void {
         ),
       ),
     }),
-    async execute(_toolCallId, params) {
+    async execute(_toolCallId, params, signal) {
       try {
         const config = loadConfig({
           globalConfigPath: getGlobalConfigPath(
@@ -51,6 +51,7 @@ export function registerReleasePrMerge(pi: ExtensionAPI): void {
           method: (params.method ?? config.defaultMergeMethod) as
             | MergeMethod
             | undefined,
+          signal,
         });
         return result.isError ? err(result.content) : ok(result.content);
       } catch (e) {

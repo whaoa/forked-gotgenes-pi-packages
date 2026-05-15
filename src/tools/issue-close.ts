@@ -27,12 +27,13 @@ export function registerIssueClose(pi: ExtensionAPI): void {
         }),
       ),
     }),
-    async execute(_toolCallId, params) {
+    async execute(_toolCallId, params, signal) {
       try {
         const content = await closeIssue({
           issueNumber: params.issue_number,
           comment: params.comment,
           reason: params.reason,
+          signal,
         });
         return ok(content);
       } catch (e) {
