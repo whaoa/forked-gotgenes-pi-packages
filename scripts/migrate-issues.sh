@@ -23,9 +23,7 @@ set -euo pipefail
 DEST_REPO="gotgenes/pi-packages"  # Change if different
 
 REPOS=(
-  "gotgenes/pi-anthropic-auth"
   "gotgenes/pi-autoformat"
-  "otahontas/pi-coding-agent-catppuccin"
   "gotgenes/pi-github-tools"
   "gotgenes/pi-permission-system"
   "gotgenes/pi-subagents"
