@@ -1,9 +1,9 @@
 {
   "packages": [
-    "./packages/pi-github-tools",
-    "./packages/pi-autoformat",
-    "./packages/pi-permission-system",
-    "./packages/pi-subagents",
+    "../packages/pi-github-tools",
+    "../packages/pi-autoformat",
+    "../packages/pi-permission-system",
+    "../packages/pi-subagents",
 
     { "source": "npm:@gotgenes/pi-github-tools", "extensions": [] },
     { "source": "npm:@gotgenes/pi-autoformat", "extensions": [] },
