@@ -55,8 +55,6 @@ export interface AgentConfig {
   source?: "default" | "project" | "global";
 }
 
-export type JoinMode = 'async' | 'group' | 'smart';
-
 export interface AgentRecord {
   id: string;
   type: SubagentType;
@@ -70,8 +68,6 @@ export interface AgentRecord {
   session?: AgentSession;
   abortController?: AbortController;
   promise?: Promise<string>;
-  groupId?: string;
-  joinMode?: JoinMode;
   /** Set when result was already consumed via get_subagent_result — suppresses completion notification. */
   resultConsumed?: boolean;
   /** Steering messages queued before the session was ready. */
@@ -122,8 +118,7 @@ export interface NotificationDetails {
   outputFile?: string;
   error?: string;
   resultPreview: string;
-  /** Additional agents in a group notification. */
-  others?: NotificationDetails[];
+
 }
 
 export interface EnvInfo {

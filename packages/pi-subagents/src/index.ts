@@ -244,8 +244,7 @@ export default function (pi: ExtensionAPI) {
         return line;
       }
 
-      const all = [d, ...(d.others ?? [])];
-      return new Text(all.map(renderOne).join("\n"), 0, 0);
+      return new Text(renderOne(d), 0, 0);
     }
   );
 
