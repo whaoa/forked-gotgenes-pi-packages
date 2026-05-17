@@ -76,24 +76,31 @@ export function createSubagentsService(deps: AdapterDeps): SubagentsService {
       return manager.listAgents().map(toSubagentRecord);
     },
 
-    abort(_id: string): boolean {
-      // TODO: implement in step 5
-      throw new Error("Not implemented");
+    abort(id: string): boolean {
+      return manager.abort(id);
     },
 
-    async steer(_id: string, _message: string): Promise<boolean> {
-      // TODO: implement in step 5
-      throw new Error("Not implemented");
+    async steer(id: string, message: string): Promise<boolean> {
+      const record = manager.getRecord(id);
+      if (!record || record.status !== "running") {
+        return false;
+      }
+      if (!record.session) {
+        // Session not ready yet — queue for delivery once initialized
+        if (!record.pendingSteers) record.pendingSteers = [];
+        record.pendingSteers.push(message);
+        return true;
+      }
+      await record.session.steer(message);
+      return true;
     },
 
     async waitForAll(): Promise<void> {
-      // TODO: implement in step 5
-      throw new Error("Not implemented");
+      return manager.waitForAll();
     },
 
     hasRunning(): boolean {
-      // TODO: implement in step 5
-      throw new Error("Not implemented");
+      return manager.hasRunning();
     },
   };
 }

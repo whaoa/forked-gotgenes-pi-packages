@@ -293,3 +293,104 @@ describe("createSubagentsService — spawn", () => {
     expect(deps.resolveModel).not.toHaveBeenCalled();
   });
 });
+
+describe("createSubagentsService — steer, abort, waitForAll, hasRunning", () => {
+  function createDeps(overrides: Partial<AdapterDeps> = {}): AdapterDeps {
+    return {
+      manager: {
+        spawn: vi.fn(() => "id"),
+        getRecord: vi.fn(),
+        listAgents: vi.fn(() => []),
+        abort: vi.fn(() => true),
+        waitForAll: vi.fn(async () => {}),
+        hasRunning: vi.fn(() => true),
+      },
+      resolveModel: vi.fn(),
+      getCtx: () => ({ pi: {}, ctx: {} }),
+      getModelRegistry: () => ({ find: () => null, getAll: () => [] }),
+      ...overrides,
+    };
+  }
+
+  describe("abort", () => {
+    it("delegates to manager.abort and returns its result", () => {
+      const deps = createDeps();
+      const svc = createSubagentsService(deps);
+      const result = svc.abort("agent-1");
+      expect(deps.manager.abort).toHaveBeenCalledWith("agent-1");
+      expect(result).toBe(true);
+    });
+
+    it("returns false when manager returns false", () => {
+      const deps = createDeps();
+      (deps.manager.abort as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      const svc = createSubagentsService(deps);
+      expect(svc.abort("unknown")).toBe(false);
+    });
+  });
+
+  describe("waitForAll", () => {
+    it("delegates to manager.waitForAll", async () => {
+      const deps = createDeps();
+      const svc = createSubagentsService(deps);
+      await svc.waitForAll();
+      expect(deps.manager.waitForAll).toHaveBeenCalled();
+    });
+  });
+
+  describe("hasRunning", () => {
+    it("delegates to manager.hasRunning", () => {
+      const deps = createDeps();
+      const svc = createSubagentsService(deps);
+      expect(svc.hasRunning()).toBe(true);
+      expect(deps.manager.hasRunning).toHaveBeenCalled();
+    });
+  });
+
+  describe("steer", () => {
+    it("returns false for non-running agent", async () => {
+      const deps = createDeps();
+      (deps.manager.getRecord as ReturnType<typeof vi.fn>).mockReturnValue({
+        id: "a-1",
+        status: "completed",
+      });
+      const svc = createSubagentsService(deps);
+      expect(await svc.steer("a-1", "hurry")).toBe(false);
+    });
+
+    it("returns false for unknown agent", async () => {
+      const deps = createDeps();
+      (deps.manager.getRecord as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+      const svc = createSubagentsService(deps);
+      expect(await svc.steer("unknown", "hurry")).toBe(false);
+    });
+
+    it("queues message and returns true when session not ready", async () => {
+      const record: Partial<AgentRecord> = {
+        id: "a-1",
+        status: "running",
+        session: undefined,
+        pendingSteers: undefined,
+      };
+      const deps = createDeps();
+      (deps.manager.getRecord as ReturnType<typeof vi.fn>).mockReturnValue(record);
+      const svc = createSubagentsService(deps);
+      expect(await svc.steer("a-1", "do this")).toBe(true);
+      expect(record.pendingSteers).toEqual(["do this"]);
+    });
+
+    it("delegates to session.steer and returns true when session is ready", async () => {
+      const mockSteer = vi.fn(async () => {});
+      const record: Partial<AgentRecord> = {
+        id: "a-1",
+        status: "running",
+        session: { steer: mockSteer } as any,
+      };
+      const deps = createDeps();
+      (deps.manager.getRecord as ReturnType<typeof vi.fn>).mockReturnValue(record);
+      const svc = createSubagentsService(deps);
+      expect(await svc.steer("a-1", "focus on tests")).toBe(true);
+      expect(mockSteer).toHaveBeenCalledWith("focus on tests");
+    });
+  });
+});
