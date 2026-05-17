@@ -12,13 +12,12 @@
 
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { defineTool, type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { defineTool, type ExtensionAPI, type ExtensionCommandContext, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { AgentManager } from "./agent-manager.js";
 import { getAgentConversation, getDefaultMaxTurns, getGraceTurns, normalizeMaxTurns, setDefaultMaxTurns, setGraceTurns, steerAgent } from "./agent-runner.js";
 import { BUILTIN_TOOL_NAMES, getAgentConfig, getAllTypes, getAvailableTypes, getDefaultAgentNames, getUserAgentNames, registerAgents, resolveType } from "./agent-types.js";
-import { registerRpcHandlers } from "./cross-extension-rpc.js";
 import { loadCustomAgents } from "./custom-agents.js";
 import { GroupJoinManager } from "./group-join.js";
 import { resolveAgentInvocationConfig, resolveJoinMode } from "./invocation-config.js";
@@ -436,12 +435,7 @@ export default function (pi: ExtensionAPI) {
     getRecord: (id: string) => manager.getRecord(id),
   };
 
-  // --- Cross-extension RPC via pi.events ---
-  let currentCtx: ExtensionContext | undefined;
-
-  // Capture ctx from session_start for RPC spawn handler.
-  pi.on("session_start", async (_event, ctx) => {
-    currentCtx = ctx;
+  pi.on("session_start", async (_event, _ctx) => {
     manager.clearCompleted();
   });
 
@@ -449,23 +443,9 @@ export default function (pi: ExtensionAPI) {
     manager.clearCompleted();
   });
 
-  const { unsubPing: unsubPingRpc, unsubSpawn: unsubSpawnRpc, unsubStop: unsubStopRpc } = registerRpcHandlers({
-    events: pi.events,
-    pi,
-    getCtx: () => currentCtx,
-    manager,
-  });
-
-  // Broadcast readiness so extensions loaded after us can discover us
-  pi.events.emit("subagents:ready", {});
-
   // On shutdown, abort all agents immediately and clean up.
   // If the session is going down, there's nothing left to consume agent results.
   pi.on("session_shutdown", async () => {
-    unsubSpawnRpc();
-    unsubStopRpc();
-    unsubPingRpc();
-    currentCtx = undefined;
     delete (globalThis as any)[MANAGER_KEY];
     manager.abortAll();
     for (const timer of pendingNudges.values()) clearTimeout(timer);
