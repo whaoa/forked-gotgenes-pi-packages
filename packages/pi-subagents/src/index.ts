@@ -19,12 +19,11 @@ import { AgentManager } from "./agent-manager.js";
 import { getAgentConversation, getDefaultMaxTurns, getGraceTurns, normalizeMaxTurns, setDefaultMaxTurns, setGraceTurns, steerAgent } from "./agent-runner.js";
 import { BUILTIN_TOOL_NAMES, getAgentConfig, getAllTypes, getAvailableTypes, getDefaultAgentNames, getUserAgentNames, registerAgents, resolveType } from "./agent-types.js";
 import { loadCustomAgents } from "./custom-agents.js";
-import { GroupJoinManager } from "./group-join.js";
-import { resolveAgentInvocationConfig, resolveJoinMode } from "./invocation-config.js";
+import { resolveAgentInvocationConfig } from "./invocation-config.js";
 import { type ModelRegistry, resolveModel } from "./model-resolver.js";
 import { createOutputFilePath, streamToOutputFile, writeInitialEntry } from "./output-file.js";
 import { applyAndEmitLoaded, type SubagentsSettings, saveAndEmitChanged } from "./settings.js";
-import { type AgentConfig, type AgentInvocation, type AgentRecord, type JoinMode, type NotificationDetails, type SubagentType } from "./types.js";
+import { type AgentConfig, type AgentInvocation, type AgentRecord, type NotificationDetails, type SubagentType } from "./types.js";
 import {
   type AgentActivity,
   type AgentDetails,
@@ -306,40 +305,6 @@ export default function (pi: ExtensionAPI) {
     widget.update();
   }
 
-  // ---- Group join manager ----
-  const groupJoin = new GroupJoinManager(
-    (records, partial) => {
-      for (const r of records) { agentActivity.delete(r.id); widget.markFinished(r.id); }
-
-      const groupKey = `group:${records.map(r => r.id).join(",")}`;
-      scheduleNudge(groupKey, () => {
-        // Re-check at send time
-        const unconsumed = records.filter(r => !r.resultConsumed);
-        if (unconsumed.length === 0) { widget.update(); return; }
-
-        const notifications = unconsumed.map(r => formatTaskNotification(r, 300)).join('\n\n');
-        const label = partial
-          ? `${unconsumed.length} agent(s) finished (partial — others still running)`
-          : `${unconsumed.length} agent(s) finished`;
-
-        const [first, ...rest] = unconsumed;
-        const details = buildNotificationDetails(first, 300, agentActivity.get(first.id));
-        if (rest.length > 0) {
-          details.others = rest.map(r => buildNotificationDetails(r, 300, agentActivity.get(r.id)));
-        }
-
-        pi.sendMessage<NotificationDetails>({
-          customType: "subagent-notification",
-          content: `Background agent group completed: ${label}\n\n${notifications}\n\nUse get_subagent_result for full output.`,
-          display: true,
-          details,
-        }, { deliverAs: "followUp", triggerTurn: true });
-      });
-      widget.update();
-    },
-    30_000,
-  );
-
   /** Helper: build event data for lifecycle events from an AgentRecord. */
   function buildEventData(record: AgentRecord) {
     const durationMs = record.completedAt ? record.completedAt - record.startedAt : Date.now() - record.startedAt;
@@ -391,19 +356,7 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    // If this agent is pending batch finalization (debounce window still open),
-    // don't send an individual nudge — finalizeBatch will pick it up retroactively.
-    if (currentBatchAgents.some(a => a.id === record.id)) {
-      widget.update();
-      return;
-    }
-
-    const result = groupJoin.onAgentComplete(record);
-    if (result === 'pass') {
-      sendIndividualNudge(record);
-    }
-    // 'held' → do nothing, group will fire later
-    // 'delivered' → group callback already fired
+    sendIndividualNudge(record);
     widget.update();
   }, undefined, (record) => {
     // Emit started event when agent transitions to running (including from queue)
@@ -456,55 +409,6 @@ export default function (pi: ExtensionAPI) {
   // Live widget: show running agents above editor
   const widget = new AgentWidget(manager, agentActivity);
 
-  // ---- Join mode configuration ----
-  let defaultJoinMode: JoinMode = 'smart';
-  function getDefaultJoinMode(): JoinMode { return defaultJoinMode; }
-  function setDefaultJoinMode(mode: JoinMode) { defaultJoinMode = mode; }
-
-
-  // ---- Batch tracking for smart join mode ----
-  // Collects background agent IDs spawned in the current turn for smart grouping.
-  // Uses a debounced timer: each new agent resets the 100ms window so that all
-  // parallel tool calls (which may be dispatched across multiple microtasks by the
-  // framework) are captured in the same batch.
-  let currentBatchAgents: { id: string; joinMode: JoinMode }[] = [];
-  let batchFinalizeTimer: ReturnType<typeof setTimeout> | undefined;
-  let batchCounter = 0;
-
-  /** Finalize the current batch: if 2+ smart-mode agents, register as a group. */
-  function finalizeBatch() {
-    batchFinalizeTimer = undefined;
-    const batchAgents = [...currentBatchAgents];
-    currentBatchAgents = [];
-
-    const smartAgents = batchAgents.filter(a => a.joinMode === 'smart' || a.joinMode === 'group');
-    if (smartAgents.length >= 2) {
-      const groupId = `batch-${++batchCounter}`;
-      const ids = smartAgents.map(a => a.id);
-      groupJoin.registerGroup(groupId, ids);
-      // Retroactively process agents that already completed during the debounce window.
-      // Their onComplete fired but was deferred (agent was in currentBatchAgents),
-      // so we feed them into the group now.
-      for (const id of ids) {
-        const record = manager.getRecord(id);
-        if (!record) continue;
-        record.groupId = groupId;
-        if (record.completedAt != null && !record.resultConsumed) {
-          groupJoin.onAgentComplete(record);
-        }
-      }
-    } else {
-      // No group formed — send individual nudges for any agents that completed
-      // during the debounce window and had their notification deferred.
-      for (const { id } of batchAgents) {
-        const record = manager.getRecord(id);
-        if (record?.completedAt != null && !record.resultConsumed) {
-          sendIndividualNudge(record);
-        }
-      }
-    }
-  }
-
   // Grab UI context from first tool execution + clear lingering widget on new turn
   pi.on("tool_execution_start", async (_event, ctx) => {
     widget.setUICtx(ctx.ui as UICtx);
@@ -554,7 +458,6 @@ export default function (pi: ExtensionAPI) {
       setMaxConcurrent: (n) => manager.setMaxConcurrent(n),
       setDefaultMaxTurns,
       setGraceTurns,
-      setDefaultJoinMode,
     },
     (event, payload) => pi.events.emit(event, payload),
   );
@@ -850,26 +753,13 @@ Guidelines:
           return textResult(err instanceof Error ? err.message : String(err));
         }
 
-        // Set output file + join mode synchronously after spawn, before the
+        // Set output file synchronously after spawn, before the
         // event loop yields — onSessionCreated is async so this is safe.
-        const joinMode = resolveJoinMode(defaultJoinMode, true);
         const record = manager.getRecord(id);
-        if (record && joinMode) {
-          record.joinMode = joinMode;
+        if (record) {
           record.toolCallId = toolCallId;
           record.outputFile = createOutputFilePath(ctx.cwd, id, ctx.sessionManager.getSessionId());
           writeInitialEntry(record.outputFile, id, params.prompt, ctx.cwd);
-        }
-
-        if (joinMode == null || joinMode === 'async') {
-          // Foreground/no join mode or explicit async — not part of any batch
-        } else {
-          // smart or group — add to current batch
-          currentBatchAgents.push({ id, joinMode });
-          // Debounce: reset timer on each new agent so parallel tool calls
-          // dispatched across multiple event loop ticks are captured together
-          if (batchFinalizeTimer) clearTimeout(batchFinalizeTimer);
-          batchFinalizeTimer = setTimeout(finalizeBatch, 100);
         }
 
         agentActivity.set(id, bgState);
@@ -1658,7 +1548,6 @@ ${systemPrompt}
       // normalizeMaxTurns() in agent-runner.ts (which maps 0 → undefined).
       defaultMaxTurns: getDefaultMaxTurns() ?? 0,
       graceTurns: getGraceTurns(),
-      defaultJoinMode: getDefaultJoinMode(),
     };
   }
 
@@ -1667,7 +1556,6 @@ ${systemPrompt}
       `Max concurrency (current: ${manager.getMaxConcurrent()})`,
       `Default max turns (current: ${getDefaultMaxTurns() ?? "unlimited"})`,
       `Grace turns (current: ${getGraceTurns()})`,
-      `Join mode (current: ${getDefaultJoinMode()})`,
     ]);
     if (!choice) return;
 
@@ -1706,17 +1594,6 @@ ${systemPrompt}
         } else {
           ctx.ui.notify("Must be a positive integer.", "warning");
         }
-      }
-    } else if (choice.startsWith("Join mode")) {
-      const val = await ctx.ui.select("Default join mode for background agents", [
-        "smart — auto-group 2+ agents in same turn (default)",
-        "async — always notify individually",
-        "group — always group background agents",
-      ]);
-      if (val) {
-        const mode = val.split(" ")[0] as JoinMode;
-        setDefaultJoinMode(mode);
-        notifyApplied(ctx, `Default join mode set to ${mode}`);
       }
     }
   }
