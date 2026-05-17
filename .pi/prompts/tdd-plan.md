@@ -1,5 +1,5 @@
 ---
-description: Execute the TDD steps from a docs/plans/ plan as red→green→commit cycles
+description: Execute the TDD steps from a package docs/plans/ plan as red→green→commit cycles
 ---
 
 # Execute a plan with TDD
@@ -17,14 +17,17 @@ Before locating or reading the plan, make sure the working tree is up to date wi
 ## Locate the plan
 
 - If `$1` looks like a path, use it.
-- If `$1` is a number, find `docs/plans/NNNN-*.md` matching that integer (issue number or plan number).
-- Otherwise, use the newest file in `docs/plans/` (by mtime).
+- If `$1` is a number, find `packages/*/docs/plans/NNNN-*.md` matching that integer (issue number or plan number).
+- Otherwise, use the newest file across all `packages/*/docs/plans/` (by mtime).
+
+The plan's path determines the target package: `packages/<PKG>/docs/plans/...` → `PKG` is that directory name.
 
 Read the plan in full before doing anything else. If "TDD Order" is missing or empty, stop and report — re-run `/plan-issue` first.
 
 ## Read project rules and load skills
 
 Read `AGENTS.md` for project priorities and conventions.
+Load the `package-<PKG>` skill (e.g., `package-pi-permission-system`) for package-specific architecture, priorities, and testing context.
 Load the `code-style` skill (TypeScript conventions, structural design heuristics).
 Load the `testing` skill (Vitest mock patterns, TDD planning rules).
 

@@ -1,15 +1,15 @@
 ---
-description: Review this session for workflow improvements and persist retro notes to docs/retro/
+description: Review this session for workflow improvements and persist retro notes to the package's docs/retro/
 deterministic:
   run: |
     echo "=== Recent commits ==="
     git log --oneline -25
     echo
     echo "=== Existing retros ==="
-    ls docs/retro/ 2>/dev/null || echo "(docs/retro/ does not exist yet)"
+    for d in packages/*/docs/retro; do echo "--- $d ---"; ls "$d" 2>/dev/null || echo "(empty)"; done
     echo
     echo "=== Plans referenced this session ==="
-    ls -t docs/plans/ 2>/dev/null | head -5
+    find packages/*/docs/plans -type f -name '*.md' -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -5
   handoff: always
 ---
 
@@ -18,13 +18,15 @@ deterministic:
 The user wants a retrospective on this session. Issue number (if provided): `$1`
 
 You **must** load the `ask-user` skill before proposing any changes.
+After identifying the target package in Step 1, load the `package-<PKG>` skill (e.g., `package-pi-permission-system`) for package-specific context.
 
 ## Step 1 — Identify the retro file
 
 1. If `$1` is set, treat it as the issue number `N`.
 2. Otherwise, infer `N` from the most recent commit subject in the deterministic output above (look for `(#N)` at the end of `feat:`, `fix:`, or `docs:` commits). If multiple issues appear, list them and ask the user which to retro on with `ask-user`.
-3. Resolve a slug from `docs/plans/NNNN-<slug>.md` if a matching plan exists; otherwise derive a short slug from the issue title via `gh issue view N --json title -q .title`.
-4. The retro file is `docs/retro/NNNN-<slug>.md`. Create the directory if missing.
+3. **Determine the target package.** Find the plan for issue `N` at `packages/*/docs/plans/NNNN-<slug>.md`. The matching path determines `PKG`. If no plan exists, run `gh issue view N` and extract the `pkg:*` label. If no label exists or it seems incongruent, ask the user which package.
+4. Resolve the slug from the plan filename; if no plan exists, derive a short slug from the issue title via `gh issue view N --json title -q .title`.
+5. The retro file is `packages/<PKG>/docs/retro/NNNN-<slug>.md`. Create the directory if missing.
 
 ## Step 2 — Synthesize observations
 
@@ -53,7 +55,7 @@ Record wins only if they are novel or surprising — a new pattern working for t
 
 ## Step 3 — Write the retro file
 
-Append (or create) `docs/retro/NNNN-<slug>.md` with this structure.
+Append (or create) `packages/<PKG>/docs/retro/NNNN-<slug>.md` with this structure.
 When creating a new file, include YAML frontmatter (see `AGENTS.md` § Documentation frontmatter):
 
 ```markdown
@@ -128,7 +130,7 @@ After implementing, edit the retro file directly to append a `### Changes made` 
 
 ## Step 9 — Commit and push
 
-1. `git add docs/retro/ AGENTS.md .pi/prompts/` (and any other touched files).
+1. `git add packages/<PKG>/docs/retro/ AGENTS.md .pi/prompts/` (and any other touched files).
 2. Commit as `docs(retro): add retro notes for issue #N`.
 3. `git push`.
 

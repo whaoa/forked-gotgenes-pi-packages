@@ -1,5 +1,5 @@
 ---
-description: Execute a docs/plans/ plan that has no TDD cycle (docs-only, config-only, or prose changes)
+description: Execute a package docs/plans/ plan that has no TDD cycle (docs-only, config-only, or prose changes)
 ---
 
 # Execute a plan (non-TDD)
@@ -20,14 +20,17 @@ Before locating or reading the plan, make sure the working tree is up to date wi
 ## Locate the plan
 
 - If `$1` looks like a path, use it.
-- If `$1` is a number, find `docs/plans/NNNN-*.md` matching that integer (issue number or plan number).
-- Otherwise, use the newest file in `docs/plans/` (by mtime).
+- If `$1` is a number, find `packages/*/docs/plans/NNNN-*.md` matching that integer (issue number or plan number).
+- Otherwise, use the newest file across all `packages/*/docs/plans/` (by mtime).
+
+The plan's path determines the target package: `packages/<PKG>/docs/plans/...` → `PKG` is that directory name.
 
 Read the plan in full before doing anything else. If the plan has a "TDD Order" section with red→green test cycles, stop and tell the user to run `/tdd-plan` instead.
 
 ## Read project rules and load skills
 
 Read `AGENTS.md` for project priorities and conventions.
+Load the `package-<PKG>` skill (e.g., `package-pi-permission-system`) for package-specific architecture, priorities, and testing context.
 If the plan touches code: load the `code-style` skill.
 If the plan touches markdown/docs: load the `markdown-conventions` skill.
 
