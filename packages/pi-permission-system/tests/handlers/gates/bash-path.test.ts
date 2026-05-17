@@ -257,4 +257,54 @@ describe("describeBashPathGate", () => {
     expect(isGateDescriptor(result)).toBe(true);
     expect((result as GateDescriptor).preCheck?.state).toBe("deny");
   });
+
+  it("returns null when all tokens match only the universal default", async () => {
+    const checkPermission = vi.fn<CheckPermissionFn>().mockReturnValue(
+      makeCheckResult({
+        state: "ask",
+        matchedPattern: undefined,
+        source: "special",
+        origin: "builtin",
+      }),
+    );
+    const getSessionRuleset = vi.fn<() => Rule[]>().mockReturnValue([]);
+    const result = await describeBashPathGate(
+      makeTcc({ input: { command: "cat .env" } }),
+      checkPermission,
+      getSessionRuleset,
+    );
+    expect(result).toBeNull();
+  });
+
+  it("ignores tokens matching universal default but fires for explicit rule matches", async () => {
+    const checkPermission = vi
+      .fn<CheckPermissionFn>()
+      .mockImplementation((_surface, input) => {
+        const record = input as Record<string, unknown>;
+        if (record.path === ".env") {
+          return makeCheckResult({
+            state: "deny",
+            matchedPattern: "*.env",
+          });
+        }
+        // Other tokens match only the universal default
+        return makeCheckResult({
+          state: "ask",
+          matchedPattern: undefined,
+          source: "special",
+          origin: "builtin",
+        });
+      });
+    const getSessionRuleset = vi.fn<() => Rule[]>().mockReturnValue([]);
+    const result = await describeBashPathGate(
+      makeTcc({ input: { command: "cat src/foo.ts .env" } }),
+      checkPermission,
+      getSessionRuleset,
+    );
+    expect(result).not.toBeNull();
+    expect(isGateDescriptor(result)).toBe(true);
+    const desc = result as GateDescriptor;
+    expect(desc.preCheck?.state).toBe("deny");
+    expect(desc.decision.value).toBe(".env");
+  });
 });
