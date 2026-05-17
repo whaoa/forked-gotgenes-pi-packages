@@ -1,4 +1,5 @@
 import { getPathBearingToolPath } from "../../path-utils";
+import type { Rule } from "../../rule";
 import { deriveApprovalPattern } from "../../session-rules";
 import type { PermissionCheckResult } from "../../types";
 import type { GateDescriptor, GateResult } from "./descriptor";
@@ -9,29 +10,39 @@ type CheckPermissionFn = (
   surface: string,
   input: unknown,
   agentName?: string,
+  sessionRules?: Rule[],
 ) => PermissionCheckResult;
 
 /**
  * Build a pure descriptor for the cross-cutting path permission gate (tools).
  *
  * Returns `null` when the gate does not apply (tool is not path-bearing,
- * no extractable path, or the `path` surface evaluates to `allow`).
+ * no extractable path, the `path` surface evaluates to `allow`, or no
+ * explicit `path` rule matched — i.e. only the universal default fired).
  * Returns a `GateDescriptor` when the path matches a `deny` or `ask` rule.
  */
 export function describePathGate(
   tcc: ToolCallContext,
   checkPermission: CheckPermissionFn,
+  getSessionRuleset: () => Rule[],
 ): GateResult {
   const filePath = getPathBearingToolPath(tcc.toolName, tcc.input);
   if (!filePath) return null;
 
+  const sessionRules = getSessionRuleset();
   const check = checkPermission(
     "path",
     { path: filePath },
     tcc.agentName ?? undefined,
+    sessionRules,
   );
 
   if (check.state === "allow") return null;
+
+  // No explicit path rule matched — only the universal default fired.
+  // Skip the gate to preserve backward compatibility: configs without a
+  // "path" key should not trigger path-level prompts (#58).
+  if (check.matchedPattern === undefined) return null;
 
   const pattern = deriveApprovalPattern(filePath);
 

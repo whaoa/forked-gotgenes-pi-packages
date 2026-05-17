@@ -143,7 +143,7 @@ export class PermissionGateHandler {
     }
 
     // ── Path gate for tools (descriptor + runner) ────────────────────────────
-    const pathDesc = describePathGate(tcc, checkPermission);
+    const pathDesc = describePathGate(tcc, checkPermission, getSessionRuleset);
     if (pathDesc) {
       if (isGateBypass(pathDesc)) {
         if (pathDesc.log) {
