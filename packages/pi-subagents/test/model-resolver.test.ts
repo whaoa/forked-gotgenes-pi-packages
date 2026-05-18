@@ -208,6 +208,26 @@ describe("resolveModel", () => {
 describe("resolveInvocationModel", () => {
   const parentModel = { id: "claude-opus-4-6", provider: "anthropic" };
 
+  describe("successful model resolution", () => {
+    it("returns resolved model when modelInput resolves (config-specified)", () => {
+      const result = resolveInvocationModel(parentModel, "haiku", false, makeRegistry());
+      expect(result).toEqual({ model: MODELS[2] });
+      expect(result.error).toBeUndefined();
+    });
+
+    it("returns resolved model when modelInput resolves (params-specified)", () => {
+      const result = resolveInvocationModel(parentModel, "opus", true, makeRegistry());
+      expect(result).toEqual({ model: MODELS[0] });
+      expect(result.error).toBeUndefined();
+    });
+
+    it("returns resolved model using exact provider/modelId", () => {
+      const result = resolveInvocationModel(parentModel, "openai/gpt-4o", true, makeRegistry());
+      expect(result).toEqual({ model: MODELS[3] });
+      expect(result.error).toBeUndefined();
+    });
+  });
+
   describe("parent model inheritance (no modelInput)", () => {
     it("returns parent model when modelInput is undefined (modelFromParams false)", () => {
       const result = resolveInvocationModel(parentModel, undefined, false, makeRegistry());
