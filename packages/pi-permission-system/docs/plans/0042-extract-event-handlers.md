@@ -12,7 +12,7 @@ The `piPermissionSystemExtension` factory contains 6 inline event-handler closur
 The `tool_call` handler alone is ~250 lines.
 This makes the file hard to navigate, review, and test in isolation.
 
-The [target architecture](../architecture/target-architecture.md) identifies this extraction as the first step in the structural cleanup phase, blocking #43 (eliminate module-scope state).
+The [target architecture](../architecture/architecture.md) identifies this extraction as the first step in the structural cleanup phase, blocking #43 (eliminate module-scope state).
 
 ## Goals
 
@@ -28,7 +28,7 @@ The [target architecture](../architecture/target-architecture.md) identifies thi
 - Restructuring module-scope state (`PI_AGENT_DIR`, `extensionLogger`, etc.) — deferred to #43 (`ExtensionRuntime`).
 - Refactoring `promptPermission`, `writeReviewLog`, or other helper internals.
 - Extracting the config-save/load helpers or the slash-command registration (they are not event handlers).
-- Unifying the Rule type or normalizing config into flat `Ruleset` at load time — deferred to #56 per the [refactoring sequence](../architecture/target-architecture.md#refactoring-sequence).
+- Unifying the Rule type or normalizing config into flat `Ruleset` at load time — deferred to #56 per the [refactoring sequence](../architecture/architecture.md).
 
 ## Background
 
@@ -54,7 +54,7 @@ Key dependencies already extracted:
 
 Permission surfaces involved: tools, bash, mcp, skills, external_directory (all gate through these handlers).
 
-See [current-architecture.md](../architecture/current-architecture.md) § "Monolithic index.ts" and § "Module map" for the full as-is picture.
+See [current-architecture.md](../architecture/v3-architecture.md) § "Monolithic index.ts" and § "Module map" for the full as-is picture.
 
 ## Design Overview
 
@@ -105,7 +105,7 @@ The key constraint is: **every test can construct a `HandlerDeps` with stubs and
 
 ### Alignment with ExtensionRuntime (#43)
 
-The [target architecture](../architecture/target-architecture.md) defines an `ExtensionRuntime` context object that replaces all module-scope mutable state.
+The [target architecture](../architecture/architecture.md) defines an `ExtensionRuntime` context object that replaces all module-scope mutable state.
 `HandlerDeps` is designed as a stepping stone: #43 will fold the getter/setter pairs and mutable fields into `ExtensionRuntime` and pass that to handlers instead.
 To keep that transition smooth:
 
@@ -165,7 +165,7 @@ Target: ≤200 lines for `src/index.ts` (currently ~1066).
 
 The issue explicitly defers restructuring module-scope state (`PI_AGENT_DIR`, `extensionLogger`, `setExtensionConfig`, etc.).
 These remain in `src/index.ts` and are referenced by the deps object closures.
-Issue #43 will lift them into `ExtensionRuntime` (see `src/runtime.ts` in the [target module structure](../architecture/target-architecture.md#module-structure-target)).
+Issue #43 will lift them into `ExtensionRuntime` (see `src/runtime.ts` in the [target module structure](../architecture/architecture.md#module-structure)).
 
 ## Module-Level Changes
 

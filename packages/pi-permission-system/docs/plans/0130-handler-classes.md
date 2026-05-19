@@ -38,7 +38,7 @@ This makes dependency requirements invisible and test factories (`makeDeps()`) u
 - **#127 — SessionLogger** (closed, implemented).
 - **#128 — ForwardingManager** (closed, implemented).
 
-Part of the handler decomposition series — see [plan doc](docs/plans/0126-handler-decomposition.md).
+Part of the handler decomposition series — see [plan doc](0126-handler-decomposition.md).
 
 ## Background
 
