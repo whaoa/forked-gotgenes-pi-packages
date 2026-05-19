@@ -91,7 +91,8 @@ Config files live at two levels, merged with project overriding global:
 1. global: `~/.pi/agent/extensions/pi-autoformat/config.json`
 2. project: `.pi/extensions/pi-autoformat/config.json`
 
-The only required fields are the `formatters` you declare and the `chains` that map file extensions to them. Everything else is optional.
+The only required fields are the `formatters` you declare and the `chains` that map file extensions to them.
+Everything else is optional.
 
 ### Key settings
 
@@ -101,8 +102,10 @@ The only required fields are the `formatters` you declare and the `chains` that 
   - `"repoRoot"` (default): git root, falling back to cwd when not inside a repo.
   - `"cwd"`: strict cwd only.
   - `["packages/a", "/abs/path"]`: explicit roots, resolved relative to cwd.
-- **`commandTimeoutMs`**: per-formatter timeout in milliseconds. Default: `10000`.
-- **`shellMutationDetection`**: opt-in detection of files mutated by `bash` commands (e.g. `sed -i`, `mv`, `cp`). Disabled by default.
+- **`commandTimeoutMs`**: per-formatter timeout in milliseconds.
+  Default: `10000`.
+- **`shellMutationDetection`**: opt-in detection of files mutated by `bash` commands (e.g. `sed -i`, `mv`, `cp`).
+  Disabled by default.
 - **`hideSummariesInTui`**: set to `true` to suppress the success status footer in the interactive TUI.
 
 See [docs/configuration.md](docs/configuration.md) for the full reference, JSON Schema, and examples.

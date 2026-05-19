@@ -172,8 +172,10 @@ The living architecture doc (`docs/architecture/architecture.md`) does not need 
 
 ## Test Impact Analysis
 
-1. **New unit tests enabled**: The new file covers handler-level integration that was previously impractical because the handler was a 1800-line monolith. The refactored descriptor + runner architecture makes it possible to test gate wiring without mocking internal functions.
-2. **Existing tests that become redundant**: None. The single test in `tests/handlers/tool-call.test.ts` ("blocks a read of a path outside cwd when policy is deny") is a subset of the new matrix, but it exercises the same layer and is cheap to keep.
+1. **New unit tests enabled**: The new file covers handler-level integration that was previously impractical because the handler was a 1800-line monolith.
+   The refactored descriptor + runner architecture makes it possible to test gate wiring without mocking internal functions.
+2. **Existing tests that become redundant**: None.
+   The single test in `tests/handlers/tool-call.test.ts` ("blocks a read of a path outside cwd when policy is deny") is a subset of the new matrix, but it exercises the same layer and is cheap to keep.
 3. **Existing tests that must stay**: All existing tests in `tests/handlers/gates/external-directory.test.ts` (descriptor unit tests), `tests/handlers/gates/runner.test.ts` (runner unit tests), `tests/permission-system.test.ts` (policy resolution), and `tests/handlers/external-directory-session-dedup.test.ts` (session dedup) remain valid — they test different layers.
 
 ## TDD Order
@@ -244,4 +246,5 @@ Add tests verifying:
 
 ## Open Questions
 
-- None. The issue is specific about what to test, and the current architecture provides a clean test seam at `handleToolCall`.
+- None.
+  The issue is specific about what to test, and the current architecture provides a clean test seam at `handleToolCall`.

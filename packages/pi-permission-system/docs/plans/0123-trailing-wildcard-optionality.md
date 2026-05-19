@@ -51,10 +51,13 @@ Edge cases:
 
 - `"git*"` (no space before `*`) — unaffected, still matches `"git"` and `"gitfoo"`.
 - `"*"` (lone wildcard) — unaffected, the escaped string is `.*` not `.*`.
-- `" *"` (space-only prefix + wildcard) — escaped is `.*`, becomes `( .*)?`, matching empty string and `anything`. This is an unlikely pattern but harmless.
-- `"git status *"` — trailing `.*` becomes optional, so matches both `"git status"` and `"git status --short"`. Correct.
+- `" *"` (space-only prefix + wildcard) — escaped is `.*`, becomes `( .*)?`, matching empty string and `anything`.
+  This is an unlikely pattern but harmless.
+- `"git status *"` — trailing `.*` becomes optional, so matches both `"git status"` and `"git status --short"`.
+  Correct.
 
-This broadens existing patterns. A user who wrote `"rm *": "deny"` would now also block bare `rm`.
+This broadens existing patterns.
+A user who wrote `"rm *": "deny"` would now also block bare `rm`.
 This matches user intent and is consistent with the principle that `deny` should err on the side of blocking more.
 
 ## Module-Level Changes
@@ -88,7 +91,9 @@ This matches user intent and is consistent with the principle that `deny` should
 ## Test Impact Analysis
 
 1. **New tests enabled**: Direct unit tests for the trailing optionality behavior — straightforward additions to the existing `wildcardMatch` and `findCompiledWildcardMatch` describe blocks.
-1. **Existing tests that may break**: The test `"glob pattern matches with wildcard"` currently asserts `"git *"` does NOT match bare `"git"` implicitly (the test checks `"git status"` and `"git push origin main"` but not `"git"`). No existing assertion should break since none test `"git *"` against `"git"`. However, review all tests to confirm.
+1. **Existing tests that may break**: The test `"glob pattern matches with wildcard"` currently asserts `"git *"` does NOT match bare `"git"` implicitly (the test checks `"git status"` and `"git push origin main"` but not `"git"`).
+   No existing assertion should break since none test `"git *"` against `"git"`.
+   However, review all tests to confirm.
 1. **Existing tests that stay**: All other wildcard tests (exact match, last-match-wins, regex escaping, home path expansion, multiline) are unaffected.
 
 ## TDD Order

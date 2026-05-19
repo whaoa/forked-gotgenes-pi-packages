@@ -26,7 +26,8 @@ Execution was fast and clean; the only friction was a markdown formatting mistak
    The pre-commit hook caught it; the autoformatter ran but could not fix it automatically.
    Manual repair: changed to `Issue #66 replaced...`.
    Impact: one failed commit, one additional fix commit.
-   Self-identified? No — caught by the pre-commit hook (effectively user-caught).
+   Self-identified?
+   No — caught by the pre-commit hook (effectively user-caught).
 
 #### What caused friction (user side)
 

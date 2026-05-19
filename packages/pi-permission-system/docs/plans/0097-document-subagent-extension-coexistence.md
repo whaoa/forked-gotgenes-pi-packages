@@ -66,7 +66,9 @@ No changes to `src/`, `schemas/`, `config/`, `tests/`, or `docs/architecture/`.
 
 ## TDD Order
 
-1. **docs: document subagent extension coexistence (#97)** — Add the new README section. No test cycle; docs-only change. Verify with `markdownlint README.md` if available.
+1. **docs: document subagent extension coexistence (#97)** — Add the new README section.
+   No test cycle; docs-only change.
+   Verify with `markdownlint README.md` if available.
 
 ## Risks and Mitigations
 
@@ -78,4 +80,5 @@ No changes to `src/`, `schemas/`, `config/`, `tests/`, or `docs/architecture/`.
 
 ## Open Questions
 
-- None. The issue scope is clear and self-contained.
+- None.
+  The issue scope is clear and self-contained.

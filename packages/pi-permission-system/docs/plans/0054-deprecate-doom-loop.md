@@ -10,8 +10,7 @@ issue_title: "Verify doom_loop detection fires end-to-end"
 The `doom_loop` key is declared as a `SpecialPermissionName`, accepted in config under `special.doom_loop`, and resolved through `checkPermission()`.
 However, nothing in this extension or in Pi's core ever calls `checkPermission("doom_loop", ...)` at runtime.
 
-Investigation of Pi's source (`~/development/pi/pi-mono/packages/coding-agent/src/`) confirms:
-Pi has **no doom_loop detection**.
+Investigation of Pi's source (`~/development/pi/pi-mono/packages/coding-agent/src/`) confirms: Pi has **no doom_loop detection**.
 The `tool_call` event only fires for actual tool names (`bash`, `read`, `edit`, etc.) — there is no repeated-tool-call tracking or synthetic `doom_loop` event.
 
 In OpenCode, doom_loop detection lives in the **session processor** (core runtime), not in the permission extension.

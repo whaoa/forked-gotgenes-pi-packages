@@ -137,7 +137,8 @@ The standalone `wildcardMatch()` function also calls `compileWildcardPattern`, s
 1. **test: add expandHomePath unit tests** — `tests/expand-home.test.ts`: covers `~`, `~/path`, `$HOME`, `$HOME/path`, bare `~`, no-op patterns, Windows separator.
 2. **feat: implement expandHomePath utility** — `src/expand-home.ts`: pure function, green tests from step 1.
 3. **test: add wildcard-matcher home expansion tests** — `tests/wildcard-matcher.test.ts`: `wildcardMatch("~/dev/*", "/Users/chris/dev/foo")` returns true; `compileWildcardPattern("~/dev/*", …).pattern` retains `~/dev/*`.
-4. **feat: integrate expandHomePath into compileWildcardPattern** — `src/wildcard-matcher.ts`: import and apply expansion. Green tests from step 3.
+4. **feat: integrate expandHomePath into compileWildcardPattern** — `src/wildcard-matcher.ts`: import and apply expansion.
+   Green tests from step 3.
 5. **test: integration test for external_directory with ~ pattern** — `tests/permission-manager-unified.test.ts`: config with `"~/trusted/*": "allow"`, `checkPermission("external_directory", { path: "<homedir>/trusted/repo" })` returns allow.
 6. **feat: green integration test (no code change expected)** — Step 4 already makes this pass; confirm and commit together with step 5 if trivial.
 7. **docs: update schema and example config** — `schemas/permissions.schema.json`: add note about `~`/`$HOME` expansion in pattern descriptions. `config/config.example.json`: add `~/...` example in `external_directory`.
@@ -153,4 +154,6 @@ The standalone `wildcardMatch()` function also calls `compileWildcardPattern`, s
 
 ## Open Questions
 
-- Should `$HOME` expansion also handle the case where the `HOME` env var differs from `os.homedir()`? For now, use `os.homedir()` consistently (matches `normalizePathForComparison` behavior). Revisit if a user reports a mismatch.
+- Should `$HOME` expansion also handle the case where the `HOME` env var differs from `os.homedir()`?
+  For now, use `os.homedir()` consistently (matches `normalizePathForComparison` behavior).
+  Revisit if a user reports a mismatch.

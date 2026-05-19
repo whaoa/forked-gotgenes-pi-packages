@@ -59,9 +59,14 @@ This diverges from pi-mono's base config, which is acceptable — this repo alre
 
 ## TDD Order
 
-1. **feat: bump tsconfig target to ES2023** — Change `target` in `tsconfig.json`. Run `pnpm run build` to verify no type errors. Commit: `feat: bump tsconfig target to ES2023 (#60)`.
-2. **docs: update AGENTS.md ES2022 constraint to ES2023** — Rewrite the two-line restriction. Commit: `docs: update AGENTS.md ES version floor to ES2023 (#60)`.
-3. **refactor: use findLast in wildcard-matcher and rule** — Replace manual reverse loops with `findLast`. Existing tests must continue to pass (no new tests needed — behavior is unchanged). Commit: `refactor: use findLast in evaluate and wildcard matcher (#60)`.
+1. **feat: bump tsconfig target to ES2023** — Change `target` in `tsconfig.json`.
+   Run `pnpm run build` to verify no type errors.
+   Commit: `feat: bump tsconfig target to ES2023 (#60)`.
+2. **docs: update AGENTS.md ES2022 constraint to ES2023** — Rewrite the two-line restriction.
+   Commit: `docs: update AGENTS.md ES version floor to ES2023 (#60)`.
+3. **refactor: use findLast in wildcard-matcher and rule** — Replace manual reverse loops with `findLast`.
+   Existing tests must continue to pass (no new tests needed — behavior is unchanged).
+   Commit: `refactor: use findLast in evaluate and wildcard matcher (#60)`.
 
 ## Risks and Mitigations
 

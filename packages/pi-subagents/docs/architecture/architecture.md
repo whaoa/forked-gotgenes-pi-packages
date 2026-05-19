@@ -49,8 +49,7 @@ ui/conversation-viewer.ts — scrollable session overlay
 
 ### Coupling today
 
-The widget reads agent state by holding a direct reference to `AgentManager` and polling a shared mutable `Map<string, AgentActivity>` every 80 ms.
-The conversation viewer subscribes directly to `AgentSession` objects.
+The widget reads agent state by holding a direct reference to `AgentManager` and polling a shared mutable `Map<string, AgentActivity>` every 80 ms. The conversation viewer subscribes directly to `AgentSession` objects.
 
 Cross-extension consumers use an ad-hoc RPC layer over `pi.events` (`subagents:rpc:spawn`, `subagents:rpc:stop`, `subagents:rpc:ping`) with per-request reply channels and untyped envelopes.
 

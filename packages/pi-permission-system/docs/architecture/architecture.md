@@ -5,13 +5,19 @@ This document describes the internal design of the permission system, informed b
 ## Design principles
 
 1. **Unified rule model** - one `Rule` type, one evaluation function, all surfaces.
-2. **Pure evaluation** - permission decisions are pure functions of (surface, pattern, rules). IO stays at the edges.
+2. **Pure evaluation** - permission decisions are pure functions of (surface, pattern, rules).
+   IO stays at the edges.
 3. **Session approvals are just more rules** - no separate matching engine, no separate pre-check.
 4. **MCP stays special** - multi-name target derivation is pre-processing, not a special evaluation path.
-5. **Defaults are rules** - the universal default (`permission["*"]`) is synthesized as a low-priority rule in the array. No side-channel fallbacks.
-6. **Flat config format** - the flat `permission: { ... }` object where each key is a surface. The config IS the ruleset in human-friendly form.
+5. **Defaults are rules** - the universal default (`permission["*"]`) is synthesized as a low-priority rule in the array.
+   No side-channel fallbacks.
+6. **Flat config format** - the flat `permission: { ... }` object where each key is a surface.
+   The config IS the ruleset in human-friendly form.
 7. **Preserve the two-phase model** - tool filtering (before_agent_start) and invocation gating (tool_call) remain separate.
-8. **Ask = cache miss** - "ask" is the absence of a matching rule. The human is the oracle. Their decision is a rule. Persistence determines lifetime (once / session / config).
+8. **Ask = cache miss** - "ask" is the absence of a matching rule.
+   The human is the oracle.
+   Their decision is a rule.
+   Persistence determines lifetime (once / session / config).
 
 ## Core data model
 
@@ -390,8 +396,10 @@ The only surface-specific logic is input normalization (what `surface` and `valu
 When `ask`-state permissions arise in a headless subagent child process, the extension forwards the dialog to the parent session rather than silently denying.
 This requires two detections:
 
-1. **Is the current process a subagent?** — `isSubagentExecutionContext()` in `src/subagent-context.ts`.
-2. **What is the parent session ID?** — `resolvePermissionForwardingTargetSessionId()` in `src/permission-forwarding.ts`.
+1. **Is the current process a subagent?**
+   — `isSubagentExecutionContext()` in `src/subagent-context.ts`.
+2. **What is the parent session ID?**
+   — `resolvePermissionForwardingTargetSessionId()` in `src/permission-forwarding.ts`.
 
 ### Known extension env var inventory
 

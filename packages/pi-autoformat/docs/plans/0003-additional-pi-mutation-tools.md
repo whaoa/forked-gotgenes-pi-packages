@@ -36,7 +36,9 @@ Issue #3 asks us to "support additional Pi mutation tools" without broadening to
 What we know from `pi-mono` (verified against `packages/coding-agent/src/core/extensions/types.ts` and `event-bus.ts` at the current `main`):
 
 - The complete set of **built-in** Pi tools is `bash | read | edit | write | grep | find | ls`.
-  Of those, only `bash`, `edit`, and `write` mutate files. `edit` and `write` are already covered; `bash` is reserved for Issue #4. **There are no additional built-in mutation tools to wire up.**
+  Of those, only `bash`, `edit`, and `write` mutate files.
+  `edit` and `write` are already covered; `bash` is reserved for Issue #4.
+  **There are no additional built-in mutation tools to wire up.**
 - Extensions can register arbitrary tools via `pi.registerTool()`.
   Their results arrive as `CustomToolResultEvent` through the same `tool_result` event we already subscribe to, with the shape:
 
@@ -92,8 +94,10 @@ Field semantics:
   Resolves nested fields, e.g. `"args.path"`.
 - `pathFields` (string[], optional): multiple dotted paths.
 - For both forms, the resolved value may be a string or a string array; string arrays are flattened.
-  Non-string scalars (numbers, booleans, null) are ignored. `pathField` and `pathFields` differ only in arity, not in value handling — a tool whose field is sometimes a string and sometimes a string array should not require switching keys. *(Refined during test-first implementation: the original draft made `pathField` string-only, which would have forced users to switch to `pathFields` for any tool with a variadic field.
-  Unifying value handling removes that foot-gun.)*
+  Non-string scalars (numbers, booleans, null) are ignored.
+  `pathField` and `pathFields` differ only in arity, not in value handling — a tool whose field is sometimes a string and sometimes a string array should not require switching keys.
+  *(Refined during test-first implementation: the original draft made `pathField` string-only, which would have forced users to switch to `pathFields` for any tool with a variadic field.*
+  *Unifying value handling removes that foot-gun.)*
 - Exactly one of `pathField` / `pathFields` is required.
   Specifying both is a config validation error.
 
@@ -245,11 +249,14 @@ Per AGENTS.md, focused tests:
 
 ## Open Questions
 
-- Do we want to expose **details-based** extraction in addition to `input`-based (e.g., `detailsField`)? Some custom tools may report written paths in `event.details` rather than `event.input`.
+- Do we want to expose **details-based** extraction in addition to `input`-based (e.g., `detailsField`)?
+  Some custom tools may report written paths in `event.details` rather than `event.input`.
   Likely yes, but the schema would mirror `pathField`/`pathFields`.
   Defer unless a real consumer needs it; easy to add later.
-- Should the EventBus payload also accept `{ paths: string }` (singular in the plural key)? Probably no — keep the contract strict and documented.
-- Should we provide a tiny "testing helper" module that other extensions can import to construct valid payloads? Out of scope for this issue; the contract is small enough to inline.
+- Should the EventBus payload also accept `{ paths: string }` (singular in the plural key)?
+  Probably no — keep the contract strict and documented.
+- Should we provide a tiny "testing helper" module that other extensions can import to construct valid payloads?
+  Out of scope for this issue; the contract is small enough to inline.
 
 ## Explicitly Deferred
 
@@ -259,7 +266,8 @@ Per AGENTS.md, focused tests:
 - **Tool-name pattern matching** (regex / glob over `toolName`).
   The current MCP naming conventions are stable enough that exact match is sufficient.
   Patterns can be added without breaking the existing schema.
-- **Auto-discovery from tool schemas.** Several MCP tools advertise a `path: string` parameter, and we could heuristically opt them in.
+- **Auto-discovery from tool schemas.**
+  Several MCP tools advertise a `path: string` parameter, and we could heuristically opt them in.
   This is exactly the "implicit, surprising" behavior AGENTS.md warns against; keep declarations explicit.
 
 ## Checkpoints / Commits

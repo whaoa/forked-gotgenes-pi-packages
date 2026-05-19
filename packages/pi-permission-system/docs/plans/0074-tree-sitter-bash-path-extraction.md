@@ -235,7 +235,8 @@ It continues to receive plain strings (now extracted from AST nodes instead of `
    - Rewrite `extractExternalPathsFromBashCommand` to be `async`, using the tree-sitter parser instead of `shell-quote.parse()`.
    - Update `src/handlers/tool-call.ts` to `await` the call.
    - Update all existing test calls to use `await` (the function is now async).
-   - All heredoc tests pass (green). Full suite passes.
+   - All heredoc tests pass (green).
+     Full suite passes.
    Commit: `feat: replace shell-quote with tree-sitter-bash for AST-based path extraction`
 
 3. **test: add command-substitution and redirect coverage**
@@ -245,8 +246,7 @@ It continues to receive plain strings (now extracted from AST nodes instead of `
    - `cat << 'EOF'\n$(cat /etc/hosts)\nEOF` → no external path (command substitution inside heredoc body is not executed by the outer shell in single-quoted heredocs; but with unquoted delimiters it is — verify correct behavior for both).
    Commit: `test: cover command-substitution and redirect path extraction`
 
-4. **feat: handle redirect targets in AST walker (if not already covered)**
-   If step 2's walker does not already extract redirect destinations, add `file_redirect` node handling.
+4. **feat: handle redirect targets in AST walker (if not already covered)** If step 2's walker does not already extract redirect destinations, add `file_redirect` node handling.
    Confirm redirect tests pass.
    Commit: `feat: extract paths from redirect targets in AST walker`
 
@@ -256,8 +256,7 @@ It continues to receive plain strings (now extracted from AST nodes instead of `
    - Confirm URL guard: `curl https://example.com/etc/hosts` — the URL is a `word` argument, `classifyTokenAsPathCandidate` must reject it.
    Commit: `test: verify defense-in-depth guards with tree-sitter tokenizer`
 
-6. **docs: update plan 0072 open questions and close**
-   Mark the tree-sitter follow-up in `docs/plans/0072-shell-quote-tokenizer.md` as addressed by #74.
+6. **docs: update plan 0072 open questions and close** Mark the tree-sitter follow-up in `docs/plans/0072-shell-quote-tokenizer.md` as addressed by #74.
    Commit: `docs: note tree-sitter follow-up addressed by #74`
 
 ## Risks and Mitigations
@@ -275,6 +274,13 @@ It continues to receive plain strings (now extracted from AST nodes instead of `
 
 ## Open Questions
 
-- **Variable expansion in tree-sitter**: tree-sitter parses `$HOME/foo` as an `expansion` + `word` concatenation. The `text` property of the concatenation node includes the literal `$HOME/foo`. `classifyTokenAsPathCandidate` does not expand variables (same as with `shell-quote`), so `$HOME/foo` will not be detected as an external path. This is a pre-existing limitation, not a regression.
-- **Subshell commands**: `(cat /etc/hosts)` — tree-sitter wraps this in a `subshell` node containing a `command`. The walker visits it. Verify in tests.
-- **WASM loading in Bun-compiled Pi binary**: Pi ships as a Bun-compiled binary. WASM files in extension `node_modules` are on the filesystem (not compiled in). `createRequire` should resolve them correctly, but this needs manual verification.
+- **Variable expansion in tree-sitter**: tree-sitter parses `$HOME/foo` as an `expansion` + `word` concatenation.
+  The `text` property of the concatenation node includes the literal `$HOME/foo`.
+  `classifyTokenAsPathCandidate` does not expand variables (same as with `shell-quote`), so `$HOME/foo` will not be detected as an external path.
+  This is a pre-existing limitation, not a regression.
+- **Subshell commands**: `(cat /etc/hosts)` — tree-sitter wraps this in a `subshell` node containing a `command`.
+  The walker visits it.
+  Verify in tests.
+- **WASM loading in Bun-compiled Pi binary**: Pi ships as a Bun-compiled binary.
+  WASM files in extension `node_modules` are on the filesystem (not compiled in).
+  `createRequire` should resolve them correctly, but this needs manual verification.

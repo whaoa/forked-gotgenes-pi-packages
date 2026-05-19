@@ -86,13 +86,19 @@ The modules listed below have **no dedicated unit test file** at all:
 After extraction, `src/index.ts` is ~970 lines.
 The factory function itself is ~740 lines because it owns:
 
-1. **Module-scope mutable state** — `extensionConfig`, `extensionLogger`, `loggingWarningReporter`, and `reportedLoggingWarnings` live outside the factory. The factory writes to them via `setExtensionConfig` / `setLoggingWarningReporter` and every extracted module that needs logging receives it via setter injection (`setForwardedPermissionLogger`). This works but creates hidden temporal coupling: callers must call the setter before any logging function is invoked.
+1. **Module-scope mutable state** — `extensionConfig`, `extensionLogger`, `loggingWarningReporter`, and `reportedLoggingWarnings` live outside the factory.
+   The factory writes to them via `setExtensionConfig` / `setLoggingWarningReporter` and every extracted module that needs logging receives it via setter injection (`setForwardedPermissionLogger`).
+   This works but creates hidden temporal coupling: callers must call the setter before any logging function is invoked.
 
-2. **Module-scope constants derived from `getAgentDir()`** — `PI_AGENT_DIR`, `SESSIONS_DIR`, `SUBAGENT_SESSIONS_DIR`, `PERMISSION_FORWARDING_DIR`, and `GLOBAL_LOGS_DIR` are all computed at import time, which violates the AGENTS.md rule *"Do not cache `getAgentDir()` at module scope."* They happen to work because `getAgentDir()` returns a stable value in production, but they make the module difficult to test in isolation (tests set `PI_CODING_AGENT_DIR` after import).
+2. **Module-scope constants derived from `getAgentDir()`** — `PI_AGENT_DIR`, `SESSIONS_DIR`, `SUBAGENT_SESSIONS_DIR`, `PERMISSION_FORWARDING_DIR`, and `GLOBAL_LOGS_DIR` are all computed at import time, which violates the AGENTS.md rule *"Do not cache `getAgentDir()` at module scope."*
+   They happen to work because `getAgentDir()` returns a stable value in production, but they make the module difficult to test in isolation (tests set `PI_CODING_AGENT_DIR` after import).
 
-3. **Closure-scoped helpers that could be pure** — `refreshExtensionConfig`, `saveExtensionConfig`, `resolveAgentName`, `shouldExposeTool`, `logResolvedConfigPaths`, `reviewPermissionDecision`, `promptPermission`, `startForwardedPermissionPolling`, and `stopForwardedPermissionPolling` are all closures over `permissionManager`, `runtimeContext`, `extensionConfig`, and the forwarding timer. Some of these (e.g., `resolveAgentName`, `shouldExposeTool`) could be pure functions if given their dependencies as parameters; others (e.g., `startForwardedPermissionPolling`) genuinely need mutable timer state.
+3. **Closure-scoped helpers that could be pure** — `refreshExtensionConfig`, `saveExtensionConfig`, `resolveAgentName`, `shouldExposeTool`, `logResolvedConfigPaths`, `reviewPermissionDecision`, `promptPermission`, `startForwardedPermissionPolling`, and `stopForwardedPermissionPolling` are all closures over `permissionManager`, `runtimeContext`, `extensionConfig`, and the forwarding timer.
+   Some of these (e.g., `resolveAgentName`, `shouldExposeTool`) could be pure functions if given their dependencies as parameters; others (e.g., `startForwardedPermissionPolling`) genuinely need mutable timer state.
 
-4. **Six event handlers inline** — `session_start`, `resources_discover`, `session_shutdown`, `before_agent_start`, `input`, and `tool_call` are defined inline as lambdas inside the factory. The `tool_call` handler alone is ~250 lines. These could be separate named functions that receive a context object with the shared state.
+4. **Six event handlers inline** — `session_start`, `resources_discover`, `session_shutdown`, `before_agent_start`, `input`, and `tool_call` are defined inline as lambdas inside the factory.
+   The `tool_call` handler alone is ~250 lines.
+   These could be separate named functions that receive a context object with the shared state.
 
 Addressing these is out of scope for this issue (pure refactor) but would be the next step toward a testable, sub-300-line `index.ts`.
 
@@ -150,12 +156,18 @@ This ensures tests exercise the module's own logic and boundary conditions witho
 
 **Guiding principles:**
 
-1. **Mock collaborators, not the module under test.** If `permission-prompts.ts` imports `formatToolInputForPrompt` from `tool-input-preview.ts`, the permission-prompts tests mock `tool-input-preview.ts` and verify that the prompts module calls it with the right arguments and uses its return value correctly.
-2. **Use `vi.mock()` for module-level imports.** Vitest hoists `vi.mock()` calls so the module under test receives mocked versions of its dependencies at import time.
-3. **Use `vi.fn()` for injected function dependencies.** When a function takes a callback or deps object (e.g., `PermissionForwardingDeps`), pass `vi.fn()` stubs and assert they were called correctly.
-4. **Mock `ExtensionContext` as a plain object.** The Pi `ExtensionContext` is an interface — tests construct minimal objects satisfying only the properties the module actually reads (e.g., `{ sessionManager: { getEntries: vi.fn() } }`).
-5. **Mock filesystem operations.** Modules that use `node:fs` (`forwarded-permissions/io.ts`) should have `node:fs` mocked via `vi.mock("node:fs")` so tests never touch the real filesystem.
-6. **Restore mocks between tests.** Use `afterEach(() => { vi.restoreAllMocks(); })` to prevent test pollution.
+1. **Mock collaborators, not the module under test.**
+   If `permission-prompts.ts` imports `formatToolInputForPrompt` from `tool-input-preview.ts`, the permission-prompts tests mock `tool-input-preview.ts` and verify that the prompts module calls it with the right arguments and uses its return value correctly.
+2. **Use `vi.mock()` for module-level imports.**
+   Vitest hoists `vi.mock()` calls so the module under test receives mocked versions of its dependencies at import time.
+3. **Use `vi.fn()` for injected function dependencies.**
+   When a function takes a callback or deps object (e.g., `PermissionForwardingDeps`), pass `vi.fn()` stubs and assert they were called correctly.
+4. **Mock `ExtensionContext` as a plain object.**
+   The Pi `ExtensionContext` is an interface — tests construct minimal objects satisfying only the properties the module actually reads (e.g., `{ sessionManager: { getEntries: vi.fn() } }`).
+5. **Mock filesystem operations.**
+   Modules that use `node:fs` (`forwarded-permissions/io.ts`) should have `node:fs` mocked via `vi.mock("node:fs")` so tests never touch the real filesystem.
+6. **Restore mocks between tests.**
+   Use `afterEach(() => { vi.restoreAllMocks(); })` to prevent test pollution.
 
 **Example pattern for a module with collaborators:**
 
@@ -336,8 +348,21 @@ Every test file should use `describe()` blocks to group tests by exported functi
 
 ## Open Questions
 
-- **Should `PermissionReviewSource` move to `src/types.ts`?** Currently only used in `index.ts`. Defer until a second module needs it.
-- **Should `extractSkillNameFromInput` move to `src/skill-prompt-sanitizer.ts`?** It's closely related but currently only called in the `input` event handler. Defer to keep this change mechanical.
-- **Should `permission-manager.ts` (941 lines) get its own unit test file?** It has complex logic (MCP target resolution, policy merge, caching) that would benefit from direct tests with `vi.mock("node:fs")` to control config file reads. Deferred — it would be a large effort and the integration tests cover the main paths. Consider as a separate issue.
-- **Should the module-scope `PI_AGENT_DIR` constants be moved inside the factory?** This would fix the AGENTS.md rule violation but requires threading the values through more call sites. Consider as part of a future factory restructuring issue.
-- **Should `forwarded-permissions/io.ts` replace setter injection with parameter injection?** The current `setForwardedPermissionLogger` pattern creates temporal coupling. An alternative is to pass the logger as a parameter to each function that logs (matching the `PermissionForwardingDeps` pattern in `polling.ts`). This would make the module fully stateless and easier to test without calling a setter first. Consider for a future cleanup.
+- **Should `PermissionReviewSource` move to `src/types.ts`?**
+  Currently only used in `index.ts`.
+  Defer until a second module needs it.
+- **Should `extractSkillNameFromInput` move to `src/skill-prompt-sanitizer.ts`?**
+  It's closely related but currently only called in the `input` event handler.
+  Defer to keep this change mechanical.
+- **Should `permission-manager.ts` (941 lines) get its own unit test file?**
+  It has complex logic (MCP target resolution, policy merge, caching) that would benefit from direct tests with `vi.mock("node:fs")` to control config file reads.
+  Deferred — it would be a large effort and the integration tests cover the main paths.
+  Consider as a separate issue.
+- **Should the module-scope `PI_AGENT_DIR` constants be moved inside the factory?**
+  This would fix the AGENTS.md rule violation but requires threading the values through more call sites.
+  Consider as part of a future factory restructuring issue.
+- **Should `forwarded-permissions/io.ts` replace setter injection with parameter injection?**
+  The current `setForwardedPermissionLogger` pattern creates temporal coupling.
+  An alternative is to pass the logger as a parameter to each function that logs (matching the `PermissionForwardingDeps` pattern in `polling.ts`).
+  This would make the module fully stateless and easier to test without calling a setter first.
+  Consider for a future cleanup.

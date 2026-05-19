@@ -105,7 +105,8 @@ The `wildcardMatch` docblock should mention `?` alongside `*`:
 1. **Red:** Add `describe("? single-character wildcard")` tests in `tests/wildcard-matcher.test.ts` — all should fail because `?` is currently a literal.
    Commit: `test: add ? single-character wildcard tests (#122)`
 
-2. **Green:** Update `compileWildcardPattern` in `src/wildcard-matcher.ts` to replace `\?` → `.` after escaping. Update JSDoc.
+2. **Green:** Update `compileWildcardPattern` in `src/wildcard-matcher.ts` to replace `\?` → `.` after escaping.
+   Update JSDoc.
    Commit: `feat: support ? single-character wildcard in permission patterns (#122)`
 
 3. **Docs:** Update `docs/configuration.md` and `docs/opencode-compatibility.md`.
@@ -122,4 +123,5 @@ The `wildcardMatch` docblock should mention `?` alongside `*`:
 
 ## Open Questions
 
-- Should `\?` be supported as an escape sequence for a literal `?`? Deferred — OpenCode does not support this either, and the need is unlikely given `?` does not appear in tool names or common paths.
+- Should `\?` be supported as an escape sequence for a literal `?`?
+  Deferred — OpenCode does not support this either, and the need is unlikely given `?` does not appear in tool names or common paths.

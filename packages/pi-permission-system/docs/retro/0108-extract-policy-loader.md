@@ -18,7 +18,8 @@ Released as v5.5.0.
 #### What went well
 
 - The user's intervention during planning — asking to add test impact analysis (what new tests are enabled, what existing tests become redundant) — significantly improved the plan quality.
-  This two-question framework ("what can we now test that we couldn't before?" / "what existing tests are now redundant?") is a reusable pattern for extraction refactors.
+  This two-question framework ("what can we now test that we couldn't before?"
+  / "what existing tests are now redundant?") is a reusable pattern for extraction refactors.
 - The TDD cycle was notably clean for steps 1–3: all tests passed on first attempt.
   The in-memory `PolicyLoader` stub pattern worked exactly as designed, producing 25 tests that are faster, simpler, and more focused than their filesystem-dependent equivalents.
 - Backward compatibility was maintained seamlessly — all 1161 pre-existing tests continued to pass after the extraction without any modifications.
@@ -31,9 +32,12 @@ Released as v5.5.0.
    Impact: no rework commit needed — caught before the file was committed.
 
 2. `missing-context` — In TDD step 4, wrote three tests based on wrong assumptions:
-   - **Cache stamp test**: assumed `getCacheStamp()` without an agent name would differ from `getCacheStamp("missing-agent")`, but both produce `"missing"` for the agent slot when no file exists. Fixed by creating an actual agent file so the stamps genuinely differ.
-   - **YAML frontmatter test**: used inline JSON-in-YAML syntax (`bash: { "git *": allow }`) which the simple YAML parser doesn't handle. Fixed by using multi-line YAML.
-   - **Config issue test**: assumed an invalid permission value like `"invalid_value"` would trigger a config issue, but `normalizeUnifiedConfig` silently normalizes unknown values. Fixed by using malformed JSON that triggers a file-read error.
+   - **Cache stamp test**: assumed `getCacheStamp()` without an agent name would differ from `getCacheStamp("missing-agent")`, but both produce `"missing"` for the agent slot when no file exists.
+     Fixed by creating an actual agent file so the stamps genuinely differ.
+   - **YAML frontmatter test**: used inline JSON-in-YAML syntax (`bash: { "git *": allow }`) which the simple YAML parser doesn't handle.
+     Fixed by using multi-line YAML.
+   - **Config issue test**: assumed an invalid permission value like `"invalid_value"` would trigger a config issue, but `normalizeUnifiedConfig` silently normalizes unknown values.
+     Fixed by using malformed JSON that triggers a file-read error.
    Self-identified during test run.
    Impact: one round of test fixes within the same step, no extra commits.
 

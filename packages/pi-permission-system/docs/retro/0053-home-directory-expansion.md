@@ -23,8 +23,12 @@ Completed in 4 functional commits + 1 docs commit with zero regressions across 9
 
 #### What caused friction (agent side)
 
-- `instruction-violation` — First draft of `tests/expand-home.test.ts` used `await import("node:os")` inside a non-async function. AGENTS.md explicitly documents the `vi.hoisted()` + `vi.mock()` pattern, and `tests/bash-external-directory.test.ts` demonstrates the correct approach 4 lines in. Self-identified after autoformat/vitest failure. Impact: one file rewrite (< 30 seconds of rework, no wasted commits).
+- `instruction-violation` — First draft of `tests/expand-home.test.ts` used `await import("node:os")` inside a non-async function.
+  AGENTS.md explicitly documents the `vi.hoisted()` + `vi.mock()` pattern, and `tests/bash-external-directory.test.ts` demonstrates the correct approach 4 lines in.
+  Self-identified after autoformat/vitest failure.
+  Impact: one file rewrite (< 30 seconds of rework, no wasted commits).
 
 #### What caused friction (user side)
 
-- None observed. The issue spec was detailed and unambiguous, including prior art and exact scope.
+- None observed.
+  The issue spec was detailed and unambiguous, including prior art and exact scope.

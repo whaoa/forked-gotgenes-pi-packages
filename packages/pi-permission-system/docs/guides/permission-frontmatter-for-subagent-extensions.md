@@ -29,7 +29,8 @@ The two layers compose additively:
 
 1. A tool hidden by your extension is never seen by the permission system — policy for it is irrelevant.
 2. A tool denied by the permission system is removed from the active set before the agent starts — your extension's allowlist cannot restore it.
-3. Both denylist mechanisms are additive. A tool blocked by either layer stays blocked.
+3. Both denylist mechanisms are additive.
+   A tool blocked by either layer stays blocked.
 
 ## The `permission:` Frontmatter Format
 

@@ -12,7 +12,8 @@ The handlers exhibit three structural problems:
 
 1. **Output arguments** — every handler writes `deps.session.runtimeContext = ctx` back into the bag it received, and lifecycle handlers do scattered 4-field resets.
 2. **Law of Demeter violations** — handlers reach through `deps.session.permissionManager.checkPermission(...)` and `deps.session.sessionRules.getRuleset()` to talk to strangers two levels deep.
-3. **Missing encapsulation** — no object owns the mutable session state. Six files independently reset the same fields to the same values.
+3. **Missing encapsulation** — no object owns the mutable session state.
+   Six files independently reset the same fields to the same values.
 
 ## Goals
 
@@ -73,7 +74,8 @@ Later issues depend on earlier ones but each leaves the repo green.
 ### Phase 1: Extract intermediate abstractions (parallel-safe)
 
 1. **#126 — ExtensionPaths** — value object extracted from `ExtensionRuntime`.
-   Zero behavioral risk. Smallest possible change.
+   Zero behavioral risk.
+   Smallest possible change.
 2. **#127 — SessionLogger** — interface unifying `writeDebugLog` + `writeReviewLog` + `notifyWarning`.
    Touches all handler files and their test factories but is mechanical find-and-replace.
 3. **#128 — ForwardingManager** — class encapsulating polling timer lifecycle.
@@ -99,9 +101,13 @@ Recommended order: #126 → #127 → #128 (increasing complexity).
 
 ## Test impact
 
-- **Phase 1**: Test factories update mechanically (rename fields). No new test files needed.
-- **Phase 2**: `makeDeps()` factories shrink. Gate tests may need `PermissionSession` mock, but `PermissionSession` can satisfy `GateRunnerDeps` so the mock is flat.
-- **Phase 3**: `makeDeps()` disappears entirely. Each handler test constructs `new Handler(mockSession, ...)`. Integration test (`permission-system.test.ts`) is unaffected — it calls `piPermissionSystemExtension(mockPi)` and never sees handler internals.
+- **Phase 1**: Test factories update mechanically (rename fields).
+  No new test files needed.
+- **Phase 2**: `makeDeps()` factories shrink.
+  Gate tests may need `PermissionSession` mock, but `PermissionSession` can satisfy `GateRunnerDeps` so the mock is flat.
+- **Phase 3**: `makeDeps()` disappears entirely.
+  Each handler test constructs `new Handler(mockSession, ...)`.
+  Integration test (`permission-system.test.ts`) is unaffected — it calls `piPermissionSystemExtension(mockPi)` and never sees handler internals.
 
 ## Risks and mitigations
 

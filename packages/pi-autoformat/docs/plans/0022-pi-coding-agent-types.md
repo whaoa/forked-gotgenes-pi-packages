@@ -49,7 +49,8 @@ Relevant pieces in this repo:
   - `ExtensionContextLike` — superseded by `ExtensionContext`.
   - `TextContentLike` — Pi exports `TextContent` (and `ToolResultEventBase.content` is `(TextContent | ImageContent)[]`).
   - `ToolCallEventLike` / `ToolResultEventLike` — Pi exports `ToolCallEvent` / `ToolResultEvent` as discriminated unions over `toolName`.
-  - `ExtensionApiLike` — Pi exports `ExtensionAPI`. Note Pi's `events` channel is **not** part of `ExtensionAPI` today; we currently piggyback via an optional `events?` property.
+  - `ExtensionApiLike` — Pi exports `ExtensionAPI`.
+    Note Pi's `events` channel is **not** part of `ExtensionAPI` today; we currently piggyback via an optional `events?` property.
 - `src/extension.ts` uses internal helpers (`setAutoformatStatus`, `reportMessage`, `formatStatusLine`, `defaultReportFlushResult`, `subscribeToEventBus`, `runFormatter`, …) that read only `ctx.cwd`, `ctx.hasUI`, `ctx.ui.notify`, `ctx.ui.setStatus`, and `ctx.ui.theme`.
 - `test/extension.test.ts` builds lightweight `TestContext` objects with exactly those fields plus a `theme.fg` stub.
   Real `ExtensionContext` requires `sessionManager`, `modelRegistry`, `model`, `signal`, `isIdle()`, `abort()`, `hasPendingMessages()`, `shutdown()`, `getContextUsage()`, `compact()`, `getSystemPrompt()` — none of which our extension touches.
@@ -114,8 +115,10 @@ Our existing dispatch already keys on `event.toolName === "bash" | "edit" | "wri
 
 ### Edge cases
 
-- **`ctx.ui.theme` is optional in Pi's types.** All call sites already null-check it; no behavior change.
-- **Tests that emit synthetic tool events** currently build object literals matching `ToolResultEventLike`. Real `ToolResultEvent`'s discriminated branches require concrete `details` and full `content` typing.
+- **`ctx.ui.theme` is optional in Pi's types.**
+  All call sites already null-check it; no behavior change.
+- **Tests that emit synthetic tool events** currently build object literals matching `ToolResultEventLike`.
+  Real `ToolResultEvent`'s discriminated branches require concrete `details` and full `content` typing.
   We satisfy them with `as ToolResultEvent` casts at the test boundary (the events do not originate from real Pi at runtime in tests, and the cast is one-place per emit), or — preferred — `satisfies` checks against `Partial<BashToolResultEvent>` etc. where the field set is already complete.
   Choose the lighter option per call site; the goal is "tests still compile and still cover the same paths."
 
@@ -167,35 +170,58 @@ Our existing dispatch already keys on `event.toolName === "bash" | "edit" | "wri
 This is a typing-only refactor, so the "red" step is **a failing `tsc`/`vitest` typecheck**, not a failing runtime assertion.
 Every cycle ends with `pnpm test` and `pnpm exec tsc --noEmit` (or whatever typecheck script lands as part of step 1).
 
-1. **chore: add `@earendil-works/pi-coding-agent` devDependency.** Install via `pnpm add -D @earendil-works/pi-coding-agent@^0.72.0`. Verify `pnpm test` still passes (no source changes yet). Commit: `chore: add pi-coding-agent for runtime types`.
+1. **chore: add `@earendil-works/pi-coding-agent` devDependency.**
+   Install via `pnpm add -D @earendil-works/pi-coding-agent@^0.72.0`.
+   Verify `pnpm test` still passes (no source changes yet).
+   Commit: `chore: add pi-coding-agent for runtime types`.
 
-2. **test: prove a plain-function `theme.fg` stub will fail to typecheck once we adopt real types.** Add a single isolated typecheck-only test (e.g. `test/types/theme-stub.test-d.ts` using `expectTypeOf` or a `// @ts-expect-error` block in a new TS file under `test/`) that asserts `{ fg: (_n, t) => t }` is **not** assignable to `Theme`.
-   This is currently `// @ts-expect-error` against the duck type (so it red-flags) — it goes green in step 4. Commit: `test: pin Theme stub-shape expectations`.
+2. **test: prove a plain-function `theme.fg` stub will fail to typecheck once we adopt real types.**
+   Add a single isolated typecheck-only test (e.g. `test/types/theme-stub.test-d.ts` using `expectTypeOf` or a `// @ts-expect-error` block in a new TS file under `test/`) that asserts `{ fg: (_n, t) => t }` is **not** assignable to `Theme`.
+   This is currently `// @ts-expect-error` against the duck type (so it red-flags) — it goes green in step 4.
+   Commit: `test: pin Theme stub-shape expectations`.
 
-3. **feat: replace `*Like` aliases in `src/extension.ts` with real Pi types.** Import real types, introduce `AutoformatExtensionContext` and `ExtensionAPIWithEvents`, swap every signature.
+3. **feat: replace `*Like` aliases in `src/extension.ts` with real Pi types.**
+   Import real types, introduce `AutoformatExtensionContext` and `ExtensionAPIWithEvents`, swap every signature.
    Tests will fail to compile here; that's expected.
    Do **not** touch test files yet — this commit captures the boundary-changing diff in isolation.
-   *(Tip: temporarily skip `pnpm test` in this commit if needed; mark in commit body. Or fold steps 3+4 into one commit if a half-broken intermediate offends — author's call.)* Commit: `refactor: import Pi types from pi-coding-agent`.
+   *(Tip: temporarily skip `pnpm test` in this commit if needed; mark in commit body.*
+   *Or fold steps 3+4 into one commit if a half-broken intermediate offends — author's call.)* Commit: `refactor: import Pi types from pi-coding-agent`.
 
-4. **test: update test stubs to satisfy real Pi types.** Hoist `StubTheme`, narrow `TestContext`, cast synthetic events, etc.
-   `pnpm test` and typecheck both green. Step 2's expectation flips from `@ts-expect-error` to a positive assertion. Commit: `test: adopt class-based Theme stubs and Pi event types`.
+4. **test: update test stubs to satisfy real Pi types.**
+   Hoist `StubTheme`, narrow `TestContext`, cast synthetic events, etc.
+   `pnpm test` and typecheck both green.
+   Step 2's expectation flips from `@ts-expect-error` to a positive assertion.
+   Commit: `test: adopt class-based Theme stubs and Pi event types`.
 
-5. **chore: verify lint / docs alignment.** Run `pnpm run lint` and `pnpm run lint:md`. No expected changes; confirm `schemas/pi-autoformat.schema.json`, `docs/configuration.md`, `README.md` untouched. If any drift, address in a single follow-up commit. Commit (only if needed): `docs: align after Pi types adoption`.
+5. **chore: verify lint / docs alignment.**
+   Run `pnpm run lint` and `pnpm run lint:md`.
+   No expected changes; confirm `schemas/pi-autoformat.schema.json`, `docs/configuration.md`, `README.md` untouched.
+   If any drift, address in a single follow-up commit.
+   Commit (only if needed): `docs: align after Pi types adoption`.
 
 If steps 3 and 4 must be merged to keep CI green at every commit, do so and label the merged commit `refactor: adopt pi-coding-agent types` — but prefer the split when feasible because the test-stub diff is mechanical and noisy.
 
 ## Risks and Mitigations
 
-- **Risk: future Pi release breaks our build.** Mitigation: `^0.72.0` range + Renovate/Dependabot bump.
+- **Risk: future Pi release breaks our build.**
+  Mitigation: `^0.72.0` range + Renovate/Dependabot bump.
   Build-time breakage is the desired tradeoff vs the runtime bug we just shipped.
-- **Risk: real `ExtensionContext` requires fields we never use, churning every test stub.** Mitigation: narrow internal helpers to `Pick<ExtensionContext, "cwd" | "hasUI" | "ui">` (decision recorded above).
-- **Risk: discriminated-union `ToolResultEvent` rejects our synthetic test events.** Mitigation: cast at emit sites; the test-side narrowing has no production value beyond "compiles."
-- **Risk: `pi.events` is not in Pi's `ExtensionAPI`, so the real type loses the channel we depend on.** Mitigation: local `ExtensionAPIWithEvents` intersection alias, scoped to `subscribeToEventBus`, with a TODO comment to delete once Pi exposes it natively.
-- **Risk: `export type { ExtensionApiLike }` is re-exported and consumed downstream.** Mitigation: `rg "ExtensionApiLike"` before deletion; if external consumers exist (none expected — this is an extension package), preserve as a deprecated alias for one release.
-- **Risk: pnpm install pulls a large transitive tree.** Mitigation: it's a `devDependency`, not shipped; verify with `pnpm why`.
+- **Risk: real `ExtensionContext` requires fields we never use, churning every test stub.**
+  Mitigation: narrow internal helpers to `Pick<ExtensionContext, "cwd" | "hasUI" | "ui">` (decision recorded above).
+- **Risk: discriminated-union `ToolResultEvent` rejects our synthetic test events.**
+  Mitigation: cast at emit sites; the test-side narrowing has no production value beyond "compiles."
+- **Risk: `pi.events` is not in Pi's `ExtensionAPI`, so the real type loses the channel we depend on.**
+  Mitigation: local `ExtensionAPIWithEvents` intersection alias, scoped to `subscribeToEventBus`, with a TODO comment to delete once Pi exposes it natively.
+- **Risk: `export type { ExtensionApiLike }` is re-exported and consumed downstream.**
+  Mitigation: `rg "ExtensionApiLike"` before deletion; if external consumers exist (none expected — this is an extension package), preserve as a deprecated alias for one release.
+- **Risk: pnpm install pulls a large transitive tree.**
+  Mitigation: it's a `devDependency`, not shipped; verify with `pnpm why`.
 
 ## Open Questions
 
-- Should we adopt Pi's `isBashToolResult` / `isEditToolResult` / `isWriteToolResult` type guards in `src/extension.ts` instead of `event.toolName === "..."` string checks? Out of scope for this plan; revisit if the dispatch grows or a guard would simplify a future change.
-- Should the local `ExtensionAPIWithEvents` alias migrate into a shared `src/pi-types.ts` module if other modules ever need it? Defer — only one call site uses it today.
-- Should we narrow `TextContent` further (e.g. require `type === "text"`)? Defer — the existing runtime check on `typeof item.text === "string"` is already the contract; tightening the type adds no value.
+- Should we adopt Pi's `isBashToolResult` / `isEditToolResult` / `isWriteToolResult` type guards in `src/extension.ts` instead of `event.toolName === "..."` string checks?
+  Out of scope for this plan; revisit if the dispatch grows or a guard would simplify a future change.
+- Should the local `ExtensionAPIWithEvents` alias migrate into a shared `src/pi-types.ts` module if other modules ever need it?
+  Defer — only one call site uses it today.
+- Should we narrow `TextContent` further (e.g. require `type === "text"`)?
+  Defer — the existing runtime check on `typeof item.text === "string"` is already the contract; tightening the type adds no value.

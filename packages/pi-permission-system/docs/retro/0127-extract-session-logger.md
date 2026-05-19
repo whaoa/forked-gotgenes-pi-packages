@@ -11,17 +11,19 @@ issue_title: "refactor: extract SessionLogger interface to unify logging + notif
 
 Extracted three separate `HandlerDeps` logging/notification fields (`writeDebugLog`, `writeReviewLog`, `notifyWarning`) into a `SessionLogger` interface with `debug`/`review`/`warn` methods.
 Created `src/session-logger.ts` with the interface and `createSessionLogger()` factory, updated all handler source files and 6 test `makeDeps()` factories.
-Shipped as v5.8.0 with zero behavioral change.
-7 new unit tests; total suite 1252 tests across 56 files.
+Shipped as v5.8.0 with zero behavioral change. 7 new unit tests; total suite 1252 tests across 56 files.
 
 ### Observations
 
 #### What went well
 
-- **Three-phase pipeline completed cleanly.** Plan → TDD (4 cycles) → ship in one session with no user corrections needed.
-- **Plan-to-code translation was nearly 1:1.** The `SessionLogger` interface, `createSessionLogger()` factory, `HandlerDeps` change, and handler migration all matched the plan exactly.
+- **Three-phase pipeline completed cleanly.**
+  Plan → TDD (4 cycles) → ship in one session with no user corrections needed.
+- **Plan-to-code translation was nearly 1:1.**
+  The `SessionLogger` interface, `createSessionLogger()` factory, `HandlerDeps` change, and handler migration all matched the plan exactly.
   The mechanical find-and-replace nature of the change made the TDD steps predictable.
-- **Test factory updates were trivially correct.** Replacing 3 fields with 1 nested object (`logger: { debug: vi.fn(), review: vi.fn(), warn: vi.fn() }`) worked identically across all 6 files.
+- **Test factory updates were trivially correct.**
+  Replacing 3 fields with 1 nested object (`logger: { debug: vi.fn(), review: vi.fn(), warn: vi.fn() }`) worked identically across all 6 files.
 
 #### What caused friction (agent side)
 

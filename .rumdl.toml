@@ -1,7 +1,12 @@
 [global]
 exclude = ["**/CHANGELOG.md", "packages/pi-subagents/README.md"]
-disable = ["MD013", "MD041", "MD057"]
+disable = ["MD041", "MD057"]
 extend-enable = ["MD060"]
+
+[MD013]
+line-length = 0
+reflow = true
+reflow-mode = "sentence-per-line"
 
 [MD024]
 siblings_only = true

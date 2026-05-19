@@ -39,7 +39,8 @@ Relevant modules:
 - `src/formatter-registry.ts` — declares `FormatterConfig` with `chains?: Record<string, string[]>` and exposes:
   - `groupFilesByChain(files, config)` — keys files by chain identity (joined with `\u0000`).
   - `resolveChain(chainNames, config)` — turns formatter names into `ResolvedFormatter[]`, dropping disabled / missing entries.
-- `src/formatter-executor.ts` — `executeChainGroup` runs a resolved chain once per group, appending the group's files as trailing args. Returns one `BatchRun` per chain step.
+- `src/formatter-executor.ts` — `executeChainGroup` runs a resolved chain once per group, appending the group's files as trailing args.
+  Returns one `BatchRun` per chain step.
 - `src/prompt-autoformatter.ts` — orchestrates flush: queue → `groupFilesByChain` → `resolveChain` → `executeChainGroup`.
 - `src/config-loader.ts` — `validateChains` uses `validateStringArray`, so today every step must be a string.
 - `src/formatter-config.ts` — built-in defaults populate `chains` with string arrays only.
@@ -260,13 +261,16 @@ This is delivered via the standard reporter, not a new channel.
 
 - **Risk: silent fallback hides missing project config.**
   A globally installed Biome will format with built-in defaults in a Prettier repo.
-  *Mitigation:* required README **Fallback caveat** block plus the **Choosing a chain strategy** recommendation; the docs explicitly point users at project-level chains. No runtime mechanism added (per AGENTS.md: "Mechanism is forever; docs are reversible.").
+  *Mitigation:* required README **Fallback caveat** block plus the **Choosing a chain strategy** recommendation; the docs explicitly point users at project-level chains.
+  No runtime mechanism added (per AGENTS.md: "Mechanism is forever; docs are reversible.").
 - **Risk: PATH probing is platform-fragile.**
-  *Mitigation:* dependency-inject the probe so tests stub it; default implementation walks `process.env.PATH` and `fs.access(X_OK)`-style checks. Match the existing extension's POSIX assumption.
+  *Mitigation:* dependency-inject the probe so tests stub it; default implementation walks `process.env.PATH` and `fs.access(X_OK)`-style checks.
+  Match the existing extension's POSIX assumption.
 - **Risk: probe overhead on every flush.**
   *Mitigation:* per-flush cache; only probe a command once even across many fallback groups.
 - **Risk: grouping-key collision between old encoding and new.**
-  *Mitigation:* the encoding is internal — keys are computed fresh from the in-memory config every flush, never persisted. No migration needed.
+  *Mitigation:* the encoding is internal — keys are computed fresh from the in-memory config every flush, never persisted.
+  No migration needed.
 - **Risk: users typo a formatter name in a fallback group.**
   *Mitigation:* config loader emits a non-fatal config-issue per occurrence and drops the offending entry.
 - **Risk: scope creep into a `when` predicate.**

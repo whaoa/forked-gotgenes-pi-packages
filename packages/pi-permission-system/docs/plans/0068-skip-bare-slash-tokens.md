@@ -80,4 +80,8 @@ No config, schema, or merge-precedence changes involved.
 
 ## Open Questions
 
-- **Follow-up: replace regex tokenizer with a proper parser.** OpenCode uses `web-tree-sitter` + `tree-sitter-bash` for full AST-based path extraction. `shell-quote` (23KB, zero deps, 47M downloads) is a lighter alternative that properly handles quoting, operators, and comments. Either would eliminate the entire class of tokenizer edge-case bugs. File a follow-up issue after this fix lands.
+- **Follow-up: replace regex tokenizer with a proper parser.**
+  OpenCode uses `web-tree-sitter` + `tree-sitter-bash` for full AST-based path extraction.
+  `shell-quote` (23KB, zero deps, 47M downloads) is a lighter alternative that properly handles quoting, operators, and comments.
+  Either would eliminate the entire class of tokenizer edge-case bugs.
+  File a follow-up issue after this fix lands.

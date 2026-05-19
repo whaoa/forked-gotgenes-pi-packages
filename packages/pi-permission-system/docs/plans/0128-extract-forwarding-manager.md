@@ -36,7 +36,8 @@ Forwarding is the mechanism by which subagent permission prompts are relayed to 
 ### Dependencies
 
 - **#126 ExtensionPaths** — closed, implemented. `ForwardingManager` constructor takes `ExtensionPaths` (needs `subagentSessionsDir` for the subagent-context check).
-- **#127 SessionLogger** — closed, implemented. Not directly consumed by `ForwardingManager` (logging goes through `PermissionForwardingDeps`).
+- **#127 SessionLogger** — closed, implemented.
+  Not directly consumed by `ForwardingManager` (logging goes through `PermissionForwardingDeps`).
 
 ### Current layout
 
@@ -126,7 +127,9 @@ And in the `deps` object: `forwarding: forwardingManager`.
 
 ### New files
 
-1. **`src/forwarding-manager.ts`** — `ForwardingManager` class. Moves `startForwardedPermissionPolling` and `stopForwardedPermissionPolling` logic from `runtime.ts`. Imports `isSubagentExecutionContext`, `processForwardedPermissionRequests`, `PERMISSION_FORWARDING_POLL_INTERVAL_MS`.
+1. **`src/forwarding-manager.ts`** — `ForwardingManager` class.
+   Moves `startForwardedPermissionPolling` and `stopForwardedPermissionPolling` logic from `runtime.ts`.
+   Imports `isSubagentExecutionContext`, `processForwardedPermissionRequests`, `PERMISSION_FORWARDING_POLL_INTERVAL_MS`.
 1. **`tests/forwarding-manager.test.ts`** — Unit tests for `ForwardingManager.start()` and `.stop()`.
 
 ### Changed files
@@ -151,7 +154,8 @@ And in the `deps` object: `forwarding: forwardingManager`.
 ### Changed test files
 
 1. **`tests/runtime.test.ts`** — Remove the 3 tests asserting initial `null`/`false` values for the removed fields.
-1. **`tests/handlers/before-agent-start.test.ts`** — Replace `startForwardedPermissionPolling: vi.fn()` / `stopForwardedPermissionPolling: vi.fn()` with `forwarding: { start: vi.fn(), stop: vi.fn() }`. Update assertion from `deps.startForwardedPermissionPolling` to `deps.forwarding.start`.
+1. **`tests/handlers/before-agent-start.test.ts`** — Replace `startForwardedPermissionPolling: vi.fn()` / `stopForwardedPermissionPolling: vi.fn()` with `forwarding: { start: vi.fn(), stop: vi.fn() }`.
+   Update assertion from `deps.startForwardedPermissionPolling` to `deps.forwarding.start`.
 1. **`tests/handlers/input.test.ts`** — Same mock shape update + assertion update.
 1. **`tests/handlers/input-events.test.ts`** — Same mock shape update (no assertions on these mocks).
 1. **`tests/handlers/tool-call.test.ts`** — Same mock shape + assertion update.
@@ -167,7 +171,8 @@ And in the `deps` object: `forwarding: forwardingManager`.
 
 ## Test impact analysis
 
-1. **New unit tests enabled**: `ForwardingManager.start()` and `.stop()` can be tested in isolation with a mock `PermissionForwardingDeps` and fake timers. Previously, testing required constructing a full `ExtensionRuntime` or going through the integration test.
+1. **New unit tests enabled**: `ForwardingManager.start()` and `.stop()` can be tested in isolation with a mock `PermissionForwardingDeps` and fake timers.
+   Previously, testing required constructing a full `ExtensionRuntime` or going through the integration test.
    - `start()` with `hasUI: false` → no-op (no timer created).
    - `start()` with subagent context → stops any existing timer.
    - `start()` when already running → updates context but does not create a second timer.
@@ -181,16 +186,24 @@ And in the `deps` object: `forwarding: forwardingManager`.
 
 1. **Red → Green**: Add `src/forwarding-manager.ts` with the class skeleton and `tests/forwarding-manager.test.ts` with core lifecycle tests (start no-op for non-UI, start no-op for subagent, stop clears state, timer tick calls process, tick skipped while processing, idempotent start).
    Commit: `feat: add ForwardingManager class (#128)`
-1. **Green → Refactor**: Remove the 3 forwarding fields from `ExtensionRuntime`, delete the two free functions from `runtime.ts`, update `createExtensionRuntime()`. Remove the 3 init-value tests from `runtime.test.ts`. Run `pnpm run build` to verify.
+1. **Green → Refactor**: Remove the 3 forwarding fields from `ExtensionRuntime`, delete the two free functions from `runtime.ts`, update `createExtensionRuntime()`.
+   Remove the 3 init-value tests from `runtime.test.ts`.
+   Run `pnpm run build` to verify.
    Commit: `refactor: remove forwarding state from ExtensionRuntime (#128)`
-1. **Green → Refactor**: Update `HandlerDeps` in `src/handlers/types.ts` — replace the two methods with `readonly forwarding: ForwardingManager`. Update all 4 handler files to use `deps.forwarding.start(ctx)` / `deps.forwarding.stop()`. Update all 7 handler test files (mock shape + assertions). Run `pnpm run build` and full test suite.
+1. **Green → Refactor**: Update `HandlerDeps` in `src/handlers/types.ts` — replace the two methods with `readonly forwarding: ForwardingManager`.
+   Update all 4 handler files to use `deps.forwarding.start(ctx)` / `deps.forwarding.stop()`.
+   Update all 7 handler test files (mock shape + assertions).
+   Run `pnpm run build` and full test suite.
    Commit: `refactor: wire ForwardingManager through HandlerDeps (#128)`
-1. **Green → Refactor**: Update `src/index.ts` — construct `ForwardingManager`, pass it as `forwarding` in the deps object, remove the two closure wrappers. Run full test suite.
+1. **Green → Refactor**: Update `src/index.ts` — construct `ForwardingManager`, pass it as `forwarding` in the deps object, remove the two closure wrappers.
+   Run full test suite.
    Commit: `refactor: construct ForwardingManager in composition root (#128)`
 
-Note: Steps 2–4 can be combined into fewer commits if the changes are small enough, but the ordering must be maintained. Step 2 will break the build until step 3 updates callers, so steps 2 and 3 should be done together or step 2 should keep the old functions as deprecated wrappers temporarily.
+Note: Steps 2–4 can be combined into fewer commits if the changes are small enough, but the ordering must be maintained.
+Step 2 will break the build until step 3 updates callers, so steps 2 and 3 should be done together or step 2 should keep the old functions as deprecated wrappers temporarily.
 
-**Revised strategy**: Combine steps 2, 3, and 4 into a single commit since removing the fields from `ExtensionRuntime` and updating `HandlerDeps` + `index.ts` are interdependent. The sequence becomes:
+**Revised strategy**: Combine steps 2, 3, and 4 into a single commit since removing the fields from `ExtensionRuntime` and updating `HandlerDeps` + `index.ts` are interdependent.
+The sequence becomes:
 
 1. `feat: add ForwardingManager class (#128)` — new file + tests, no existing code changed.
 1. `refactor: wire ForwardingManager and remove legacy forwarding state (#128)` — all mechanical changes in one commit: runtime, types, handlers, index, handler tests, runtime tests.
@@ -206,4 +219,6 @@ Note: Steps 2–4 can be combined into fewer commits if the changes are small en
 
 ## Open questions
 
-- Should `ForwardingManager` accept the full `ExtensionPaths` or just `subagentSessionsDir`? The issue suggests `ExtensionPaths`; this plan uses the narrower `subagentSessionsDir` to follow the dependency-width heuristic. Either works — the `PermissionSession` (#129) will wrap it regardless.
+- Should `ForwardingManager` accept the full `ExtensionPaths` or just `subagentSessionsDir`?
+  The issue suggests `ExtensionPaths`; this plan uses the narrower `subagentSessionsDir` to follow the dependency-width heuristic.
+  Either works — the `PermissionSession` (#129) will wrap it regardless.

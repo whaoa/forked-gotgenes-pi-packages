@@ -12,7 +12,8 @@ The extension currently splits configuration across two unrelated files and path
 1. A **policy file** (`~/.pi/agent/pi-permissions.jsonc` / `<cwd>/.pi/agent/pi-permissions.jsonc`) holding permission rules.
 2. An **extension runtime config** (`<extension-install-dir>/config.json`) holding knobs like `debugLog`, `permissionReviewLog`, and `yoloMode`.
 
-This split makes "what does this project allow?" hard to answer by looking in one place.
+This split makes "what does this project allow?"
+hard to answer by looking in one place.
 The runtime config lives inside the install directory, which is read-only for npm-installed extensions and has no project-scope counterpart.
 The project policy path (`.pi/agent/`) does not match the convention used by other Pi extensions.
 
@@ -237,59 +238,43 @@ Unified loader replacing both the policy-loading logic in `permission-manager.ts
 
 ## TDD Order
 
-1. **`config-paths.ts` — path derivation**
-   Test: all path functions return expected segments for given `agentDir`/`cwd`/`extensionRoot`.
-   Commit: `test: add config-paths derivation tests`
-   Then implement.
+1. **`config-paths.ts` — path derivation** Test: all path functions return expected segments for given `agentDir`/`cwd`/`extensionRoot`.
+   Commit: `test: add config-paths derivation tests` Then implement.
    Commit: `feat!: add config-paths module with new layout paths (#10)`
 
-2. **`config-loader.ts` — unified loader (happy path)**
-   Test: `loadUnifiedConfig` parses a valid JSON file into the unified shape; JSONC comments are stripped; unknown keys are ignored.
-   Commit: `test: unified config loader happy path`
-   Then implement.
+2. **`config-loader.ts` — unified loader (happy path)** Test: `loadUnifiedConfig` parses a valid JSON file into the unified shape; JSONC comments are stripped; unknown keys are ignored.
+   Commit: `test: unified config loader happy path` Then implement.
    Commit: `feat: add unified config loader (#10)`
 
-3. **`config-loader.ts` — merge precedence**
-   Test: `loadAndMergeConfigs` deep-merges object fields (project overrides global per-key), replaces scalars, collects issues.
-   Commit: `test: config merge precedence for unified loader`
-   Then implement.
+3. **`config-loader.ts` — merge precedence** Test: `loadAndMergeConfigs` deep-merges object fields (project overrides global per-key), replaces scalars, collects issues.
+   Commit: `test: config merge precedence for unified loader` Then implement.
    Commit: `feat: implement config merge in unified loader (#10)`
 
-4. **`config-loader.ts` — legacy-path detection**
-   Test: when legacy files exist, loader merges their contents and emits exactly one config issue per legacy file with migration instructions.
+4. **`config-loader.ts` — legacy-path detection** Test: when legacy files exist, loader merges their contents and emits exactly one config issue per legacy file with migration instructions.
    When legacy files do not exist, no issues are emitted.
-   Commit: `test: legacy-path detection and migration warnings`
-   Then implement.
+   Commit: `test: legacy-path detection and migration warnings` Then implement.
    Commit: `feat: detect and merge legacy config paths (#10)`
 
-5. **`extension-config.ts` — remove old load/save, keep normalization**
-   Test: update `extension-config.test.ts` — remove tests for deleted functions, keep normalization tests.
+5. **`extension-config.ts` — remove old load/save, keep normalization** Test: update `extension-config.test.ts` — remove tests for deleted functions, keep normalization tests.
    Commit: `refactor: strip old load/save from extension-config (#10)`
 
-6. **`permission-manager.ts` — consume unified loader**
-   Test: update `permission-system.test.ts` to use new path layout; verify merge precedence is preserved (global → project → per-agent).
-   Commit: `test: update permission-manager tests for new config layout`
-   Then implement.
+6. **`permission-manager.ts` — consume unified loader** Test: update `permission-system.test.ts` to use new path layout; verify merge precedence is preserved (global → project → per-agent).
+   Commit: `test: update permission-manager tests for new config layout` Then implement.
    Commit: `feat!: wire permission-manager to unified config loader (#10)`
 
-7. **`logging.ts` — parameterized log paths**
-   Test: logger uses injected paths, not hardcoded constants.
+7. **`logging.ts` — parameterized log paths** Test: logger uses injected paths, not hardcoded constants.
    Commit: `refactor: parameterize log paths in logging module (#10)`
 
-8. **`config-reporter.ts` — updated log entry**
-   Test: update `config-reporter.test.ts` for new path fields and legacy-detection status.
+8. **`config-reporter.ts` — updated log entry** Test: update `config-reporter.test.ts` for new path fields and legacy-detection status.
    Commit: `feat: update config-reporter for consolidated layout (#10)`
 
-9. **`index.ts` — orchestration wiring**
-   Test: update `session-start.test.ts` to verify new paths are passed through.
+9. **`index.ts` — orchestration wiring** Test: update `session-start.test.ts` to verify new paths are passed through.
    Commit: `feat!: wire index.ts to consolidated config layout (#10)`
 
-10. **`config-modal.ts` — TUI save target**
-    Test: modal reads/writes the new global config path.
+10. **`config-modal.ts` — TUI save target** Test: modal reads/writes the new global config path.
     Commit: `feat: update config-modal to use new global config path (#10)`
 
-11. **Schema, example, docs**
-    Update `schemas/permissions.schema.json`, `config/config.example.json`, `README.md`, `AGENTS.md`.
+11. **Schema, example, docs** Update `schemas/permissions.schema.json`, `config/config.example.json`, `README.md`, `AGENTS.md`.
     Commit: `docs: update schema, example, and docs for consolidated config (#10)`
 
 ## Risks and Mitigations

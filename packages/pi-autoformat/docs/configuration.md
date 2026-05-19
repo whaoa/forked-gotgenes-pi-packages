@@ -65,21 +65,18 @@ Example:
 
 ### `formatScope`
 
-Boundary used to filter the touched-files queue. Paths outside the configured
-scope are dropped silently.
+Boundary used to filter the touched-files queue.
+Paths outside the configured scope are dropped silently.
 
 Allowed values:
 
-- `"repoRoot"` (default) — detect the Git toplevel via
-  `git rev-parse --show-toplevel` and use it as the scope. Falls back to `cwd`
-  when not in a Git repo.
+- `"repoRoot"` (default) — detect the Git toplevel via `git rev-parse --show-toplevel` and use it as the scope.
+  Falls back to `cwd` when not in a Git repo.
 - `"cwd"` — strict cwd subtree.
 - `string[]` — explicit allowlist of roots, each resolved relative to `cwd`.
   A path is in scope if it falls under any configured root.
 
-Symlinks are resolved on both sides via `fs.realpath`, so a symlinked workspace
-dep that resolves outside the scope is correctly filtered, and a symlink
-pointing into the scope is correctly included.
+Symlinks are resolved on both sides via `fs.realpath`, so a symlinked workspace dep that resolves outside the scope is correctly filtered, and a symlink pointing into the scope is correctly included.
 
 Example:
 
@@ -91,9 +88,8 @@ Example:
 
 ### `shellMutationDetection`
 
-Opt-in detection of files mutated by shell (`bash`) commands. Disabled by
-default; enable to surface files touched by `sed -i`, `mv`, `cp`, `touch`,
-`tee`, redirections, or user-declared codegen wrappers.
+Opt-in detection of files mutated by shell (`bash`) commands.
+Disabled by default; enable to surface files touched by `sed -i`, `mv`, `cp`, `touch`, `tee`, redirections, or user-declared codegen wrappers.
 
 Defaults:
 
@@ -110,17 +106,16 @@ Defaults:
 
 Fields:
 
-- `enabled` — master switch. Defaults to `false`.
-- `argumentParsing` — parse a small whitelist of known mutating commands
-  (`sed -i`, `mv`, `cp`, `touch`, `tee`, plus simple `>` / `>>`
-  redirections). Bails on pipelines, command substitutions, sequencing, and
-  unknown flags so the surface stays auditable.
-- `snapshotGlobs` — globs whose mtimes are sampled before and after each
-  `bash` invocation. Files whose mtime advanced are treated as touched.
-  Capped at 5,000 entries with a warning on overflow. Defaults to `[]`.
-- `wrappers` — shell command prefixes that already print the files they
-  touched on stdout. Each entry has a `prefix` (matched at the start of the
-  bash command) and optional `outputFormat` (currently only `"lines"`).
+- `enabled` — master switch.
+  Defaults to `false`.
+- `argumentParsing` — parse a small whitelist of known mutating commands (`sed -i`, `mv`, `cp`, `touch`, `tee`, plus simple `>` / `>>` redirections).
+  Bails on pipelines, command substitutions, sequencing, and unknown flags so the surface stays auditable.
+- `snapshotGlobs` — globs whose mtimes are sampled before and after each `bash` invocation.
+  Files whose mtime advanced are treated as touched.
+  Capped at 5,000 entries with a warning on overflow.
+  Defaults to `[]`.
+- `wrappers` — shell command prefixes that already print the files they touched on stdout.
+  Each entry has a `prefix` (matched at the start of the bash command) and optional `outputFormat` (currently only `"lines"`).
 
 Example:
 
@@ -134,18 +129,15 @@ Example:
 }
 ```
 
-Merge semantics: `snapshotGlobs` and `wrappers` arrays replace lower-precedence
-values rather than merging — consistent with other array fields in this config.
+Merge semantics: `snapshotGlobs` and `wrappers` arrays replace lower-precedence values rather than merging — consistent with other array fields in this config.
 
 ### `customMutationTools`
 
-Declare additional tool names whose results should be treated as file
-mutations and routed into the touched-files queue. Useful for project- or
-extension-specific tools that the agent calls directly.
+Declare additional tool names whose results should be treated as file mutations and routed into the touched-files queue.
+Useful for project- or extension-specific tools that the agent calls directly.
 
-Each entry must specify the tool name and exactly one of `pathField` or
-`pathFields`, each a dotted path into the tool's `input` payload. A field
-may resolve to a string or a string array; arrays are flattened.
+Each entry must specify the tool name and exactly one of `pathField` or `pathFields`, each a dotted path into the tool's `input` payload.
+A field may resolve to a string or a string array; arrays are flattened.
 
 Defaults to `[]`.
 
@@ -160,13 +152,11 @@ Example:
 }
 ```
 
-Paths are normalized and scope-filtered by the same pipeline used for
-`write`/`edit`, so you do not need to restate scope rules per tool.
+Paths are normalized and scope-filtered by the same pipeline used for `write`/`edit`, so you do not need to restate scope rules per tool.
 
 ### `eventBusMutationChannel`
 
-Lets peer extensions publish touched files onto Pi's shared event bus and
-have them flow through the same prompt-end formatter pipeline.
+Lets peer extensions publish touched files onto Pi's shared event bus and have them flow through the same prompt-end formatter pipeline.
 
 Defaults:
 
@@ -183,7 +173,8 @@ Fields:
 
 - `enabled` — subscribe to the channel when Pi exposes `pi.events`.
   Defaults to `true`.
-- `channel` — channel name to subscribe to. Defaults to `"autoformat:touched"`.
+- `channel` — channel name to subscribe to.
+  Defaults to `"autoformat:touched"`.
 
 Payload shape (best-effort; malformed payloads are silently ignored):
 
@@ -192,8 +183,7 @@ Payload shape (best-effort; malformed payloads are silently ignored):
 { paths: string[] }         // multiple files
 ```
 
-Paths are resolved relative to the session `cwd` and pass through the same
-scope filter as every other mutation source.
+Paths are resolved relative to the session `cwd` and pass through the same scope filter as every other mutation source.
 
 ### `formatterOutput`
 
@@ -277,18 +267,14 @@ Each formatter can define:
 - `environment?: Record<string, string>`
 - `disabled?: boolean`
 
-> **Deprecated:** earlier versions accepted an `extensions: string[]`
-> field on each formatter. It was never read by dispatch and has been
-> removed. The loader still accepts on-disk configs that carry it but
-> emits a single deprecation notice and ignores the value — remove
-> `extensions` from your formatter entries and rely on `chains` to
-> declare which extensions a formatter runs against.
+> **Deprecated:** earlier versions accepted an `extensions: string[]` field on each formatter.
+> It was never read by dispatch and has been removed.
+> The loader still accepts on-disk configs that carry it but emits a single deprecation notice and ignores the value — remove `extensions` from your formatter entries and rely on `chains` to declare which extensions a formatter runs against.
 
-**Batch dispatch.** Touched file paths are appended to `command` as
-trailing arguments. The executor runs each formatter once per chain
-group, passing every file in the group as a single invocation. Do not
-include file paths or the legacy `$FILE` token in `command` — it is
-rejected at config-load time.
+**Batch dispatch.**
+Touched file paths are appended to `command` as trailing arguments.
+The executor runs each formatter once per chain group, passing every file in the group as a single invocation.
+Do not include file paths or the legacy `$FILE` token in `command` — it is rejected at config-load time.
 
 Formatter command resolution stays intentionally simple:
 
@@ -362,8 +348,7 @@ Fallback example:
 #### Fallback semantics
 
 The only fallthrough trigger is **command not found in `PATH`**.
-Non-zero exit codes are treated as real failures and surfaced — they are
-not masked by trying the next alternative.
+Non-zero exit codes are treated as real failures and surfaced — they are not masked by trying the next alternative.
 
 | Outcome of formatter N in the group | Behavior                                              |
 | ----------------------------------- | ----------------------------------------------------- |
@@ -372,47 +357,30 @@ not masked by trying the next alternative.
 | Command runs, exits non-zero        | Failure, stop the group, report                       |
 | All formatters missing from `PATH`  | Group is a no-op (no batch run emitted)               |
 
-The `PATH` probe is cached per flush, so the same command is probed at
-most once across a single agent turn even when many extensions share
-the same fallback group.
+The `PATH` probe is cached per flush, so the same command is probed at most once across a single agent turn even when many extensions share the same fallback group.
 
-When a non-first alternative wins, the formatter name in success and
-failure summaries is annotated with which earlier alternatives were
-skipped (e.g. `prettier (fallback after biome unavailable)`).
+When a non-first alternative wins, the formatter name in success and failure summaries is annotated with which earlier alternatives were skipped (e.g. `prettier (fallback after biome unavailable)`).
 
 #### Choosing a chain strategy
 
 Prefer **project-level** `chains` over relying on global fallback.
-Global `chains` are convenient defaults, but become ambiguous in
-repositories that use multiple alternative tools.
-A project-level `chains` declaration in
-`.pi/extensions/pi-autoformat/config.json` is explicit, predictable,
-and survives team handoffs.
+Global `chains` are convenient defaults, but become ambiguous in repositories that use multiple alternative tools.
+A project-level `chains` declaration in `.pi/extensions/pi-autoformat/config.json` is explicit, predictable, and survives team handoffs.
 
-Treat global fallback (`[{ "fallback": ["biome", "prettier"] }]`) as a
-"what to do when no project config has opinions" backstop — useful for
-ad-hoc repos, not load-bearing for projects you maintain.
+Treat global fallback (`[{ "fallback": ["biome", "prettier"] }]`) as a "what to do when no project config has opinions" backstop — useful for ad-hoc repos, not load-bearing for projects you maintain.
 
 #### Fallback caveat
 
 Fallback chooses the first formatter whose command is on `PATH`.
 It does **not** check whether the tool has a project config to apply.
-A globally installed Biome will win a `[biome, prettier]` fallback even
-in repos that use Prettier — and Biome will format the file with its
-built-in defaults.
-If both alternatives are realistic in your environment, declare a
-project-level chain to disambiguate.
+A globally installed Biome will win a `[biome, prettier]` fallback even in repos that use Prettier — and Biome will format the file with its built-in defaults.
+If both alternatives are realistic in your environment, declare a project-level chain to disambiguate.
 
 #### Wildcard chain key (`*`)
 
-In addition to per-extension keys, `chains` may declare a single `"*"`
-entry that applies to **every** touched file (including files without
-an extension).
+In addition to per-extension keys, `chains` may declare a single `"*"` entry that applies to **every** touched file (including files without an extension).
 The wildcard chain runs first across the full batch.
-Files that any built-in dispatcher (see [built-in formatters](#built-in-formatters)
-below) reports as unhandled fall through to the per-extension chain
-for their extension; files claimed by the wildcard chain are removed
-from the per-extension pass to avoid double-formatting.
+Files that any built-in dispatcher (see [built-in formatters](#built-in-formatters) below) reports as unhandled fall through to the per-extension chain for their extension; files claimed by the wildcard chain are removed from the per-extension pass to avoid double-formatting.
 
 ```json
 {
@@ -424,14 +392,11 @@ from the per-extension pass to avoid double-formatting.
 }
 ```
 
-This pattern lets a project-level dispatcher (`treefmt` or
-`treefmt-nix`) handle anything it knows about, while per-extension
-chains backstop the rest.
+This pattern lets a project-level dispatcher (`treefmt` or `treefmt-nix`) handle anything it knows about, while per-extension chains backstop the rest.
 
 #### Built-in formatters
 
-Two formatter names are shipped as built-ins and may be referenced in
-`chains` without a `formatters` entry:
+Two formatter names are shipped as built-ins and may be referenced in `chains` without a `formatters` entry:
 
 - `treefmt` — discovers `treefmt.toml` (preferred) or `.treefmt.toml`
   by walking up from each touched file, then invokes
@@ -443,35 +408,23 @@ Two formatter names are shipped as built-ins and may be referenced in
   `nix fmt --no-update-lock-file --no-write-lock-file -- <paths...>`
   from the flake root.
 
-Discovered config-root paths are cached for the lifetime of the
-autoformatter, so repeated flushes within a session do not re-walk the
-filesystem.
+Discovered config-root paths are cached for the lifetime of the autoformatter, so repeated flushes within a session do not re-walk the filesystem.
 
-Both built-ins translate documented "no formatter for path" output into
-a clean **skip** outcome so chain composition (especially `fallback`
-and the wildcard-then-per-extension flow) works naturally:
+Both built-ins translate documented "no formatter for path" output into a clean **skip** outcome so chain composition (especially `fallback` and the wildcard-then-per-extension flow) works naturally:
 
-- `treefmt`: stderr lines matching `no formatter for path: <p>` mark
-  that file as unhandled.
-  An exit-0 run where every input file was unhandled is treated as a
-  full skip.
+- `treefmt`: stderr lines matching `no formatter for path: <p>` mark that file as unhandled.
+  An exit-0 run where every input file was unhandled is treated as a full skip.
 - `treefmt-nix`: stderr containing `emitted 0 files for processing`
   is treated as a full skip; transient `nix` daemon errors
   (e.g. `cannot connect to socket`) are also skipped so a downstream
   fallback alternative can take over.
 
-Anything else with a non-zero exit is reported as a real failure and is
-never silently swallowed.
+Anything else with a non-zero exit is reported as a real failure and is never silently swallowed.
 
-When both `treefmt` and `treefmt-nix` appear inside the same `fallback`
-group and both are on `PATH` and both resolve to a config at the **same**
-root, `treefmt-nix` wins regardless of declaration order.
+When both `treefmt` and `treefmt-nix` appear inside the same `fallback` group and both are on `PATH` and both resolve to a config at the **same** root, `treefmt-nix` wins regardless of declaration order.
 When the roots differ, the user-declared order is preserved.
 
-Declaring a `formatters` entry whose key matches a built-in name still
-works — the user-declared definition wins, providing an escape hatch for
-custom flags — but the loader emits a single non-fatal config issue so
-the shadowing is visible.
+Declaring a `formatters` entry whose key matches a built-in name still works — the user-declared definition wins, providing an escape hatch for custom flags — but the loader emits a single non-fatal config issue so the shadowing is visible.
 
 ## Merge behavior
 

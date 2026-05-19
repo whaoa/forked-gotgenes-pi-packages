@@ -210,7 +210,9 @@ return `${meaningful.join(" ")} *`;
 ## Open Questions
 
 - Should the arity dictionary be user-configurable (e.g., in `config.json`)?
-  Leaning no — keep it curated in code. User can always decline the suggestion and rely on exact-match session rules.
+  Leaning no — keep it curated in code.
+  User can always decline the suggestion and rely on exact-match session rules.
 - Should flags (tokens starting with `-`) be skipped when counting arity tokens?
   E.g., `rm -rf node_modules` — the meaningful prefix is `rm`, not `rm -rf`.
-  Leaning yes — skip flag tokens when matching against the dictionary. But this adds complexity; defer to a follow-up if the simple approach works well enough.
+  Leaning yes — skip flag tokens when matching against the dictionary.
+  But this adds complexity; defer to a follow-up if the simple approach works well enough.

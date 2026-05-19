@@ -151,5 +151,7 @@ No change — `special.external_directory` resolves via the standard global → 
 
 ## Open Questions
 
-- Should the prompt show all external paths found, or just the first? (Suggest: show all, capped at 5, with "and N more" overflow.)
-- Should there be a config escape hatch to disable the bash extension of `external_directory` independently? (Suggest: defer — if users ask, add `special.bash_external_directory` in a follow-up.)
+- Should the prompt show all external paths found, or just the first?
+  (Suggest: show all, capped at 5, with "and N more" overflow.)
+- Should there be a config escape hatch to disable the bash extension of `external_directory` independently?
+  (Suggest: defer — if users ask, add `special.bash_external_directory` in a follow-up.)

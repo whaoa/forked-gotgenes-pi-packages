@@ -93,7 +93,8 @@ No references to model-option-compatibility exist in `README.md`, `AGENTS.md`, o
 
 ## TDD Order
 
-1. **Baseline verification.** Run `npm test` and `npm run build` to confirm green.
+1. **Baseline verification.**
+   Run `npm test` and `npm run build` to confirm green.
    No commit.
 
 2. **Delete module and remove references.**
@@ -102,7 +103,8 @@ No references to model-option-compatibility exist in `README.md`, `AGENTS.md`, o
    - Run `npm test` and `npm run build` to confirm green.
    - Commit: `feat!: remove out-of-scope model-option-compatibility provider shim (#17)`
 
-3. **Verify no stale references.** Grep the entire repo for `model-option-compatibility`, `registerModelOptionCompatibilityGuard`, `ModelOption`, `temperatur` (catching both `temperature` and `Temperature`), and `GUARDED_TEMPERATURE_APIS`.
+3. **Verify no stale references.**
+   Grep the entire repo for `model-option-compatibility`, `registerModelOptionCompatibilityGuard`, `ModelOption`, `temperatur` (catching both `temperature` and `Temperature`), and `GUARDED_TEMPERATURE_APIS`.
    If any references remain in docs or config, remove them and amend or add a commit: `docs: remove model-option-compatibility references (#17)`
 
 ## Risks and Mitigations

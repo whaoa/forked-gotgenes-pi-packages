@@ -110,7 +110,8 @@ The [target architecture](../architecture/target-architecture.md) defines an `Ex
 To keep that transition smooth:
 
 - Handler function signatures use a single `deps` parameter (not positional state args) — swapping the type is a one-line change per handler.
-- Helpers that only read state (e.g., `shouldExposeTool`, `canRequestPermissionConfirmation`) should be pure functions of their inputs where possible, taking the needed value as a parameter rather than closing over the deps bag. This aligns with the target architecture's principle: *"pure evaluation, IO at the edges."*
+- Helpers that only read state (e.g., `shouldExposeTool`, `canRequestPermissionConfirmation`) should be pure functions of their inputs where possible, taking the needed value as a parameter rather than closing over the deps bag.
+  This aligns with the target architecture's principle: *"pure evaluation, IO at the edges."*
 
 ### File layout
 
@@ -249,8 +250,10 @@ Each cycle is red → green → commit.
 - `getEventToolName` was eliminated entirely — handlers call `getToolNameFromValue` from `tool-registry.ts` directly.
 - `shouldExposeTool` was extracted as a pure exported function in `src/handlers/before-agent-start.ts` rather than a dep entry, consistent with the target architecture principle.
 - Event parameter types: the SDK does not export `ResourcesDiscoverEvent`; handler files use lean local payload interfaces (`SessionStartPayload`, `ResourcesDiscoverPayload`, `InputPayload`, `BeforeAgentStartPayload`) instead of full SDK event types, since handlers consume only a subset of fields.
-- `src/index.ts` reduced from 1066 → 466 lines (56% reduction). The ≤200 line target requires #43 to eliminate module-scope state and extract the remaining factory helpers (`refreshExtensionConfig`, `saveExtensionConfig`, `promptPermission`, `resolveAgentName`, `logResolvedConfigPaths`, etc.) into an `ExtensionRuntime` context object.
+- `src/index.ts` reduced from 1066 → 466 lines (56% reduction).
+  The ≤200 line target requires #43 to eliminate module-scope state and extract the remaining factory helpers (`refreshExtensionConfig`, `saveExtensionConfig`, `promptPermission`, `resolveAgentName`, `logResolvedConfigPaths`, etc.) into an `ExtensionRuntime` context object.
 
 ## Open Questions
 
-- **Should `HandlerDeps` be split into per-handler narrower interfaces?** Defer until the single interface proves unwieldy — YAGNI for now.
+- **Should `HandlerDeps` be split into per-handler narrower interfaces?**
+  Defer until the single interface proves unwieldy — YAGNI for now.

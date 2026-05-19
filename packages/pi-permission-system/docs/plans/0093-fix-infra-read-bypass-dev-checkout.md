@@ -127,7 +127,8 @@ Key details:
 
 - **npm not installed**: `spawnSync` throws `ENOENT` → caught → returns `null`.
 - **npm root -g returns a non-existent path**: `existsSync` check → returns `null`.
-- **Bun binary runtime**: walk-up fails (virtual filesystem), npm may not be available → subprocess fails → returns `null`. Acceptable — Bun binary bundles extensions.
+- **Bun binary runtime**: walk-up fails (virtual filesystem), npm may not be available → subprocess fails → returns `null`.
+  Acceptable — Bun binary bundles extensions.
 - **Windows**: `npm root -g` works on Windows. `spawnSync` handles cross-platform.
 - **NVM / fnm**: `npm root -g` returns the correct root for the active Node version.
 - **Custom npm prefix**: `npm root -g` respects the configured prefix.
@@ -173,12 +174,10 @@ Key details:
    Mock `spawnSync` to control subprocess behavior without actually spawning.
    Commit: `test: cover npm root -g fallback for global node_modules discovery`
 
-2. **feat: add `npm root -g` fallback to `discoverGlobalNodeModulesRoot`**
-   Extract `walkUpToNodeModules` helper, add `discoverGlobalNodeModulesViaSubprocess`, wire into `discoverGlobalNodeModulesRoot`.
+2. **feat: add `npm root -g` fallback to `discoverGlobalNodeModulesRoot`** Extract `walkUpToNodeModules` helper, add `discoverGlobalNodeModulesViaSubprocess`, wire into `discoverGlobalNodeModulesRoot`.
    Commit: `fix: discover global node_modules root from dev checkout via npm root -g fallback`
 
-3. **docs: note the fallback in README**
-   The README already documents `piInfrastructureReadPaths` as the manual workaround.
+3. **docs: note the fallback in README** The README already documents `piInfrastructureReadPaths` as the manual workaround.
    Add a brief note that the automatic discovery now works from dev checkouts via `npm root -g` fallback.
    Commit: `docs: note npm root -g fallback for dev checkout infrastructure reads`
 
@@ -194,5 +193,6 @@ Key details:
 
 ## Open Questions
 
-- Should we log a debug message when the subprocess fallback is used? This would help diagnose issues but adds noise.
+- Should we log a debug message when the subprocess fallback is used?
+  This would help diagnose issues but adds noise.
   Leaning yes — it's a dev-only path and the debug log is opt-in.

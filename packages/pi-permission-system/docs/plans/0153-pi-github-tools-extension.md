@@ -50,7 +50,8 @@ Key patterns to port:
 
 Things to **not** port:
 
-- `github-project.ts` — hardcoded `ORG`, `REPO`, `PROJECT_NUMBER`, `STATUS_OPTIONS`, `PRODUCTION_URL`. Replace with auto-detected owner/repo.
+- `github-project.ts` — hardcoded `ORG`, `REPO`, `PROJECT_NUMBER`, `STATUS_OPTIONS`, `PRODUCTION_URL`.
+  Replace with auto-detected owner/repo.
 - `board.ts`, `milestone.ts`, `retro.ts`, `devserver.ts`, `dod-preflight.ts` — repo-specific.
 - `temp-file.ts` — only needed for issue body creation (not in scope).
 
@@ -490,9 +491,11 @@ MIT license, matching `pi-permission-system`.
 
 This is a greenfield package — no existing tests to consider.
 
-1. **New unit tests enabled**: The portable `lib/` layer is fully testable by mocking `runCommand`. This includes backoff timing (`findRetryDelay`), progress formatting (`formatProgress`), poll loop exit conditions, timeout vs. success branching, repo detection fallback logic, and PR merge precondition checking.
+1. **New unit tests enabled**: The portable `lib/` layer is fully testable by mocking `runCommand`.
+   This includes backoff timing (`findRetryDelay`), progress formatting (`formatProgress`), poll loop exit conditions, timeout vs. success branching, repo detection fallback logic, and PR merge precondition checking.
 2. **No existing tests to simplify**: Greenfield.
-3. **Integration tests**: The `tools/` wrappers are thin enough that integration tests are optional. The `onUpdate` mapping in `progress.ts` is a one-liner.
+3. **Integration tests**: The `tools/` wrappers are thin enough that integration tests are optional.
+   The `onUpdate` mapping in `progress.ts` is a one-liner.
 
 ## TDD Order
 
@@ -558,8 +561,7 @@ This is a greenfield package — no existing tests to consider.
 
 ### Could this silently weaken a permission?
 
-No.
-This extension registers new tools — it does not modify any permission surface, policy, or gate in `pi-permission-system`.
+No. This extension registers new tools — it does not modify any permission surface, policy, or gate in `pi-permission-system`.
 The tools invoke `gh` CLI commands via `child_process.spawn`, which flow through Pi's normal bash permission gate if the permission system is active.
 
 ### `gh` CLI availability
@@ -584,7 +586,14 @@ Testing real backoff delays would make tests slow.
 
 ## Open Questions
 
-1. **Workflow name defaults** — Should tools default to a workflow name (e.g., `ci.yml`) or require it explicitly? Leaning toward requiring it — workflow names vary across projects. The `promptSnippet` can guide the LLM.
-2. **Release-please detection heuristic** — Should `release_pr_find` search by label (`autorelease: pending`) or title pattern (`chore(main): release`)? Both are release-please conventions. May need to try both.
-3. **`release_pr_merge` merge strategy** — The issue says `--rebase`. Some repos use `--squash` or `--merge`. Consider making it a parameter with a default.
-4. **TypeBox version alignment** — Pi uses `typebox` v1. Confirm the extension's `peerDependencies` should declare `typebox` v1 or rely on Pi's copy.
+1. **Workflow name defaults** — Should tools default to a workflow name (e.g., `ci.yml`) or require it explicitly?
+   Leaning toward requiring it — workflow names vary across projects.
+   The `promptSnippet` can guide the LLM.
+2. **Release-please detection heuristic** — Should `release_pr_find` search by label (`autorelease: pending`) or title pattern (`chore(main): release`)?
+   Both are release-please conventions.
+   May need to try both.
+3. **`release_pr_merge` merge strategy** — The issue says `--rebase`.
+   Some repos use `--squash` or `--merge`.
+   Consider making it a parameter with a default.
+4. **TypeBox version alignment** — Pi uses `typebox` v1.
+   Confirm the extension's `peerDependencies` should declare `typebox` v1 or rely on Pi's copy.

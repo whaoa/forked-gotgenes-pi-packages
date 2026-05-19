@@ -98,7 +98,8 @@ This ensures trailing blank lines between the section and the next non-section c
 
 1. **Section at EOF with trailing blanks only** — `end` reaches `lines.length`, same as today; no content is lost because only blank lines follow.
 2. **Section immediately followed by another header** — `isTopLevelSectionHeader` fires first, same as today.
-3. **Section followed by non-bullet, non-indented prose** — new `isSectionBodyLine` check fires, `end` stops before the prose. This is the fix.
+3. **Section followed by non-bullet, non-indented prose** — new `isSectionBodyLine` check fires, `end` stops before the prose.
+   This is the fix.
 4. **Guidelines section** — same `findSection` is used, same fix applies.
 
 ## Module-Level Changes

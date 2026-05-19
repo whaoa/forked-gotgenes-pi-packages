@@ -22,12 +22,16 @@ The change was planned, implemented, shipped, and released as `pi-subagents-v1.0
 
 #### What caused friction (agent side)
 
-- No friction observed. The task was unambiguous and the tooling well-suited.
+- No friction observed.
+  The task was unambiguous and the tooling well-suited.
 
 #### What caused friction (user side)
 
-- No friction observed. The session required no user input beyond invoking the three slash commands.
+- No friction observed.
+  The session required no user input beyond invoking the three slash commands.
 
 ### Follow-ups identified
 
-- The `package-pi-subagents` skill (`.pi/skills/package-pi-subagents/SKILL.md`) still frames the fork as "a friendly fork… carrying a small number of patches" with priorities like "stays as close to upstream as possible." This framing is now stale given the hard-fork commitment. A separate issue should update the skill to reflect the architecture document's posture.
+- The `package-pi-subagents` skill (`.pi/skills/package-pi-subagents/SKILL.md`) still frames the fork as "a friendly fork… carrying a small number of patches" with priorities like "stays as close to upstream as possible."
+  This framing is now stale given the hard-fork commitment.
+  A separate issue should update the skill to reflect the architecture document's posture.

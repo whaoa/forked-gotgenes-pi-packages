@@ -129,7 +129,8 @@ No change — no new policy fields.
 6. **Green**: Update `extractExternalPathsFromBashCommand` to skip safe system paths.
    Commit: `feat: filter safe system paths from bash external path extraction (#44)`
 
-7. **Docs**: No config or schema changes needed. Add a brief note in README if the external-directory section mentions the allowlist.
+7. **Docs**: No config or schema changes needed.
+   Add a brief note in README if the external-directory section mentions the allowlist.
    Commit: `docs: note safe system path allowlist in external-directory section (#44)`
 
 ## Risks and Mitigations
@@ -145,4 +146,6 @@ No change — no new policy fields.
 
 ## Open Questions
 
-- Should `/dev/zero`, `/dev/random`, `/dev/urandom` be included? They are read-only device files but less commonly used by agents. Suggest: defer and add if agents trigger false positives on them.
+- Should `/dev/zero`, `/dev/random`, `/dev/urandom` be included?
+  They are read-only device files but less commonly used by agents.
+  Suggest: defer and add if agents trigger false positives on them.

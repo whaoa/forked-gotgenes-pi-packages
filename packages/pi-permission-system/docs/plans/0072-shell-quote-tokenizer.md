@@ -28,7 +28,8 @@ These are not hypothetical — the escaped-quote bug triggered a false-positive 
 ## Non-Goals
 
 - Adopting `web-tree-sitter` + `tree-sitter-bash` — deferred to a follow-up issue. `shell-quote` is sufficient for path extraction and avoids the 1.5MB WASM overhead.
-- Handling heredocs — `shell-quote` flattens heredoc content into tokens, which is the same behavior as the current tokenizer. This is a known limitation shared by both approaches.
+- Handling heredocs — `shell-quote` flattens heredoc content into tokens, which is the same behavior as the current tokenizer.
+  This is a known limitation shared by both approaches.
 - Changing `classifyTokenAsPathCandidate` logic — the classification heuristics are orthogonal to tokenization.
 - Changing any permission surface, config format, or merge precedence.
 
@@ -114,16 +115,15 @@ This is the first runtime dependency for this package.
    - Add `shell-quote` and `@types/shell-quote` dependencies.
    - In `extractExternalPathsFromBashCommand`, replace `stripQuotedStrings` + `split()` with `parse()` + string filter.
    - Remove the `stripQuotedStrings` function.
-   - All new tests pass (green). Run full suite to confirm no regressions.
+   - All new tests pass (green).
+     Run full suite to confirm no regressions.
    Commit: `feat: replace regex tokenizer with shell-quote (#72)`
 
-3. **test: verify defense-in-depth for bare-slash tokens (#72)**
-   Add or confirm a test that `parse("echo /")` still produces `/` as a token and `classifyTokenAsPathCandidate` still rejects it.
+3. **test: verify defense-in-depth for bare-slash tokens (#72)** Add or confirm a test that `parse("echo /")` still produces `/` as a token and `classifyTokenAsPathCandidate` still rejects it.
    This validates the bare-slash guard remains necessary even with `shell-quote`.
    Commit: `test: confirm bare-slash guard with shell-quote tokenizer (#72)`
 
-4. **docs: update plan retro and close issue (#72)**
-   Optional retro in `docs/retro/0072-shell-quote-tokenizer.md` if anything surprising surfaces.
+4. **docs: update plan retro and close issue (#72)** Optional retro in `docs/retro/0072-shell-quote-tokenizer.md` if anything surprising surfaces.
    Commit: `docs: retro for shell-quote tokenizer migration (#72)`
 
 ## Risks and Mitigations
@@ -137,5 +137,9 @@ This is the first runtime dependency for this package.
 
 ## Open Questions
 
-- **Follow-up: `tree-sitter-bash` for full AST parsing.** Addressed by #74 — `shell-quote` has been replaced with `web-tree-sitter` + `tree-sitter-bash`, eliminating heredoc false positives and providing full AST-based path extraction.
-- **`$VAR` expansion**: tree-sitter parses `$HOME/foo` as an `expansion` + `word` concatenation. `classifyTokenAsPathCandidate` does not expand variables, so `$HOME/foo` is not detected as an external path. This is the same pre-existing limitation as with `shell-quote`. Deferred — not a regression from current behavior.
+- **Follow-up: `tree-sitter-bash` for full AST parsing.**
+  Addressed by #74 — `shell-quote` has been replaced with `web-tree-sitter` + `tree-sitter-bash`, eliminating heredoc false positives and providing full AST-based path extraction.
+- **`$VAR` expansion**: tree-sitter parses `$HOME/foo` as an `expansion` + `word` concatenation.
+  `classifyTokenAsPathCandidate` does not expand variables, so `$HOME/foo` is not detected as an external path.
+  This is the same pre-existing limitation as with `shell-quote`.
+  Deferred — not a regression from current behavior.

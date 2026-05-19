@@ -33,7 +33,8 @@ This issue implements that boundary, following the naming and structural convent
 
 ### Prerequisite issues
 
-- #49 (remove group-join and RPC) — **closed/merged**. The untyped RPC channels are already gone.
+- #49 (remove group-join and RPC) — **closed/merged**.
+  The untyped RPC channels are already gone.
 - #52 (remove scheduled subagents) — **closed/merged**.
 - #51 (update ADR for hard fork) — **closed/merged**.
 

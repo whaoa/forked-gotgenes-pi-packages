@@ -9,7 +9,8 @@ issue_title: "Track and report provenance of each permission rule"
 
 When a permission decision (allow/deny/ask) is made, there is no way to determine which config source contributed the winning rule.
 All four config sources — global, project, agent frontmatter, and project-agent frontmatter — are merged into a single `FlatPermissionConfig` before rules are created, so every config rule receives the generic `layer: "config"` label.
-Debugging "why is tool X denied?" requires manually inspecting up to four config locations.
+Debugging "why is tool X denied?"
+requires manually inspecting up to four config locations.
 The review log records the decision but not its source, and `/permission-system` cannot show where each effective rule came from.
 
 Additionally, the `"override"` value in the `Rule.layer` type union is dead code — introduced in #65, the layer value was removed in #66 but left in the type.
@@ -322,5 +323,8 @@ This requires `config-modal.ts` to accept a function that returns the composed r
 
 ## Open Questions
 
-- Should the `origin` field also appear on synthesized default and baseline rules (e.g., `origin: "builtin"`)? The issue scopes it to `layer: "config"` only; this could be revisited if debugging of defaults becomes a pain point.
-- Should origin be exposed in the interactive permission dialog prompt (e.g., "This permission comes from your project config")? The issue mentions this as a future benefit but does not include it in scope. Deferred.
+- Should the `origin` field also appear on synthesized default and baseline rules (e.g., `origin: "builtin"`)?
+  The issue scopes it to `layer: "config"` only; this could be revisited if debugging of defaults becomes a pain point.
+- Should origin be exposed in the interactive permission dialog prompt (e.g., "This permission comes from your project config")?
+  The issue mentions this as a future benefit but does not include it in scope.
+  Deferred.

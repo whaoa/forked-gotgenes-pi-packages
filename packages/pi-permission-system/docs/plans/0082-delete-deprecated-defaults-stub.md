@@ -47,7 +47,8 @@ No schema, config, or architecture doc changes needed.
 
 ## TDD Order
 
-1. Delete `src/defaults.ts` and `tests/defaults.test.ts`. Run full test suite to confirm nothing breaks.
+1. Delete `src/defaults.ts` and `tests/defaults.test.ts`.
+   Run full test suite to confirm nothing breaks.
    Commit: `chore: delete deprecated defaults.ts stub (#82)`
 
 ## Risks and Mitigations

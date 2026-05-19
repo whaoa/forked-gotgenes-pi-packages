@@ -106,5 +106,9 @@ This issue is primarily a configuration/tooling change with no application logic
 
 ## Open Questions
 
-1. **Should `prepare` silently skip if prek is not installed?** A guard like `command -v prek >/dev/null 2>&1 && prek install || true` avoids blocking `npm install` for contributors who haven't installed prek yet, but it also means hooks silently won't exist. Decide during implementation.
-2. **Should we pin a prek version?** prek is installed globally (via `cargo install` or a binary download), not as an npm dependency. Pinning is not straightforward — defer unless version-specific breakage appears.
+1. **Should `prepare` silently skip if prek is not installed?**
+   A guard like `command -v prek >/dev/null 2>&1 && prek install || true` avoids blocking `npm install` for contributors who haven't installed prek yet, but it also means hooks silently won't exist.
+   Decide during implementation.
+2. **Should we pin a prek version?**
+   prek is installed globally (via `cargo install` or a binary download), not as an npm dependency.
+   Pinning is not straightforward — defer unless version-specific breakage appears.

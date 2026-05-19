@@ -205,4 +205,6 @@ No changes needed — `PermissionDecisionState` lives in `permission-dialog.ts`.
 - Should the dialog show the resolved prefix being approved (e.g., "Allow all access to ~/other-project/src/ for this session")?
   Leaning yes for transparency, but can be deferred to a follow-up polish pass.
 - Should the session approval cover the exact directory of the path or its parent?
-  Current design uses `dirname()` (parent of the file). If the user is accessing `~/other-project/README.md`, the prefix is `~/other-project/` which seems right. For directory-bearing tools like `find` and `ls` where the path *is* a directory, using the path itself as the prefix may be more appropriate — worth validating in tests.
+  Current design uses `dirname()` (parent of the file).
+  If the user is accessing `~/other-project/README.md`, the prefix is `~/other-project/` which seems right.
+  For directory-bearing tools like `find` and `ls` where the path *is* a directory, using the path itself as the prefix may be more appropriate — worth validating in tests.

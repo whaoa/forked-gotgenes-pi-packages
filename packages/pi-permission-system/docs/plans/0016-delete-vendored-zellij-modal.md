@@ -133,10 +133,12 @@ Entire file removed.
 
 ## TDD Order
 
-1. **Baseline.** Run `npm test -- tests/config-modal.test.ts` and `npm run build` to confirm green.
+1. **Baseline.**
+   Run `npm test -- tests/config-modal.test.ts` and `npm run build` to confirm green.
    No commit (baseline verification only).
 
-2. **Delete `zellij-modal.ts` and rewrite `openSettingsModal()`.** Do both together — there is no useful intermediate state where the vendored file exists but nothing imports it.
+2. **Delete `zellij-modal.ts` and rewrite `openSettingsModal()`.**
+   Do both together — there is no useful intermediate state where the vendored file exists but nothing imports it.
    - Delete `src/zellij-modal.ts`.
    - Update imports in `src/config-modal.ts`.
    - Delete `SettingValueSyncTarget` interface.
@@ -146,7 +148,8 @@ Entire file removed.
    - Run full test suite and `npm run build`.
    - Commit: `feat: replace vendored zellij-modal with direct pi-tui SettingsList (#16)`
 
-3. **Docs.** Scan `README.md`, `AGENTS.md`, `docs/` for references to `zellij-modal.ts` and remove them.
+3. **Docs.**
+   Scan `README.md`, `AGENTS.md`, `docs/` for references to `zellij-modal.ts` and remove them.
    - Commit: `docs: remove zellij-modal references (#16)` (skip if none found)
 
 ## Risks and Mitigations

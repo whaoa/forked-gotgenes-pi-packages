@@ -238,8 +238,11 @@ Tests for these pure helpers do not change.
 ## Test impact analysis
 
 1. **New unit tests enabled**: `PermissionSession.canPrompt`, `.prompt`, `.createPermissionRequestId` can be tested in isolation — these were previously untestable closures in `index.ts`.
-2. **Existing tests simplified**: All 6 handler test files lose their `makeDeps()` factory. Each test constructs the specific handler class with only the deps it needs. The session mock gains `canPrompt`/`prompt`/`createPermissionRequestId` but this is mechanical — and the mock is still flat `vi.fn()` stubs.
-3. **Existing tests that must stay**: Tests for handler orchestration logic (gate ordering, cache key checks, prompt flow) stay intact — they test the same class methods. Tests for pure helpers (`shouldExposeTool`, `extractSkillNameFromInput`, `getEventInput`) are completely unchanged.
+2. **Existing tests simplified**: All 6 handler test files lose their `makeDeps()` factory.
+   Each test constructs the specific handler class with only the deps it needs.
+   The session mock gains `canPrompt`/`prompt`/`createPermissionRequestId` but this is mechanical — and the mock is still flat `vi.fn()` stubs.
+3. **Existing tests that must stay**: Tests for handler orchestration logic (gate ordering, cache key checks, prompt flow) stay intact — they test the same class methods.
+   Tests for pure helpers (`shouldExposeTool`, `extractSkillNameFromInput`, `getEventInput`) are completely unchanged.
 4. **Integration test unaffected**: `tests/permission-system.test.ts` calls `piPermissionSystemExtension(mockPi)` and never sees handler internals.
 
 ## TDD order
@@ -294,7 +297,8 @@ Run `pnpm run build` to verify.
 1. Create `PermissionGateHandler` class with `handleToolCall` and `handleInput` methods.
 2. `handleToolCall` moves from `src/handlers/tool-call.ts` into the class. `getEventInput` stays as exported free function.
 3. `handleInput` moves from `src/handlers/input.ts` into the class. `extractSkillNameFromInput` stays as exported free function.
-4. Update `tests/handlers/tool-call.test.ts` and `tests/handlers/tool-call-events.test.ts`: replace `makeDeps()` with `new PermissionGateHandler(mockSession, mockEvents, mockToolRegistry)`. Add `canPrompt`/`prompt` to session mock.
+4. Update `tests/handlers/tool-call.test.ts` and `tests/handlers/tool-call-events.test.ts`: replace `makeDeps()` with `new PermissionGateHandler(mockSession, mockEvents, mockToolRegistry)`.
+   Add `canPrompt`/`prompt` to session mock.
 5. Update `tests/handlers/input.test.ts` and `tests/handlers/input-events.test.ts`: same pattern.
 6. Update `src/index.ts` to construct `PermissionGateHandler` and wire `tool_call` + `input`.
 

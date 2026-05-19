@@ -18,10 +18,12 @@ Mid-session the user introduced a new "sync with remote first" rule for all flow
 
 #### What went well
 
-- The plan/TDD/ship flow worked end-to-end against a non-trivial change with no human-in-the-loop debugging. Eleven feat commits + acceptance test + docs landed in a single sitting and release-please picked them all up into `v2.1.0` automatically.
+- The plan/TDD/ship flow worked end-to-end against a non-trivial change with no human-in-the-loop debugging.
+  Eleven feat commits + acceptance test + docs landed in a single sitting and release-please picked them all up into `v2.1.0` automatically.
 - TDD discipline caught a real bug at step 10 of the plan: the acceptance test surfaced that `flushPrompt` was emitting groups with empty `runs[]` when all fallback alternatives were missing, contradicting the plan's "group is a no-op" wording.
   Fixed in the same commit.
-- Running `pnpm exec tsc --noEmit` mid-flow caught a vacuous test in step 8 — `commandProbe` was passed via the constructor's options but TS flagged it as an unknown property. Without the typecheck the test would have passed for the wrong reason.
+- Running `pnpm exec tsc --noEmit` mid-flow caught a vacuous test in step 8 — `commandProbe` was passed via the constructor's options but TS flagged it as an unknown property.
+  Without the typecheck the test would have passed for the wrong reason.
 
 #### What caused friction (agent side)
 
@@ -63,5 +65,6 @@ Kept the retro file's record of the rabbit-hole as the lesson; no `AGENTS.md` ch
 
 ### Changes made
 
-1. `.pi/prompts/tdd-plan.md` — appended one clause to the lint-fixup rule: "The fixup must NOT land in a `docs:` commit." Closes the gap that produced this session's noisy `3bbc846` docs commit.
+1. `.pi/prompts/tdd-plan.md` — appended one clause to the lint-fixup rule: "The fixup must NOT land in a `docs:` commit."
+   Closes the gap that produced this session's noisy `3bbc846` docs commit.
 2. `docs/retro/0013-fallback-chain-step-type.md` — this file.

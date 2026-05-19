@@ -286,6 +286,8 @@ The caller inspects it and records into `SessionRules`.
 ## Open Questions
 
 - Should "for session" for write/edit tools suggest a path-based pattern (e.g. `src/*`) instead of blanket `*`?
-  Leaning no — the tool permission surface doesn't currently match on file paths, only tool names. Path-based session rules would need a new surface or evaluation mode.
+  Leaning no — the tool permission surface doesn't currently match on file paths, only tool names.
+  Path-based session rules would need a new surface or evaluation mode.
 - Should session approvals be blocked from overriding explicit `deny` rules?
-  Yes — the implementation should only offer "for session" when the config state is `ask`, not `deny`. A `deny` bypasses the gate entirely (no prompt shown).
+  Yes — the implementation should only offer "for session" when the config state is `ask`, not `deny`.
+  A `deny` bypasses the gate entirely (no prompt shown).

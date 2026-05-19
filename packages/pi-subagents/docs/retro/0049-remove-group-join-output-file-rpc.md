@@ -23,15 +23,26 @@ A new issue (#61) was filed to port the output-file format to Pi's official JSON
 
 #### What caused friction (agent side)
 
-- `missing-context` — Included `output-file.ts` removal in the initial plan without questioning its debugging value, despite AGENTS.md's rule "Ask before removing functionality or changing defaults." The issue body explicitly listed it for removal so I followed the spec literally. Impact: required plan revision (amend commit), scope-narrowing comment on issue, and filing #61 — roughly 10 minutes of rework, but produced a better design.
+- `missing-context` — Included `output-file.ts` removal in the initial plan without questioning its debugging value, despite AGENTS.md's rule "Ask before removing functionality or changing defaults."
+  The issue body explicitly listed it for removal so I followed the spec literally.
+  Impact: required plan revision (amend commit), scope-narrowing comment on issue, and filing #61 — roughly 10 minutes of rework, but produced a better design.
 
-- `missing-context` — When asked whether output-file adheres to Pi's session format, searched the web (`web_search` for "Claude Code session JSONL format") instead of checking the local `~/development/pi/pi` monorepo. The user had to explicitly say "~/development/pi/pi has the code for Pi's JSONL format." Impact: one extra round-trip and less authoritative initial answer (Claude Code's format vs Pi's `SessionManager`). Self-identified after user redirect.
+- `missing-context` — When asked whether output-file adheres to Pi's session format, searched the web (`web_search` for "Claude Code session JSONL format") instead of checking the local `~/development/pi/pi` monorepo.
+  The user had to explicitly say "~/development/pi/pi has the code for Pi's JSONL format."
+  Impact: one extra round-trip and less authoritative initial answer (Claude Code's format vs Pi's `SessionManager`).
+  Self-identified after user redirect.
 
-- `instruction-violation` (self-identified) — Shell-escaped the `gh issue comment` body incorrectly; backtick-wrapped `src/output-file.ts` was interpreted by bash. Caught immediately via `gh issue view` and fixed with `--edit-last`. Impact: trivial — one extra command.
+- `instruction-violation` (self-identified) — Shell-escaped the `gh issue comment` body incorrectly; backtick-wrapped `src/output-file.ts` was interpreted by bash.
+  Caught immediately via `gh issue view` and fixed with `--edit-last`.
+  Impact: trivial — one extra command.
 
 #### What caused friction (user side)
 
-- The issue body listed output-file for removal without noting its debugging value. The user's "How confident are we in getting rid of the logging system?" intervention was the correction. If the issue had marked output-file removal as "tentative pending debugging value assessment," the plan would have surfaced it as a design decision from the start. Minor — the discussion was quick and productive.
+- The issue body listed output-file for removal without noting its debugging value.
+  The user's "How confident are we in getting rid of the logging system?"
+  intervention was the correction.
+  If the issue had marked output-file removal as "tentative pending debugging value assessment," the plan would have surfaced it as a design decision from the start.
+  Minor — the discussion was quick and productive.
 
 ### Changes made
 

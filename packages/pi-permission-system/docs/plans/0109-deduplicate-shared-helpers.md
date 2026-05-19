@@ -106,40 +106,36 @@ Both new modules export only pure functions with no module-scope state.
 
 ## Test Impact Analysis
 
-1. **New unit tests enabled:** `mergeFlatPermissions()` currently has no direct unit tests — it is only exercised indirectly through config-loader and permission-manager integration tests. The extraction enables focused unit tests in `tests/permission-merge.test.ts`.
+1. **New unit tests enabled:** `mergeFlatPermissions()` currently has no direct unit tests — it is only exercised indirectly through config-loader and permission-manager integration tests.
+   The extraction enables focused unit tests in `tests/permission-merge.test.ts`.
 2. **Tests that move:** The `normalizePathForComparison` and `isPathWithinDirectory` describe blocks in `tests/external-directory.test.ts` move to `tests/path-utils.test.ts` with only the import path changing.
 3. **Tests that stay as-is:** All other tests in `tests/external-directory.test.ts`, `tests/skill-prompt-sanitizer.test.ts`, `tests/config-loader.test.ts`, and `tests/permission-manager.test.ts` stay unchanged — they exercise higher-level behavior that happens to use these helpers internally.
 
 ## TDD Order
 
-1. **test: add unit tests for mergeFlatPermissions**
-   Create `tests/permission-merge.test.ts` importing from `../src/permission-merge`.
+1. **test: add unit tests for mergeFlatPermissions** Create `tests/permission-merge.test.ts` importing from `../src/permission-merge`.
    Tests will initially fail (module does not exist).
    Cover: string-replaces-string, both-objects-merge, object-replaces-string, string-replaces-object, empty inputs.
    Commit: `test: add unit tests for mergeFlatPermissions`
 
-2. **feat: extract mergeFlatPermissions to permission-merge.ts**
-   Create `src/permission-merge.ts` with the function.
+2. **feat: extract mergeFlatPermissions to permission-merge.ts** Create `src/permission-merge.ts` with the function.
    Update `src/config-loader.ts` and `src/permission-manager.ts` to import from it, remove local copies.
    All tests pass (new + existing).
    Commit: `refactor: extract mergeFlatPermissions to permission-merge.ts`
 
-3. **test: move path helper tests to path-utils.test.ts**
-   Create `tests/path-utils.test.ts` with the `normalizePathForComparison` and `isPathWithinDirectory` blocks, importing from `../src/path-utils`.
+3. **test: move path helper tests to path-utils.test.ts** Create `tests/path-utils.test.ts` with the `normalizePathForComparison` and `isPathWithinDirectory` blocks, importing from `../src/path-utils`.
    Remove those blocks from `tests/external-directory.test.ts`.
    New tests initially fail (module does not exist); existing tests still pass.
    Commit: `test: move path helper tests to path-utils.test.ts`
 
-4. **feat: extract path helpers to path-utils.ts**
-   Create `src/path-utils.ts` with both functions.
+4. **feat: extract path helpers to path-utils.ts** Create `src/path-utils.ts` with both functions.
    Update `src/external-directory.ts` to import + re-export from `./path-utils`, remove local copies.
    Update `src/skill-prompt-sanitizer.ts` to import from `./path-utils`, remove local copies.
    Update `src/handlers/gates/external-directory.ts` and `src/handlers/gates/skill-read.ts` to import from `../../path-utils`.
    All tests pass.
    Commit: `refactor: extract path helpers to path-utils.ts`
 
-5. **docs: update architecture docs**
-   Add the two new modules to `docs/architecture/target-architecture.md`.
+5. **docs: update architecture docs** Add the two new modules to `docs/architecture/target-architecture.md`.
    Commit: `docs: update target architecture for extracted helpers`
 
 ## Risks and Mitigations

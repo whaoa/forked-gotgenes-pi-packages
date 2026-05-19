@@ -24,8 +24,10 @@ This causes `evaluate()` to find no matching rule — not even the universal `{ 
 ## Background
 
 - **Permission surface**: `bash` (but the fix is in the generic wildcard module, affecting all surfaces).
-- **Module**: `src/wildcard-matcher.ts` — `compileWildcardPattern()` builds a `RegExp` by escaping literal segments and joining with `.*`. The regex uses no flags, so `.` does not match `\n`.
-- **Call path**: `evaluate()` in `src/rule.ts` calls `wildcardMatch(rule.pattern, value)` for both `surface` and `pattern` fields. A multiline bash command is the `value` argument to the pattern match.
+- **Module**: `src/wildcard-matcher.ts` — `compileWildcardPattern()` builds a `RegExp` by escaping literal segments and joining with `.*`.
+  The regex uses no flags, so `.` does not match `\n`.
+- **Call path**: `evaluate()` in `src/rule.ts` calls `wildcardMatch(rule.pattern, value)` for both `surface` and `pattern` fields.
+  A multiline bash command is the `value` argument to the pattern match.
 
 ## Design Overview
 
@@ -61,8 +63,7 @@ No new types, no data-shape changes, no config changes.
 
    Commit: `test: cover multiline values in wildcardMatch`
 
-2. **feat: add dotAll flag to wildcard regex**
-   In `src/wildcard-matcher.ts`, change `new RegExp(...)` to include `"s"` flag.
+2. **feat: add dotAll flag to wildcard regex** In `src/wildcard-matcher.ts`, change `new RegExp(...)` to include `"s"` flag.
    Tests from step 1 go green.
 
    Commit: `fix: add dotAll flag so wildcard`*`matches newlines (#73)`

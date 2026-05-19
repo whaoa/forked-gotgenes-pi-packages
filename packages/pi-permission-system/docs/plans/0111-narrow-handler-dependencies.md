@@ -12,10 +12,13 @@ Gate tests must build deeply nested mock trees — `deps.runtime.permissionManag
 
 The pain shows up concretely in tests:
 
-1. **Copy-paste `makeRuntime()`** — 6 files × identical 18-field factories. Adding a field to `ExtensionRuntime` breaks all 6.
-2. **Deep mock nesting** — `deps.runtime.permissionManager.checkPermission` is 3 levels deep. Every test that cares about a permission result wraps it in two objects.
+1. **Copy-paste `makeRuntime()`** — 6 files × identical 18-field factories.
+   Adding a field to `ExtensionRuntime` breaks all 6.
+2. **Deep mock nesting** — `deps.runtime.permissionManager.checkPermission` is 3 levels deep.
+   Every test that cares about a permission result wraps it in two objects.
 3. **Irrelevant fields in scope** — gate tests never read `permissionForwardingTimer`, `lastConfigWarning`, `globalLogsDir`, yet must provide them.
-4. **`deps.runtime.runtimeContext!`** — gates fish out the context only to pass it back to `deps.promptPermission(ctx, ...)`. The `ctx` was already available to `handleToolCall`.
+4. **`deps.runtime.runtimeContext!`** — gates fish out the context only to pass it back to `deps.promptPermission(ctx, ...)`.
+   The `ctx` was already available to `handleToolCall`.
 5. **Two-tier override dance** — tests override both `makeDeps({ runtime: makeRuntime({ ... }) })` AND `makeDeps({ promptPermission: ... })` for the same scenario.
 
 ## Goals
@@ -35,8 +38,11 @@ The pain shows up concretely in tests:
 
 ## Related Issues
 
-- **#114** (closed as duplicate of #111) — describes the per-gate interface segregation in detail. Folded into this plan.
-- **#107** — extracted gate functions into `src/handlers/gates/`. Already implemented. This plan narrows their dependency signatures.
+- **#114** (closed as duplicate of #111) — describes the per-gate interface segregation in detail.
+  Folded into this plan.
+- **#107** — extracted gate functions into `src/handlers/gates/`.
+  Already implemented.
+  This plan narrows their dependency signatures.
 
 ## Background
 
@@ -250,7 +256,10 @@ it("blocks when policy is deny", async () => {
 });
 ```
 
-No `makeRuntime()`. No nesting. No `as unknown as`. One override for the field that matters.
+No `makeRuntime()`.
+No nesting.
+No `as unknown as`.
+One override for the field that matters.
 
 **Lifecycle test (handleSessionStart):**
 
@@ -269,7 +278,8 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 }
 ```
 
-7 fields instead of 18. No forwarding state, no path constants, no config warning.
+7 fields instead of 18.
+No forwarding state, no path constants, no config warning.
 
 ## Module-Level Changes
 
@@ -301,18 +311,25 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 
 ## Test Impact Analysis
 
-1. **New unit tests enabled**: Each gate can now be tested in complete isolation in its own file with a 7-field flat mock. Previously impractical due to `makeRuntime()` cost.
-2. **Existing handler tests become simpler**: `makeRuntime()` (18 fields) → `makeSession()` (7 fields). Deep `as unknown as ExtensionRuntime["permissionManager"]` casts disappear. Gate-specific tests in existing handler files can be migrated to dedicated gate test files or simplified in place.
+1. **New unit tests enabled**: Each gate can now be tested in complete isolation in its own file with a 7-field flat mock.
+   Previously impractical due to `makeRuntime()` cost.
+2. **Existing handler tests become simpler**: `makeRuntime()` (18 fields) → `makeSession()` (7 fields).
+   Deep `as unknown as ExtensionRuntime["permissionManager"]` casts disappear.
+   Gate-specific tests in existing handler files can be migrated to dedicated gate test files or simplified in place.
 3. **Integration tests stay as-is**: `tests/permission-system.test.ts` exercises the full extension through Pi SDK mocks — never constructs `HandlerDeps` directly — validates the wiring is correct.
 
 ## TDD Order
 
 ### Phase 1: Per-gate interfaces + gate migration (the #114 work)
 
-1. Define `ToolGateDeps` in `src/handlers/gates/types.ts`. Write `tests/handlers/gates/tool.test.ts` using the flat interface (red — gates don't accept it yet).
+1. Define `ToolGateDeps` in `src/handlers/gates/types.ts`.
+   Write `tests/handlers/gates/tool.test.ts` using the flat interface (red — gates don't accept it yet).
    - `test: add tool gate tests with narrow ToolGateDeps (#111)`
 
-2. Change `evaluateToolGate` signature to accept `ToolGateDeps`. Replace all `deps.runtime.*` references with flat method calls. Gate tests go green. Existing `handleToolCall` tests still pass because `handleToolCall` adapts deps before calling the gate.
+2. Change `evaluateToolGate` signature to accept `ToolGateDeps`.
+   Replace all `deps.runtime.*` references with flat method calls.
+   Gate tests go green.
+   Existing `handleToolCall` tests still pass because `handleToolCall` adapts deps before calling the gate.
    - `refactor: evaluateToolGate accepts narrow ToolGateDeps (#111)`
 
 3. Same for `evaluateExternalDirectoryGate` — define `ExternalDirectoryGateDeps`, write tests, migrate.
@@ -327,15 +344,19 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
    - `test: add skill-read gate tests with narrow deps (#111)`
    - `refactor: evaluateSkillReadGate accepts SkillReadGateDeps (#111)`
 
-6. Update `handleToolCall` to build per-gate adapter objects. During this step it still reads from `deps.runtime` to construct the adapters.
+6. Update `handleToolCall` to build per-gate adapter objects.
+   During this step it still reads from `deps.runtime` to construct the adapters.
    - `refactor: handleToolCall builds per-gate adapters (#111)`
 
 ### Phase 2: SessionState + slim HandlerDeps (the #111 decomposition)
 
-1. Define `SessionState` in `src/runtime.ts`. Make `ExtensionRuntime` extend it.
+1. Define `SessionState` in `src/runtime.ts`.
+   Make `ExtensionRuntime` extend it.
    - `refactor: define SessionState interface (#111)`
 
-2. Replace `runtime: ExtensionRuntime` with `session: SessionState` on `HandlerDeps`. Promote `writeDebugLog`, `writeReviewLog`, `piInfrastructureDirs`, `getPiInfrastructureReadPaths` to top-level. Update `src/index.ts` wiring.
+2. Replace `runtime: ExtensionRuntime` with `session: SessionState` on `HandlerDeps`.
+   Promote `writeDebugLog`, `writeReviewLog`, `piInfrastructureDirs`, `getPiInfrastructureReadPaths` to top-level.
+   Update `src/index.ts` wiring.
    - `refactor: HandlerDeps uses SessionState, promotes logging (#111)`
 
 3. Migrate `handleToolCall` adapter construction to use `deps.session.*` + `deps.writeReviewLog`.
@@ -352,7 +373,8 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 
 ### Phase 3: Test cleanup
 
-1. Replace `makeRuntime()` with `makeSession()` across all handler test files. Remove `ExtensionRuntime` imports.
+1. Replace `makeRuntime()` with `makeSession()` across all handler test files.
+   Remove `ExtensionRuntime` imports.
    - `test: handler tests use makeSession instead of makeRuntime (#111)`
 
 2. Migrate gate-level assertions from handler test files to dedicated gate test files where they test more clearly in isolation.
@@ -375,6 +397,11 @@ function makeSession(overrides: Partial<SessionState> = {}): SessionState {
 
 ## Open Questions
 
-- Should gate interfaces use `Pick<PermissionManager, "checkPermission">` or a standalone function type? Standalone function type (as shown) — it's flatter and test-friendlier. The gate never needs to know `PermissionManager` exists.
-- Should `handleInput`'s permission logic be extracted into a `SkillInputGateDeps`-style gate for consistency? Likely yes, but deferred to a follow-up to keep scope contained.
-- Can gate interfaces share a common base (e.g. `BaseGateDeps` with `writeReviewLog` + `canConfirm` + `promptPermission`)? Possible, but risks re-introducing the "bag" problem for tests that use the base. Defer until repetition is clearly painful.
+- Should gate interfaces use `Pick<PermissionManager, "checkPermission">` or a standalone function type?
+  Standalone function type (as shown) — it's flatter and test-friendlier.
+  The gate never needs to know `PermissionManager` exists.
+- Should `handleInput`'s permission logic be extracted into a `SkillInputGateDeps`-style gate for consistency?
+  Likely yes, but deferred to a follow-up to keep scope contained.
+- Can gate interfaces share a common base (e.g. `BaseGateDeps` with `writeReviewLog` + `canConfirm` + `promptPermission`)?
+  Possible, but risks re-introducing the "bag" problem for tests that use the base.
+  Defer until repetition is clearly painful.

@@ -17,8 +17,7 @@
 ## Why a class instead of a free function
 
 The previous implementation was `promptPermission(runtime, forwardingDeps, ctx, details)` in `runtime.ts`.
-Adding a new field to `PromptPermissionDetails` (e.g. `sessionLabel` in #51) required touching four files:
-`types.ts` → `runtime.ts` → `polling.ts` → `index.ts`.
+Adding a new field to `PromptPermissionDetails` (e.g. `sessionLabel` in #51) required touching four files: `types.ts` → `runtime.ts` → `polling.ts` → `index.ts`.
 
 With `PermissionPrompter`, adding a new field touches two files:
 
@@ -46,17 +45,13 @@ interface PermissionPrompterDeps {
 ## Relationship to PermissionForwardingDeps
 
 `PermissionPrompter` constructs a `PermissionForwardingDeps` internally when calling `confirmPermission()`.
-The `shouldAutoApprove` field in that internal object always returns `false` — yolo-mode is already
-handled at the prompter level before `confirmPermission` is ever reached.
+The `shouldAutoApprove` field in that internal object always returns `false` — yolo-mode is already handled at the prompter level before `confirmPermission` is ever reached.
 
-The separate `forwardingDeps` object in `index.ts` (used by `startForwardedPermissionPolling`) is
-independent: it carries its own `shouldAutoApprove` for the parent-session flow that processes
-requests forwarded from subagents.
+The separate `forwardingDeps` object in `index.ts` (used by `startForwardedPermissionPolling`) is independent: it carries its own `shouldAutoApprove` for the parent-session flow that processes requests forwarded from subagents.
 
 ## Wiring
 
-`PermissionPrompter` is instantiated once in `piPermissionSystemExtension()` (`src/index.ts`) and
-injected into `PermissionSessionRuntimeDeps.promptPermission`:
+`PermissionPrompter` is instantiated once in `piPermissionSystemExtension()` (`src/index.ts`) and injected into `PermissionSessionRuntimeDeps.promptPermission`:
 
 ```typescript
 const prompter = new PermissionPrompter({ … });

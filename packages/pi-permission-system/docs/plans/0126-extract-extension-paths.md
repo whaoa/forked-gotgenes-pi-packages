@@ -114,7 +114,8 @@ Callers that read `runtime.agentDir` or `runtime.piInfrastructureDirs` continue 
 
 ### Unchanged
 
-- `src/index.ts` — continues to read `runtime.agentDir`, `runtime.subagentSessionsDir`, etc. No change needed.
+- `src/index.ts` — continues to read `runtime.agentDir`, `runtime.subagentSessionsDir`, etc.
+  No change needed.
 - `src/handlers/types.ts` — `HandlerDeps.piInfrastructureDirs` stays as-is.
 - All handler test files — `makeDeps()` factories are unaffected.
 - `schemas/`, `config/`, `docs/architecture/` — no changes needed.

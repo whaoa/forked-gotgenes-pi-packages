@@ -413,7 +413,8 @@ The legacy keys should still be detected as misplaced — they indicate someone 
 
 4. **feat!: update ScopeConfig and remove PermissionDefaultPolicy**
    - Red: update `defaults.test.ts` and any tests importing `PermissionDefaultPolicy`.
-   - Green: update `ScopeConfig` in `src/types.ts`. Remove `mergeDefaults()`, `getSurfaceDefault()`, `DEFAULT_POLICY` from `src/defaults.ts` (or remove the file).
+   - Green: update `ScopeConfig` in `src/types.ts`.
+     Remove `mergeDefaults()`, `getSurfaceDefault()`, `DEFAULT_POLICY` from `src/defaults.ts` (or remove the file).
    - Commit: `feat!: remove PermissionDefaultPolicy and legacy defaults (#66)`
 
 5. **feat!: update PermissionManager for flat config**

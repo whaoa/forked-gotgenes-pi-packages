@@ -33,7 +33,8 @@ The file only governs extension runtime settings (`debugLog`, `permissionReviewL
 
 ### Permission surface
 
-This is a **config-loading** concern, not a permission-surface change. No policy semantics, merge precedence, or on-disk identity are affected.
+This is a **config-loading** concern, not a permission-surface change.
+No policy semantics, merge precedence, or on-disk identity are affected.
 
 ## Design Overview
 

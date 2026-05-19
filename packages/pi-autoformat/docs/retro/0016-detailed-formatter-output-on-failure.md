@@ -11,7 +11,8 @@ issue_title: "Support optional detailed formatter output in reports"
 
 Triaged the open backlog, picked issue #2, planned (`docs/plans/0016-detailed-formatter-output-on-failure.md`), implemented across ten TDD cycles, and shipped `2.3.0`.
 Added an opt-in `formatterOutput` config object that surfaces a failed formatter run's `stderr` (or `stdout + stderr`) with tail-preserving byte/line truncation; defaults preserve prior concise reporting.
-While testing, the user reported an "Unexpected runtime error: ... `fgColors`" warning above the editor that traced to a latent `this`-binding bug in `themed()` from the plan-0002 work; landed a regression test plus fix (`6ba7576`, `6a6ec16`) in the same release.
+While testing, the user reported an "Unexpected runtime error: ...
+`fgColors`" warning above the editor that traced to a latent `this`-binding bug in `themed()` from the plan-0002 work; landed a regression test plus fix (`6ba7576`, `6a6ec16`) in the same release.
 
 ### Observations
 

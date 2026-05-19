@@ -91,4 +91,6 @@ No types, schemas, or config surfaces change.
 
 ## Open Questions
 
-- **Extract a named helper?** If future issues add more `session_start` work, extracting `initializeSession(event, ctx)` would improve readability. Defer unless the single handler grows beyond ~15 lines.
+- **Extract a named helper?**
+  If future issues add more `session_start` work, extracting `initializeSession(event, ctx)` would improve readability.
+  Defer unless the single handler grows beyond ~15 lines.

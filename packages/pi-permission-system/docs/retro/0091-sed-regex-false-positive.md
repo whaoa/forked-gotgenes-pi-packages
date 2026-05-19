@@ -25,7 +25,8 @@ Released as v5.1.0.
 #### What caused friction (agent side)
 
 1. `premature-convergence` — Initially designed the plan around character-based heuristics (`{`, `}`, `!`, `;` rejection in `classifyTokenAsPathCandidate`) without questioning whether the command-blind approach was fundamentally flawed.
-   The user had to explicitly ask "Step back. Examine our overall approach" and point to OpenCode.
+   The user had to explicitly ask "Step back.
+   Examine our overall approach" and point to OpenCode.
    Impact: the first draft plan was discarded and rewritten with the command-aware design.
 
 2. `instruction-violation` (user-caught) — Used `test.todo` in step 6 instead of writing a concrete assertion.

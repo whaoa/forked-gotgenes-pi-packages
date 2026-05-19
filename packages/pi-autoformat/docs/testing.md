@@ -71,12 +71,15 @@ This test is the primary safeguard against EventBus payload-shape drift between 
 
 Several scenarios named in issue #10 are not in the default acceptance suite because Pi's RPC mode does not surface the events they depend on:
 
-- **`bash` shell mutation.** Pi's RPC `bash` command stores a `BashExecutionMessage` for the next prompt's LLM context but does not emit `tool_call` or `tool_result` events.
+- **`bash` shell mutation.**
+  Pi's RPC `bash` command stores a `BashExecutionMessage` for the next prompt's LLM context but does not emit `tool_call` or `tool_result` events.
   Our extension's snapshot tracker is wired to those events, so an RPC `bash` command does not drive the shell-mutation path.
   Coverage today: `test/shell-mutation-detector.test.ts` (unit).
-- **`write` / `edit` payload-shape validation.** These tools are only invoked by the LLM; there is no documented non-LLM trigger.
+- **`write` / `edit` payload-shape validation.**
+  These tools are only invoked by the LLM; there is no documented non-LLM trigger.
   Coverage today: `test/extension.test.ts` (integration with a stubbed `ExtensionAPI`).
-- **`customMutationTools` real `tool_result` events.** Same constraint as `write`/`edit`: the registered tool only fires when an LLM calls it.
+- **`customMutationTools` real `tool_result` events.**
+  Same constraint as `write`/`edit`: the registered tool only fires when an LLM calls it.
   Coverage today: `test/custom-mutation-tools.test.ts` (unit).
 
 These gaps are real but bounded.

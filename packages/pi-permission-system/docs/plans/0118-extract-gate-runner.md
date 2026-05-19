@@ -193,7 +193,8 @@ Critically, it does NOT need `writeReviewLog`, `emitDecision`, `canConfirm`, `pr
 
 ### GateRunnerDeps
 
-The runner handles all side effects. Its deps are the infrastructure functions shared by all gates:
+The runner handles all side effects.
+Its deps are the infrastructure functions shared by all gates:
 
 ```typescript
 interface GateRunnerDeps {
@@ -344,7 +345,10 @@ describe("describeToolGate", () => {
 });
 ```
 
-No mocks. No async. No deps. Pure input → output.
+No mocks.
+No async.
+No deps.
+Pure input → output.
 
 ## Module-Level Changes
 
@@ -387,8 +391,11 @@ No mocks. No async. No deps. Pure input → output.
 
 ### New unit tests enabled
 
-1. **Pure gate descriptor tests** — each gate function is now a pure function returning data. Tests become simple assertions on the returned descriptor's fields (surface, messages, decision value, sessionApproval patterns). Zero mocks needed for `describeToolGate`, `describeSkillReadGate`, and `describeExternalDirectoryGate`.
-2. **Runner tests** — `runGateCheck()` is tested once with all resolution paths: session-hit, policy-allow, policy-deny, ask+approve, ask+approve-for-session, ask+deny, ask+no-UI. This replaces the duplicated wiring assertions scattered across 4 gate test files.
+1. **Pure gate descriptor tests** — each gate function is now a pure function returning data.
+   Tests become simple assertions on the returned descriptor's fields (surface, messages, decision value, sessionApproval patterns).
+   Zero mocks needed for `describeToolGate`, `describeSkillReadGate`, and `describeExternalDirectoryGate`.
+2. **Runner tests** — `runGateCheck()` is tested once with all resolution paths: session-hit, policy-allow, policy-deny, ask+approve, ask+approve-for-session, ask+deny, ask+no-UI.
+   This replaces the duplicated wiring assertions scattered across 4 gate test files.
 
 ### Existing tests that become redundant
 
@@ -404,7 +411,8 @@ Each existing gate test file simplifies from ~150 lines with 7-field mock factor
 
 ### Existing tests that must stay
 
-- `tests/handlers/tool-call.test.ts` — orchestrator integration tests validate wiring between descriptor factories, runner, and `handleToolCall`. These exercise the real call chain.
+- `tests/handlers/tool-call.test.ts` — orchestrator integration tests validate wiring between descriptor factories, runner, and `handleToolCall`.
+  These exercise the real call chain.
 - `tests/handlers/gates/helpers.test.ts` — `deriveDecisionValue` and `deriveResolution` are still used by the runner.
 - `tests/permission-system.test.ts` — full extension integration tests.
 
@@ -432,7 +440,8 @@ Commit: `refactor: add GateDescriptor and GateRunnerDeps types (#118)`
    - Auto-approved → emits `auto_approved`.
    - Pre-resolved state (skill-read) → uses `preResolved.state` instead of calling `checkPermission`.
 2. Implement `src/handlers/gates/runner.ts`.
-3. Tests go green. Run `pnpm run build`.
+3. Tests go green.
+   Run `pnpm run build`.
 
 Commit: `feat: implement runGateCheck gate runner (#118)`
 
@@ -468,7 +477,9 @@ Commit: `refactor: describeToolGate returns pure descriptor (#118)`
    - Returns `GateDescriptor` with `preResolved.state` matching the skill entry's state.
    - Decision surface is `"skill"`, decision value is the skill name.
    - Messages contain the skill name.
-2. Rename `evaluateSkillReadGate` → `describeSkillReadGate`. Remove deps except `getActiveSkillEntries`. Return `GateDescriptor | null`.
+2. Rename `evaluateSkillReadGate` → `describeSkillReadGate`.
+   Remove deps except `getActiveSkillEntries`.
+   Return `GateDescriptor | null`.
 3. Update `handleToolCall` to use `describeSkillReadGate` → `runGateCheck`.
 4. Existing orchestrator tests pass.
 5. Run `pnpm run build`.
@@ -483,7 +494,9 @@ Commit: `refactor: describeSkillReadGate returns pure descriptor (#118)`
    - Returns `GateDescriptor` with `surface: "external_directory"` for external paths.
    - Decision value is the external path.
    - Session approval pattern uses `deriveApprovalPattern`.
-2. Rename `evaluateExternalDirectoryGate` → `describeExternalDirectoryGate`. Remove all deps; accept `infraDirs: string[]` directly. Return `GateResult`.
+2. Rename `evaluateExternalDirectoryGate` → `describeExternalDirectoryGate`.
+   Remove all deps; accept `infraDirs: string[]` directly.
+   Return `GateResult`.
 3. Update `handleToolCall` to handle `GateBypass` (log + emit inline) or pass `GateDescriptor` to `runGateCheck`.
 4. Existing orchestrator tests pass.
 5. Run `pnpm run build`.
@@ -494,10 +507,13 @@ Commit: `refactor: describeExternalDirectoryGate returns pure descriptor (#118)`
 
 1. Write tests for `describeBashExternalDirectoryGate(tcc, checkPermission, getSessionRuleset)`:
    - Returns `null` when tool is not bash, no CWD, or no external paths.
-   - Returns `null` (with session-approved log context) when all paths are session-covered. **Note**: the session-approved log entry for this case is a bypass — handle as `GateBypass`.
+   - Returns `null` (with session-approved log context) when all paths are session-covered.
+     **Note**: the session-approved log entry for this case is a bypass — handle as `GateBypass`.
    - Returns `GateDescriptor` with multi-pattern `sessionApproval` for uncovered paths.
    - Uses config-level `checkPermission("external_directory", {})` for the policy state.
-2. Rename `evaluateBashExternalDirectoryGate` → `describeBashExternalDirectoryGate`. Accept only `checkPermission` and `getSessionRuleset` as functional parameters. Return `Promise<GateResult>`.
+2. Rename `evaluateBashExternalDirectoryGate` → `describeBashExternalDirectoryGate`.
+   Accept only `checkPermission` and `getSessionRuleset` as functional parameters.
+   Return `Promise<GateResult>`.
 3. Update `handleToolCall`.
 4. Existing orchestrator tests pass.
 5. Run `pnpm run build`.

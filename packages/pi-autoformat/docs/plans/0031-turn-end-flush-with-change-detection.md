@@ -267,37 +267,47 @@ Keep `sendMessage` capture for steering-message assertions.
 ### 1. Content-change detection in `flushPrompt`
 
 - **Test surface:** `test/prompt-autoformatter.test.ts`.
-- **Covers:** `changedFiles` populated when formatter changes file content. Empty when formatter is a no-op. Files that don't exist after formatting are excluded.
+- **Covers:** `changedFiles` populated when formatter changes file content.
+  Empty when formatter is a no-op.
+  Files that don't exist after formatting are excluded.
 - **Commit:** `feat: detect content changes in flushPrompt (#31)`
 
 ### 2. Remove `notifyAgent` from config types and defaults
 
 - **Test surface:** `test/formatter-config.test.ts`, `test/config-loader.test.ts`.
-- **Covers:** `notifyAgent` removed from types; `createFormatterConfig()` no longer accepts it. Legacy key in config emits a config issue and is discarded.
+- **Covers:** `notifyAgent` removed from types; `createFormatterConfig()` no longer accepts it.
+  Legacy key in config emits a config issue and is discarded.
 - **Commit:** `feat!: remove notifyAgent config field (#31)`
 
 ### 3. Remove `notifyAgent` from JSON schema and docs
 
 - **Test surface:** `test/schema.test.ts`, manual review.
-- **Covers:** Schema no longer includes `notifyAgent`. Docs updated.
+- **Covers:** Schema no longer includes `notifyAgent`.
+  Docs updated.
 - **Commit:** `feat!: remove notifyAgent from schema and docs (#31)`
 
 ### 4. Steering message builder
 
 - **Test surface:** `test/extension.test.ts`.
-- **Covers:** Message with 1 changed file, 3 changed files, 11 files (truncation). Message with failures. Message with mixed changes + failures. Returns `undefined` when no changes and no failures.
+- **Covers:** Message with 1 changed file, 3 changed files, 11 files (truncation).
+  Message with failures.
+  Message with mixed changes + failures.
+  Returns `undefined` when no changes and no failures.
 - **Commit:** `feat: add buildSteeringMessageContent helper (#31)`
 
 ### 5. Turn-end flush handler
 
 - **Test surface:** `test/extension.test.ts`.
-- **Covers:** `turn_end` event triggers flush. Files recorded in `tool_result` are formatted at `turn_end`. Queue is empty after flush.
+- **Covers:** `turn_end` event triggers flush.
+  Files recorded in `tool_result` are formatted at `turn_end`.
+  Queue is empty after flush.
 - **Commit:** `feat: flush formatters at turn_end (#31)`
 
 ### 6. Steering notification on change
 
 - **Test surface:** `test/extension.test.ts`.
-- **Covers:** When flush changes files, `pi.sendMessage` is called with steering content. When flush is a no-op (no changes, no failures), no message is sent.
+- **Covers:** When flush changes files, `pi.sendMessage` is called with steering content.
+  When flush is a no-op (no changes, no failures), no message is sent.
 - **Commit:** `feat: send steering notification after turn-end formatting (#31)`
 
 ### 7. Steering notification on failure
@@ -315,7 +325,8 @@ Keep `sendMessage` capture for steering-message assertions.
 ### 9. Agent-end safety-net flush
 
 - **Test surface:** `test/extension.test.ts`.
-- **Covers:** Files added via EventBus (no turn loop) are formatted at `agent_end`. Files already flushed at `turn_end` are not re-formatted at `agent_end`.
+- **Covers:** Files added via EventBus (no turn loop) are formatted at `agent_end`.
+  Files already flushed at `turn_end` are not re-formatted at `agent_end`.
 - **Commit:** `test: agent_end safety-net flush (#31)`
 
 ### 10. Documentation

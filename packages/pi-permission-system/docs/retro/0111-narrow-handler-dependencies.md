@@ -19,7 +19,8 @@ Discussion after implementation led to filing #118 (gates as pure descriptor fun
 #### What went well
 
 - The per-gate interface pattern worked cleanly — each gate migration was a self-contained commit, existing handler tests stayed green throughout, and the 4 gate test files became dramatically simpler.
-- The user's pushback on the plan drove real design improvement: the first plan proposed sub-object bags (just smaller bags); the final plan delivered flat leaf methods. The discussion *after* shipping led to #118, which is architecturally sharper than anything in the plan.
+- The user's pushback on the plan drove real design improvement: the first plan proposed sub-object bags (just smaller bags); the final plan delivered flat leaf methods.
+  The discussion *after* shipping led to #118, which is architecturally sharper than anything in the plan.
 - Phase 1 (gate interfaces) landed independently of Phase 2 (SessionState), so each phase was shippable alone.
 
 #### What caused friction (agent side)
@@ -27,12 +28,14 @@ Discussion after implementation led to filing #118 (gates as pure descriptor fun
 1. `wrong-abstraction` — The first two plan revisions proposed reorganizing production types (`RuntimePaths`, `RuntimeSessionState`, shared `GateDeps` bag) without examining the test files.
    The test files showed the real pain: 18-field `makeRuntime()` with `as unknown as` casts and 3-level-deep mock nesting.
    The production structure was what we were escaping, not what we should model the target on.
-   Impact: two full plan rewrites before the user redirected to #114 and test-first thinking. User-caught.
+   Impact: two full plan rewrites before the user redirected to #114 and test-first thinking.
+   User-caught.
 
 2. `wrong-abstraction` — Used `sed` and shell loops to batch-rename `runtime` → `session` across 6 test files simultaneously.
    The `sed` after `session: makeSession` pattern-matched inside test *bodies* (not just helper factories), injecting promoted fields into assertion blocks and producing syntax errors.
    Required a full `git checkout --` rollback and per-file redo with the Edit tool.
-   Impact: ~10 minutes of rework, 3 user interventions ("what is going on here?", "sorry, what is going on here?", "roll back"). User-caught.
+   Impact: ~10 minutes of rework, 3 user interventions ("what is going on here?", "sorry, what is going on here?", "roll back").
+   User-caught.
 
 #### What caused friction (user side)
 

@@ -30,11 +30,13 @@ This creates confusing fallback behavior: if a caller omitted a path argument, i
 
 ### Permission surface
 
-None — this is a pure internal cleanup. No permission surface is involved.
+None — this is a pure internal cleanup.
+No permission surface is involved.
 
 ### Relevant modules
 
-- **`src/extension-config.ts`** — defines the legacy constants and functions. Also defines `EXTENSION_ID`, `DEFAULT_EXTENSION_CONFIG`, `normalizePermissionSystemConfig`, `detectMisplacedPermissionKeys`, `ensurePermissionSystemLogsDirectory`, and `EXTENSION_ROOT` which remain in use.
+- **`src/extension-config.ts`** — defines the legacy constants and functions.
+  Also defines `EXTENSION_ID`, `DEFAULT_EXTENSION_CONFIG`, `normalizePermissionSystemConfig`, `detectMisplacedPermissionKeys`, `ensurePermissionSystemLogsDirectory`, and `EXTENSION_ROOT` which remain in use.
 - **`src/logging.ts`** — `createPermissionSystemLogger()` imports legacy constants as defaults for its optional parameters.
 - **`src/runtime.ts`** — the sole production consumer of both modules; already provides explicit paths and never relies on legacy defaults.
 
@@ -86,15 +88,18 @@ Make the `logsDir` parameter of `ensurePermissionSystemLogsDirectory` required (
 
 ### Test changes
 
-- **`tests/extension-config.test.ts`** — remove the `loadPermissionSystemConfig` describe block and its import. The `detectMisplacedPermissionKeys` and `normalizePermissionSystemConfig` tests remain.
-- **`tests/permission-system.test.ts`** — remove or replace the `loadPermissionSystemConfig` / `savePermissionSystemConfig` tests. These test config round-tripping which is now covered by `config-loader.test.ts` or can be deleted as dead-code tests.
+- **`tests/extension-config.test.ts`** — remove the `loadPermissionSystemConfig` describe block and its import.
+  The `detectMisplacedPermissionKeys` and `normalizePermissionSystemConfig` tests remain.
+- **`tests/permission-system.test.ts`** — remove or replace the `loadPermissionSystemConfig` / `savePermissionSystemConfig` tests.
+  These test config round-tripping which is now covered by `config-loader.test.ts` or can be deleted as dead-code tests.
 - **`tests/config-modal.test.ts`** — replace `loadPermissionSystemConfig` / `savePermissionSystemConfig` usage with direct `readFileSync` + `JSON.parse` + `normalizePermissionSystemConfig` and `writeFileSync`, or with the `loadUnifiedConfig` function that `runtime.ts` already uses.
 - **`tests/config-reporter.test.ts`** — add the missing `debugLogPath` to the logger construction call.
 
 ## Test Impact Analysis
 
 1. **New tests enabled** — none; this is a removal, not an extraction.
-2. **Redundant tests** — the `loadPermissionSystemConfig` / `savePermissionSystemConfig` tests in `permission-system.test.ts` and `extension-config.test.ts` test functions that no production code calls. They should be removed.
+2. **Redundant tests** — the `loadPermissionSystemConfig` / `savePermissionSystemConfig` tests in `permission-system.test.ts` and `extension-config.test.ts` test functions that no production code calls.
+   They should be removed.
 3. **Tests that must stay** — `detectMisplacedPermissionKeys` and `normalizePermissionSystemConfig` tests in `extension-config.test.ts`; logger tests in `permission-system.test.ts` that construct the logger with explicit options; config-modal tests (adapted to use direct file I/O or `loadUnifiedConfig`).
 
 ## TDD Order

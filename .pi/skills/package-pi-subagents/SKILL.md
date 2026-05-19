@@ -45,7 +45,8 @@ Use `vi.hoisted(...)` for module-level mocks, matching the existing patterns in 
 When working in this package:
 
 1. The two RepOne-specific patches are marked in source — search for `// Patch 2 (RepOne` or `// Patch 3 (RepOne` to find them.
-2. New features and removals follow the phase plan in `docs/architecture/architecture.md`. Document architectural decisions in `docs/decisions/`.
+2. New features and removals follow the phase plan in `docs/architecture/architecture.md`.
+   Document architectural decisions in `docs/decisions/`.
 3. The upstream test suite is run periodically as a regression canary for the `agent-runner` core.
 4. Modules marked `← removing` or `← replacing` in the architecture doc's current-state listing are slated for deletion — do not add features to them.
 

@@ -17,14 +17,14 @@ Shipped as `pi-subagents-v5.1.0`, then followed up with a `refactor:` commit con
 
 #### What went well
 
-- The plan's "Non-Goals" section correctly excluded `usage.ts` and `settings.ts` before implementation started, and a post-TDD `grep -rn 'catch\s*{'` confirmed only those two in-scope-excluded files remained. Closing the loop with a verification query is worth repeating.
+- The plan's "Non-Goals" section correctly excluded `usage.ts` and `settings.ts` before implementation started, and a post-TDD `grep -rn 'catch\s*{'` confirmed only those two in-scope-excluded files remained.
+  Closing the loop with a verification query is worth repeating.
 - The scope of the change was so well-defined (the issue listed exact file names) that no `ask_user` call was needed during planning.
 
 #### What caused friction (agent side)
 
 - `missing-context` — When loading the `ask-user` skill I guessed `.pi/skills/ask-user/SKILL.md` before reading the actual `<location>` tag in `AGENTS.md`, triggering an ENOENT error and a follow-up `find` call.
-  Impact: 2 extra tool calls, no rework.
-  (self-identified)
+  Impact: 2 extra tool calls, no rework. (self-identified)
 
 - `other` — The plan's TDD Order step 1 stated *"the test skill documents this pattern"* for `vi.resetModules()` + dynamic import when testing module-level env constants — but the testing skill does not have that entry.
   The aspiration was recorded rather than verified.
@@ -62,13 +62,13 @@ Filed #76 (`AgentManager.dispose()` reads `process.cwd()` without a stored `cwd`
 
 - `premature-convergence` — The original plan accepted the module-level `DEBUG` constant without checking how the rest of the codebase reads `process.env`.
   The code-style skill said "keep IO at the edges" but didn't name `process.*` specifically, so the rule wasn't applied.
-  Impact: one post-ship `refactor:` commit to replace `DEBUG` with `isDebug()`; the pattern was technically correct but inconsistent with codebase conventions.
-  (user-caught)
+  Impact: one post-ship `refactor:` commit to replace `DEBUG` with `isDebug()`; the pattern was technically correct but inconsistent with codebase conventions. (user-caught)
 
 #### What caused friction (user side)
 
 - Nothing notable.
-  The user's two redirecting questions ("should that be a function?" and "how many places access `process.*`?") were well-timed interventions that broadened scope productively.
+  The user's two redirecting questions ("should that be a function?"
+  and "how many places access `process.*`?") were well-timed interventions that broadened scope productively.
 
 ### Changes made
 

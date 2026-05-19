@@ -23,11 +23,15 @@ Released as v5.11.2.
 
 #### What caused friction (agent side)
 
-- `instruction-violation` — The plan's markdown table separator used `|---|---|` instead of `| --- | --- |`, failing the `markdownlint-cli2` pre-commit hook (MD060). Self-identified (caught by pre-commit, fixed before user intervention). The markdown-conventions skill mentioned compact table style but lacked a separator example. Impact: one failed commit + immediate fix, ~15 seconds.
+- `instruction-violation` — The plan's markdown table separator used `|---|---|` instead of `| --- | --- |`, failing the `markdownlint-cli2` pre-commit hook (MD060).
+  Self-identified (caught by pre-commit, fixed before user intervention).
+  The markdown-conventions skill mentioned compact table style but lacked a separator example.
+  Impact: one failed commit + immediate fix, ~15 seconds.
 
 #### What caused friction (user side)
 
-- No friction observed. The issue body was comprehensive with exact file and function names, making plan and execution straightforward.
+- No friction observed.
+  The issue body was comprehensive with exact file and function names, making plan and execution straightforward.
 
 ### Changes made
 

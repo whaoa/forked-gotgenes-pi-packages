@@ -32,8 +32,10 @@ For each consumer (function or class that receives it), list which fields that c
 
 Ask:
 
-- Does every consumer use more than half the fields? If not, the interface is too wide.
-- Are there natural clusters of fields that always appear together? Those are missing intermediate abstractions (value objects or collaborator interfaces).
+- Does every consumer use more than half the fields?
+  If not, the interface is too wide.
+- Are there natural clusters of fields that always appear together?
+  Those are missing intermediate abstractions (value objects or collaborator interfaces).
 
 ### 2. Law of Demeter violations
 
@@ -43,8 +45,10 @@ The fix is a method on `a` that delegates to `b` internally.
 
 Ask:
 
-- Do multiple callers perform the same reach-through? That confirms the missing method.
-- Does the intermediate object appear in the caller's test mocks? If yes, the coupling is leaking into tests.
+- Do multiple callers perform the same reach-through?
+  That confirms the missing method.
+- Does the intermediate object appear in the caller's test mocks?
+  If yes, the coupling is leaking into tests.
 
 ### 3. Output arguments
 
@@ -54,8 +58,10 @@ The fix is a method on the owning object or a returned value.
 
 Ask:
 
-- Is the same field written in multiple places? That is scattered state management — extract a single method.
-- Is the write paired with a read elsewhere? The object that reads should own the write.
+- Is the same field written in multiple places?
+  That is scattered state management — extract a single method.
+- Is the write paired with a read elsewhere?
+  The object that reads should own the write.
 
 ### 4. Scattered resets
 
@@ -84,7 +90,8 @@ After completing checks 1–6, look for groups of raw dependencies that form a c
 - Multiple function deps that always appear together → interface.
 - Mutable state + the methods that read/write it → class.
 
-Name the abstraction. Verify it reduces the field count of the parent interface by at least 2.
+Name the abstraction.
+Verify it reduces the field count of the parent interface by at least 2.
 
 ## Output
 

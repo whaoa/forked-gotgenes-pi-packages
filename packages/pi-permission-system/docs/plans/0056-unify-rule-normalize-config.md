@@ -390,38 +390,32 @@ Conversely, if `bash: { "*": "deny" }`, the tool is hidden — which is better U
 
 ### Phase 1: New modules (additive, no existing code changes)
 
-1. **test: normalizeConfig converts tools entries to tool-name-as-surface rules**
-   Red: test that `normalizeConfig({ tools: { read: "allow", write: "deny" } })` produces `[{ surface: "read", pattern: "*", action: "allow" }, { surface: "write", pattern: "*", action: "deny" }]`.
+1. **test: normalizeConfig converts tools entries to tool-name-as-surface rules** Red: test that `normalizeConfig({ tools: { read: "allow", write: "deny" } })` produces `[{ surface: "read", pattern: "*", action: "allow" }, { surface: "write", pattern: "*", action: "deny" }]`.
    Green: implement `normalizeConfig()` tools path in `src/normalize.ts`.
    `test: normalizeConfig tools entries`
 
-2. **test: normalizeConfig converts bash entries to surface "bash" rules**
-   Red: test `normalizeConfig({ bash: { "git *": "allow", "rm -rf *": "deny" } })` produces bash rules.
+2. **test: normalizeConfig converts bash entries to surface "bash" rules** Red: test `normalizeConfig({ bash: { "git *": "allow", "rm -rf *": "deny" } })` produces bash rules.
    Green: implement bash path.
    `test: normalizeConfig bash entries`
 
-3. **test: normalizeConfig converts mcp, skills, special entries**
-   Red: test all remaining surfaces. Verify special keys become their own surface (`external_directory`).
+3. **test: normalizeConfig converts mcp, skills, special entries** Red: test all remaining surfaces.
+   Verify special keys become their own surface (`external_directory`).
    Green: implement remaining paths.
    `test: normalizeConfig mcp, skills, special entries`
 
-4. **test: normalizeConfig ordering — tools before bash/mcp/skills/special**
-   Red: test that with `{ tools: { bash: "allow" }, bash: { "git *": "ask" } }`, the tools catch-all appears before the bash-specific rule.
+4. **test: normalizeConfig ordering — tools before bash/mcp/skills/special** Red: test that with `{ tools: { bash: "allow" }, bash: { "git *": "ask" } }`, the tools catch-all appears before the bash-specific rule.
    Green: already passes from implementation order.
    `test: normalizeConfig rule ordering`
 
-5. **test: normalizeConfig empty/missing sections produce empty ruleset**
-   Red: test `normalizeConfig({})` returns `[]`.
+5. **test: normalizeConfig empty/missing sections produce empty ruleset** Red: test `normalizeConfig({})` returns `[]`.
    Green: already passes.
    `test: normalizeConfig empty config`
 
-6. **test: getSurfaceDefault returns correct defaults for each surface category**
-   Red: test that `getSurfaceDefault("bash", defaults, specialKeys)` returns `defaults.bash`, tool surfaces return `defaults.tools`, special surfaces return `defaults.special`.
+6. **test: getSurfaceDefault returns correct defaults for each surface category** Red: test that `getSurfaceDefault("bash", defaults, specialKeys)` returns `defaults.bash`, tool surfaces return `defaults.tools`, special surfaces return `defaults.special`.
    Green: implement `getSurfaceDefault()` in `src/defaults.ts`.
    `test: getSurfaceDefault per-surface dispatch`
 
-7. **test: mergeDefaults shallow-merges partial policies**
-   Red: test that `mergeDefaults(globalDefaults, projectDefaults)` produces correct merged result.
+7. **test: mergeDefaults shallow-merges partial policies** Red: test that `mergeDefaults(globalDefaults, projectDefaults)` produces correct merged result.
    Green: implement `mergeDefaults()` in `src/defaults.ts`.
    `test: mergeDefaults shallow merge`
 
@@ -431,69 +425,59 @@ Conversely, if `bash: { "*": "deny" }`, the tool is hidden — which is better U
 
 ### Phase 2: Update evaluate() signature
 
-1. **test: update evaluate() tests for optional defaultAction parameter**
-   Red→Green: update `tests/rule.test.ts` — `evaluate()` now accepts an optional `defaultAction` instead of calling `getDefaultAction()`.
+1. **test: update evaluate() tests for optional defaultAction parameter** Red→Green: update `tests/rule.test.ts` — `evaluate()` now accepts an optional `defaultAction` instead of calling `getDefaultAction()`.
    Move `getDefaultAction()` tests to `tests/defaults.test.ts`.
    `test: evaluate with optional defaultAction parameter`
 
-2. **feat: evaluate() accepts optional defaultAction**
-   Change `evaluate()` signature to accept `defaultAction?: PermissionState`.
+2. **feat: evaluate() accepts optional defaultAction** Change `evaluate()` signature to accept `defaultAction?: PermissionState`.
    When no rule matches, use `defaultAction ?? "ask"` instead of `getDefaultAction(surface)`.
    Remove `getDefaultAction()` and `SURFACE_DEFAULTS` from `src/rule.ts`.
    `feat: evaluate accepts optional defaultAction parameter`
 
 ### Phase 3: Refactor PermissionManager internals
 
-1. **refactor: update permission-system.test.ts helpers for new types**
-   Update test helper functions that construct `GlobalPermissionConfig` / `AgentPermissions` to use `UnifiedPermissionConfig` or inline `Record<string, PermissionState>`.
+1. **refactor: update permission-system.test.ts helpers for new types** Update test helper functions that construct `GlobalPermissionConfig` / `AgentPermissions` to use `UnifiedPermissionConfig` or inline `Record<string, PermissionState>`.
    Remove the `BashFilter` test from `permission-system.test.ts`.
    All tests should still pass (helpers produce equivalent data).
    `test: update permission-system test helpers for new types`
 
-2. **refactor: resolvePermissions uses normalizeConfig and array concat**
-   Replace per-surface compiled pattern arrays with `normalizeConfig()` per scope.
+2. **refactor: resolvePermissions uses normalizeConfig and array concat** Replace per-surface compiled pattern arrays with `normalizeConfig()` per scope.
    Replace `mergePermissions()` with array concatenation.
    Replace per-scope `GlobalPermissionConfig` / `AgentPermissions` caches with `Ruleset` + defaults.
    Simplify `ResolvedPermissions` type.
    Run full test suite.
    `refactor: resolvePermissions uses normalizeConfig and array concat`
 
-3. **refactor: checkPermission uses merged Ruleset directly**
-   Remove `compiledToRuleset()`.
+3. **refactor: checkPermission uses merged Ruleset directly** Remove `compiledToRuleset()`.
    Each surface branch calls `evaluate()` against the merged ruleset.
    Fallback uses `getSurfaceDefault()`.
    MCP baseline auto-allow logic preserved (uses `hasAnyMcpAllowRule`).
    Run full test suite.
    `refactor: checkPermission uses merged Ruleset directly`
 
-4. **refactor: getToolPermission uses evaluate**
-   Replace the per-surface `if/else if` chain with a single `evaluate()` call + `getSurfaceDefault()` fallback.
+4. **refactor: getToolPermission uses evaluate** Replace the per-surface `if/else if` chain with a single `evaluate()` call + `getSurfaceDefault()` fallback.
    Run full test suite.
    `refactor: getToolPermission uses evaluate`
 
 ### Phase 4: Remove dead code
 
-1. **refactor: remove BashFilter class**
-   Delete `src/bash-filter.ts`.
+1. **refactor: remove BashFilter class** Delete `src/bash-filter.ts`.
    Delete `tests/bash-filter.test.ts`.
    Remove import from `permission-manager.ts`.
    Run full test suite.
    `refactor: remove BashFilter class`
 
-2. **refactor: remove per-surface type aliases**
-   Remove `ToolPermissions`, `BashPermissions`, `SkillPermissions`, `SpecialPermissions` from `src/types.ts`.
+2. **refactor: remove per-surface type aliases** Remove `ToolPermissions`, `BashPermissions`, `SkillPermissions`, `SpecialPermissions` from `src/types.ts`.
    Remove `AgentPermissions`, `GlobalPermissionConfig` from `src/types.ts`.
    Update all remaining imports (tests, other modules).
    Run `pnpm run build` (typecheck).
    `refactor: remove per-surface type aliases and wrapper interfaces`
 
-3. **refactor: remove getBashPermissions dead method**
-   Remove `getBashPermissions()` from `PermissionManager` (no callers).
+3. **refactor: remove getBashPermissions dead method** Remove `getBashPermissions()` from `PermissionManager` (no callers).
    Run full test suite.
    `refactor: remove getBashPermissions dead method`
 
-4. **refactor: remove unused compiled-pattern helpers**
-   If `compilePermissionPatternsFromSources()`, `findCompiledPermissionMatch()`, `findCompiledPermissionMatchForNames()` are now unused, remove them.
+4. **refactor: remove unused compiled-pattern helpers** If `compilePermissionPatternsFromSources()`, `findCompiledPermissionMatch()`, `findCompiledPermissionMatchForNames()` are now unused, remove them.
    Check whether `compileWildcardPatternEntries()`, `compileWildcardPatterns()`, `findCompiledWildcardMatch()`, `findCompiledWildcardMatchForNames()` in `wildcard-matcher.ts` still have callers.
    Remove any that are dead.
    Run full test suite + `pnpm run build`.
@@ -505,8 +489,7 @@ Conversely, if `bash: { "*": "deny" }`, the tool is hidden — which is better U
    Update `docs/architecture/target-architecture.md` refactoring sequence to mark #56 as done.
    `docs: mark #56 complete in target architecture`
 
-2. **verify: full build and test suite**
-   Run `pnpm run build` and `npx vitest run`.
+2. **verify: full build and test suite** Run `pnpm run build` and `npx vitest run`.
    Confirm no regressions.
    `chore: verify clean build after config normalization refactor`
 
@@ -525,8 +508,11 @@ Conversely, if `bash: { "*": "deny" }`, the tool is hidden — which is better U
 ## Open Questions
 
 - **Should `evaluate()` accept `defaultAction` as a parameter or keep calling `getDefaultAction()`?**
-  Plan proposes parameter — cleaner for testing and keeps `evaluate()` independent of `defaults.ts`. Final decision during implementation.
+  Plan proposes parameter — cleaner for testing and keeps `evaluate()` independent of `defaults.ts`.
+  Final decision during implementation.
 - **Should unused `compileWildcardPatternEntries` / `findCompiledWildcardMatch` exports be removed in this PR?**
-  They may be used by other modules not yet migrated to `evaluate()`. Removal is in step 18 but gated on checking callers.
+  They may be used by other modules not yet migrated to `evaluate()`.
+  Removal is in step 18 but gated on checking callers.
 - **Should `normalizeConfig()` accept raw `Record<string, unknown>` or the already-validated `Record<string, PermissionState>` sub-objects?**
-  Plan uses the validated shape (`NormalizableConfig`). Raw validation stays in `config-loader.ts` / `normalizeRawPermission()`.
+  Plan uses the validated shape (`NormalizableConfig`).
+  Raw validation stays in `config-loader.ts` / `normalizeRawPermission()`.

@@ -27,7 +27,9 @@ Since nobody outside the project uses this extension yet, we can make a clean br
 
 ## Goals
 
-1. Remove the `formatMode` config field entirely. The runtime always uses prompt-end timing (the previous `"prompt"` behavior). The loader tolerates the legacy key, emits a config issue, and discards the value.
+1. Remove the `formatMode` config field entirely.
+   The runtime always uses prompt-end timing (the previous `"prompt"` behavior).
+   The loader tolerates the legacy key, emits a config issue, and discards the value.
 2. After formatting runs at `agent_end`, give the agent one follow-up turn via `pi.sendMessage({ triggerTurn: true })` so it can see which files changed and react.
 3. Include formatter failure details (stderr, exit code) in the follow-up message so the agent can attempt to fix issues.
 4. Prevent infinite loops: at most one follow-up per user prompt.
@@ -97,7 +99,10 @@ Concrete changes:
 3. Drop `formatMode` from `schemas/pi-autoformat.schema.json`.
 4. Drop `formatMode` from `docs/configuration.md`.
 5. In `src/config-loader.ts`: when `formatMode` key is present in user config, emit a config issue (`formatMode has been removed; prompt-end formatting is now the only mode.`) and discard.
-6. In `src/extension.ts`: remove all `formatMode` branching. The `tool_result` handler no longer conditionally flushes. The `agent_end` handler always flushes. The `session_shutdown` handler no longer conditionally flushes (it still cleans up state).
+6. In `src/extension.ts`: remove all `formatMode` branching.
+   The `tool_result` handler no longer conditionally flushes.
+   The `agent_end` handler always flushes.
+   The `session_shutdown` handler no longer conditionally flushes (it still cleans up state).
 7. Remove tests for `"tool"` and `"session"` mode behaviors; add a test for the legacy-key config issue.
 
 ### Sequence with `notifyAgent: true`
@@ -129,7 +134,8 @@ A `followUpPending` flag on `SessionState` prevents unbounded re-triggering:
 
 1. On `agent_end` entry: read `followUpPending` into a local, then set it to `false`.
 2. After flush: if result has groups AND the locally-read value was `false`, send the message and set `followUpPending = true`.
-3. Effect: first `agent_end` → format + notify. Second `agent_end` → format if needed, no notify.
+3. Effect: first `agent_end` → format + notify.
+   Second `agent_end` → format if needed, no notify.
 
 The flag resets naturally because step 1 always clears it on entry.
 
@@ -245,19 +251,25 @@ readonly sendMessage = ((message: unknown, options?: unknown) => {
 ### 2. Legacy `formatMode` key tolerance in config loader
 
 - **Test surface:** `test/config-loader.test.ts`.
-- **Covers:** Config containing `formatMode: "prompt"` (or any value) is accepted without error but emits a config issue. The value is discarded.
+- **Covers:** Config containing `formatMode: "prompt"` (or any value) is accepted without error but emits a config issue.
+  The value is discarded.
 - **Commit:** `feat: emit config issue for legacy formatMode key (#27)`
 
 ### 3. Remove `formatMode` from JSON schema
 
 - **Test surface:** `test/schema.test.ts`.
-- **Covers:** Schema no longer includes `formatMode`. Configs with `formatMode` pass validation (via `additionalProperties` tolerance or explicit handling).
+- **Covers:** Schema no longer includes `formatMode`.
+  Configs with `formatMode` pass validation (via `additionalProperties` tolerance or explicit handling).
 - **Commit:** `feat!: remove formatMode from config schema (#27)`
 
 ### 4. Remove `formatMode` branching from extension runtime
 
 - **Test surface:** `test/extension.test.ts`.
-- **Covers:** Remove `"tool"` and `"session"` mode tests. `tool_result` handler no longer flushes. `agent_end` always flushes. `session_shutdown` no longer conditionally flushes. Update `createLoadResult()` helper to drop the `formatMode` parameter.
+- **Covers:** Remove `"tool"` and `"session"` mode tests.
+  `tool_result` handler no longer flushes.
+  `agent_end` always flushes.
+  `session_shutdown` no longer conditionally flushes.
+  Update `createLoadResult()` helper to drop the `formatMode` parameter.
 - **Commit:** `feat!: always use prompt-end formatting (#27)`
 
 ### 5. `notifyAgent` config field — types, defaults, schema, loader
@@ -269,13 +281,16 @@ readonly sendMessage = ((message: unknown, options?: unknown) => {
 ### 6. Notification message builder
 
 - **Test surface:** `test/extension.test.ts` (or extracted `test/notify-message.test.ts`).
-- **Covers:** Message text with 1 file, 3 files, 11 files (truncation at 10), 0 groups (returns `undefined`). Message with mixed success/failure including stderr. Message with all-failures (no success line).
+- **Covers:** Message text with 1 file, 3 files, 11 files (truncation at 10), 0 groups (returns `undefined`).
+  Message with mixed success/failure including stderr.
+  Message with all-failures (no success line).
 - **Commit:** `feat: add buildNotifyMessageContent helper (#27)`
 
 ### 7. `TestPi` harness — add `sendMessage` capture
 
 - **Test surface:** `test/extension.test.ts`.
-- **Covers:** Refactor only — `TestPi` records `sendMessage` calls. No behavioral change to existing tests.
+- **Covers:** Refactor only — `TestPi` records `sendMessage` calls.
+  No behavioral change to existing tests.
 - **Commit:** `test: extend TestPi with sendMessage capture (#27)`
 
 ### 8. Follow-up turn on successful flush

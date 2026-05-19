@@ -24,8 +24,10 @@ Released as v5.3.1 with no rework or corrections.
 
 #### What caused friction (agent side)
 
-- None observed. The issue was well-scoped, all prerequisites were landed, and the deliverable was unambiguous documentation.
+- None observed.
+  The issue was well-scoped, all prerequisites were landed, and the deliverable was unambiguous documentation.
 
 #### What caused friction (user side)
 
-- None observed. The issue body provided clear tasks, explicit prerequisites, and no ambiguous design choices.
+- None observed.
+  The issue body provided clear tasks, explicit prerequisites, and no ambiguous design choices.

@@ -219,9 +219,11 @@ No more LoD violations — every call is one level deep.
 
 ## Test impact analysis
 
-1. **New unit tests enabled**: `PermissionSession` can be tested in isolation — `resetForNewSession()`, `shutdown()`, `activate()`, cache key logic, agent name resolution. These were previously untestable because the logic was scattered across handlers.
+1. **New unit tests enabled**: `PermissionSession` can be tested in isolation — `resetForNewSession()`, `shutdown()`, `activate()`, cache key logic, agent name resolution.
+   These were previously untestable because the logic was scattered across handlers.
 2. **Existing handler tests simplified**: `makeSession()` factories shrink from 7+ fields with nested mocks (`permissionManager: { checkPermission: vi.fn() }`) to a flat mock of `PermissionSession` methods. `as unknown as` casts on `SessionState["permissionManager"]` disappear.
-3. **Existing handler tests that must stay**: Tests that verify handler orchestration logic (which gates are called, in what order, how results are handled) must remain. Tests that verify the scattered reset sequences can be simplified to assert `session.resetForNewSession()` / `session.shutdown()` was called once.
+3. **Existing handler tests that must stay**: Tests that verify handler orchestration logic (which gates are called, in what order, how results are handled) must remain.
+   Tests that verify the scattered reset sequences can be simplified to assert `session.resetForNewSession()` / `session.shutdown()` was called once.
 4. **Integration test unaffected**: `tests/permission-system.test.ts` calls `piPermissionSystemExtension(mockPi)` and never constructs `HandlerDeps` — validates the wiring is correct.
 
 ## TDD order
@@ -232,7 +234,8 @@ No more LoD violations — every call is one level deep.
    Red — class does not exist yet.
    `test: add PermissionSession unit tests (#129)`
 
-2. Implement `src/permission-session.ts` with constructor and delegation methods. Tests go green.
+2. Implement `src/permission-session.ts` with constructor and delegation methods.
+   Tests go green.
    `feat: PermissionSession class with delegation methods (#129)`
 
 3. Add tests for `resetForNewSession(ctx)` — verifies new `PermissionManager` is created, cache keys are cleared, skill entries are cleared, forwarding is started.
@@ -253,13 +256,17 @@ No more LoD violations — every call is one level deep.
 
 ### Phase 2: Wire PermissionSession into index.ts (alongside existing)
 
-1. Construct `PermissionSession` in `src/index.ts`. Pass it as `deps.session` on `HandlerDeps`. Update `HandlerDeps.session` type from `SessionState` to `PermissionSession`. Remove absorbed fields from `HandlerDeps`.
+1. Construct `PermissionSession` in `src/index.ts`.
+   Pass it as `deps.session` on `HandlerDeps`.
+   Update `HandlerDeps.session` type from `SessionState` to `PermissionSession`.
+   Remove absorbed fields from `HandlerDeps`.
    Existing handler tests break (type mismatch) — update `makeDeps` factories to use a `PermissionSession` mock.
    `refactor: wire PermissionSession into HandlerDeps (#129)`
 
 ### Phase 3: Migrate handlers (one at a time)
 
-1. Migrate `handleSessionStart` and `handleResourcesDiscover` to use `session.resetForNewSession(ctx)` instead of scattered field writes. Migrate `handleSessionShutdown` to use `session.shutdown()`.
+1. Migrate `handleSessionStart` and `handleResourcesDiscover` to use `session.resetForNewSession(ctx)` instead of scattered field writes.
+   Migrate `handleSessionShutdown` to use `session.shutdown()`.
    Update lifecycle tests: assert `session.resetForNewSession` / `session.shutdown` called instead of checking individual field values.
    `refactor: lifecycle handlers use PermissionSession (#129)`
 
@@ -277,7 +284,8 @@ No more LoD violations — every call is one level deep.
 
 ### Phase 4: Cleanup
 
-1. Remove `SessionState` interface from `src/runtime.ts` if no longer referenced. Remove absorbed free functions (`resolveAgentName`, `logResolvedConfigPaths`) from `runtime.ts` if they are now only used internally by `PermissionSession`.
+1. Remove `SessionState` interface from `src/runtime.ts` if no longer referenced.
+   Remove absorbed free functions (`resolveAgentName`, `logResolvedConfigPaths`) from `runtime.ts` if they are now only used internally by `PermissionSession`.
    `refactor: remove SessionState interface (#129)`
 
 2. Update `docs/architecture/architecture.md` module listing.
@@ -296,6 +304,11 @@ No more LoD violations — every call is one level deep.
 
 ## Open questions
 
-- Should `PermissionSession` expose a `logger` property so `handleToolCall` can pass `session.logger.review` to `GateRunnerDeps.writeReviewLog`? Or should it expose a `writeReviewLog` method directly? Leaning toward exposing the `SessionLogger` since it is already a narrow interface — avoids duplicating method signatures.
-- Should `canPrompt(ctx)` and `prompt(ctx, details)` absorb `ctx` via `activate()` so they become zero-arg / one-arg? The issue suggests this but it adds temporal coupling (must call `activate` before `canPrompt`). Current plan keeps `ctx` explicit for safety — revisit in #130 if handler classes guarantee `activate` is always called first.
-- Should the `config-modal.ts` command (`getComposedRules`, `getConfig`) read from `PermissionSession` instead of `runtime`? Defer — the command is wired in `index.ts` with closures over `runtime` and does not flow through `HandlerDeps`.
+- Should `PermissionSession` expose a `logger` property so `handleToolCall` can pass `session.logger.review` to `GateRunnerDeps.writeReviewLog`?
+  Or should it expose a `writeReviewLog` method directly?
+  Leaning toward exposing the `SessionLogger` since it is already a narrow interface — avoids duplicating method signatures.
+- Should `canPrompt(ctx)` and `prompt(ctx, details)` absorb `ctx` via `activate()` so they become zero-arg / one-arg?
+  The issue suggests this but it adds temporal coupling (must call `activate` before `canPrompt`).
+  Current plan keeps `ctx` explicit for safety — revisit in #130 if handler classes guarantee `activate` is always called first.
+- Should the `config-modal.ts` command (`getComposedRules`, `getConfig`) read from `PermissionSession` instead of `runtime`?
+  Defer — the command is wired in `index.ts` with closures over `runtime` and does not flow through `HandlerDeps`.

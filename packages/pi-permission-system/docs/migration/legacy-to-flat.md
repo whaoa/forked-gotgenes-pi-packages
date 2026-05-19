@@ -100,8 +100,7 @@ In the flat format, tool names are surface keys directly inside `permission`.
 }
 ```
 
-**Special case — `tools.bash` and `tools.mcp`:**
-These were catch-all overrides for their respective surfaces.
+**Special case — `tools.bash` and `tools.mcp`:** These were catch-all overrides for their respective surfaces.
 In the flat format, use a string shorthand or an explicit `"*"` pattern:
 
 ```jsonc
@@ -122,9 +121,7 @@ In the flat format, use a string shorthand or an explicit `"*"` pattern:
 ### `bash`
 
 Bash patterns translate directly; the surface name stays `bash`.
-If you also had a `tools.bash` or `defaultPolicy.bash` value different from `defaultPolicy.tools`,
-add an explicit `"*"` catch-all pattern at the **start** of the object
-(so specific patterns placed after it override it via last-match-wins).
+If you also had a `tools.bash` or `defaultPolicy.bash` value different from `defaultPolicy.tools`, add an explicit `"*"` catch-all pattern at the **start** of the object (so specific patterns placed after it override it via last-match-wins).
 
 ```jsonc
 // Before
@@ -234,10 +231,8 @@ Other deprecated keys (`doom_loop`, `tool_call_limit`) are simply dropped.
 }
 ```
 
-> **Note:** In the old format, `special.external_directory: "deny"` produced a rule with
-> `matchedPattern: "external_directory"`.
-> In the flat format, the string shorthand produces `pattern: "*"`, so
-> `matchedPattern` is now `"*"` when the explicit rule matches.
+> **Note:** In the old format, `special.external_directory: "deny"` produced a rule with `matchedPattern: "external_directory"`.
+> In the flat format, the string shorthand produces `pattern: "*"`, so `matchedPattern` is now `"*"` when the explicit rule matches.
 
 ## Full before/after example
 
@@ -345,13 +340,10 @@ Key differences from the old frontmatter:
 
 ### Agent scope catch-alls override parent scope patterns
 
-In the old format, `tools.bash: allow` (override layer) was lower priority than
-config-layer patterns from any scope, including global.
-In the flat format, `bash: allow` in an agent scope is a config-layer catch-all
-with **higher** priority than global-scope patterns (last-match-wins, agent rules come later).
+In the old format, `tools.bash: allow` (override layer) was lower priority than config-layer patterns from any scope, including global.
+In the flat format, `bash: allow` in an agent scope is a config-layer catch-all with **higher** priority than global-scope patterns (last-match-wins, agent rules come later).
 
-If you relied on global `rm -rf *: deny` surviving an agent's `tools.bash: allow`,
-you must now explicitly deny the pattern within the agent's own `bash` object:
+If you relied on global `rm -rf *: deny` surviving an agent's `tools.bash: allow`, you must now explicitly deny the pattern within the agent's own `bash` object:
 
 ```yaml
 # Old agent frontmatter — global "rm -rf *": "deny" survived

@@ -42,7 +42,8 @@ Relevant existing surface:
   Spawns `pi --mode rpc --no-tools --no-extensions --no-session -e <EXTENSION_PATH>`, writes JSON commands to stdin, parses JSON-per-line responses from stdout.
   Today it relies on `pi` being on `PATH` and skips when `spawnSync("pi", ["--help"]).status !== 0`; the new harness will resolve `pi` from `node_modules/.bin/pi` so the test runs whenever `pnpm install` has been done.
 - `src/extension.ts` — `createAutoformatExtension` wires three real touched-file sources: built-in `write`/`edit` `tool_result` events, `customMutationTools` declared in config, and `pi.events.on(channel, …)` for the `autoformat:touched` (configurable) channel.
-- `src/shell-mutation-detector.ts` — drives `bash` snapshot tracking (`SnapshotTracker`) plus argument parsing and wrapper matching for known mutation commands. The `bash` RPC command sends a real `tool_call` + `tool_result` pair through Pi.
+- `src/shell-mutation-detector.ts` — drives `bash` snapshot tracking (`SnapshotTracker`) plus argument parsing and wrapper matching for known mutation commands.
+  The `bash` RPC command sends a real `tool_call` + `tool_result` pair through Pi.
 - `src/custom-mutation-tools.ts` — `parseTouchedPayload` and `createCustomToolHandlers` accept either a `{ touched: string[] }` payload (event-bus path) or extract paths from configured custom tools.
 - `node_modules/@earendil-works/pi-coding-agent/docs/rpc.md` — confirms RPC supports `prompt`, `bash`, `get_state`, and that `prompt` accepts extension commands (`/mycommand`) which execute immediately even without an LLM provider configured.
 - `node_modules/@earendil-works/pi-coding-agent/docs/extensions.md` — confirms `pi.registerCommand(name, { handler })` lets a companion extension expose a slash command we can trigger over RPC.
@@ -121,12 +122,14 @@ After the RPC session closes, the test reads the recorder log and asserts:
    - Asserts the recorder ran on `out.ts` exactly once.
 
 2. `customMutationTools` acceptance.
-   - Loads `custom-tool-emitter.ts` via `-e`. The companion registers a tool whose name is also listed in `customMutationTools` config; the slash command `/trigger-custom-tool` calls `pi.sendMessage()`-style hooks that produce a real `tool_result` for that tool with a `{touched: [...]}` payload.
+   - Loads `custom-tool-emitter.ts` via `-e`.
+     The companion registers a tool whose name is also listed in `customMutationTools` config; the slash command `/trigger-custom-tool` calls `pi.sendMessage()`-style hooks that produce a real `tool_result` for that tool with a `{touched: [...]}` payload.
    - If we cannot trigger a real registered tool without an LLM, fall back to a slash command that emits the synthetic `tool_result` via a documented hook; if no such hook exists, drop this scenario into Open Questions and rely on the EventBus path for v1.
    - Asserts the recorder ran on the declared file.
 
 3. `autoformat:touched` EventBus acceptance.
-   - Loads `event-bus-emitter.ts` via `-e`. Slash command `/emit-touched <path>` calls `pi.events.emit("autoformat:touched", { touched: [absolutePath] })`.
+   - Loads `event-bus-emitter.ts` via `-e`.
+     Slash command `/emit-touched <path>` calls `pi.events.emit("autoformat:touched", { touched: [absolutePath] })`.
    - Test sends `{type: "prompt", message: "/emit-touched out.ts"}`, then triggers a flush as in (1).
    - Asserts the recorder ran on `out.ts`.
 
@@ -162,15 +165,23 @@ LLM-gated scenarios add a second guard on `PI_AUTOFORMAT_LLM_TESTS` and the rele
 
 ## Module-Level Changes
 
-- `test/helpers/rpc.ts` — new. Extracted RPC harness. Adds `extraExtensions`, `env`, and event/response separation.
-- `test/acceptance.test.ts` — updated to import from `test/helpers/rpc.ts`. Behavior unchanged.
-- `test/acceptance-bash-mutation.test.ts` — new. Scenario (1).
-- `test/acceptance-event-bus.test.ts` — new. Scenario (3).
-- `test/acceptance-custom-tool.test.ts` — new. Scenario (2). May be deferred if the no-LLM trigger turns out infeasible (see Open Questions).
+- `test/helpers/rpc.ts` — new.
+  Extracted RPC harness.
+  Adds `extraExtensions`, `env`, and event/response separation.
+- `test/acceptance.test.ts` — updated to import from `test/helpers/rpc.ts`.
+  Behavior unchanged.
+- `test/acceptance-bash-mutation.test.ts` — new.
+  Scenario (1).
+- `test/acceptance-event-bus.test.ts` — new.
+  Scenario (3).
+- `test/acceptance-custom-tool.test.ts` — new.
+  Scenario (2).
+  May be deferred if the no-LLM trigger turns out infeasible (see Open Questions).
 - `test/fixtures/event-bus-emitter.ts` — new companion extension.
 - `test/fixtures/custom-tool-emitter.ts` — new companion extension.
 - `test/fixtures/formatter-recorder.sh` — new helper script (executable, POSIX `sh`).
-- `docs/testing.md` — new. Documents acceptance-test layout, the `node_modules/.bin/pi` resolution behavior, skip semantics, and the env-gated `PI_AUTOFORMAT_LLM_TESTS` design.
+- `docs/testing.md` — new.
+  Documents acceptance-test layout, the `node_modules/.bin/pi` resolution behavior, skip semantics, and the env-gated `PI_AUTOFORMAT_LLM_TESTS` design.
 - `README.md` — small "Testing" pointer to `docs/testing.md`.
 
 No `.github/workflows/*.yml` change is needed: the existing `pnpm install --frozen-lockfile` step already provides `pi` via the devDependency.
@@ -187,15 +198,18 @@ If the new tests expose a real bug, that bug is fixed in its own commit on the s
    Commit: `test: extract shared rpc harness and resolve pi from node_modules`.
 
 2. **Bash mutation acceptance (red → green).**
-   Add `test/fixtures/formatter-recorder.sh`. Add `test/acceptance-bash-mutation.test.ts` that writes a project config pointing at the recorder, sends a `bash` RPC command that creates `out.ts`, triggers a flush, and asserts the recorder log.
+   Add `test/fixtures/formatter-recorder.sh`.
+   Add `test/acceptance-bash-mutation.test.ts` that writes a project config pointing at the recorder, sends a `bash` RPC command that creates `out.ts`, triggers a flush, and asserts the recorder log.
    Commit: `test: add acceptance coverage for bash-driven mutation flush`.
 
 3. **EventBus channel acceptance (red → green).**
-   Add `test/fixtures/event-bus-emitter.ts` and `test/acceptance-event-bus.test.ts`. Drive `/emit-touched` via `prompt`, trigger a flush, assert.
+   Add `test/fixtures/event-bus-emitter.ts` and `test/acceptance-event-bus.test.ts`.
+   Drive `/emit-touched` via `prompt`, trigger a flush, assert.
    Commit: `test: add acceptance coverage for autoformat:touched event bus`.
 
 4. **Custom-tool acceptance (red → green) — conditional.**
-   Add `test/fixtures/custom-tool-emitter.ts` and `test/acceptance-custom-tool.test.ts`. If the no-LLM trigger path proves infeasible during TDD, capture the finding in Open Questions and skip this cycle.
+   Add `test/fixtures/custom-tool-emitter.ts` and `test/acceptance-custom-tool.test.ts`.
+   If the no-LLM trigger path proves infeasible during TDD, capture the finding in Open Questions and skip this cycle.
    Commit: `test: add acceptance coverage for customMutationTools dispatch`.
 
 5. **Documentation (green → docs).**

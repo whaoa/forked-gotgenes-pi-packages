@@ -264,8 +264,10 @@ Per AGENTS.md, add focused tests:
 
 ## Open Questions
 
-- Does the Pi extension API expose a pre-tool hook usable for snapshotting? If not, strategy 2 is deferred.
-- Should wrappers support a JSON output format in addition to line format? Likely yes, but not in the first cut.
+- Does the Pi extension API expose a pre-tool hook usable for snapshotting?
+  If not, strategy 2 is deferred.
+- Should wrappers support a JSON output format in addition to line format?
+  Likely yes, but not in the first cut.
 
 ## Explicitly Deferred: `git status --porcelain` Detection
 
@@ -281,7 +283,8 @@ It is **not** included at this stage because:
 - It silently does nothing in non-Git directories, which Pi runs in more often than expected.
 - It loses per-command attribution, hurting debuggability and foreclosing future per-command policy.
 
-The explicit strategies above match the issue's stated philosophy that "explicit, low-noise designs are preferable to implicit heuristics." We can revisit `git status` later if real-world usage shows meaningful gaps the three explicit strategies cannot close, ideally as a scoped, opt-in tertiary strategy rather than a default.
+The explicit strategies above match the issue's stated philosophy that "explicit, low-noise designs are preferable to implicit heuristics."
+We can revisit `git status` later if real-world usage shows meaningful gaps the three explicit strategies cannot close, ideally as a scoped, opt-in tertiary strategy rather than a default.
 
 ## Checkpoints / Commits
 

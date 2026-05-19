@@ -43,7 +43,8 @@ The update touches three areas of the ADR:
 
 1. **Frontmatter + Status section** — change `status: accepted` to `status: superseded` in frontmatter, and update the Status section body to read "Superseded" with a pointer to `docs/architecture/architecture.md`.
 2. **"Upstream PRs are open" subsection** — keep the PR list and factual statements intact; revise the final sentence ("Once these land upstream, the fork's divergence reduces to package naming and tooling.") to note that the fork now diverges intentionally beyond those patches, per the architecture document.
-3. **Consequences → Operational** — add a sentence noting that the fork diverges intentionally beyond patches, and that the architecture document governs the fork's direction going forward. Keep the existing bullet about upstream PRs.
+3. **Consequences → Operational** — add a sentence noting that the fork diverges intentionally beyond patches, and that the architecture document governs the fork's direction going forward.
+   Keep the existing bullet about upstream PRs.
 
 No structural changes (new sections, removed sections, reordered content).
 

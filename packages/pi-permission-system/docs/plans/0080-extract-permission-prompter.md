@@ -149,7 +149,8 @@ The `PermissionForwardingDeps` interface narrows to only what `processForwardedP
 3. **feat:** Wire `PermissionPrompter` in `src/index.ts`, remove `promptPermission` free function from `runtime.ts`, narrow `PermissionForwardingDeps`.
    Commit: `feat: wire PermissionPrompter and remove runtime promptPermission (#80)`
 
-4. **test:** Update `tests/unit/runtime.test.ts` — remove now-dead `promptPermission` tests. Update `tests/unit/polling.test.ts` mock to narrowed `PermissionForwardingDeps`.
+4. **test:** Update `tests/unit/runtime.test.ts` — remove now-dead `promptPermission` tests.
+   Update `tests/unit/polling.test.ts` mock to narrowed `PermissionForwardingDeps`.
    Commit: `test: update runtime and polling tests for PermissionPrompter extraction (#80)`
 
 5. **docs:** Add `docs/architecture/permission-prompter.md` describing responsibility boundaries.

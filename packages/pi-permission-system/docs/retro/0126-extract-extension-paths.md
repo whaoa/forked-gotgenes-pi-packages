@@ -11,16 +11,17 @@ issue_title: "refactor: extract ExtensionPaths value object from ExtensionRuntim
 
 Extracted six immutable path fields from `ExtensionRuntime` into a new `ExtensionPaths` interface and `computeExtensionPaths()` factory in `src/extension-paths.ts`.
 Updated `ExtensionRuntime` to `extends ExtensionPaths`, delegated path computation in `createExtensionRuntime`, and narrowed `HandlerDeps.piInfrastructureDirs` to `readonly string[]`.
-Shipped as v5.7.0 with zero behavioral change.
-11 new unit tests; total suite 1245 tests across 55 files.
+Shipped as v5.7.0 with zero behavioral change. 11 new unit tests; total suite 1245 tests across 55 files.
 
 ### Observations
 
 #### What went well
 
-- **Plan-to-ship pipeline was smooth.** Three phases (plan → TDD → ship) completed in a single session with no rework.
+- **Plan-to-ship pipeline was smooth.**
+  Three phases (plan → TDD → ship) completed in a single session with no rework.
   The plan's risk table predicted the exact `readonly string[]` assignability issue and the `discoverGlobalNodeModulesRoot` mock-interception strategy, both of which played out as described.
-- **Transitive mock interception worked cleanly.** The existing `vi.mock("../src/node-modules-discovery")` in `runtime.test.ts` continued to intercept correctly through `computeExtensionPaths`, avoiding any mock-target migration.
+- **Transitive mock interception worked cleanly.**
+  The existing `vi.mock("../src/node-modules-discovery")` in `runtime.test.ts` continued to intercept correctly through `computeExtensionPaths`, avoiding any mock-target migration.
   The plan listed this as the simpler of two options and it proved correct.
 
 #### What caused friction (agent side)

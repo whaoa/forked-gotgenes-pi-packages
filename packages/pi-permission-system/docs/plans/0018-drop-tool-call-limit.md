@@ -9,7 +9,8 @@ issue_title: "Drop unread special.tool_call_limit from permissions schema"
 
 `schemas/permissions.schema.json` declares `special.tool_call_limit` with a `oneOf [permissionState, integer]` shape, but no runtime code reads it.
 `SpecialPermissionName` in `src/types.ts` and `SPECIAL_PERMISSION_KEYS` in `src/permission-manager.ts` both omit `tool_call_limit`.
-AGENTS.md is explicit: *"Treat any declared config field not read at runtime as a maintenance trap. Remove it or document its purpose."*
+AGENTS.md is explicit: *"Treat any declared config field not read at runtime as a maintenance trap.*
+*Remove it or document its purpose."*
 
 The field also appears in the `README.md` special-permissions table with the note *"schema only, not enforced yet"*.
 

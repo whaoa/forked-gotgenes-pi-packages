@@ -128,7 +128,8 @@ Current behavior: if the MCP operation is a metadata target (status, list, searc
 
 After:
 
-- If `defaults.mcp === "allow"` → the synthesized default `{ surface: "mcp", pattern: "*", action: "allow" }` catches all targets, including baseline ones. No separate baseline rules needed.
+- If `defaults.mcp === "allow"` → the synthesized default `{ surface: "mcp", pattern: "*", action: "allow" }` catches all targets, including baseline ones.
+  No separate baseline rules needed.
 - If any config rule has `surface: "mcp" && action: "allow"` → synthesize explicit baseline rules for the 5 targets, placed BEFORE config rules so explicit denies can still override them.
 - If neither condition → no baseline rules synthesized → baseline targets fall through to MCP default (ask or deny).
 
@@ -156,7 +157,8 @@ export interface Rule {
 }
 ```
 
-`evaluate()` ignores this field. Post-evaluation, `checkPermission()` derives `PermissionCheckResult.source`:
+`evaluate()` ignores this field.
+Post-evaluation, `checkPermission()` derives `PermissionCheckResult.source`:
 
 | `rule.layer`            | Derived `source`                                                                                      |
 | ----------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -208,7 +210,11 @@ else { /* normal gate using extCheck.state */ }
 
 ### `getToolPermission()` simplification
 
-`getToolPermission()` also uses `bashDefault`/`mcpToolLevel`. After the change, it evaluates against the composed rules directly. For "bash", it evaluates `evaluate("bash", "*", composedRules)`. For "mcp", it evaluates `evaluate("mcp", "*", composedRules)`. The synthesized override rules ensure correct results.
+`getToolPermission()` also uses `bashDefault`/`mcpToolLevel`.
+After the change, it evaluates against the composed rules directly.
+For "bash", it evaluates `evaluate("bash", "*", composedRules)`.
+For "mcp", it evaluates `evaluate("mcp", "*", composedRules)`.
+The synthesized override rules ensure correct results.
 
 ### `PermissionCheckResult.source` update
 
@@ -238,7 +244,8 @@ When called without path info (e.g., to get the general policy for tool filterin
 
 - `synthesizeDefaults(defaults: PermissionDefaultPolicy): Ruleset` — 5 catch-all rules with `layer: "default"`.
 - `synthesizeOverrides(overrides: Array<{ bash?: PermissionState; mcp?: PermissionState }>): Ruleset` — per-scope override rules with `layer: "override"`.
-- `synthesizeBaseline(configRules: Ruleset): Ruleset` — conditional MCP baseline rules with `layer: "baseline"`. Emits rules only when `configRules` contains at least one `surface: "mcp" && action: "allow"` rule.
+- `synthesizeBaseline(configRules: Ruleset): Ruleset` — conditional MCP baseline rules with `layer: "baseline"`.
+  Emits rules only when `configRules` contains at least one `surface: "mcp" && action: "allow"` rule.
 - `composeRuleset(defaults: Ruleset, overrides: Ruleset, baseline: Ruleset, configRules: Ruleset): Ruleset` — concatenates in priority order.
 
 ### `src/permission-manager.ts`
@@ -259,7 +266,8 @@ When called without path info (e.g., to get the general policy for tool filterin
 
 ### `src/defaults.ts`
 
-- `getSurfaceDefault()` can be removed after the refactor (defaults are rules now). Defer removal to avoid breaking other callers — mark as `@deprecated`.
+- `getSurfaceDefault()` can be removed after the refactor (defaults are rules now).
+  Defer removal to avoid breaking other callers — mark as `@deprecated`.
 - `mergeDefaults()` remains (needed to compute the merged default policy before synthesizing).
 
 ### `src/types.ts`

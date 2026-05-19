@@ -25,7 +25,8 @@ Read `docs/plans/` before making architectural changes (created by `/plan-issue`
 - Preserve the `/permission-system` slash command name — renaming it is a breaking change.
 - In the flat permission format, `permission["*"]` is the universal fallback; pattern ordering is last-match-wins.
 - Wildcard matching must be explicit and tested — silent over-matching is a permission bypass.
-- Prefer config patterns over new runtime mechanisms. Mechanism is forever; docs are reversible.
+- Prefer config patterns over new runtime mechanisms.
+  Mechanism is forever; docs are reversible.
 - Treat any declared config field not read at runtime as a maintenance trap.
 
 ## Configuration
@@ -54,7 +55,8 @@ Module-scoped state is isolated — a variable set in this extension's module is
 Shared communication channels:
 
 - **`pi.events`** (the event bus) — for fire-and-forget broadcasts and RPC.
-- **`globalThis` + `Symbol.for()`** — process-global by spec, survives jiti isolation. Use for direct service access.
+- **`globalThis` + `Symbol.for()`** — process-global by spec, survives jiti isolation.
+  Use for direct service access.
 
 Do not propose module-scoped singletons or Node.js module-cache sharing as a cross-extension communication mechanism — they do not work under jiti.
 

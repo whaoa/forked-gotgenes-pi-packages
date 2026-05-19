@@ -321,8 +321,10 @@ Suggested commit: `test: add failing tests for grep/awk/rg/sd pattern-first extr
 ### Step 4
 
 Surface: `collectPathCandidateTokens` — implement command-aware extraction.
-Coverage: all tests from steps 1–3 go green. Run full suite to verify no regressions.
-Changes: add `PATTERN_FIRST_COMMANDS`, `PatternCommandConfig`, `extractCommandName`, `collectPatternCommandTokens`. Refactor `command` branch in `collectPathCandidateTokens` to dispatch based on command name.
+Coverage: all tests from steps 1–3 go green.
+Run full suite to verify no regressions.
+Changes: add `PATTERN_FIRST_COMMANDS`, `PatternCommandConfig`, `extractCommandName`, `collectPatternCommandTokens`.
+Refactor `command` branch in `collectPathCandidateTokens` to dispatch based on command name.
 Suggested commit: `feat: command-aware path extraction for pattern-first commands (#91)`
 
 ### Step 5
@@ -350,6 +352,16 @@ Suggested commit: `test: document sed -i no-extension known limitation (#91)`
 
 ## Open Questions
 
-- **Should `-i` for sed consume the next argument?** Current plan says yes (handles BSD `sed -i ''` correctly). The trade-off is a false negative for GNU `sed -i 'script' file`. An alternative is to peek at the next argument's content — if it looks like a sed script (contains `/` delimiters and is longer than a typical extension), don't consume it. Defer this refinement unless test coverage reveals it matters in practice.
-- **Should we add `perl`, `ruby`, `python`, `node` to the command map?** These interpreters' first positional argument is a script FILE (a real path), not inline code. They are not "pattern-first" — they are "script-first" and their arguments ARE paths. They should NOT be in `PATTERN_FIRST_COMMANDS`. Only commands whose first argument is an inline pattern/script (not a file reference) belong here.
-- **Should character-based defense-in-depth be added to `classifyTokenAsPathCandidate`?** Adding script-indicator characters (`{`, `}`, `!`, `;`) as a rejection heuristic would catch patterns that slip through position-based skipping. This is orthogonal and could be a follow-up.
+- **Should `-i` for sed consume the next argument?**
+  Current plan says yes (handles BSD `sed -i ''` correctly).
+  The trade-off is a false negative for GNU `sed -i 'script' file`.
+  An alternative is to peek at the next argument's content — if it looks like a sed script (contains `/` delimiters and is longer than a typical extension), don't consume it.
+  Defer this refinement unless test coverage reveals it matters in practice.
+- **Should we add `perl`, `ruby`, `python`, `node` to the command map?**
+  These interpreters' first positional argument is a script FILE (a real path), not inline code.
+  They are not "pattern-first" — they are "script-first" and their arguments ARE paths.
+  They should NOT be in `PATTERN_FIRST_COMMANDS`.
+  Only commands whose first argument is an inline pattern/script (not a file reference) belong here.
+- **Should character-based defense-in-depth be added to `classifyTokenAsPathCandidate`?**
+  Adding script-indicator characters (`{`, `}`, `!`, `;`) as a rejection heuristic would catch patterns that slip through position-based skipping.
+  This is orthogonal and could be a follow-up.

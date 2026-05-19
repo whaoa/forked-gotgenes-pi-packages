@@ -128,23 +128,40 @@ Since this is a removal (not a feature), the order is deletion-first with valida
    Commit: `feat!: remove group-join and cross-extension-rpc source`
 
 2. **Remove RPC wiring from `index.ts`.**
-   Remove `registerRpcHandlers` import and call. Remove `currentCtx` state and RPC-related `session_start`/`session_shutdown` logic (keep `manager.clearCompleted()` call). Remove `unsubPing/Spawn/Stop` teardown. Remove `subagents:ready` emit.
+   Remove `registerRpcHandlers` import and call.
+   Remove `currentCtx` state and RPC-related `session_start`/`session_shutdown` logic (keep `manager.clearCompleted()` call).
+   Remove `unsubPing/Spawn/Stop` teardown.
+   Remove `subagents:ready` emit.
    Commit: `feat!: remove RPC wiring from index.ts`
 
 3. **Remove group-join wiring from `index.ts`.**
-   Remove `GroupJoinManager` import and instantiation (including the grouped-delivery callback). Remove batch tracking (`currentBatchAgents`, `batchFinalizeTimer`, `batchCounter`, `finalizeBatch`). Remove `defaultJoinMode` state, `getDefaultJoinMode`, `setDefaultJoinMode`. Remove join-mode resolution in background spawn path. Remove "Join mode" settings menu entry. Remove `defaultJoinMode` from `snapshotSettings()`. Simplify the `onComplete` callback: remove `currentBatchAgents` check and `groupJoin.onAgentComplete()` routing — always call `sendIndividualNudge(record)`. Remove `setDefaultJoinMode` from `applyAndEmitLoaded` appliers.
+   Remove `GroupJoinManager` import and instantiation (including the grouped-delivery callback).
+   Remove batch tracking (`currentBatchAgents`, `batchFinalizeTimer`, `batchCounter`, `finalizeBatch`).
+   Remove `defaultJoinMode` state, `getDefaultJoinMode`, `setDefaultJoinMode`.
+   Remove join-mode resolution in background spawn path.
+   Remove "Join mode" settings menu entry.
+   Remove `defaultJoinMode` from `snapshotSettings()`.
+   Simplify the `onComplete` callback: remove `currentBatchAgents` check and `groupJoin.onAgentComplete()` routing — always call `sendIndividualNudge(record)`.
+   Remove `setDefaultJoinMode` from `applyAndEmitLoaded` appliers.
    Commit: `feat!: remove group-join wiring from index.ts`
 
 4. **Clean up types, settings, and invocation-config.**
-   Remove `JoinMode` type from `types.ts`. Remove `groupId` and `joinMode` from `AgentRecord`. Remove `others` from `NotificationDetails`. Remove `defaultJoinMode` from `SubagentsSettings` and `SettingsAppliers` in `settings.ts`. Remove `VALID_JOIN_MODES` and sanitize/apply clauses. Remove `resolveJoinMode` and `JoinMode` import from `invocation-config.ts`.
+   Remove `JoinMode` type from `types.ts`.
+   Remove `groupId` and `joinMode` from `AgentRecord`.
+   Remove `others` from `NotificationDetails`.
+   Remove `defaultJoinMode` from `SubagentsSettings` and `SettingsAppliers` in `settings.ts`.
+   Remove `VALID_JOIN_MODES` and sanitize/apply clauses.
+   Remove `resolveJoinMode` and `JoinMode` import from `invocation-config.ts`.
    Commit: `feat!: remove join-mode types and settings`
 
 5. **Verify all tests pass and fix straggling references.**
-   Run `pnpm vitest run` and `pnpm run check`. Fix any test fixtures or assertions that reference removed fields (`joinMode`, `groupId`, `defaultJoinMode`, `resolveJoinMode`).
+   Run `pnpm vitest run` and `pnpm run check`.
+   Fix any test fixtures or assertions that reference removed fields (`joinMode`, `groupId`, `defaultJoinMode`, `resolveJoinMode`).
    Commit (if fixes needed): `test: remove references to deleted subsystems from test fixtures`
 
 6. **Update documentation.**
-   Update `README.md`: remove "Cross-extension RPC" section, join-mode documentation, `subagents:ready` event row. Update settings persistence paragraph.
+   Update `README.md`: remove "Cross-extension RPC" section, join-mode documentation, `subagents:ready` event row.
+   Update settings persistence paragraph.
    Update `.pi/skills/package-pi-subagents/SKILL.md`: remove `cross-extension-rpc.ts` and `group-join.ts` from architecture diagram and module tables, update `index.ts` description.
    Commit: `docs: remove group-join and RPC from README and AGENTS`
 

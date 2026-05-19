@@ -166,26 +166,38 @@ The new executor still runs once, appending the single path — behavior is unch
 
 Each step is a small red→green→commit cycle.
 
-1. **Registry: chain resolution.** Tests for `resolveChain(names, config)` covering ordered resolution, disabled-formatter skip, missing-formatter skip, environment passthrough.
-2. **Registry: file grouping.** Tests for `groupFilesByChain(files, config)` covering: mixed extensions → distinct groups; same extension → one group; different extensions sharing a chain → one group; files with no chain dropped; deterministic group and file ordering.
-3. **Executor: batch dispatch.** Tests for `executeChainGroup` covering single-file batch, multi-file batch, multi-step chain (each step runs once with all files appended), step failure does not abort later steps, environment overrides propagate.
-4. **Executor: command shape.** Tests asserting configured args come first and file paths are appended verbatim.
-5. **Config loader: `$FILE` rejection.** Test that a formatter command containing `$FILE` produces a validation issue and the formatter is excluded from the active config.
-6. **PromptAutoformatter: end-to-end.** Tests for the new `groups`-based result shape: mixed-extension touched set produces one group per chain; tool-mode size-1 batch still works; empty touched set yields no groups; existing chain steps run once each.
-7. **Extension: reporting.** Tests for the updated `defaultReportFlushResult` covering success summary across multiple groups and per-batch failure lines.
-8. **Defaults + schema alignment.** Update built-in formatter defaults and schema; acceptance/smoke tests assert defaults contain no `$FILE` and the schema rejects it.
-9. **Docs + changelog.** Update `docs/configuration.md`, `README.md`, and `CHANGELOG.md`.
+1. **Registry: chain resolution.**
+   Tests for `resolveChain(names, config)` covering ordered resolution, disabled-formatter skip, missing-formatter skip, environment passthrough.
+2. **Registry: file grouping.**
+   Tests for `groupFilesByChain(files, config)` covering: mixed extensions → distinct groups; same extension → one group; different extensions sharing a chain → one group; files with no chain dropped; deterministic group and file ordering.
+3. **Executor: batch dispatch.**
+   Tests for `executeChainGroup` covering single-file batch, multi-file batch, multi-step chain (each step runs once with all files appended), step failure does not abort later steps, environment overrides propagate.
+4. **Executor: command shape.**
+   Tests asserting configured args come first and file paths are appended verbatim.
+5. **Config loader: `$FILE` rejection.**
+   Test that a formatter command containing `$FILE` produces a validation issue and the formatter is excluded from the active config.
+6. **PromptAutoformatter: end-to-end.**
+   Tests for the new `groups`-based result shape: mixed-extension touched set produces one group per chain; tool-mode size-1 batch still works; empty touched set yields no groups; existing chain steps run once each.
+7. **Extension: reporting.**
+   Tests for the updated `defaultReportFlushResult` covering success summary across multiple groups and per-batch failure lines.
+8. **Defaults + schema alignment.**
+   Update built-in formatter defaults and schema; acceptance/smoke tests assert defaults contain no `$FILE` and the schema rejects it.
+9. **Docs + changelog.**
+   Update `docs/configuration.md`, `README.md`, and `CHANGELOG.md`.
 
 Commit at each step using Conventional Commits, e.g. `test: cover chain grouping`, `feat: group touched files by chain`, `feat!: batch-dispatch chain steps`, `feat!: drop $FILE substitution`, `docs: document batch dispatch convention`.
 
 ## Risks and Mitigations
 
-- **Risk:** A user upgrades and finds their `$FILE`-using config rejected. **Mitigation:** Validation message names the formatter, says exactly what to do, and points at `docs/configuration.md`.
+- **Risk:** A user upgrades and finds their `$FILE`-using config rejected.
+  **Mitigation:** Validation message names the formatter, says exactly what to do, and points at `docs/configuration.md`.
   CHANGELOG entry flags the breaking change.
   Major version bump.
-- **Risk:** A formatter that genuinely needs one-file-per-invocation (e.g. a tool requiring `--stdin-filepath`) is now broken. **Mitigation:** Not present in any formatter listed in #14.
+- **Risk:** A formatter that genuinely needs one-file-per-invocation (e.g. a tool requiring `--stdin-filepath`) is now broken.
+  **Mitigation:** Not present in any formatter listed in #14.
   If a real case appears, add a `batch: false` per-formatter opt-out in a follow-up.
-- **Risk:** A formatter aborts on the first file with an error, silently skipping later files in the batch. **Mitigation:** Documented as a known limitation; per-file output parsing is a follow-up.
+- **Risk:** A formatter aborts on the first file with an error, silently skipping later files in the batch.
+  **Mitigation:** Documented as a known limitation; per-file output parsing is a follow-up.
   Exit code is still surfaced and stderr is preserved.
 
 ## Open Questions

@@ -17,8 +17,10 @@ Released as v1.1.0.
 
 #### What went well
 
-- **Unambiguous issue, clean execution.** The issue body was precise (remove field, add deprecation warning, clean docs), AGENTS.md rules were clear (tolerant loader pattern), and the plan mapped directly to 5 TDD steps that executed without deviation.
-- **Plan-to-code fidelity.** All 5 TDD steps landed exactly as planned with no rework, scope changes, or unexpected test failures.
+- **Unambiguous issue, clean execution.**
+  The issue body was precise (remove field, add deprecation warning, clean docs), AGENTS.md rules were clear (tolerant loader pattern), and the plan mapped directly to 5 TDD steps that executed without deviation.
+- **Plan-to-code fidelity.**
+  All 5 TDD steps landed exactly as planned with no rework, scope changes, or unexpected test failures.
 
 #### What caused friction (agent side)
 

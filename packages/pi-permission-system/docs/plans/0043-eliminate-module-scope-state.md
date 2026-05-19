@@ -34,7 +34,9 @@ The setter-injection pattern (`setExtensionConfig`, `setLoggingWarningReporter`,
 ### Dependencies (all resolved)
 
 - #41 (permission-gate extraction) — CLOSED. `applyPermissionGate` exists in `src/permission-gate.ts`.
-- #42 (handler extraction) — CLOSED. Handlers live in `src/handlers/` and receive a `HandlerDeps` object. The #42 plan explicitly noted: "#43 will fold the getter/setter pairs and mutable fields into ExtensionRuntime."
+- #42 (handler extraction) — CLOSED.
+  Handlers live in `src/handlers/` and receive a `HandlerDeps` object.
+  The #42 plan explicitly noted: "#43 will fold the getter/setter pairs and mutable fields into ExtensionRuntime."
 
 ### Current module-scope state in `src/index.ts`
 
@@ -265,12 +267,14 @@ Target: ≤150 lines.
 
 ### Step 2: Extract helper functions into `src/runtime.ts`
 
-- Test surface: `tests/runtime.test.ts` — test `createPermissionManagerForCwd`, `derivePiProjectPaths`, `refreshExtensionConfig`, `resolveAgentName` as standalone functions that take runtime. Verify they read/write `runtime.*` fields correctly.
+- Test surface: `tests/runtime.test.ts` — test `createPermissionManagerForCwd`, `derivePiProjectPaths`, `refreshExtensionConfig`, `resolveAgentName` as standalone functions that take runtime.
+  Verify they read/write `runtime.*` fields correctly.
 - Commit: `feat: relocate factory helpers into src/runtime.ts (#43)`
 
 ### Step 3: Update handler tests to use `runtime` field in mock deps
 
-- Test surface: `tests/handlers/*.test.ts` — update all mock `HandlerDeps` construction to use `{ runtime: mockRuntime, ... }` instead of getter/setter stubs. All existing handler tests must still pass.
+- Test surface: `tests/handlers/*.test.ts` — update all mock `HandlerDeps` construction to use `{ runtime: mockRuntime, ... }` instead of getter/setter stubs.
+  All existing handler tests must still pass.
 - Commit: `test: update handler test mocks for ExtensionRuntime deps (#43)`
 
 ### Step 4: Simplify `HandlerDeps` and update handler implementations

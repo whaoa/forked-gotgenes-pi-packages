@@ -192,7 +192,8 @@ This is purely a file-move with re-export.
 ### 6. Unified checkPermission
 
 - **Test surface**: `tests/permission-manager-unified.test.ts` (extend)
-- **Covers**: all five surfaces produce identical `PermissionCheckResult` as current implementation (snapshot-style comparison against known inputs). Verify `source` field derivation.
+- **Covers**: all five surfaces produce identical `PermissionCheckResult` as current implementation (snapshot-style comparison against known inputs).
+  Verify `source` field derivation.
 - **Commit**: `refactor: unify checkPermission into single evaluate path`
 
 ### 7. Remove dead code and verify full suite
@@ -218,5 +219,8 @@ This is purely a file-move with re-export.
 
 ## Open Questions
 
-- Should `evaluateFirst` live in `src/rule.ts` (alongside `evaluate`) or in `src/input-normalizer.ts`? Leaning toward `src/rule.ts` since it's a pure evaluation helper. Decide during implementation.
-- Should the `NormalizedInput.resultExtras` carry typed fields per surface, or is `Record<string, unknown>` sufficient? Start with the record; refine if type-safety issues arise.
+- Should `evaluateFirst` live in `src/rule.ts` (alongside `evaluate`) or in `src/input-normalizer.ts`?
+  Leaning toward `src/rule.ts` since it's a pure evaluation helper.
+  Decide during implementation.
+- Should the `NormalizedInput.resultExtras` carry typed fields per surface, or is `Record<string, unknown>` sufficient?
+  Start with the record; refine if type-safety issues arise.

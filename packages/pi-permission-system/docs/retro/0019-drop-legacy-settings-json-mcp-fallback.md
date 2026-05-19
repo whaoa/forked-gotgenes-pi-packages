@@ -17,12 +17,20 @@ Released as v1.2.0.
 
 #### What went well
 
-- **End-to-end pipeline without intervention.** Plan → TDD → ship executed in sequence with no user corrections, redirections, or rework. The issue body was precise, the plan was unambiguous, and the implementation was a pure removal.
-- **Correct red→green test design despite misleading plan language.** The plan's TDD step 1 suggested the test "should pass even before the removal," but a proper red→green cycle needs a failing test. The agent correctly wrote a test that fails before the fix (by passing `legacyGlobalSettingsPath` to the constructor, proving the legacy path is active) and passes after (when the option is removed). The test was updated in the green commit — a minor plan deviation but the right call.
+- **End-to-end pipeline without intervention.**
+  Plan → TDD → ship executed in sequence with no user corrections, redirections, or rework.
+  The issue body was precise, the plan was unambiguous, and the implementation was a pure removal.
+- **Correct red→green test design despite misleading plan language.**
+  The plan's TDD step 1 suggested the test "should pass even before the removal," but a proper red→green cycle needs a failing test.
+  The agent correctly wrote a test that fails before the fix (by passing `legacyGlobalSettingsPath` to the constructor, proving the legacy path is active) and passes after (when the option is removed).
+  The test was updated in the green commit — a minor plan deviation but the right call.
 
 #### What caused friction (agent side)
 
-- `instruction-violation` (self-identified) — Markdownlint MD060 (table column alignment) failed the pre-commit hook on the plan commit because separator widths didn't match header widths. This is the same friction seen in the #18 retro. MD060 is not auto-fixable by `markdownlint-cli2 --fix`. Impact: one failed pre-commit hook, ~30 seconds of rework.
+- `instruction-violation` (self-identified) — Markdownlint MD060 (table column alignment) failed the pre-commit hook on the plan commit because separator widths didn't match header widths.
+  This is the same friction seen in the #18 retro.
+  MD060 is not auto-fixable by `markdownlint-cli2 --fix`.
+  Impact: one failed pre-commit hook, ~30 seconds of rework.
 
 #### What caused friction (user side)
 

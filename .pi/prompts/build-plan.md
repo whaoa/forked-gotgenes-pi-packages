@@ -14,7 +14,8 @@ For plans with red→green test cycles, use `/tdd-plan` instead.
 Before locating or reading the plan, make sure the working tree is up to date with the remote:
 
 1. Run `git pull --ff-only`.
-2. If it fails for **any** reason — uncommitted changes, divergent history, merge conflict, network error, detached HEAD — stop immediately and report the failure to the user. Do not attempt to stash, rebase, force, or otherwise resolve.
+2. If it fails for **any** reason — uncommitted changes, divergent history, merge conflict, network error, detached HEAD — stop immediately and report the failure to the user.
+   Do not attempt to stash, rebase, force, or otherwise resolve.
 3. Only proceed once the pull reports a clean fast-forward (or `Already up to date.`).
 
 ## Locate the plan
@@ -25,7 +26,8 @@ Before locating or reading the plan, make sure the working tree is up to date wi
 
 The plan's path determines the target package: `packages/<PKG>/docs/plans/...` → `PKG` is that directory name.
 
-Read the plan in full before doing anything else. If the plan has a "TDD Order" section with red→green test cycles, stop and tell the user to run `/tdd-plan` instead.
+Read the plan in full before doing anything else.
+If the plan has a "TDD Order" section with red→green test cycles, stop and tell the user to run `/tdd-plan` instead.
 
 ## Read project rules and load skills
 
@@ -39,24 +41,32 @@ If the plan touches markdown/docs: load the `markdown-conventions` skill.
 For **each** numbered step in the plan's "TDD Order" (or equivalent execution section), in order:
 
 1. **Implement** the change the step describes.
-2. **Verify.** Run the linters to confirm the change is clean:
-   - `pnpm run lint`. If it fails, run `pnpm run lint:fix` and re-check.
-3. **Commit.** Use the commit message the plan suggests, or a Conventional Commits message that matches:
+2. **Verify.**
+   Run the linters to confirm the change is clean:
+   - `pnpm run lint`.
+     If it fails, run `pnpm run lint:fix` and re-check.
+3. **Commit.**
+   Use the commit message the plan suggests, or a Conventional Commits message that matches:
    - `docs:` for documentation changes.
    - `feat:` for new behavior.
    - `feat!:` for breaking changes the plan calls out (include a `BREAKING CHANGE:` footer).
    - `fix:` for bug fixes.
    - `style:` for lint/format fixups.
 
-One logical change per commit. Do not bundle unrelated steps into one commit.
+One logical change per commit.
+Do not bundle unrelated steps into one commit.
 
-If a step uncovers a problem the plan didn't anticipate, fix it as part of the same commit and note the deviation in the commit body. If the deviation is large, stop and ask.
+If a step uncovers a problem the plan didn't anticipate, fix it as part of the same commit and note the deviation in the commit body.
+If the deviation is large, stop and ask.
 
 ## After the last step
 
-1. If any `src/` or `test/` files were touched (even tangentially), run the full suite: `pnpm vitest run`. Must be all green.
-2. If any `.ts` files were touched, run the type check: `pnpm run check` (`tsc --noEmit`). Must succeed.
-3. Run the linter one final time: `pnpm run lint`. Commit any fixup as `style:` if you haven't pushed yet.
+1. If any `src/` or `test/` files were touched (even tangentially), run the full suite: `pnpm vitest run`.
+   Must be all green.
+2. If any `.ts` files were touched, run the type check: `pnpm run check` (`tsc --noEmit`).
+   Must succeed.
+3. Run the linter one final time: `pnpm run lint`.
+   Commit any fixup as `style:` if you haven't pushed yet.
 4. **Do not edit `CHANGELOG.md`** — release-please owns it and will generate entries from your Conventional Commit messages on the next release.
 
 ## Summarize
@@ -67,4 +77,5 @@ Print:
 - One-line summary of what changed.
 - Any deviations from the plan.
 
-Stop. The next step is `/ship-issue`.
+Stop.
+The next step is `/ship-issue`.

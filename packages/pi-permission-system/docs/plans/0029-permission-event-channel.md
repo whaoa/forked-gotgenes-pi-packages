@@ -54,8 +54,7 @@ interface EventBus {
 }
 ```
 
-This is the only cross-extension communication mechanism Pi provides.
-tintinweb/pi-subagents already built a working RPC over this bus with protocol versioning, request/reply envelopes, and scoped reply channels — a proven pattern in the ecosystem.
+This is the only cross-extension communication mechanism Pi provides. tintinweb/pi-subagents already built a working RPC over this bus with protocol versioning, request/reply envelopes, and scoped reply channels — a proven pattern in the ecosystem.
 
 ### Affected permission surfaces
 
@@ -302,16 +301,21 @@ Wire `emitReadyEvent()` in `src/index.ts` after extension setup.
 
 Implement `registerPermissionRpcHandlers()` in `src/permission-event-rpc.ts` — starting with the `permissions:rpc:check` handler.
 
-1. **Red**: `tests/permission-event-rpc.test.ts` — mock event bus and permission manager; emit a `permissions:rpc:check` request; assert the handler replies on `permissions:rpc:check:reply:<requestId>` with `{ success: true, protocolVersion: 1, data: { result: "allow", ... } }`. Test deny, ask, unknown surface, and missing `requestId` cases.
-2. **Green**: Implement the check handler in `src/permission-event-rpc.ts`. Wire it in `src/index.ts`.
+1. **Red**: `tests/permission-event-rpc.test.ts` — mock event bus and permission manager; emit a `permissions:rpc:check` request; assert the handler replies on `permissions:rpc:check:reply:<requestId>` with `{ success: true, protocolVersion: 1, data: { result: "allow", ... } }`.
+   Test deny, ask, unknown surface, and missing `requestId` cases.
+2. **Green**: Implement the check handler in `src/permission-event-rpc.ts`.
+   Wire it in `src/index.ts`.
 3. Commit: `feat: add permissions:rpc:check policy query RPC (#29)`
 
 ### Step 4: Prompt forwarding RPC handler
 
 Add the `permissions:rpc:prompt` handler to `registerPermissionRpcHandlers()`.
 
-1. **Red**: `tests/permission-event-rpc.test.ts` — emit a `permissions:rpc:prompt` request; assert the handler calls the UI dialog function with the message; assert the reply contains the approval decision. Test the no-UI guard (reply with `success: false, error: "no_ui"`). Test user-denied path.
-2. **Green**: Implement the prompt handler. It checks `runtime.runtimeContext?.hasUI`, calls `requestPermissionDecisionFromUi`, and emits the reply.
+1. **Red**: `tests/permission-event-rpc.test.ts` — emit a `permissions:rpc:prompt` request; assert the handler calls the UI dialog function with the message; assert the reply contains the approval decision.
+   Test the no-UI guard (reply with `success: false, error: "no_ui"`).
+   Test user-denied path.
+2. **Green**: Implement the prompt handler.
+   It checks `runtime.runtimeContext?.hasUI`, calls `requestPermissionDecisionFromUi`, and emits the reply.
 3. Commit: `feat: add permissions:rpc:prompt forwarding RPC (#29)`
 
 ### Step 5: Wire RPC cleanup on session shutdown
@@ -328,8 +332,11 @@ Add `events` (or `emitDecision`) to `HandlerDeps`.
 Emit `permissions:decision` after each gate resolution in `handleToolCall`.
 
 1. **Red**: `tests/handlers/tool-call-events.test.ts` — mock `deps.events.emit`; exercise `handleToolCall` with allow, deny, ask→approved, session-approved, and infrastructure-auto-allowed scenarios; assert each emits `permissions:decision` with the correct `resolution` and `surface`.
-2. **Green**: Add `events` to `HandlerDeps` in `src/handlers/types.ts`. Add `emitDecisionEvent()` calls in `src/handlers/tool-call.ts` at each decision point. Update `src/index.ts` to pass `pi.events` in deps.
-3. **Red/Green**: Update existing tool-call handler tests that construct `HandlerDeps` to include the new `events` field (mock `{ emit: vi.fn(), on: vi.fn() }`). This is a pre-requisite for the existing test suite to pass after the type change.
+2. **Green**: Add `events` to `HandlerDeps` in `src/handlers/types.ts`.
+   Add `emitDecisionEvent()` calls in `src/handlers/tool-call.ts` at each decision point.
+   Update `src/index.ts` to pass `pi.events` in deps.
+3. **Red/Green**: Update existing tool-call handler tests that construct `HandlerDeps` to include the new `events` field (mock `{ emit: vi.fn(), on: vi.fn() }`).
+   This is a pre-requisite for the existing test suite to pass after the type change.
 4. Commit: `feat: emit permission decision events from tool-call handler (#29)`
 
 ### Step 7: Decision broadcast in input handler
@@ -346,7 +353,8 @@ Ensure yolo-mode auto-approved decisions emit with `resolution: "auto_approved"`
 The `PermissionPrompter.prompt()` returns `{ approved: true, state: "approved" }` for both user approval and yolo auto-approve — they are indistinguishable at the handler level.
 
 1. **Red**: Test that when yolo mode is enabled, the emitted decision has `resolution: "auto_approved"`.
-2. **Green**: Either add a distinguishing field to `PermissionPromptDecision` (e.g. `autoApproved: true`) or have the prompter accept an `onAutoApprove` callback. The handler sets a local flag before calling the gate and checks it when constructing the emission payload.
+2. **Green**: Either add a distinguishing field to `PermissionPromptDecision` (e.g. `autoApproved: true`) or have the prompter accept an `onAutoApprove` callback.
+   The handler sets a local flag before calling the gate and checks it when constructing the emission payload.
 3. Commit: `feat: distinguish auto-approved from user-approved in decision events (#29)`
 
 ### Step 9: Documentation
@@ -369,7 +377,19 @@ Update `docs/architecture/target-architecture.md` module list.
 
 ## Open Questions
 
-1. **Should `before_agent_start` tool-filtering decisions emit events?** Tool filtering is a bulk pre-start phase (deny tools hidden before the agent runs). Emitting for each filtered tool could be noisy. Deferred — the handler can opt in later without API changes.
-2. **Should the prompt RPC handler write to the permission review log?** Currently, the review log captures all UI dialog outcomes. The RPC prompt handler should likely log too, but the source would be `"rpc_prompt"` rather than `"tool_call"`. Deferred to implementation.
-3. **Should the check RPC normalize the `value` input the same way handlers do?** For example, bash commands go through `normalizeInput()` which extracts the command string. Exposing raw `checkPermission()` without normalization may surprise callers. Deferred — start with raw passthrough and document the limitation.
-4. **Should we add a `permissions:rpc:ping` channel for health checks?** tintinweb uses `subagents:rpc:ping`. The `permissions:ready` event serves a similar purpose, but a synchronous ping RPC could be useful for late-arriving consumers. Low cost to add — can be folded into step 3 if desired.
+1. **Should `before_agent_start` tool-filtering decisions emit events?**
+   Tool filtering is a bulk pre-start phase (deny tools hidden before the agent runs).
+   Emitting for each filtered tool could be noisy.
+   Deferred — the handler can opt in later without API changes.
+2. **Should the prompt RPC handler write to the permission review log?**
+   Currently, the review log captures all UI dialog outcomes.
+   The RPC prompt handler should likely log too, but the source would be `"rpc_prompt"` rather than `"tool_call"`.
+   Deferred to implementation.
+3. **Should the check RPC normalize the `value` input the same way handlers do?**
+   For example, bash commands go through `normalizeInput()` which extracts the command string.
+   Exposing raw `checkPermission()` without normalization may surprise callers.
+   Deferred — start with raw passthrough and document the limitation.
+4. **Should we add a `permissions:rpc:ping` channel for health checks?**
+   tintinweb uses `subagents:rpc:ping`.
+   The `permissions:ready` event serves a similar purpose, but a synchronous ping RPC could be useful for late-arriving consumers.
+   Low cost to add — can be folded into step 3 if desired.

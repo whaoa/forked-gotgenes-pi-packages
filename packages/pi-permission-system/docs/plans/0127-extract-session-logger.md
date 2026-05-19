@@ -177,29 +177,36 @@ Test assertions change from `deps.writeDebugLog` to `deps.logger.debug`, etc.
 
 ## Test impact analysis
 
-1. **New unit tests enabled**: `createSessionLogger()` can be tested in isolation — verify `debug`/`review` delegate to `runtime.writeDebugLog`/`writeReviewLog`, and `warn` delegates to `runtime.runtimeContext?.ui.notify` (including the null-context case). These were previously untestable because the closures were inline in `index.ts`.
-2. **Existing tests that become simpler**: All 6 handler `makeDeps()` factories shrink by 2 net fields (3 removed, 1 added). Assertions on logging behavior get a single parent object (`deps.logger`) instead of reaching into `deps` directly.
+1. **New unit tests enabled**: `createSessionLogger()` can be tested in isolation — verify `debug`/`review` delegate to `runtime.writeDebugLog`/`writeReviewLog`, and `warn` delegates to `runtime.runtimeContext?.ui.notify` (including the null-context case).
+   These were previously untestable because the closures were inline in `index.ts`.
+2. **Existing tests that become simpler**: All 6 handler `makeDeps()` factories shrink by 2 net fields (3 removed, 1 added).
+   Assertions on logging behavior get a single parent object (`deps.logger`) instead of reaching into `deps` directly.
 3. **Existing tests that must stay as-is**: All handler behavioral tests stay — they test permission logic, not logging wiring. `GateRunnerDeps` tests are completely unaffected.
 
 ## TDD order
 
 ### Step 1 — SessionLogger interface + createSessionLogger factory
 
-1. **Red**: Write `tests/session-logger.test.ts` — test that `createSessionLogger()` delegates `debug` → `runtime.writeDebugLog`, `review` → `runtime.writeReviewLog`, and `warn` → `runtime.runtimeContext.ui.notify`. Test the null-context `warn` no-op path.
+1. **Red**: Write `tests/session-logger.test.ts` — test that `createSessionLogger()` delegates `debug` → `runtime.writeDebugLog`, `review` → `runtime.writeReviewLog`, and `warn` → `runtime.runtimeContext.ui.notify`.
+   Test the null-context `warn` no-op path.
 2. **Green**: Create `src/session-logger.ts` with the `SessionLogger` interface and `createSessionLogger()` factory.
 3. **Commit**: `feat: add SessionLogger interface and createSessionLogger factory (#127)`
 
 ### Step 2 — Update HandlerDeps and handler source files
 
 1. **Red**: `pnpm run build` fails after updating `HandlerDeps` (callers still use old field names).
-2. **Green**: Update `src/handlers/types.ts` to replace the 3 fields with `readonly logger: SessionLogger`. Update all handler source files (`lifecycle.ts`, `tool-call.ts`, `input.ts`) and `gates/runner.ts` to use `deps.logger.*`. Update `src/index.ts` to wire `logger: createSessionLogger(runtime)` instead of 3 separate closures.
-3. **Verify**: `pnpm run build` passes. Tests still fail (test factories reference old fields).
+2. **Green**: Update `src/handlers/types.ts` to replace the 3 fields with `readonly logger: SessionLogger`.
+   Update all handler source files (`lifecycle.ts`, `tool-call.ts`, `input.ts`) and `gates/runner.ts` to use `deps.logger.*`.
+   Update `src/index.ts` to wire `logger: createSessionLogger(runtime)` instead of 3 separate closures.
+3. **Verify**: `pnpm run build` passes.
+   Tests still fail (test factories reference old fields).
 4. **Commit**: `refactor: replace HandlerDeps logging fields with SessionLogger (#127)`
 
 ### Step 3 — Update handler test factories and assertions
 
 1. **Red**: `pnpm vitest run` shows failures in all 6 handler test files (old field names in `makeDeps` + assertions).
-2. **Green**: Update `makeDeps()` in each test file to use `logger: { debug: vi.fn(), review: vi.fn(), warn: vi.fn() }`. Update assertions that reference `deps.writeDebugLog` → `deps.logger.debug`, `deps.writeReviewLog` → `deps.logger.review`, `deps.notifyWarning` → `deps.logger.warn`.
+2. **Green**: Update `makeDeps()` in each test file to use `logger: { debug: vi.fn(), review: vi.fn(), warn: vi.fn() }`.
+   Update assertions that reference `deps.writeDebugLog` → `deps.logger.debug`, `deps.writeReviewLog` → `deps.logger.review`, `deps.notifyWarning` → `deps.logger.warn`.
 3. **Verify**: `pnpm vitest run` passes. `pnpm run build` passes.
 4. **Commit**: `test: update handler test factories for SessionLogger (#127)`
 

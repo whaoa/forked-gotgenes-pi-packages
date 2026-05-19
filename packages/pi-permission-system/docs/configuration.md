@@ -281,7 +281,8 @@ Four orthogonal layers compose with most-restrictive-wins:
 Configs without a `path` key behave identically to before — the gate does not fire.
 When no `path` key is present, the universal fallback (`permission["*"]`) applies: `"*": "allow"` keeps the gate transparent, while `"*": "deny"` would deny all file access via every surface including `path`.
 
-> **Ordering matters.** Rules use last-match-wins.
+> **Ordering matters.**
+> Rules use last-match-wins.
 > `{ "*.env": "deny", "*": "allow" }` allows `.env` because `"*"` is last and matches everything.
 > Put the catch-all first: `{ "*": "allow", "*.env": "deny" }`.
 

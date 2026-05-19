@@ -25,7 +25,8 @@ A service object stored on `globalThis` via `Symbol.for()` enables direct, type-
 - **Remove `permissions:rpc:check`** — it stays as a zero-dependency fallback for consumers who do not want to add an optional peer dep.
 - **Move `permissions:rpc:prompt` to the service** — prompt forwarding is genuinely async and the event bus is a reasonable fit.
 - **Move `permissions:decision` broadcasts** — fire-and-forget observation belongs on the event bus.
-- **Add a Proxy delegate for reload safety** — during `/reload`, all extensions re-initialize; both provider and consumer call their factories anew, so captured references are naturally refreshed. Document the "call per use, don't cache" pattern as a best practice.
+- **Add a Proxy delegate for reload safety** — during `/reload`, all extensions re-initialize; both provider and consumer call their factories anew, so captured references are naturally refreshed.
+  Document the "call per use, don't cache" pattern as a best practice.
 - **Add a JS build step** — consumers are Pi extensions that use jiti; pointing `exports` to `.ts` source is sufficient.
 - **Upstream `registerService`/`getService`** — tracked in earendil-works/pi#4207; this plan works independently.
 
@@ -111,7 +112,8 @@ export function unpublishPermissionsService(): void {
 
 - `publishPermissionsService` overwrites the slot — safe for `/reload`.
 - `unpublishPermissionsService` clears the slot — called during `session_shutdown` to avoid stale references after the extension is torn down.
-- `getPermissionsService` returns `undefined` when the extension has not loaded (or has been unloaded). Consumers handle this with a `try/catch` around the dynamic import plus an `if` guard.
+- `getPermissionsService` returns `undefined` when the extension has not loaded (or has been unloaded).
+  Consumers handle this with a `try/catch` around the dynamic import plus an `if` guard.
 
 ### Consumer usage
 
@@ -181,7 +183,8 @@ No build step is required.
 
 ## Test Impact Analysis
 
-1. **New unit tests enabled**: `tests/service.test.ts` tests the `globalThis` accessor in isolation — publish, get, unpublish, overwrite. Also tests the service adapter's `checkPermission` delegation via a mock `PermissionManager`.
+1. **New unit tests enabled**: `tests/service.test.ts` tests the `globalThis` accessor in isolation — publish, get, unpublish, overwrite.
+   Also tests the service adapter's `checkPermission` delegation via a mock `PermissionManager`.
 2. **No existing tests become redundant**: the RPC handler tests cover the event-bus path which remains the fallback API.
 3. **Existing tests that must stay**: `tests/permission-event-rpc.test.ts` — the RPC handler is not removed, only deprecated.
 4. **`buildInputForSurface` extraction**: no test changes needed — the function is non-exported today and tested only indirectly through the RPC handler tests, which continue to exercise it after the move.
@@ -191,19 +194,24 @@ No build step is required.
 ### Step 1 — Service accessor module
 
 - **Red**: `tests/service.test.ts` — assert `getPermissionsService()` returns `undefined` by default; assert `publishPermissionsService(mock)` makes it retrievable; assert `unpublishPermissionsService()` clears it; assert a second publish overwrites the first.
-- **Green**: implement `src/service.ts` with the `PermissionsService` interface, `SERVICE_KEY`, and the three accessor functions. Re-export `PermissionCheckResult` and `PermissionState`.
+- **Green**: implement `src/service.ts` with the `PermissionsService` interface, `SERVICE_KEY`, and the three accessor functions.
+  Re-export `PermissionCheckResult` and `PermissionState`.
 - **Commit**: `feat: add Symbol.for()-backed service accessor module (#145)`
 
 ### Step 2 — Extract `buildInputForSurface`
 
-- **Green**: move `buildInputForSurface` from `src/permission-event-rpc.ts` to `src/input-normalizer.ts` as a named export. Update `src/permission-event-rpc.ts` to import it. Run existing tests to confirm no breakage.
+- **Green**: move `buildInputForSurface` from `src/permission-event-rpc.ts` to `src/input-normalizer.ts` as a named export.
+  Update `src/permission-event-rpc.ts` to import it.
+  Run existing tests to confirm no breakage.
 - **Commit**: `refactor: extract buildInputForSurface to input-normalizer (#145)`
 
 ### Step 3 — Service adapter and lifecycle wiring
 
 - **Red**: `tests/service.test.ts` — add tests that construct a service adapter object using a mock `PermissionManager` and mock `SessionRules`, call `checkPermission("bash", "git push")`, and assert it delegates correctly with the right input shape and session rules.
 - **Red**: verify that `getPermissionsService()` returns `undefined` after the shutdown cleanup runs (test the cleanup callback separately or via the `SessionLifecycleHandler` test).
-- **Green**: in `src/index.ts`, build the service adapter object and call `publishPermissionsService()`. Pass `unpublishPermissionsService` into the lifecycle handler's cleanup callback. Update `src/handlers/lifecycle.ts` to accept and call the additional cleanup.
+- **Green**: in `src/index.ts`, build the service adapter object and call `publishPermissionsService()`.
+  Pass `unpublishPermissionsService` into the lifecycle handler's cleanup callback.
+  Update `src/handlers/lifecycle.ts` to accept and call the additional cleanup.
 - **Build**: run `pnpm run build` to verify the `handlers/lifecycle.ts` signature change compiles.
 - **Commit**: `feat: publish permissions service on startup, clear on shutdown (#145)`
 
@@ -220,7 +228,8 @@ No build step is required.
 
 ### Step 6 — Documentation
 
-- Update `README.md`: add "Service API" section documenting the `Symbol.for()` accessor, consumer usage pattern, and reload behavior. Mark `permissions:rpc:check` as deprecated in the existing event API section.
+- Update `README.md`: add "Service API" section documenting the `Symbol.for()` accessor, consumer usage pattern, and reload behavior.
+  Mark `permissions:rpc:check` as deprecated in the existing event API section.
 - Update `docs/architecture/architecture.md`: add cross-extension service accessor description.
 - **Commit**: `docs: document service accessor and deprecate RPC check (#145)`
 
@@ -237,6 +246,13 @@ No build step is required.
 
 ## Open Questions
 
-1. **Should the service expose `getToolPermission()` for tool-filtering queries?** The current RPC only exposes `checkPermission`. Adding `getToolPermission` would let consumers replicate before\_agent\_start filtering. Deferred — add when a consumer needs it.
-2. **Should additional event types be re-exported from `src/service.ts`?** Consumers using the service accessor for policy queries may also want `PermissionDecisionEvent` for observation. Subpath exports (`"./events"`) can be added later without breaking changes.
-3. **Should the `exports` field include a `"types"` condition?** Since the entry point is a `.ts` file and jiti consumers resolve types natively, a `"types"` condition adds no value today. Revisit if a JS build step is added.
+1. **Should the service expose `getToolPermission()` for tool-filtering queries?**
+   The current RPC only exposes `checkPermission`.
+   Adding `getToolPermission` would let consumers replicate before\_agent\_start filtering.
+   Deferred — add when a consumer needs it.
+2. **Should additional event types be re-exported from `src/service.ts`?**
+   Consumers using the service accessor for policy queries may also want `PermissionDecisionEvent` for observation.
+   Subpath exports (`"./events"`) can be added later without breaking changes.
+3. **Should the `exports` field include a `"types"` condition?**
+   Since the entry point is a `.ts` file and jiti consumers resolve types natively, a `"types"` condition adds no value today.
+   Revisit if a JS build step is added.

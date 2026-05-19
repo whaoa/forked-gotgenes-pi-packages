@@ -28,7 +28,8 @@ This ADR records why Patch 1 was deferred and the strategy for upstream PRs back
 
 ### Patch 1 is deferred
 
-The original Spike 2 finding was that the parent's `additionalExtensionPaths` does not propagate to the child's `DefaultResourceLoader`. The fix was sketched as "plumb parent's `additionalExtensionPaths` (and siblings) into the child."
+The original Spike 2 finding was that the parent's `additionalExtensionPaths` does not propagate to the child's `DefaultResourceLoader`.
+The fix was sketched as "plumb parent's `additionalExtensionPaths` (and siblings) into the child."
 
 During planning for this fork, two implementation constraints surfaced:
 
@@ -40,9 +41,12 @@ A working patch would have to either:
 - Accept new fields in `RunOptions` so callers supply the paths explicitly, **or**
 - Reach into `process.argv` to re-resolve `-e`/`--extensions` flags from the child's perspective.
 
-Neither matches the production need. For RepOne (and any consumer that installs extensions via `pi install`), extensions are settings-discoverable: children inherit them independently of the parent's `DefaultResourceLoader` configuration. The `pi -e <path>` ephemeral-extension case is the only beneficiary of Patch 1, and it does not appear in our workflow.
+Neither matches the production need.
+For RepOne (and any consumer that installs extensions via `pi install`), extensions are settings-discoverable: children inherit them independently of the parent's `DefaultResourceLoader` configuration.
+The `pi -e <path>` ephemeral-extension case is the only beneficiary of Patch 1, and it does not appear in our workflow.
 
-We therefore defer Patch 1 rather than carry a speculative patch in the fork's diff against upstream. A follow-up issue on the RepOne board (linked from #443) captures the criterion for revisiting: **a workflow that needs `pi -e <path>` ephemeral extensions to reach children**.
+We therefore defer Patch 1 rather than carry a speculative patch in the fork's diff against upstream.
+A follow-up issue on the RepOne board (linked from #443) captures the criterion for revisiting: **a workflow that needs `pi -e <path>` ephemeral extensions to reach children**.
 
 ### Upstream PRs are open
 
@@ -65,10 +69,12 @@ However, the fork now diverges intentionally beyond those patches — see [`docs
 
 ### Negative
 
-- The `pi -e <path>` ephemeral-extension case in subagents will not work until Patch 1 lands. We accept this because no consumer in scope uses that pattern.
+- The `pi -e <path>` ephemeral-extension case in subagents will not work until Patch 1 lands.
+  We accept this because no consumer in scope uses that pattern.
 
 ### Operational
 
-- Upstream PRs are open and linked above. If merged, upstream gains the three patches, but the fork continues independently with broader architectural changes per [`docs/architecture/architecture.md`](../architecture/architecture.md).
+- Upstream PRs are open and linked above.
+  If merged, upstream gains the three patches, but the fork continues independently with broader architectural changes per [`docs/architecture/architecture.md`](../architecture/architecture.md).
 - The architecture document governs the fork's direction going forward; this ADR's original "thin-patch" framing no longer describes the fork's trajectory.
 - When Patch 1 is eventually added, it should be a separate ADR in `docs/decisions/` with its own follow-up.

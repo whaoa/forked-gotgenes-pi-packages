@@ -103,7 +103,8 @@ When set, the executor takes the built-in path; otherwise behavior is unchanged.
 3. After the wildcard pass, only files that ended up unhandled by the wildcard (every step either skipped them or never ran) flow into the existing per-extension grouping.
 4. Files handled by the wildcard chain do not appear in any per-extension group.
 
-For non-built-in formatters in a `"*"` chain, every file is considered "handled" (the same as today's per-extension chain semantics). This keeps the wildcard generic but makes it most useful with built-ins or fallback groups containing built-ins.
+For non-built-in formatters in a `"*"` chain, every file is considered "handled" (the same as today's per-extension chain semantics).
+This keeps the wildcard generic but makes it most useful with built-ins or fallback groups containing built-ins.
 
 ### Discovery and caching
 
@@ -199,7 +200,8 @@ The exact regex/substring set lives in one place and is unit-tested.
 
 ## TDD Order
 
-Each cycle is a tight red→green→commit. Numbering restarts at 1 under this heading.
+Each cycle is a tight red→green→commit.
+Numbering restarts at 1 under this heading.
 
 1. **Schema accepts `"*"` chain key.**
    Surface: `test/schema.test.ts`.
@@ -263,7 +265,8 @@ Each cycle is a tight red→green→commit. Numbering restarts at 1 under this h
   Anything we cannot confidently classify defaults to "real failure" (visible), not "silent skip".
 
 - **Risk:** Wildcard chain accidentally double-formats files when a built-in handles them and a per-extension chain runs anyway.
-  **Mitigation:** Wildcard-handled files are subtracted from the per-extension grouping. Tested explicitly.
+  **Mitigation:** Wildcard-handled files are subtracted from the per-extension grouping.
+  Tested explicitly.
 
 - **Risk:** Discovery walks become a per-flush hot path on large repos with many touched files.
   **Mitigation:** Per-session cache keyed by directory; the walk for each flush is at most O(unique-dirs × depth).
@@ -287,4 +290,5 @@ Each cycle is a tight red→green→commit. Numbering restarts at 1 under this h
 - Should we expose the built-in registry for project extensibility (user-declared "built-in like" entries with discovery + skip patterns)?
   Defer until a second use case emerges.
 - Should `treefmt --config-file` discovery prefer `.treefmt.toml` over `treefmt.toml` when both exist at the same root?
-  Plan: prefer `treefmt.toml` (matches `treefmt`'s own precedence). Confirm during step 4.
+  Plan: prefer `treefmt.toml` (matches `treefmt`'s own precedence).
+  Confirm during step 4.

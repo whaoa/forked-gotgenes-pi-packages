@@ -83,7 +83,8 @@ The `bypassQueue` option on `SpawnOptions` stays — its JSDoc comment mentionin
 
 1. No new unit tests are needed — this is pure deletion.
 2. All three scheduling test files (`schedule.test.ts`, `schedule-store.test.ts`, `schedule-e2e.test.ts`) become entirely redundant and are deleted.
-3. Existing tests for `agent-manager`, `agent-runner`, `settings`, and other modules stay as-is. The `settings.test.ts` file (if it exists) may need minor updates to remove `schedulingEnabled` from fixture data.
+3. Existing tests for `agent-manager`, `agent-runner`, `settings`, and other modules stay as-is.
+   The `settings.test.ts` file (if it exists) may need minor updates to remove `schedulingEnabled` from fixture data.
 
 ## TDD Order
 
@@ -109,7 +110,8 @@ Since this is a removal (not a feature), the order is deletion-first with a sing
    Commit: `build: remove croner dependency`
 
 5. **Verify all tests pass.**
-   Run `pnpm vitest run` in the package. Fix any test fixtures that reference `schedulingEnabled` or scheduling types.
+   Run `pnpm vitest run` in the package.
+   Fix any test fixtures that reference `schedulingEnabled` or scheduling types.
    Commit (if fixes needed): `test: remove scheduling references from test fixtures`
 
 6. **Update documentation.**

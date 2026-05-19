@@ -34,8 +34,7 @@ That case is deferred to #29 (event bus RPC).
 
 ### Permission surfaces involved
 
-This issue touches the **forwarding** path that sits above all permission surfaces:
-when a permission resolves to `ask` in a headless subagent context the extension must forward the dialog to the parent session rather than blocking or silently denying.
+This issue touches the **forwarding** path that sits above all permission surfaces: when a permission resolves to `ask` in a headless subagent context the extension must forward the dialog to the parent session rather than blocking or silently denying.
 No surface-level rule evaluation changes — only the subagent detection and parent-session resolution steps.
 
 ### Relevant modules
@@ -204,9 +203,7 @@ The forwarding path sits above rule evaluation; this fix only changes when the e
 
 File: `tests/subagent-context.test.ts`
 
-Add test cases that `isSubagentExecutionContext()` returns `true` for each newly added key:
-`PI_SUBAGENT_CHILD`, `PI_SUBAGENT_RUN_ID`, `PI_SUBAGENT_CHILD_AGENT`, `PI_SUBAGENT_DEPTH`,
-`PI_SUBAGENT_NAME`, `PI_SUBAGENT_ID`, `PI_SUBAGENT_SESSION`, `PI_SUBAGENT_ACTIVITY_FILE`.
+Add test cases that `isSubagentExecutionContext()` returns `true` for each newly added key: `PI_SUBAGENT_CHILD`, `PI_SUBAGENT_RUN_ID`, `PI_SUBAGENT_CHILD_AGENT`, `PI_SUBAGENT_DEPTH`, `PI_SUBAGENT_NAME`, `PI_SUBAGENT_ID`, `PI_SUBAGENT_SESSION`, `PI_SUBAGENT_ACTIVITY_FILE`.
 
 Add a "covers all declared SUBAGENT_ENV_HINT_KEYS" guard test that reads the exported array and asserts each key has an individual test.
 
@@ -275,6 +272,8 @@ Commit: `docs: update target-architecture subagent detection for #96`
 
 ## Open Questions
 
-- **#98 adoption**: Once nicobailon and HazAT adopt a shared parent-session env var, add it to `SUBAGENT_PARENT_SESSION_ENV_CANDIDATES`. Plan is intentionally array-shaped to make that a one-line change.
-- **`PI_SUBAGENT_DEPTH=0`**: Depth-0 could mean "top-level orchestrator in a subagent run". If that case should be excluded from subagent detection, a depth check could be added — deferred until there is a concrete user report.
+- **#98 adoption**: Once nicobailon and HazAT adopt a shared parent-session env var, add it to `SUBAGENT_PARENT_SESSION_ENV_CANDIDATES`.
+  Plan is intentionally array-shaped to make that a one-line change.
+- **`PI_SUBAGENT_DEPTH=0`**: Depth-0 could mean "top-level orchestrator in a subagent run".
+  If that case should be excluded from subagent detection, a depth check could be added — deferred until there is a concrete user report.
 - **tintinweb in-process**: No env var approach can fix this; deferred to #29 (event bus RPC).

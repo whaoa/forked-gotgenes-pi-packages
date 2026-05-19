@@ -23,9 +23,13 @@ Shipped as v5.12.0 with 10 new tests and doc updates to `docs/opencode-compatibi
 
 #### What caused friction (agent side)
 
-- `instruction-violation` (self-identified) — Used padded table style (`| Risk | Mitigation |`) in the plan file despite the `markdown-conventions` skill specifying compact/tight style with no cell padding. Caught by markdownlint MD060 on the first commit attempt. Impact: one failed commit, one extra edit call, minor time waste (~30s).
-- `missing-context` — Attempted an 8-edit batch on `docs/opencode-compatibility.md` where edit 5 referenced step `5. **Add .env rules manually**` but step 4 was being removed by edit 4 in the same batch, shifting the original step 5 to `5. **Replace...`**`. Since all`oldText` matches run against the original file, edit 5 couldn't find its target. Impact: one failed edit call, one re-read of the file, one retry — added ~1 minute of friction but no rework in the final output.
+- `instruction-violation` (self-identified) — Used padded table style (`| Risk | Mitigation |`) in the plan file despite the `markdown-conventions` skill specifying compact/tight style with no cell padding.
+  Caught by markdownlint MD060 on the first commit attempt.
+  Impact: one failed commit, one extra edit call, minor time waste (~30s).
+- `missing-context` — Attempted an 8-edit batch on `docs/opencode-compatibility.md` where edit 5 referenced step `5. **Add .env rules manually**` but step 4 was being removed by edit 4 in the same batch, shifting the original step 5 to `5. **Replace...`**`. Since all`oldText` matches run against the original file, edit 5 couldn't find its target.
+  Impact: one failed edit call, one re-read of the file, one retry — added ~1 minute of friction but no rework in the final output.
 
 #### What caused friction (user side)
 
-- No user-side friction observed. The issue was thoroughly specified with prior art, risk assessment, and exact code snippets, which made the plan and implementation straightforward.
+- No user-side friction observed.
+  The issue was thoroughly specified with prior art, risk assessment, and exact code snippets, which made the plan and implementation straightforward.

@@ -30,7 +30,8 @@ These are read-only infrastructure paths — the agent should be able to read th
 ### Relevant modules
 
 - `src/external-directory.ts` — contains `isPathOutsideWorkingDirectory()`, `isSafeSystemPath()`, `SAFE_SYSTEM_PATHS`, path normalization, and the tree-sitter bash path extractor.
-- `src/handlers/tool-call.ts` — the file-tool external-directory gate (lines ~160–250) and bash external-directory gate (lines ~252–350). Both call `isPathOutsideWorkingDirectory()` and then check permissions.
+- `src/handlers/tool-call.ts` — the file-tool external-directory gate (lines ~160–250) and bash external-directory gate (lines ~252–350).
+  Both call `isPathOutsideWorkingDirectory()` and then check permissions.
 - `src/runtime.ts` — `ExtensionRuntime` holds `agentDir` and is constructed once at startup.
 - `src/extension-config.ts` — config loading and validation.
 - `src/types.ts` — TypeScript types for config.
@@ -53,7 +54,8 @@ Build a set of "Pi infrastructure directories" at extension startup (inside `cre
 1. **Agent config directory** — `getAgentDir()` (already available as `runtime.agentDir`).
 2. **Project-local Pi packages** — `<cwd>/.pi/npm/` and `<cwd>/.pi/git/` (derived from `ctx.cwd` at check time, not startup).
 3. **Git-cloned global packages** — `<agentDir>/git/`.
-4. **Global npm root** — discovered via **self-discovery**: walk up from `import.meta.url` (this extension's own install path) to find the enclosing `node_modules` directory. This works regardless of package manager since the extension itself is installed in the global npm root.
+4. **Global npm root** — discovered via **self-discovery**: walk up from `import.meta.url` (this extension's own install path) to find the enclosing `node_modules` directory.
+   This works regardless of package manager since the extension itself is installed in the global npm root.
 
 ```typescript
 /**
@@ -214,5 +216,9 @@ per tool-call:
 
 ## Open Questions
 
-- Should the bash external-directory gate also auto-allow infrastructure reads? Deferred — bash commands are harder to classify as read-only (e.g. `cat /opt/.../SKILL.md` is a read, but detecting "read-only bash commands" reliably is complex). Can be added in a follow-up.
-- Should `piInfrastructureReadPaths` support glob patterns or only directory prefixes? Starting with directory prefixes (simpler, consistent with `isPathWithinDirectory`). Globs can be added later if needed.
+- Should the bash external-directory gate also auto-allow infrastructure reads?
+  Deferred — bash commands are harder to classify as read-only (e.g. `cat /opt/.../SKILL.md` is a read, but detecting "read-only bash commands" reliably is complex).
+  Can be added in a follow-up.
+- Should `piInfrastructureReadPaths` support glob patterns or only directory prefixes?
+  Starting with directory prefixes (simpler, consistent with `isPathWithinDirectory`).
+  Globs can be added later if needed.

@@ -56,8 +56,7 @@ Relevant existing pieces:
   - `ctx.ui.setStatus(key, text | undefined)` — persistent footer/status text; pass `undefined` to clear.
   - `ctx.ui.theme.fg("success" | "warning" | "error" | "dim" | "accent", text)` — themed foreground color, used by the `status-line.ts` example extension.
   - `setWidget` and `custom` exist but are out of scope (see Non-Goals).
-- Lifecycle:
-  `session_start` → many `tool_call`/`tool_result` pairs → `agent_end` (the prompt-end flush we report on) → eventually `session_shutdown`.
+- Lifecycle: `session_start` → many `tool_call`/`tool_result` pairs → `agent_end` (the prompt-end flush we report on) → eventually `session_shutdown`.
   Multiple flushes happen per session in interactive use.
 
 ## Design Overview

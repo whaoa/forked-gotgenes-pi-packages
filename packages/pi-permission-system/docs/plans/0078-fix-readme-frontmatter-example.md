@@ -73,21 +73,17 @@ No schema, config, or architecture doc changes needed — this issue is docs + t
 
 ## TDD Order
 
-1. **docs: fix README per-agent frontmatter example to flat format (#78)**
-   Fix the YAML code block under "Global Per-Agent Overrides" to use flat keys.
+1. **docs: fix README per-agent frontmatter example to flat format (#78)** Fix the YAML code block under "Global Per-Agent Overrides" to use flat keys.
    Fix `skills:` → `skill:`.
    Fix `permission.tools.mcp` → `permission.mcp` in the MCP behavior note.
 
-2. **test: skill patterns in agent frontmatter (#78)**
-   Red: test that `skill` pattern map in agent frontmatter overrides global `skill` policy (e.g., global `skill: deny`, agent frontmatter `skill: { "pi-*": allow }`).
+2. **test: skill patterns in agent frontmatter (#78)** Red: test that `skill` pattern map in agent frontmatter overrides global `skill` policy (e.g., global `skill: deny`, agent frontmatter `skill: { "pi-*": allow }`).
    Green: should pass immediately — no runtime changes needed, this is coverage for existing behavior.
 
-3. **test: external_directory pattern map in agent frontmatter (#78)**
-   Red: test that `external_directory` with a pattern map in agent frontmatter works (e.g., `external_directory: { "~/Downloads": allow }`).
+3. **test: external_directory pattern map in agent frontmatter (#78)** Red: test that `external_directory` with a pattern map in agent frontmatter works (e.g., `external_directory: { "~/Downloads": allow }`).
    Green: should pass immediately.
 
-4. **test: global-agent vs project-agent frontmatter precedence for skill and external_directory (#78)**
-   Red: test using `createManagerWithProject` with both `agentFiles` (global) and `projectAgentFiles` (project) defining `skill` and `external_directory` rules, verifying project-agent wins.
+4. **test: global-agent vs project-agent frontmatter precedence for skill and external_directory (#78)** Red: test using `createManagerWithProject` with both `agentFiles` (global) and `projectAgentFiles` (project) defining `skill` and `external_directory` rules, verifying project-agent wins.
    Green: should pass immediately.
 
 Since all tests exercise existing runtime behavior (no code changes), steps 2–4 can be combined into a single commit:

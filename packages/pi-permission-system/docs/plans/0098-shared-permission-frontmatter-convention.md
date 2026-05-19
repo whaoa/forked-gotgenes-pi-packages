@@ -59,10 +59,16 @@ All surfaces are relevant to the guide since we're documenting the full capabili
 The guide is a standalone Markdown document aimed at extension authors (not end users).
 It should answer:
 
-1. **What is the `permission:` frontmatter?** — A flat policy map in agent `.md` files that pi-permission-system reads.
-2. **Why adopt it?** — Richer semantics (ask), broader coverage (bash/mcp/skills/directories), forwarding support.
-3. **How does it compose with existing keys?** — The two-layer model: visibility first, then policy. Both apply independently.
-4. **What does adoption look like?** — Extension authors document `permission:` as an optional key in their agent frontmatter docs. They do NOT need to evaluate it — pi-permission-system handles that.
+1. **What is the `permission:` frontmatter?**
+   — A flat policy map in agent `.md` files that pi-permission-system reads.
+2. **Why adopt it?**
+   — Richer semantics (ask), broader coverage (bash/mcp/skills/directories), forwarding support.
+3. **How does it compose with existing keys?**
+   — The two-layer model: visibility first, then policy.
+   Both apply independently.
+4. **What does adoption look like?**
+   — Extension authors document `permission:` as an optional key in their agent frontmatter docs.
+   They do NOT need to evaluate it — pi-permission-system handles that.
 5. **Runtime integration (optional)** — Extensions running in-process can query policy via the event bus API instead of re-implementing evaluation.
 
 ### Flat Format (for reference in guide)

@@ -69,7 +69,9 @@ export type FormatterDefinition = {
 After the change:
 
 - `extensions` is **not** in `FormatterDefinition` and is **not** required.
-- If a user config still includes `extensions` on a formatter, the loader emits a single non-fatal config issue (`formatters.<name>.extensions` → "Deprecated. Remove this field; dispatch is driven by `chains`. The value is ignored.") and discards the value.
+- If a user config still includes `extensions` on a formatter, the loader emits a single non-fatal config issue (`formatters.<name>.extensions` → "Deprecated.
+  Remove this field; dispatch is driven by `chains`.
+  The value is ignored.") and discards the value.
   This is consistent with the existing config-issue plumbing — surfacing the trap without breaking startup.
 - Any other unknown formatter key continues to raise the existing "Unknown formatter property." issue.
 
@@ -120,12 +122,10 @@ The `chains` map is unchanged and remains the single source of truth.
 1. **red** — Add a `config-loader.test.ts` case: a user formatter with `extensions: [".ts"]` loads successfully, the resolved definition has no `extensions` key, and a single config issue is recorded for `formatters.<name>.extensions` describing the deprecation.
    commit: `test: cover deprecated extensions field on formatter`
 2. **green** — Update `validateFormatterDefinition` to drop `extensions` from the required gate, emit the deprecation notice, and stop populating the field.
-   Remove `validateExtensionArray` if it has no remaining callers.
-   commit: `feat!: drop extensions field from formatter definitions`
+   Remove `validateExtensionArray` if it has no remaining callers. commit: `feat!: drop extensions field from formatter definitions`
 3. **red→green** — Update `formatter-registry.ts` type, `formatter-config.ts` defaults, and any existing tests that constructed `extensions`.
    Tests should still pass (or be updated to no longer reference `extensions`).
-   Add a `formatter-config.test.ts` assertion that `DEFAULT_FORMATTER_CONFIG.formatters.prettier` has no `extensions` key.
-   commit: `feat!: remove extensions from FormatterDefinition type and defaults`
+   Add a `formatter-config.test.ts` assertion that `DEFAULT_FORMATTER_CONFIG.formatters.prettier` has no `extensions` key. commit: `feat!: remove extensions from FormatterDefinition type and defaults`
 4. **red→green** — Update `schemas/pi-autoformat.schema.json` to remove the `extensions` property and add a schema-shape test (or extend an existing one) that verifies the schema no longer declares it.
    commit: `feat!: drop extensions from pi-autoformat JSON schema`
 5. **docs** — Update `docs/configuration.md` and `README.md`: strip `extensions` from examples and reference; add a deprecation note pointing users at `chains`.
@@ -138,9 +138,11 @@ Each cycle leaves the repo in a green state.
 - **Risk:** Existing user configs on disk still contain `extensions`.
   **Mitigation:** Loader accepts and ignores them with a single deprecation notice per formatter; no startup failure.
 - **Risk:** Editor validation flags `extensions` as an unknown property under `additionalProperties: false`.
-  **Mitigation:** This is the intended signal — the runtime tolerates it. Document the removal in `docs/configuration.md`.
+  **Mitigation:** This is the intended signal — the runtime tolerates it.
+  Document the removal in `docs/configuration.md`.
 - **Risk:** Downstream code imports `FormatterDefinition` and constructs values with `extensions`.
-  **Mitigation:** Marked as breaking (`feat!:`). Release-please will bump major; CHANGELOG will call out the removal.
+  **Mitigation:** Marked as breaking (`feat!:`).
+  Release-please will bump major; CHANGELOG will call out the removal.
 - **Risk:** Tests across multiple files reference `extensions`.
   **Mitigation:** TDD cycle 3 sweeps all tests in one commit; CI catches stragglers.
 

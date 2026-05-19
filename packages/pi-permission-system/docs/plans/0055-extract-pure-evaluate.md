@@ -174,10 +174,15 @@ The `PermissionCheckResult` return type and `source` field remain unchanged.
 
 ### Edge cases
 
-1. **MCP baseline auto-allow**: remains outside `evaluate()` — it is a heuristic that fires only when no rule matches and certain preconditions hold. Preserved as-is.
-2. **`BashFilter`**: still instantiated and used (deferred removal to #56). Internally its `check()` method will delegate to `evaluate()` or remain unchanged for this step — TBD during implementation based on code clarity. The plan prefers minimal changes: keep `BashFilter.check()` as-is and call `evaluate()` only from `checkPermission()` for the bash surface.
-3. **Compiled pattern caching**: no change. Patterns are still compiled once per config load; `compiledToRuleset()` is cheap (array map, no regex compilation).
-4. **`defaultPolicy` injection**: each surface branch passes the relevant default as a fallback after calling `evaluate()`, rather than encoding it in `SURFACE_DEFAULTS`. This preserves the current behavior where user-configured defaults override the hardcoded ones.
+1. **MCP baseline auto-allow**: remains outside `evaluate()` — it is a heuristic that fires only when no rule matches and certain preconditions hold.
+   Preserved as-is.
+2. **`BashFilter`**: still instantiated and used (deferred removal to #56).
+   Internally its `check()` method will delegate to `evaluate()` or remain unchanged for this step — TBD during implementation based on code clarity.
+   The plan prefers minimal changes: keep `BashFilter.check()` as-is and call `evaluate()` only from `checkPermission()` for the bash surface.
+3. **Compiled pattern caching**: no change.
+   Patterns are still compiled once per config load; `compiledToRuleset()` is cheap (array map, no regex compilation).
+4. **`defaultPolicy` injection**: each surface branch passes the relevant default as a fallback after calling `evaluate()`, rather than encoding it in `SURFACE_DEFAULTS`.
+   This preserves the current behavior where user-configured defaults override the hardcoded ones.
 
 ## Module-Level Changes
 
@@ -245,22 +250,28 @@ The `PermissionCheckResult` return type and `source` field remain unchanged.
    **Green**: should pass with existing implementation.
    `test: evaluate covers all permission surfaces`
 
-8. **Refactor**: wire `evaluate()` into `checkPermission()` for the `special` surface branch. Run full test suite.
+8. **Refactor**: wire `evaluate()` into `checkPermission()` for the `special` surface branch.
+   Run full test suite.
    `refactor: checkPermission special branch uses evaluate()`
 
-9. **Refactor**: wire `evaluate()` into the `skill` surface branch. Run full test suite.
+9. **Refactor**: wire `evaluate()` into the `skill` surface branch.
+   Run full test suite.
    `refactor: checkPermission skill branch uses evaluate()`
 
-10. **Refactor**: wire `evaluate()` into the built-in tool and other-tool branches. Run full test suite.
+10. **Refactor**: wire `evaluate()` into the built-in tool and other-tool branches.
+    Run full test suite.
     `refactor: checkPermission tool branches use evaluate()`
 
-11. **Refactor**: wire `evaluate()` into the `bash` surface branch (calling `evaluate()` from `checkPermission()`, keeping `BashFilter` alive for now). Run full test suite.
+11. **Refactor**: wire `evaluate()` into the `bash` surface branch (calling `evaluate()` from `checkPermission()`, keeping `BashFilter` alive for now).
+    Run full test suite.
     `refactor: checkPermission bash branch uses evaluate()`
 
-12. **Refactor**: wire `evaluate()` into the `mcp` surface branch (loop over candidates). Run full test suite.
+12. **Refactor**: wire `evaluate()` into the `mcp` surface branch (loop over candidates).
+    Run full test suite.
     `refactor: checkPermission mcp branch uses evaluate()`
 
-13. **Verify**: run `pnpm run build` (typecheck) and `npx vitest run` (full suite). Confirm no regressions.
+13. **Verify**: run `pnpm run build` (typecheck) and `npx vitest run` (full suite).
+    Confirm no regressions.
     `chore: verify clean build after evaluate() extraction`
 
 14. **Docs**: update `docs/architecture/target-architecture.md` to mark #55 as complete in the refactoring sequence diagram.

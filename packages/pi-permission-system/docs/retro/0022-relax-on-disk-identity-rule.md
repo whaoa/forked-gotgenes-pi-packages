@@ -17,9 +17,11 @@ Released as v1.2.1.
 
 #### What went well
 
-- **Implementation committed on first try.** The 4 prose edits across 2 files passed markdownlint and pre-commit hooks immediately.
+- **Implementation committed on first try.**
+  The 4 prose edits across 2 files passed markdownlint and pre-commit hooks immediately.
   All friction was confined to the plan file, not the implementation itself.
-- **Badge update was clean.** User requested an unplanned badge refresh mid-session; the change was scoped, committed separately, and passed CI.
+- **Badge update was clean.**
+  User requested an unplanned badge refresh mid-session; the change was scoped, committed separately, and passed CI.
 
 #### What caused friction (agent side)
 

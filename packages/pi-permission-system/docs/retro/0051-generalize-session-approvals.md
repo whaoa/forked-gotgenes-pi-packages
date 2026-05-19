@@ -10,8 +10,7 @@ issue_title: "Generalize session approvals to all permission surfaces with wildc
 ### Session summary
 
 Implemented generalized session approvals across all permission surfaces (bash, mcp, skill, tools) in 6 commits released as v4.3.0.
-The work added a `pattern-suggest` module, extended `checkPermission` session evaluation to all surface branches, wired the gate with `sessionApproval` pass-through, made the dialog label dynamic, and threaded `sessionLabel` through the full prompt chain.
-44 new tests (754 → 798), all green, no breaking changes.
+The work added a `pattern-suggest` module, extended `checkPermission` session evaluation to all surface branches, wired the gate with `sessionApproval` pass-through, made the dialog label dynamic, and threaded `sessionLabel` through the full prompt chain. 44 new tests (754 → 798), all green, no breaking changes.
 
 ### Observations
 
@@ -23,12 +22,18 @@ The work added a `pattern-suggest` module, extended `checkPermission` session ev
 
 #### What caused friction (agent side)
 
-- `missing-context` — The plan's "Module-Level Changes" listed `tool-call.ts`, `permission-gate.ts`, `permission-dialog.ts`, and `permission-prompts.ts` for step 5, but the actual `sessionLabel` threading required changes to `src/handlers/types.ts`, `src/forwarded-permissions/polling.ts`, and `src/runtime.ts` (the full callback chain). I had to trace the chain at implementation time: `deps.promptPermission` → `runtime.promptPermission` → `confirmPermission` → `requestPermissionDecisionFromUi`. Impact: ~5 extra read/grep calls to map the chain before writing code. No rework, but added friction.
-- `missing-context` — First `Edit` attempt on `tests/handlers/tool-call.test.ts` failed with "Found 2 occurrences" because the file had two identical closing sequences (`expect(result).toEqual({});\n  });\n});\n`). Impact: one failed tool call, immediate retry with wider context. Self-identified.
+- `missing-context` — The plan's "Module-Level Changes" listed `tool-call.ts`, `permission-gate.ts`, `permission-dialog.ts`, and `permission-prompts.ts` for step 5, but the actual `sessionLabel` threading required changes to `src/handlers/types.ts`, `src/forwarded-permissions/polling.ts`, and `src/runtime.ts` (the full callback chain).
+  I had to trace the chain at implementation time: `deps.promptPermission` → `runtime.promptPermission` → `confirmPermission` → `requestPermissionDecisionFromUi`.
+  Impact: ~5 extra read/grep calls to map the chain before writing code.
+  No rework, but added friction.
+- `missing-context` — First `Edit` attempt on `tests/handlers/tool-call.test.ts` failed with "Found 2 occurrences" because the file had two identical closing sequences (`expect(result).toEqual({});\n  });\n});\n`).
+  Impact: one failed tool call, immediate retry with wider context.
+  Self-identified.
 
 #### What caused friction (user side)
 
-- No significant friction from the user side. The plan was well-specified and the session flow was smooth.
+- No significant friction from the user side.
+  The plan was well-specified and the session flow was smooth.
 
 ### Changes made
 

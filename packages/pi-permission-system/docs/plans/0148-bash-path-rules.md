@@ -537,8 +537,7 @@ A session approval on the `path` surface applies to both tool and bash access to
 
 3. **Gate ordering: should the bash path gate run before or after the bash external-directory gate?**
    Current plan: after (ext-dir first, path second).
-   If the path gate ran first, a `path` deny would prevent the wasted ext-dir prompt in Scenario C.
-   But this changes the existing invariant that ext-dir is the outermost safety net.
+   If the path gate ran first, a `path` deny would prevent the wasted ext-dir prompt in Scenario C. But this changes the existing invariant that ext-dir is the outermost safety net.
    Recommendation: keep ext-dir first for now; revisit if double-prompt feedback materializes.
 
 4. **Should the `path` surface affect non-path-bearing tools?**
