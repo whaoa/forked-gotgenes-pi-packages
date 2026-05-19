@@ -174,6 +174,17 @@ export interface RunOptions {
     reason: "manual" | "threshold" | "overflow";
     tokensBefore: number;
   }) => void;
+  /**
+   * Default max turns from runtime config. Falls back to the module-scope
+   * `defaultMaxTurns` during the lift-and-shift migration; superseded by
+   * per-call `maxTurns` and per-agent `agentConfig.maxTurns`.
+   */
+  defaultMaxTurns?: number;
+  /**
+   * Grace turns after the soft-limit steer message. Falls back to the
+   * module-scope `graceTurns` during migration.
+   */
+  graceTurns?: number;
 }
 
 export interface RunResult {
@@ -424,7 +435,7 @@ export async function runAgent(
   // Track turns for graceful max_turns enforcement
   let turnCount = 0;
   const maxTurns = normalizeMaxTurns(
-    options.maxTurns ?? agentConfig?.maxTurns ?? defaultMaxTurns,
+    options.maxTurns ?? agentConfig?.maxTurns ?? options.defaultMaxTurns ?? defaultMaxTurns,
   );
   let softLimitReached = false;
   let aborted = false;
@@ -440,7 +451,7 @@ export async function runAgent(
           session.steer(
             "You have reached your turn limit. Wrap up immediately — provide your final answer now.",
           );
-        } else if (softLimitReached && turnCount >= maxTurns + graceTurns) {
+        } else if (softLimitReached && turnCount >= maxTurns + (options.graceTurns ?? graceTurns)) {
           aborted = true;
           session.abort();
         }

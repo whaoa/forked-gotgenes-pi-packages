@@ -300,3 +300,80 @@ describe("agent-runner usage callback wiring", () => {
     expect(seen).toEqual([{ reason: "threshold", tokensBefore: 12345 }]);
   });
 });
+
+// ─── defaultMaxTurns / graceTurns via RunOptions (issue #69) ─────────────────
+describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
+  function emitTurnEnd(listeners: Array<(e: any) => void>) {
+    for (const l of listeners) l({ type: "turn_end" });
+  }
+
+  it("uses options.defaultMaxTurns as the fallback turn limit when no per-call maxTurns is set", async () => {
+    const { session, listeners } = createSession("done");
+    createAgentSession.mockResolvedValue({ session });
+
+    // 2 turns → soft limit; 3rd turn → abort (graceTurns=1)
+    session.prompt = vi.fn(async () => {
+      emitTurnEnd(listeners); // turn 1
+      emitTurnEnd(listeners); // turn 2 → steer (maxTurns=2)
+      emitTurnEnd(listeners); // turn 3 → abort (maxTurns+graceTurns=3)
+      session.messages.push({ role: "assistant", content: [{ type: "text", text: "done" }] });
+    });
+
+    const result = await runAgent(ctx, "Explore", "go", {
+      pi,
+      defaultMaxTurns: 2,
+      graceTurns: 1,
+    } as any);
+
+    expect(session.steer).toHaveBeenCalledWith(expect.stringContaining("turn limit"));
+    expect(session.abort).toHaveBeenCalled();
+    expect(result.aborted).toBe(true);
+  });
+
+  it("options.graceTurns extends the grace window after the soft-limit steer", async () => {
+    const { session, listeners } = createSession("done");
+    createAgentSession.mockResolvedValue({ session });
+
+    // maxTurns=1, graceTurns=3 → need 4 turns total to abort
+    session.prompt = vi.fn(async () => {
+      emitTurnEnd(listeners); // turn 1 → steer
+      emitTurnEnd(listeners); // turn 2 → grace
+      emitTurnEnd(listeners); // turn 3 → grace (still < 1+3=4)
+      session.messages.push({ role: "assistant", content: [{ type: "text", text: "done" }] });
+    });
+
+    const result = await runAgent(ctx, "Explore", "go", {
+      pi,
+      defaultMaxTurns: 1,
+      graceTurns: 3,
+    } as any);
+
+    // Steered at turn 1, but not aborted (turn 3 < 1+3=4)
+    expect(result.steered).toBe(true);
+    expect(result.aborted).toBe(false);
+    expect(session.abort).not.toHaveBeenCalled();
+  });
+
+  it("options.maxTurns takes precedence over options.defaultMaxTurns", async () => {
+    const { session, listeners } = createSession("done");
+    createAgentSession.mockResolvedValue({ session });
+
+    // maxTurns=3 (explicit) should win over defaultMaxTurns=1
+    session.prompt = vi.fn(async () => {
+      emitTurnEnd(listeners); // turn 1 — under maxTurns=3, no steer
+      emitTurnEnd(listeners); // turn 2
+      session.messages.push({ role: "assistant", content: [{ type: "text", text: "done" }] });
+    });
+
+    await runAgent(ctx, "Explore", "go", {
+      pi,
+      maxTurns: 3,       // explicit per-call limit
+      defaultMaxTurns: 1, // should be overridden
+      graceTurns: 1,
+    } as any);
+
+    // Only 2 turns fired, maxTurns=3, so steer should NOT be called
+    expect(session.steer).not.toHaveBeenCalled();
+    expect(session.abort).not.toHaveBeenCalled();
+  });
+});
