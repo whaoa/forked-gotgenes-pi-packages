@@ -413,3 +413,111 @@ describe("assembleSessionConfig — skill preloading", () => {
     expect(result.noSkills).toBe(true);
   });
 });
+
+describe("assembleSessionConfig — memory block selection", () => {
+  function agentWithMemory(toolNames: string[], disallowedTools?: string[]) {
+    return {
+      name: "Writer",
+      description: "test",
+      builtinToolNames: toolNames,
+      extensions: false as const,
+      skills: false as const,
+      systemPrompt: "prompt",
+      promptMode: "replace" as const,
+      memory: "project" as const,
+      ...(disallowedTools ? { disallowedTools } : {}),
+    };
+  }
+
+  it("no memory config → no memory block in extras", () => {
+    // default mock has no memory field
+    const result = assembleSessionConfig("Explore", ctx, {}, mockEnv);
+
+    expect(result.extras.memoryBlock).toBeUndefined();
+    expect(mockBuildMemoryBlock).not.toHaveBeenCalled();
+    expect(mockBuildReadOnlyMemoryBlock).not.toHaveBeenCalled();
+  });
+
+  it("agent with memory + write tool → read-write block", () => {
+    mockGetAgentConfig.mockReturnValueOnce(agentWithMemory(["read", "write", "bash"]));
+    mockGetToolNamesForType.mockReturnValueOnce(["read", "write", "bash"]);
+    mockGetMemoryToolNames.mockReturnValueOnce([]);
+
+    const result = assembleSessionConfig("Writer", ctx, {}, mockEnv);
+
+    expect(mockBuildMemoryBlock).toHaveBeenCalledWith("Writer", "project", "/tmp");
+    expect(mockBuildReadOnlyMemoryBlock).not.toHaveBeenCalled();
+    expect(result.extras.memoryBlock).toBe("memory block");
+  });
+
+  it("agent with memory + edit tool (but no write) → read-write block", () => {
+    mockGetAgentConfig.mockReturnValueOnce(agentWithMemory(["read", "edit"]));
+    mockGetToolNamesForType.mockReturnValueOnce(["read", "edit"]);
+    mockGetMemoryToolNames.mockReturnValueOnce([]);
+
+    assembleSessionConfig("Writer", ctx, {}, mockEnv);
+
+    expect(mockBuildMemoryBlock).toHaveBeenCalledTimes(1);
+    expect(mockBuildReadOnlyMemoryBlock).not.toHaveBeenCalled();
+  });
+
+  it("agent with memory + read-only tools → read-only block", () => {
+    mockGetAgentConfig.mockReturnValueOnce(agentWithMemory(["read", "bash", "grep"]));
+    mockGetToolNamesForType.mockReturnValueOnce(["read", "bash", "grep"]);
+    mockGetReadOnlyMemoryToolNames.mockReturnValueOnce([]);
+
+    const result = assembleSessionConfig("Writer", ctx, {}, mockEnv);
+
+    expect(mockBuildReadOnlyMemoryBlock).toHaveBeenCalledWith("Writer", "project", "/tmp");
+    expect(mockBuildMemoryBlock).not.toHaveBeenCalled();
+    expect(result.extras.memoryBlock).toBe("read-only memory block");
+  });
+
+  it("denied write tool → read-only block (denylist applied before capability check)", () => {
+    mockGetAgentConfig.mockReturnValueOnce(
+      agentWithMemory(["read", "write", "bash"], ["write"]),
+    );
+    mockGetToolNamesForType.mockReturnValueOnce(["read", "write", "bash"]);
+    mockGetReadOnlyMemoryToolNames.mockReturnValueOnce([]);
+
+    assembleSessionConfig("Writer", ctx, {}, mockEnv);
+
+    expect(mockBuildReadOnlyMemoryBlock).toHaveBeenCalledTimes(1);
+    expect(mockBuildMemoryBlock).not.toHaveBeenCalled();
+  });
+
+  it("denied edit tool → read-only block when edit was the only write capability", () => {
+    mockGetAgentConfig.mockReturnValueOnce(
+      agentWithMemory(["read", "edit"], ["edit"]),
+    );
+    mockGetToolNamesForType.mockReturnValueOnce(["read", "edit"]);
+    mockGetReadOnlyMemoryToolNames.mockReturnValueOnce([]);
+
+    assembleSessionConfig("Writer", ctx, {}, mockEnv);
+
+    expect(mockBuildReadOnlyMemoryBlock).toHaveBeenCalledTimes(1);
+    expect(mockBuildMemoryBlock).not.toHaveBeenCalled();
+  });
+
+  it("adds missing memory tool names from getMemoryToolNames to toolNames", () => {
+    mockGetAgentConfig.mockReturnValueOnce(agentWithMemory(["read", "write"]));
+    mockGetToolNamesForType.mockReturnValueOnce(["read", "write"]);
+    // getMemoryToolNames returns tools not already present (e.g. edit)
+    mockGetMemoryToolNames.mockReturnValueOnce(["edit"]);
+
+    const result = assembleSessionConfig("Writer", ctx, {}, mockEnv);
+
+    expect(result.toolNames).toContain("edit");
+    expect(mockGetMemoryToolNames).toHaveBeenCalledWith(new Set(["read", "write"]));
+  });
+
+  it("adds read tool name from getReadOnlyMemoryToolNames when not already present", () => {
+    mockGetAgentConfig.mockReturnValueOnce(agentWithMemory(["bash", "grep"]));
+    mockGetToolNamesForType.mockReturnValueOnce(["bash", "grep"]);
+    mockGetReadOnlyMemoryToolNames.mockReturnValueOnce(["read"]);
+
+    const result = assembleSessionConfig("Writer", ctx, {}, mockEnv);
+
+    expect(result.toolNames).toContain("read");
+  });
+});
