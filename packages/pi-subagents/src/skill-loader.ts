@@ -23,6 +23,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { debugLog } from "./debug.js";
 import { isSymlink, isUnsafeName, safeReadFile } from "./memory.js";
 
 export interface PreloadedSkill {
@@ -71,7 +72,8 @@ function findSkillDirectory(root: string, name: string): string | undefined {
     let entries: Dirent<string>[];
     try {
       entries = readdirSync(current, { withFileTypes: true });
-    } catch {
+    } catch (err) {
+      debugLog("readdirSync skill root", err);
       continue;
     }
 
