@@ -1,32 +1,24 @@
 # Architecture
 
-This document describes the planned decomposition of the pi-subagents fork
-into a focused, composable core with a stable API boundary that other
-extensions can build on.
+This document describes the planned decomposition of the pi-subagents fork into a focused, composable core with a stable API boundary that other extensions can build on.
 
 ## Design principles
 
-1. **Narrow core** — the extension owns agent spawning, execution, and result
-   retrieval. Everything else is a consumer.
-2. **Composable by default** — other extensions can spawn agents, observe
-   their lifecycle, and display their state without importing this package
-   directly.
-3. **Typed API boundary** — this package exports a `SubagentsAPI` interface
-   and `Symbol.for()` accessors (`publishSubagentsAPI` /
-   `getSubagentsAPI`). Consumers declare this package as an optional peer
-   dependency and use dynamic import for compile-time types. The runtime
-   bridge is `Symbol.for()` on `globalThis` — no separate API package.
+1. **Narrow core** — the extension owns agent spawning, execution, and result retrieval.
+   Everything else is a consumer.
+2. **Composable by default** — other extensions can spawn agents, observe their lifecycle, and display their state without importing this package directly.
+3. **Typed API boundary** — this package exports a `SubagentsAPI` interface and `Symbol.for()` accessors (`publishSubagentsAPI` / `getSubagentsAPI`).
+   Consumers declare this package as an optional peer dependency and use dynamic import for compile-time types.
+   The runtime bridge is `Symbol.for()` on `globalThis` — no separate API package.
 4. **No scheduling** — in-process scheduling is removed from the core.
-   Scheduling is a separate concern that any extension can implement by
-   calling `spawn()` on the published API.
-5. **UI extraction is deferred** — the widget, conversation viewer, and
-   `/agents` command menu stay in the core for now. They are the first
-   candidate for extraction once the API boundary is proven stable.
+   Scheduling is a separate concern that any extension can implement by calling `spawn()` on the published API.
+5. **UI extraction is deferred** — the widget, conversation viewer, and `/agents` command menu stay in the core for now.
+   They are the first candidate for extraction once the API boundary is proven stable.
 
 ## Current state
 
-The extension is a 6,300 LOC monolith organized into well-factored internal
-modules but with no public API contract. The subsystems are:
+The extension is a 6,300 LOC monolith organized into well-factored internal modules but with no public API contract.
+The subsystems are:
 
 ```text
 index.ts (1,894 LOC) — entry point, tool registration, event wiring
@@ -57,18 +49,12 @@ ui/conversation-viewer.ts — scrollable session overlay
 
 ### Coupling today
 
-The widget reads agent state by holding a direct reference to
-`AgentManager` and polling a shared mutable `Map<string, AgentActivity>`
-every 80 ms. The conversation viewer subscribes directly to `AgentSession`
-objects.
+The widget reads agent state by holding a direct reference to `AgentManager` and polling a shared mutable `Map<string, AgentActivity>` every 80 ms.
+The conversation viewer subscribes directly to `AgentSession` objects.
 
-Cross-extension consumers use an ad-hoc RPC layer over `pi.events`
-(`subagents:rpc:spawn`, `subagents:rpc:stop`, `subagents:rpc:ping`) with
-per-request reply channels and untyped envelopes.
+Cross-extension consumers use an ad-hoc RPC layer over `pi.events` (`subagents:rpc:spawn`, `subagents:rpc:stop`, `subagents:rpc:ping`) with per-request reply channels and untyped envelopes.
 
-There is also a `Symbol.for("pi-subagents:manager")` export on
-`globalThis` that exposes `{ waitForAll, hasRunning, spawn, getRecord }`,
-but it is undocumented and untyped.
+There is also a `Symbol.for("pi-subagents:manager")` export on `globalThis` that exposes `{ waitForAll, hasRunning, spawn, getRecord }`, but it is undocumented and untyped.
 
 ## Target state
 
@@ -111,31 +97,26 @@ but it is undocumented and untyped.
 
 - The three tools: `Agent`, `get_subagent_result`, `steer_subagent`.
 - `AgentManager` — spawn, queue, abort, resume, concurrency control.
-- `agent-runner` — session creation, turn loop, tool filtering, extension
-  binding (Patches 2 and 3).
+- `agent-runner` — session creation, turn loop, tool filtering, extension binding (Patches 2 and 3).
 - Agent type registry — default agents, custom `.md` file loading.
 - Prompt assembly, context extraction, memory, skills, environment.
 - Worktree isolation.
 - Token usage tracking.
 - Settings persistence.
-- Internal UI (widget, conversation viewer, `/agents` menu) — these stay
-  until the API boundary is proven, then move to a separate extension.
+- Internal UI (widget, conversation viewer, `/agents` menu) — these stay until the API boundary is proven, then move to a separate extension.
 
 ### What the core drops
 
-- **Scheduling** (`schedule.ts`, `schedule-store.ts`,
-  `ui/schedule-menu.ts`) — 612 LOC removed. The `schedule` parameter is
-  removed from the `Agent` tool schema. Any extension that wants scheduling
-  can implement it by calling `getSubagentsAPI()?.spawn(...)` on a timer.
-- **Ad-hoc RPC** (`cross-extension-rpc.ts`) — replaced by the typed
-  `SubagentsAPI` published via `Symbol.for()`. The untyped event-bus RPC
-  channels are removed.
-- **Group join** (`group-join.ts`) — 141 LOC removed. The grouped
-  notification batching adds complexity for a marginal UX improvement.
+- **Scheduling** (`schedule.ts`, `schedule-store.ts`, `ui/schedule-menu.ts`) — 612 LOC removed.
+  The `schedule` parameter is removed from the `Agent` tool schema.
+  Any extension that wants scheduling can implement it by calling `getSubagentsAPI()?.spawn(...)` on a timer.
+- **Ad-hoc RPC** (`cross-extension-rpc.ts`) — replaced by the typed `SubagentsAPI` published via `Symbol.for()`.
+  The untyped event-bus RPC channels are removed.
+- **Group join** (`group-join.ts`) — 141 LOC removed.
+  The grouped notification batching adds complexity for a marginal UX improvement.
   Individual completion notifications are sufficient.
-- **Output file** (`output-file.ts`) — 96 LOC removed. JSONL transcript
-  streaming is a consumer concern; a separate extension can subscribe to
-  lifecycle events and write transcripts.
+- **Output file** (`output-file.ts`) — 96 LOC removed.
+  JSONL transcript streaming is a consumer concern; a separate extension can subscribe to lifecycle events and write transcripts.
 
 ### Estimated impact
 
@@ -147,13 +128,11 @@ but it is undocumented and untyped.
 | Output file       | 83          | ~50                       |
 | **Total**         | **~916**    | **~400**                  |
 
-After removal and `index.ts` decomposition, the core shrinks from ~6,300
-to ~5,400 LOC, and `index.ts` shrinks from ~1,894 to ~1,300 LOC.
+After removal and `index.ts` decomposition, the core shrinks from ~6,300 to ~5,400 LOC, and `index.ts` shrinks from ~1,894 to ~1,300 LOC.
 
 ## SubagentsAPI
 
-The `SubagentsAPI` interface, accessor functions, and serializable types
-are exported directly from this package (`@earendil-works/pi-subagents`).
+The `SubagentsAPI` interface, accessor functions, and serializable types are exported directly from this package (`@earendil-works/pi-subagents`).
 No separate API package is needed.
 
 Consumers declare this package as an optional peer dependency:
@@ -169,8 +148,7 @@ Consumers declare this package as an optional peer dependency:
 }
 ```
 
-At runtime, consumers use dynamic import for type-safe access to the
-accessor functions:
+At runtime, consumers use dynamic import for type-safe access to the accessor functions:
 
 ```typescript
 const { getSubagentsAPI } = await import("@earendil-works/pi-subagents");
@@ -180,12 +158,9 @@ if (api) {
 }
 ```
 
-Pi's extension loader creates a fresh `jiti` instance per extension with
-`moduleCache: false`, so module-scoped singletons don't survive across
-extensions. The accessor functions use `Symbol.for()` on `globalThis`,
-which is process-global by spec, to bridge this gap. The dynamic import
-provides compile-time types; the `Symbol.for()` key is the actual
-runtime channel.
+Pi's extension loader creates a fresh `jiti` instance per extension with `moduleCache: false`, so module-scoped singletons don't survive across extensions.
+The accessor functions use `Symbol.for()` on `globalThis`, which is process-global by spec, to bridge this gap.
+The dynamic import provides compile-time types; the `Symbol.for()` key is the actual runtime channel.
 
 ### Interface
 
@@ -245,9 +220,7 @@ export function getSubagentsAPI(): SubagentsAPI | undefined {
 }
 ```
 
-If Pi gains a native service registry ([earendil-works/pi#4207]), these
-accessors can be updated to delegate to `pi.registerService()` /
-`pi.getService()` internally while keeping the same consumer API.
+If Pi gains a native service registry ([earendil-works/pi#4207]), these accessors can be updated to delegate to `pi.registerService()` / `pi.getService()` internally while keeping the same consumer API.
 
 ### Lifecycle events
 
@@ -259,8 +232,8 @@ The core emits events on `pi.events` that any extension can observe:
 | `subagents:completed` | `{ id, type, status, result?, error? }`     | Agent finishes       |
 | `subagents:activity`  | `{ id, toolName?, textDelta?, turnCount? }` | Streaming progress   |
 
-These replace the ad-hoc RPC channels. They are fire-and-forget broadcast
-events — no request IDs, no reply channels.
+These replace the ad-hoc RPC channels.
+They are fire-and-forget broadcast events — no request IDs, no reply channels.
 
 ### Consumer example: scheduling extension
 
@@ -327,104 +300,82 @@ src/
 └── (existing modules unchanged)
 ```
 
-Each extracted module receives narrow constructor-injected dependencies
-rather than closing over module-level state.
+Each extracted module receives narrow constructor-injected dependencies rather than closing over module-level state.
 
 ## Phase plan
 
 ### Phase 1: Export `SubagentsAPI` from this package
 
-Add the `SubagentsAPI` interface, serializable types, and `Symbol.for()`
-accessor functions as public exports of this package. No behavioral
-changes to the core yet.
+Add the `SubagentsAPI` interface, serializable types, and `Symbol.for()` accessor functions as public exports of this package.
+No behavioral changes to the core yet.
 
 ### Phase 2: Remove scheduling ✓ (done — issue #52)
 
-Deleted `schedule.ts`, `schedule-store.ts`, `ui/schedule-menu.ts`. Removed
-the `schedule` parameter from the `Agent` tool schema. Removed scheduler
-setup and lifecycle hooks from `index.ts`.
+Deleted `schedule.ts`, `schedule-store.ts`, `ui/schedule-menu.ts`.
+Removed the `schedule` parameter from the `Agent` tool schema.
+Removed scheduler setup and lifecycle hooks from `index.ts`.
 
 ### Phase 3: Remove group-join, output-file, ad-hoc RPC
 
 Delete `group-join.ts`, `output-file.ts`, `cross-extension-rpc.ts`.
-Simplify `index.ts` to use direct individual notifications. Emit
-lifecycle events on `pi.events` for external consumers.
+Simplify `index.ts` to use direct individual notifications.
+Emit lifecycle events on `pi.events` for external consumers.
 
 ### Phase 4: Implement and publish `SubagentsAPI`
 
-Wire `api-adapter.ts` to wrap `AgentManager` and call
-`publishSubagentsAPI()` at extension init. Resolve model strings inside
-the adapter (fixing upstream [tintinweb/pi-subagents#60]).
+Wire `api-adapter.ts` to wrap `AgentManager` and call `publishSubagentsAPI()` at extension init.
+Resolve model strings inside the adapter (fixing upstream [tintinweb/pi-subagents#60]).
 
 ### Phase 5: Decompose `index.ts` ✓ (done — issue #54)
 
-Extracted tools, notifications, activity tracking, and the `/agents` command
-into separate modules.
+Extracted tools, notifications, activity tracking, and the `/agents` command into separate modules.
 `src/index.ts` shrank from ~1,619 lines to ~265 lines.
 
 ### Phase 6 (future): Extract UI to `@earendil-works/pi-subagents-ui`
 
-Move `ui/agent-widget.ts`, `ui/conversation-viewer.ts`, the `/agents`
-command, notifications, and activity tracking to a separate extension that
-consumes `SubagentsAPI` + lifecycle events. This phase is deferred until
-the API boundary is proven stable in production.
+Move `ui/agent-widget.ts`, `ui/conversation-viewer.ts`, the `/agents` command, notifications, and activity tracking to a separate extension that consumes `SubagentsAPI` + lifecycle events.
+This phase is deferred until the API boundary is proven stable in production.
 
 ## Structural refactoring roadmap (post-#54)
 
-The Issue #54 decomposition created focused modules but left several
-structural cleanup opportunities on the table.
-The following issues track the work needed to bring `pi-subagents` to the
-same level of testability and composability as `pi-permission-system`.
+The Issue #54 decomposition created focused modules but left several structural cleanup opportunities on the table.
+The following issues track the work needed to bring `pi-subagents` to the same level of testability and composability as `pi-permission-system`.
 
 ### Phase 1: Foundation
 
 These three issues are independent of each other and can land in any order.
-Together they eliminate module-scope mutable state and create a testable
-functional core.
+Together they eliminate module-scope mutable state and create a testable functional core.
 
 1. **gotgenes/pi-packages#69** — Create `SubagentRuntime`
-   - Move `defaultMaxTurns`, `graceTurns`, `agentActivity`, `currentCtx`,
-     and widget references out of closure/module scope into a single
-     factory-constructed object.
-   - This unblocks handler extraction (Issue #70) by giving handlers a
-     concrete deps bag instead of closure variables.
+   - Move `defaultMaxTurns`, `graceTurns`, `agentActivity`, `currentCtx`, and widget references out of closure/module scope into a single factory-constructed object.
+   - This unblocks handler extraction (Issue #70) by giving handlers a concrete deps bag instead of closure variables.
 
-2. **gotgenes/pi-packages#71** — Extract pure agent-session assembler from
-   `agent-runner.ts`
-   - Split `runAgent()` into a pure configuration assembler
-     (~200 lines) and an IO shell (~200 lines).
+2. **gotgenes/pi-packages#71** — Extract pure agent-session assembler from `agent-runner.ts`
+   - Split `runAgent()` into a pure configuration assembler (~200 lines) and an IO shell (~200 lines).
    - The assembler becomes independently testable without mocking the Pi SDK.
 
 3. **gotgenes/pi-packages#76** — Inject `cwd` into `AgentManager`
-   - Replace the `process.cwd()` call in `dispose()` with a constructor
-     parameter.
+   - Replace the `process.cwd()` call in `dispose()` with a constructor parameter.
    - A small, mechanical prerequisite for Issue #72.
 
 ### Phase 2: Core decomposition
 
 These build on Phase 1 and should land after it.
 
-4. **gotgenes/pi-packages#72** — Dependency-inject `AgentManager`'s
-   collaborators
-   - Introduce `AgentRunner` and `WorktreeManager` interfaces and inject
-     them into `AgentManager`.
-   - Removes direct imports of `agent-runner.ts` and `worktree.ts` from
-     `agent-manager.ts`.
+4. **gotgenes/pi-packages#72** — Dependency-inject `AgentManager`'s collaborators
+   - Introduce `AgentRunner` and `WorktreeManager` interfaces and inject them into `AgentManager`.
+   - Removes direct imports of `agent-runner.ts` and `worktree.ts` from `agent-manager.ts`.
 
-5. **gotgenes/pi-packages#70** — Extract event handlers into
-   `src/handlers/`
-   - Move the four inline lambdas (`session_start`, `session_before_switch`,
-     `session_shutdown`, `tool_execution_start`) into named handler modules.
-   - Requires Issue #69 because handlers need the `SubagentRuntime` as their
-     deps bag.
+5. **gotgenes/pi-packages#70** — Extract event handlers into `src/handlers/`
+   - Move the four inline lambdas (`session_start`, `session_before_switch`, `session_shutdown`, `tool_execution_start`) into named handler modules.
+   - Requires Issue #69 because handlers need the `SubagentRuntime` as their deps bag.
    - Target: `src/index.ts` ≤150 lines.
 
 ### Phase 3: Interface polish
 
 Small cleanups that are safest after the structural changes settle.
 
-6. **gotgenes/pi-packages#66** — Replace `as any` casts with proper SDK
-   types
+6. **gotgenes/pi-packages#66** — Replace `as any` casts with proper SDK types
    - Type-only change in the tool/menu factory dep interfaces.
    - Best done after Issues #69 and #70 when the interfaces are stable.
 
@@ -433,15 +384,11 @@ Small cleanups that are safest after the structural changes settle.
 
 ### Phase 4: Features and cross-cutting concerns
 
-8. **gotgenes/pi-packages#61** — Port transcript logging to Pi's official
-   JSONL session format
-   - Feature work that should happen after structural refactoring is
-     complete so the output-file subsystem has a stable home.
+8. **gotgenes/pi-packages#61** — Port transcript logging to Pi's official JSONL session format
+   - Feature work that should happen after structural refactoring is complete so the output-file subsystem has a stable home.
 
-9. **gotgenes/pi-packages#22** — Parent-session resolution for
-   `nicobailon/pi-subagents` children
-   - Cross-extension issue that spans `pi-permission-system` and
-     `pi-subagents`.
+9. **gotgenes/pi-packages#22** — Parent-session resolution for `nicobailon/pi-subagents` children
+   - Cross-extension issue that spans `pi-permission-system` and `pi-subagents`.
    - Requires coordination on env-var conventions.
    - Not blocked by the structural refactor but logically separate from it.
 
@@ -471,23 +418,19 @@ The recommended sequence is:
 #69 → #71 → #76 → #72 → #70 → #66 → #77 → #61
 ```
 
-Issue #22 is a parallel cross-extension track and does not gate the
-structural work.
+Issue #22 is a parallel cross-extension track and does not gate the structural work.
 
 ## Relationship with upstream
 
-This fork ([earendil-works/pi-subagents]) is now a hard fork of
-[tintinweb/pi-subagents].
+This fork ([earendil-works/pi-subagents]) is now a hard fork of [tintinweb/pi-subagents].
 The decomposition diverges materially from upstream's direction.
 
 The three upstream PRs (#71, #72, #73) remain open.
 If they land, upstream gains the peer-dep fix and the two RepOne patches.
 This fork continues independently regardless.
 
-Upstream fixes and ideas are cherry-picked when they align with this
-fork's scope.
-The upstream test suite is run periodically as a regression canary for the
-agent-runner core.
+Upstream fixes and ideas are cherry-picked when they align with this fork's scope.
+The upstream test suite is run periodically as a regression canary for the agent-runner core.
 
 [earendil-works/pi#4207]: https://github.com/earendil-works/pi/issues/4207
 [earendil-works/pi-subagents]: https://github.com/earendil-works/pi-subagents

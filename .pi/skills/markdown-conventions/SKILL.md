@@ -12,6 +12,9 @@ Load this skill when writing or editing markdown files.
 ## Formatting rules
 
 - Use one sentence per line (unbroken) for better diffs.
+  Each sentence occupies exactly one line; never wrap a sentence across lines or place two sentences on the same line.
+  This applies to all prose, including list-item continuations.
+- When an issue number would begin a line outside a fenced code block, prefix it with `Issue` (e.g. `Issue #42`) to prevent `#N` from being misread as a Markdown heading.
 - Always specify a language on fenced code blocks (e.g., ` ```typescript `, ` ```bash `, ` ```jsonc `, ` ```text `); use `text` for plain output.
 - Use sequential numbering (`1.` `2.` `3.`) in ordered lists, restarting at `1.` under each new heading — markdownlint's MD029 rejects continued numbering across section boundaries.
 - Do not use bold text (`**...**`) as a substitute for headings — use proper heading syntax; markdownlint's MD036 rejects emphasis used as headings.
