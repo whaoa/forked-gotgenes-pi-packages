@@ -10,6 +10,7 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, } from "node:path";
+import { debugLog } from "./debug.js";
 import type { MemoryScope } from "./types.js";
 
 /** Maximum lines to read from MEMORY.md */
@@ -30,7 +31,8 @@ export function isUnsafeName(name: string): boolean {
 export function isSymlink(filePath: string): boolean {
   try {
     return lstatSync(filePath).isSymbolicLink();
-  } catch {
+  } catch (err) {
+    debugLog("lstatSync", err);
     return false;
   }
 }
@@ -44,7 +46,8 @@ export function safeReadFile(filePath: string): string | undefined {
   if (isSymlink(filePath)) return undefined;
   try {
     return readFileSync(filePath, "utf-8");
-  } catch {
+  } catch (err) {
+    debugLog("readFileSync", err);
     return undefined;
   }
 }

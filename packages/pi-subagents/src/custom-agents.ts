@@ -6,6 +6,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import { BUILTIN_TOOL_NAMES } from "./agent-types.js";
+import { debugLog } from "./debug.js";
 import type { AgentConfig, MemoryScope, ThinkingLevel } from "./types.js";
 
 /**
@@ -34,7 +35,8 @@ function loadFromDir(dir: string, agents: Map<string, AgentConfig>, source: "pro
   let files: string[];
   try {
     files = readdirSync(dir).filter(f => f.endsWith(".md"));
-  } catch {
+  } catch (err) {
+    debugLog("readdirSync agents dir", err);
     return;
   }
 
@@ -44,7 +46,8 @@ function loadFromDir(dir: string, agents: Map<string, AgentConfig>, source: "pro
     let content: string;
     try {
       content = readFileSync(join(dir, file), "utf-8");
-    } catch {
+    } catch (err) {
+      debugLog("readFileSync agent file", err);
       continue;
     }
 
