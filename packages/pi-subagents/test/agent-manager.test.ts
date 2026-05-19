@@ -358,6 +358,49 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
 // Regression: `isolation: "worktree"` MUST fail loud when the cwd can't host
 // a worktree. The previous behavior silently fell back to the main tree and
 // injected a warning into the LLM's prompt — invisible to the caller.
+describe("AgentManager — getRunConfig threads defaultMaxTurns and graceTurns into RunOptions", () => {
+  let manager: AgentManager;
+
+  afterEach(() => {
+    manager?.dispose();
+  });
+
+  it("passes defaultMaxTurns and graceTurns from getRunConfig to runAgent", async () => {
+    const getRunConfig = vi.fn(() => ({ defaultMaxTurns: 10, graceTurns: 3 }));
+    manager = new AgentManager(undefined, undefined, undefined, undefined, getRunConfig);
+    resolvedRun();
+    vi.mocked(runAgent).mockClear();
+
+    manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+      description: "test",
+      isBackground: true,
+    });
+
+    await vi.waitFor(() => expect(vi.mocked(runAgent)).toHaveBeenCalled());
+
+    const runOpts = vi.mocked(runAgent).mock.calls[0][3];
+    expect(runOpts.defaultMaxTurns).toBe(10);
+    expect(runOpts.graceTurns).toBe(3);
+  });
+
+  it("omits defaultMaxTurns and graceTurns from runAgent when no getRunConfig is provided", async () => {
+    manager = new AgentManager();
+    resolvedRun();
+    vi.mocked(runAgent).mockClear();
+
+    manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+      description: "test",
+      isBackground: true,
+    });
+
+    await vi.waitFor(() => expect(vi.mocked(runAgent)).toHaveBeenCalled());
+
+    const runOpts = vi.mocked(runAgent).mock.calls[0][3];
+    expect(runOpts.defaultMaxTurns).toBeUndefined();
+    expect(runOpts.graceTurns).toBeUndefined();
+  });
+});
+
 describe("AgentManager — isolation: worktree fails loud, no silent fallback", () => {
   let manager: AgentManager;
 

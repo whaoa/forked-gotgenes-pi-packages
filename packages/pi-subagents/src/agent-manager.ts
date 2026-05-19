@@ -11,6 +11,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { resumeAgent, runAgent, type ToolActivity } from "./agent-runner.js";
 import { debugLog } from "./debug.js";
+import type { RunConfig } from "./runtime.js";
 import type { AgentInvocation, AgentRecord, IsolationMode, SubagentType, ThinkingLevel } from "./types.js";
 import { addUsage } from "./usage.js";
 import { cleanupWorktree, createWorktree, pruneWorktrees, } from "./worktree.js";
@@ -72,6 +73,7 @@ export class AgentManager {
   private onStart?: OnAgentStart;
   private onCompact?: OnAgentCompact;
   private maxConcurrent: number;
+  private getRunConfig?: () => RunConfig;
 
   /** Queue of background agents waiting to start. */
   private queue: { id: string; args: SpawnArgs }[] = [];
@@ -83,10 +85,12 @@ export class AgentManager {
     maxConcurrent = DEFAULT_MAX_CONCURRENT,
     onStart?: OnAgentStart,
     onCompact?: OnAgentCompact,
+    getRunConfig?: () => RunConfig,
   ) {
     this.onComplete = onComplete;
     this.onStart = onStart;
     this.onCompact = onCompact;
+    this.getRunConfig = getRunConfig;
     this.maxConcurrent = maxConcurrent;
     // Cleanup completed agents after 10 minutes (but keep sessions for resume)
     this.cleanupInterval = setInterval(() => this.cleanup(), 60_000);
@@ -182,10 +186,13 @@ export class AgentManager {
     }
     const detach = () => { detachParentSignal?.(); detachParentSignal = undefined; };
 
+    const runConfig = this.getRunConfig?.();
     const promise = runAgent(ctx, type, prompt, {
       pi,
       model: options.model,
       maxTurns: options.maxTurns,
+      defaultMaxTurns: runConfig?.defaultMaxTurns,
+      graceTurns: runConfig?.graceTurns,
       isolated: options.isolated,
       inheritContext: options.inheritContext,
       thinkingLevel: options.thinkingLevel,
