@@ -35,7 +35,7 @@ Any test of `AgentManager` must mock entire modules via `vi.mock()`, coupling th
 | #71   | Extract pure agent-session assembler                | ✓ Done  |
 | #76   | Inject `cwd` into `AgentManager`                    | ✓ Done  |
 | #80   | Consolidate `getConfig`/`getAgentConfig`            | ✓ Done  |
-| #84   | Extract `GitWorktreeManager` class from worktree.ts | Pending |
+| #84   | Extract `GitWorktreeManager` class from worktree.ts | ✓ Done  |
 
 ### Prior art
 
@@ -201,7 +201,7 @@ expect(runner.run).toHaveBeenCalled();
 
 ### `src/worktree.ts` (no changes in this issue)
 
-`WorktreeManager` interface and `GitWorktreeManager` class are added by prerequisite #84.
+`WorktreeManager` interface and `GitWorktreeManager` class were added by #84.
 
 ### `src/agent-runner.ts` (modified)
 
