@@ -61,8 +61,7 @@ const agentConfigMock = vi.hoisted(() => ({
 }));
 
 vi.mock("../src/agent-types.js", () => ({
-  getConfig: vi.fn(() => agentConfigMock.current),
-  getAgentConfig: vi.fn(() => agentConfigMock.current),
+  resolveAgentConfig: vi.fn(() => agentConfigMock.current),
   getMemoryToolNames: vi.fn(() => []),
   getReadOnlyMemoryToolNames: vi.fn(() => []),
   getToolNamesForType: vi.fn(() => ["read"]),

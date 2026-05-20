@@ -29,15 +29,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 }));
 
 vi.mock("../src/agent-types.js", () => ({
-  getConfig: vi.fn(() => ({
-    displayName: "Explore",
-    description: "Explore",
-    builtinToolNames: ["read"],
-    extensions: false,
-    skills: false,
-    promptMode: "replace",
-  })),
-  getAgentConfig: vi.fn(() => ({
+  resolveAgentConfig: vi.fn(() => ({
     name: "Explore",
     description: "Explore",
     builtinToolNames: ["read"],
