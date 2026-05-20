@@ -17,6 +17,7 @@ import {
 import { buildParentContext, extractText } from "./context.js";
 import { detectEnv } from "./env.js";
 import { assembleSessionConfig } from "./session-config.js";
+import { deriveSubagentSessionDir } from "./session-dir.js";
 import type { SubagentType, ThinkingLevel } from "./types.js";
 
 /** Names of tools registered by this extension that subagents must NOT inherit. */
@@ -246,10 +247,17 @@ export async function runAgent(
   });
   await loader.reload();
 
+  // Create a persisted SessionManager so transcripts are written in Pi's
+  // official JSONL format. Falls back to a temp directory when the parent
+  // session is not persisted (e.g. headless/API mode).
+  const sessionDir = deriveSubagentSessionDir(options.parentSessionFile, cfg.effectiveCwd);
+  const sessionManager = SessionManager.create(cfg.effectiveCwd, sessionDir);
+  sessionManager.newSession({ parentSession: options.parentSessionId });
+
   const sessionOpts: Parameters<typeof createAgentSession>[0] = {
     cwd: cfg.effectiveCwd,
     agentDir,
-    sessionManager: SessionManager.inMemory(cfg.effectiveCwd),
+    sessionManager,
     settingsManager: SettingsManager.create(cfg.effectiveCwd, agentDir),
     modelRegistry: ctx.modelRegistry,
     model: cfg.model as Model<any> | undefined,
@@ -389,7 +397,13 @@ export async function runAgent(
 
   const responseText =
     collector.getText().trim() || getLastAssistantText(session);
-  return { responseText, session, aborted, steered: softLimitReached, sessionFile: undefined };
+  return {
+    responseText,
+    session,
+    aborted,
+    steered: softLimitReached,
+    sessionFile: sessionManager.getSessionFile(),
+  };
 }
 
 /**

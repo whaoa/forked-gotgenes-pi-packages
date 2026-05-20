@@ -4,12 +4,18 @@ const {
   createAgentSession,
   defaultResourceLoaderCtor,
   getAgentDir,
+  sessionManagerCreate,
   sessionManagerInMemory,
   settingsManagerCreate,
 } = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
   defaultResourceLoaderCtor: vi.fn(),
   getAgentDir: vi.fn(() => "/mock/agent-dir"),
+  sessionManagerCreate: vi.fn(() => ({
+    kind: "persisted-session-manager",
+    newSession: vi.fn(),
+    getSessionFile: vi.fn(() => "/sessions/child.jsonl"),
+  })),
   sessionManagerInMemory: vi.fn(() => ({ kind: "memory-session-manager" })),
   settingsManagerCreate: vi.fn(() => ({ kind: "settings-manager" })),
 }));
@@ -24,7 +30,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
     async reload() {}
   },
   getAgentDir,
-  SessionManager: { inMemory: sessionManagerInMemory },
+  SessionManager: { create: sessionManagerCreate, inMemory: sessionManagerInMemory },
   SettingsManager: { create: settingsManagerCreate },
 }));
 
@@ -61,6 +67,10 @@ vi.mock("../src/memory.js", () => ({
 
 vi.mock("../src/skill-loader.js", () => ({
   preloadSkills: vi.fn(() => []),
+}));
+
+vi.mock("../src/session-dir.js", () => ({
+  deriveSubagentSessionDir: vi.fn(() => "/mock/session-dir/tasks"),
 }));
 
 import { resumeAgent, runAgent } from "../src/agent-runner.js";
@@ -102,6 +112,12 @@ beforeEach(() => {
   createAgentSession.mockReset();
   defaultResourceLoaderCtor.mockClear();
   getAgentDir.mockClear();
+  sessionManagerCreate.mockClear();
+  sessionManagerCreate.mockReturnValue({
+    kind: "persisted-session-manager",
+    newSession: vi.fn(),
+    getSessionFile: vi.fn(() => "/sessions/child.jsonl"),
+  });
   sessionManagerInMemory.mockClear();
   settingsManagerCreate.mockClear();
 });
@@ -144,7 +160,7 @@ describe("agent-runner final output capture", () => {
       agentDir: "/mock/agent-dir",
     }));
     expect(settingsManagerCreate).toHaveBeenCalledWith("/tmp/worktree", "/mock/agent-dir");
-    expect(sessionManagerInMemory).toHaveBeenCalledWith("/tmp/worktree");
+    expect(sessionManagerCreate).toHaveBeenCalledWith("/tmp/worktree", "/mock/session-dir/tasks");
     expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({
       cwd: "/tmp/worktree",
       agentDir: "/mock/agent-dir",
@@ -170,14 +186,27 @@ describe("agent-runner final output capture", () => {
     expect(ctorArgs.appendSystemPromptOverride(["would-be-loaded"])).toEqual([]);
   });
 
-  it("returns sessionFile in RunResult (undefined until SessionManager is persisted)", async () => {
+  it("returns sessionFile from the persisted SessionManager in RunResult", async () => {
     const { session } = createSession("WITH_FILE");
     createAgentSession.mockResolvedValue({ session });
 
     const result = await runAgent(ctx, "Explore", "go", { pi });
 
-    // sessionFile is part of RunResult — currently undefined when using inMemory
-    expect(result).toHaveProperty("sessionFile");
+    expect(result.sessionFile).toBe("/sessions/child.jsonl");
+  });
+
+  it("calls newSession with parentSession when parentSessionId is provided", async () => {
+    const { session } = createSession("LINKED");
+    createAgentSession.mockResolvedValue({ session });
+
+    await runAgent(ctx, "Explore", "go", {
+      pi,
+      parentSessionFile: "/sessions/parent.jsonl",
+      parentSessionId: "parent-id-123",
+    });
+
+    const sm = sessionManagerCreate.mock.results[0].value;
+    expect(sm.newSession).toHaveBeenCalledWith({ parentSession: "parent-id-123" });
   });
 
   it("resumeAgent also falls back to the final assistant message text", async () => {
