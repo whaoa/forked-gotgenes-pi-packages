@@ -229,7 +229,7 @@ export default function (pi: ExtensionAPI) {
     manager: {
       listAgents: () => manager.listAgents(),
       getRecord: (id) => manager.getRecord(id),
-      spawnAndWait: (piArg, ctx, type, prompt, opts) => manager.spawnAndWait((piArg ?? pi) as any, ctx as any, type, prompt, opts as any),
+      spawnAndWait: (piArg, ctx, type, prompt, opts) => manager.spawnAndWait(piArg ?? pi, ctx, type, prompt, opts),
       getMaxConcurrent: () => manager.getMaxConcurrent(),
       setMaxConcurrent: (n) => manager.setMaxConcurrent(n),
     },
@@ -239,7 +239,7 @@ export default function (pi: ExtensionAPI) {
       const cfg = resolveAgentConfig(type);
       if (!cfg.model) return 'inherit';
       if (registry) {
-        const resolved = resolveModel(cfg.model, registry as any);
+        const resolved = resolveModel(cfg.model, registry);
         if (typeof resolved === 'string') return 'inherit';
       }
       return getModelLabelFromConfig(cfg.model);
@@ -268,6 +268,6 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand('agents', {
     description: 'Manage agents',
-    handler: async (_args, ctx) => { await agentsMenuHandler(ctx as any); },
+    handler: async (_args, ctx) => { await agentsMenuHandler(ctx); },
   });
 }

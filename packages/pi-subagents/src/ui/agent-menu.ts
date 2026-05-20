@@ -1,12 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { SpawnOptions } from "../agent-manager.js";
 import {
   BUILTIN_TOOL_NAMES,
   getAllTypes,
   resolveAgentConfig,
   resolveType,
 } from "../agent-types.js";
+import type { ModelRegistry } from "../model-resolver.js";
 import type { AgentConfig, AgentRecord } from "../types.js";
 import type { AgentActivity } from "./agent-widget.js";
 import { formatDuration, getDisplayName } from "./agent-widget.js";
@@ -18,7 +21,7 @@ export interface AgentMenuManager {
   listAgents: () => AgentRecord[];
   getRecord: (id: string) => AgentRecord | undefined;
   /** Used by generate wizard to spawn an agent that writes the .md file. */
-  spawnAndWait: (pi: unknown, ctx: unknown, type: string, prompt: string, opts: object) => Promise<AgentRecord>;
+  spawnAndWait: (pi: ExtensionAPI | null, ctx: ExtensionContext, type: string, prompt: string, opts: Omit<SpawnOptions, "isBackground">) => Promise<AgentRecord>;
   getMaxConcurrent: () => number;
   setMaxConcurrent: (n: number) => void;
 }
@@ -28,7 +31,7 @@ export interface AgentMenuDeps {
   reloadCustomAgents: () => void;
   agentActivity: Map<string, AgentActivity>;
   /** Resolve model label for a given agent type + registry. */
-  getModelLabel: (type: string, registry?: unknown) => string;
+  getModelLabel: (type: string, registry?: ModelRegistry) => string;
   /** Snapshot current settings for persistence. */
   snapshotSettings: () => { maxConcurrent: number; defaultMaxTurns: number; graceTurns: number };
   /** Save settings and return a notification result. */
@@ -50,20 +53,6 @@ export interface AgentMenuDeps {
 
 // ---- Narrow UI context types ----
 
-interface MenuUI {
-  select: (title: string, options: string[]) => Promise<string | undefined>;
-  input: (prompt: string, defaultValue?: string) => Promise<string | undefined>;
-  confirm: (title: string, message: string) => Promise<boolean>;
-  editor: (title: string, content: string) => Promise<string | undefined>;
-  notify: (message: string, level: string) => void;
-  custom: <T>(factory: any, options: any) => Promise<T>;
-}
-
-interface MenuContext {
-  ui: MenuUI;
-  modelRegistry?: unknown;
-}
-
 // ---- Factory ----
 
 /**
@@ -83,7 +72,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     return undefined;
   }
 
-  async function showAgentsMenu(ctx: MenuContext) {
+  async function showAgentsMenu(ctx: ExtensionContext) {
     deps.reloadCustomAgents();
     const allNames = getAllTypes();
 
@@ -137,7 +126,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     }
   }
 
-  async function showAllAgentsList(ctx: MenuContext) {
+  async function showAllAgentsList(ctx: ExtensionContext) {
     const allNames = getAllTypes();
     if (allNames.length === 0) {
       ctx.ui.notify("No agents.", "info");
@@ -191,7 +180,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     }
   }
 
-  async function showRunningAgents(ctx: MenuContext) {
+  async function showRunningAgents(ctx: ExtensionContext) {
     const agents = deps.manager.listAgents();
     if (agents.length === 0) {
       ctx.ui.notify("No agents.", "info");
@@ -215,7 +204,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     await showRunningAgents(ctx);
   }
 
-  async function viewAgentConversation(ctx: MenuContext, record: AgentRecord) {
+  async function viewAgentConversation(ctx: ExtensionContext, record: AgentRecord) {
     if (!record.session) {
       ctx.ui.notify(
         `Agent is ${record.status === "queued" ? "queued" : "expired"} — no session available.`,
@@ -245,7 +234,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     );
   }
 
-  async function showAgentDetail(ctx: MenuContext, name: string) {
+  async function showAgentDetail(ctx: ExtensionContext, name: string) {
     if (resolveType(name) == null) {
       ctx.ui.notify(`Agent config not found for "${name}".`, "warning");
       return;
@@ -312,7 +301,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     }
   }
 
-  async function ejectAgent(ctx: MenuContext, name: string, cfg: AgentConfig) {
+  async function ejectAgent(ctx: ExtensionContext, name: string, cfg: AgentConfig) {
     const location = await ctx.ui.select("Choose location", [
       "Project (.pi/agents/)",
       `Personal (${deps.personalAgentsDir})`,
@@ -363,7 +352,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     ctx.ui.notify(`Ejected ${name} to ${targetPath}`, "info");
   }
 
-  async function disableAgent(ctx: MenuContext, name: string) {
+  async function disableAgent(ctx: ExtensionContext, name: string) {
     const file = findAgentFile(name);
     if (file) {
       const content = readFileSync(file.path, "utf-8");
@@ -397,7 +386,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     ctx.ui.notify(`Disabled ${name} (${targetPath})`, "info");
   }
 
-  async function enableAgent(ctx: MenuContext, name: string) {
+  async function enableAgent(ctx: ExtensionContext, name: string) {
     const file = findAgentFile(name);
     if (!file) return;
 
@@ -416,7 +405,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     }
   }
 
-  async function showCreateWizard(ctx: MenuContext) {
+  async function showCreateWizard(ctx: ExtensionContext) {
     const location = await ctx.ui.select("Choose location", [
       "Project (.pi/agents/)",
       `Personal (${deps.personalAgentsDir})`,
@@ -440,7 +429,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
     }
   }
 
-  async function showGenerateWizard(ctx: MenuContext, targetDir: string) {
+  async function showGenerateWizard(ctx: ExtensionContext, targetDir: string) {
     const description = await ctx.ui.input("Describe what this agent should do");
     if (!description) return;
 
@@ -526,7 +515,7 @@ Write the file using the write tool. Only write the file, nothing else.`;
     }
   }
 
-  async function showManualWizard(ctx: MenuContext, targetDir: string) {
+  async function showManualWizard(ctx: ExtensionContext, targetDir: string) {
     const name = await ctx.ui.input("Agent name (filename, no spaces)");
     if (!name) return;
 
@@ -621,7 +610,7 @@ ${systemPrompt}
     ctx.ui.notify(`Created ${targetPath}`, "info");
   }
 
-  async function showSettings(ctx: MenuContext) {
+  async function showSettings(ctx: ExtensionContext) {
     const choice = await ctx.ui.select("Settings", [
       `Max concurrency (current: ${deps.manager.getMaxConcurrent()})`,
       `Default max turns (current: ${deps.getDefaultMaxTurns() ?? "unlimited"})`,
@@ -677,13 +666,13 @@ ${systemPrompt}
     }
   }
 
-  function notifyApplied(ctx: MenuContext, successMsg: string) {
+  function notifyApplied(ctx: ExtensionContext, successMsg: string) {
     const { message, level } = deps.saveSettings(deps.snapshotSettings(), successMsg);
-    ctx.ui.notify(message, level);
+    ctx.ui.notify(message, level as "info" | "warning" | "error");
   }
 
   // Return the handler function
-  return async (ctx: MenuContext) => {
+  return async (ctx: ExtensionContext) => {
     await showAgentsMenu(ctx);
   };
 }
