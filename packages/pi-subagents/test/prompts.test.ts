@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getAgentConfig, registerAgents } from "../src/agent-types.js";
+import { registerAgents, resolveAgentConfig } from "../src/agent-types.js";
 import { buildAgentPrompt } from "../src/prompts.js";
 import type { AgentConfig, EnvInfo } from "../src/types.js";
 
@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 
 function getDefaultConfig(name: string): AgentConfig {
-  return getAgentConfig(name)!;
+  return resolveAgentConfig(name);
 }
 
 describe("buildAgentPrompt", () => {

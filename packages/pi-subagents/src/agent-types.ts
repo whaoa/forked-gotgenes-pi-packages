@@ -48,12 +48,6 @@ export function resolveType(name: string): string | undefined {
   return resolveKey(name);
 }
 
-/** Get the agent config for a type (case-insensitive). */
-export function getAgentConfig(name: string): AgentConfig | undefined {
-  const key = resolveKey(name);
-  return key ? agents.get(key) : undefined;
-}
-
 /** Get all enabled type names (for spawning and tool descriptions). */
 export function getAvailableTypes(): string[] {
   return [...agents.entries()]
@@ -139,52 +133,6 @@ export function resolveAgentConfig(type: string): AgentConfig {
     extensions: true,
     skills: true,
     systemPrompt: "",
-    promptMode: "append",
-  };
-}
-
-/** Get config for a type (case-insensitive, returns a SubagentTypeConfig-compatible object). Falls back to general-purpose. */
-export function getConfig(type: string): {
-  displayName: string;
-  description: string;
-  builtinToolNames: string[];
-  extensions: true | string[] | false;
-  skills: true | string[] | false;
-  promptMode: "replace" | "append";
-} {
-  const key = resolveKey(type);
-  const config = key ? agents.get(key) : undefined;
-  if (config && config.enabled !== false) {
-    return {
-      displayName: config.displayName ?? config.name,
-      description: config.description,
-      builtinToolNames: config.builtinToolNames ?? BUILTIN_TOOL_NAMES,
-      extensions: config.extensions,
-      skills: config.skills,
-      promptMode: config.promptMode,
-    };
-  }
-
-  // Fallback for unknown/disabled types — general-purpose config
-  const gp = agents.get("general-purpose");
-  if (gp && gp.enabled !== false) {
-    return {
-      displayName: gp.displayName ?? gp.name,
-      description: gp.description,
-      builtinToolNames: gp.builtinToolNames ?? BUILTIN_TOOL_NAMES,
-      extensions: gp.extensions,
-      skills: gp.skills,
-      promptMode: gp.promptMode,
-    };
-  }
-
-  // Absolute fallback (should never happen)
-  return {
-    displayName: "Agent",
-    description: "General-purpose agent for complex, multi-step tasks",
-    builtinToolNames: BUILTIN_TOOL_NAMES,
-    extensions: true,
-    skills: true,
     promptMode: "append",
   };
 }
