@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the planned decomposition of the pi-subagents fork into a focused, composable core with a stable API boundary that other extensions can build on.
+This document describes the architecture of the pi-subagents fork: a focused, composable core with a stable API boundary that other extensions can build on.
 
 ## Design principles
 
@@ -14,6 +14,9 @@ This document describes the planned decomposition of the pi-subagents fork into 
    Scheduling is a separate concern that any extension can implement by calling `spawn()` on the published API.
 5. **UI extraction is deferred** — the widget, conversation viewer, and `/agents` command menu stay in the core for now.
    They are the first candidate for extraction once the API boundary is proven stable.
+6. **Snapshot, don't capture** — mutable parent state (ctx, session, model) is read once at spawn time and frozen into a plain data object.
+   No live references survive past the spawn call.
+7. **Subscribe, don't thread** — observation of agent progress uses event subscription on the session, not callback parameters threaded through multiple layers.
 
 ## Current state
 
@@ -292,7 +295,7 @@ src/
 Each extracted module receives narrow constructor-injected dependencies rather than closing over module-level state.
 Handlers call methods on narrow runtime interfaces — no raw field writes, no `widget!` reach-throughs.
 
-## Phase plan
+## Phase plan (Phases 1–5 complete)
 
 ### Phase 1: Export `SubagentsService` from this package ✓ (done — #48)
 
@@ -328,100 +331,202 @@ Created `SubagentRuntime` factory to hold session-scoped state.
 Move `ui/agent-widget.ts`, `ui/conversation-viewer.ts`, the `/agents` command, notifications, and activity tracking to a separate extension that consumes `SubagentsService` + lifecycle events.
 This phase is deferred until the API boundary is proven stable in production.
 
-## Structural refactoring roadmap (post-#54)
-
-The Issue #54 decomposition created focused modules but left several structural cleanup opportunities on the table.
-The following issues track the work needed to bring `pi-subagents` to the same level of testability and composability as `pi-permission-system`.
-
-### Phase 1: Foundation
-
-These issues are independent of each other and can land in any order.
-Together they eliminate module-scope mutable state, create a testable functional core, and simplify the agent-types API.
-
-1. **gotgenes/pi-packages#69** ✓ — Create `SubagentRuntime`
-   - Move `defaultMaxTurns`, `graceTurns`, `agentActivity`, `currentCtx`, and widget references out of closure/module scope into a single factory-constructed object.
-   - This unblocks handler extraction (Issue #70) by giving handlers a concrete deps bag instead of closure variables.
-
-2. **gotgenes/pi-packages#71** ✓ — Extract pure agent-session assembler from `agent-runner.ts`
-   - Split `runAgent()` into a pure configuration assembler (~200 lines) and an IO shell (~200 lines).
-   - The assembler becomes independently testable without mocking the Pi SDK.
-
-3. **gotgenes/pi-packages#76** ✓ — Inject `cwd` into `AgentManager`
-   - Replaced the `process.cwd()` call in `dispose()` with a constructor parameter.
-
-4. **gotgenes/pi-packages#80** ✓ — Consolidate `getConfig` / `getAgentConfig` into a single resolution path
-   - Replaced the two overlapping lookup functions with a single `resolveAgentConfig(type): AgentConfig` that handles the unknown-type fallback internally.
-   - Eliminated the duplicated fallback chain exposed by #71 and simplified test mock setup.
-
-### Phase 2: Core decomposition
-
-These build on Phase 1 and should land after it.
-
-1. **gotgenes/pi-packages#84** ✓ — Extract `GitWorktreeManager` class from `worktree.ts`
-   - Added `WorktreeManager` interface and `GitWorktreeManager` class that captures `cwd` at construction.
-   - Prerequisite for #72 — separated the real-object extraction from the DI refactor.
-
-2. **gotgenes/pi-packages#72** ✓ — Dependency-inject `AgentManager`'s collaborators
-   - Defined `AgentRunner` interface (execution boundary) and `ResumeOptions` type in `agent-runner.ts`.
-   - Converted `AgentManager` constructor from 6 positional parameters to an `AgentManagerOptions` bag with injected `AgentRunner` and `WorktreeManager`.
-   - Removed all runtime imports of `agent-runner.ts` and `worktree.ts` from `agent-manager.ts` (only `import type` remains).
-   - Migrated all tests from `vi.mock()` module stubs to `vi.fn()` interface stubs.
-
-3. **gotgenes/pi-packages#87** ✓ — Evolve `SubagentRuntime` from data bag to object with methods
-   - Added session-context methods (`setSessionContext`, `clearSessionContext`) and widget delegation methods (`setUICtx`, `onTurnStart`, `markFinished`, `updateWidget`, `ensureTimer`).
-   - Prerequisite for #70 — without runtime methods, extracted handlers would move LoD violations and output-argument smells into handler classes.
-
-4. **gotgenes/pi-packages#70** ✓ — Extract event handlers into `src/handlers/`
-   - Moved the four inline lambdas (`session_start`, `session_before_switch`, `session_shutdown`, `tool_execution_start`) into `SessionLifecycleHandler` and `ToolStartHandler` classes.
-   - Handlers call methods on narrow runtime interfaces — no raw field writes, no `widget!` reach-throughs.
-
-### Phase 3: Interface polish ✓ (done)
-
-1. **gotgenes/pi-packages#66** ✓ — Replace `as any` casts with proper SDK types
-   - Typed tool/menu factory dep interfaces with `ExtensionContext`, `AgentSession`, `SpawnOptions`, etc.
-
-2. **gotgenes/pi-packages#77** ✓ — Add `projectAgentsDir` to `AgentMenuDeps`
-   - Removed the inline `process.cwd()` lambda from the menu handler.
-
-### Phase 4: Features and cross-cutting concerns
-
-1. **gotgenes/pi-packages#61** ✓ — Port transcript logging to Pi's official JSONL session format
-   - Replaced `output-file.ts` with `SessionManager.create()` + `session-dir.ts`.
-   - Subagent sessions are persisted under `<parent-session-dir>/<parent-session-basename>/tasks/` with `parentSession` header linking.
-
-2. **gotgenes/pi-packages#22** — Parent-session resolution for `nicobailon/pi-subagents` children
-   - Cross-extension issue that spans `pi-permission-system` and `pi-subagents`.
-   - Requires coordination on env-var conventions.
-   - Not blocked by the structural refactor but logically separate from it.
-
-### Dependency graph
-
-```text
-#69 (SubagentRuntime) ✓ ──► #87 (runtime methods) ✓ ─┬─► #70 (handler extraction) ✓
-                                                   │
-#71 (pure assembler) ✓                              │
-#80 (config lookup) ✓                               │
-#76 (cwd injection) ✓                               │
-#84 (WorktreeManager) ✓                             │
-#72 (AgentManager DI) ✓ ────────────────────────────┘──(optional)──► #70
-
-#66 (type casts) ✓
-#77 (projectAgentsDir) ✓
-
-#61 (transcript format) ✓
-#22 (parent session) ◄──(cross-extension, independent)
-```
-
-### Recommended order
-
-The recommended sequence is:
-
-```text
-#69 ✓ → #71 ✓ → #80 ✓ → #76 ✓ → #84 ✓ → #72 ✓ → #87 ✓ → #70 ✓ → #66 ✓ → #77 ✓ → #61 ✓
-```
+## Structural refactoring roadmap (post-#54) ✓ complete
 
 All structural refactoring phases are complete.
+See `git log` for the full history; issue references are preserved below for traceability.
+
+| Phase              | Issue              | Summary                                                               |
+| ------------------ | ------------------ | --------------------------------------------------------------------- |
+| Foundation         | #69, #71, #76, #80 | SubagentRuntime, pure assembler, cwd injection, config consolidation  |
+| Core decomposition | #84, #72, #87, #70 | WorktreeManager, AgentManager DI, runtime methods, handler extraction |
+| Interface polish   | #66, #77           | SDK types, projectAgentsDir                                           |
+| Features           | #61                | JSONL session transcripts                                             |
+
 The remaining open issue is #22 (parent-session resolution), a cross-extension track that does not gate the structural work.
+
+---
+
+## Next target: AgentManager internal decomposition
+
+The structural refactoring roadmap decomposed the extension entry point and established clean module boundaries.
+AgentManager itself — the central class — was not touched structurally.
+A design review reveals three tangled responsibilities and two systemic patterns that inflate complexity.
+
+### Problem statement
+
+AgentManager is a 500-line class that serves as the single mediator between tool callers and the agent runner.
+Every concern passes through it because it owns the `AgentRecord`.
+
+Three responsibilities are tangled:
+
+1. **Record registry** — create, track, query, clean up `AgentRecord` instances.
+2. **Concurrency control** — queue, running count, drain, `bypassQueue`.
+3. **Execution orchestration** — thread options to the runner, intercept callbacks to update records, wire abort signals, manage worktree lifecycle.
+
+`startAgent()` alone is ~130 lines because it handles all three.
+The `.then()` / `.catch()` blocks mix status updates (job 1), worktree cleanup (job 3), notification callbacks (job 1), and queue draining (job 2).
+
+Two systemic patterns compound the problem:
+
+### Problem 1: Callback threading
+
+`SpawnOptions` carries 6 `on*` callback fields.
+They thread through three layers:
+
+```text
+agent-tool.ts (UI tracking state)
+  → AgentManager.startAgent() wraps each to update the record, then forwards
+    → runner.run() subscribes to session events, calls callbacks
+```
+
+The callbacks serve two purposes that are tangled together:
+
+1. **Record statistics** — `onToolActivity` increments `toolUses`, `onAssistantUsage` accumulates `lifetimeUsage`, `onCompaction` increments `compactionCount`, `onSessionCreated` captures the session and output file.
+   This is internal bookkeeping that belongs to the record.
+2. **UI streaming** — the same callbacks update the widget's active-tool display, response text preview, and turn counter.
+   This is presentation that belongs to the UI layer.
+
+The session already emits all of these events via `session.subscribe()`.
+The runner subscribes to session events, translates them into callback invocations, AgentManager wraps each callback to update the record, then forwards to the caller's callback.
+Three layers reimplementing what a single event subscription could provide.
+
+### Problem 2: Live `ctx` capture
+
+`ctx: ExtensionContext` is a mutable reference to the parent session.
+It is captured into `SpawnArgs` and held in the concurrency queue:
+
+```typescript
+const args: SpawnArgs = { pi, ctx, type, prompt, options };
+this.queue.push({ id, args });  // ctx held until dequeue
+```
+
+When the queued agent dequeues, `runAgent()` reads from the live `ctx`:
+
+- `ctx.cwd` — directory that may have changed.
+- `ctx.getSystemPrompt()` — live method call on a potentially stale session.
+- `ctx.model` — model that may have been switched.
+- `ctx.modelRegistry` — registry reference.
+
+If the parent session changes between queue and dequeue (model switch, cwd change, session restart), the agent reads invalid state.
+The same live reference persists in `runtime.currentCtx` for the service-adapter.
+
+Additionally, `inheritContext` calls `ctx.sessionManager.getBranch()` at run time.
+The user's intent is to fork the conversation as it existed when they asked for the agent — not the conversation at some arbitrary later point when a queue slot opens.
+
+### Design: snapshot at spawn time
+
+Replace the live `ctx` capture with a plain data snapshot taken once at spawn time:
+
+```typescript
+interface ParentSnapshot {
+  cwd: string;
+  systemPrompt: string;
+  model: unknown;
+  modelRegistry: { find(...): unknown; getAvailable?(): ... };
+  parentContext?: string;  // pre-built text if inheritContext
+}
+```
+
+This snapshot is:
+
+- Captured once in `spawn()` (or by the tool before calling `spawn()`).
+- Stored in `SpawnArgs` instead of `ctx`.
+- Passed to `runner.run()` instead of `ctx: ExtensionContext`.
+- Immutable — no staleness risk, no session-lifetime coupling.
+
+`runAgent()` already reads exactly these 4 values from `ctx` and never touches it again.
+`buildParentContext()` also reads once and produces a string.
+The snapshot formalizes what is already happening, and makes the "read once" guarantee structural.
+
+### Design: session-event observation replaces callback threading
+
+The session emits events via `session.subscribe()`.
+Today, `runner.run()` subscribes and translates events into `RunOptions.on*()` callbacks, AgentManager wraps those to update the record, then forwards to the caller.
+
+The target replaces this three-layer chain with direct subscription:
+
+```text
+                     session.subscribe()
+                            │
+              ┌─────────────┼─────────────┐
+              │                           │
+       Record observer              UI observer
+  (accumulates stats on record)   (updates widget state)
+  managed by AgentManager         managed by agent-tool
+  subscribes in startAgent()      subscribes after spawn
+```
+
+AgentManager subscribes to the session to update the record (toolUses, lifetimeUsage, compactionCount, outputFile).
+The agent-tool subscribes to the session to stream UI state (active tools, response text, turn count).
+Neither layer wraps or forwards the other's callbacks.
+
+`RunOptions` drops all 6 `on*` fields and becomes pure configuration.
+`SpawnOptions` drops all 6 `on*` fields and becomes identity + dispatch mode.
+The session reference reaches callers via `record.session` (already stored) or via an `onSessionCreated` callback that is the one callback that remains (it delivers the session object, enabling the external subscription).
+
+### Design: record state machine
+
+Status transitions are scattered across 6 locations (`startAgent` `.then()`, `.catch()`, `resume()`, `abort()`, `abortAll()`, `drainQueue()`).
+Each location sets `record.status` plus associated fields (`completedAt`, `result`, `error`) in ad-hoc combinations.
+
+Extract a state machine on `AgentRecord` (or a thin wrapper) that owns all transitions:
+
+```typescript
+record.markRunning(startedAt)
+record.markCompleted(result, completedAt)
+record.markError(error)
+record.markStopped()
+record.resetForResume()
+```
+
+Each method sets exactly the fields that belong to that transition.
+Invalid transitions (e.g., `markCompleted` on an already-stopped record) are no-ops.
+The `if (record.status !== "stopped")` guards in `.then()` and `.catch()` become part of the transition logic rather than scattered conditionals.
+
+### Phased implementation
+
+The three designs are independent and can land in any order.
+The recommended sequence minimizes intermediate churn.
+
+#### Step 1: Record state machine
+
+Extract status-transition methods onto `AgentRecord` (or a `RecordManager` wrapper).
+Purely mechanical — replace scattered field writes with method calls.
+No interface changes for callers.
+
+This is the lowest-risk change and immediately reduces `startAgent()` line count.
+
+#### Step 2: Parent snapshot
+
+Replace `ctx: ExtensionContext` in `SpawnArgs` with a `ParentSnapshot` data object.
+Capture the snapshot in `spawn()` or at the tool call site.
+Update `runner.run()` signature to accept `ParentSnapshot` instead of `ctx`.
+Remove `pi: ExtensionAPI` from `SpawnArgs` (it is only used to pass to `runner.run()`, which only uses it for `detectEnv()` — that can accept a shell-exec function instead).
+
+This change narrows the `AgentRunner` interface and eliminates live-reference capture.
+
+#### Step 3: Session-event observation
+
+Replace the callback-threading pattern with direct session subscriptions.
+AgentManager subscribes to the session after creation to update the record.
+The agent-tool subscribes to the session after spawn to stream UI state.
+`RunOptions` and `SpawnOptions` drop all `on*` callback fields.
+
+This is the largest change but depends on Step 2 (the runner signature is already narrower) and benefits from Step 1 (the record's transition methods encapsulate the stats updates that the subscription drives).
+
+### Expected outcome
+
+| Metric                            | Before | After                    |
+| --------------------------------- | ------ | ------------------------ |
+| `SpawnOptions` fields             | 19     | ~8 (identity + dispatch) |
+| `RunOptions` fields               | 15     | ~9 (config only)         |
+| `startAgent()` lines              | ~130   | ~50                      |
+| Callback layers                   | 3      | 0 (direct subscription)  |
+| Live `ctx` references in queue    | 1      | 0 (snapshot)             |
+| Scattered status-transition sites | 6      | 1 (state machine)        |
+
+---
 
 ## Relationship with upstream
 
