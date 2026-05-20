@@ -57,20 +57,20 @@ describe("formatTaskNotification", () => {
 
   it("truncates long results", () => {
     const longResult = "x".repeat(600);
-    const record = { ...baseRecord, result: longResult };
+    const record = createTestRecord({ result: longResult });
     const xml = formatTaskNotification(record, 100);
     expect(xml).toContain("truncated");
     expect(xml).not.toContain(longResult);
   });
 
   it("shows No output when result is undefined", () => {
-    const record = { ...baseRecord, result: undefined };
+    const record = createTestRecord({ result: undefined });
     const xml = formatTaskNotification(record, 500);
     expect(xml).toContain("No output.");
   });
 
   it("includes toolCallId when present", () => {
-    const record = { ...baseRecord, toolCallId: "tc-123" };
+    const record = createTestRecord({ toolCallId: "tc-123" });
     const xml = formatTaskNotification(record, 500);
     expect(xml).toContain("<tool-use-id>tc-123</tool-use-id>");
   });
@@ -109,7 +109,7 @@ describe("buildNotificationDetails", () => {
   });
 
   it("truncates long result previews with ellipsis", () => {
-    const record = { ...baseRecord, result: "x".repeat(600) };
+    const record = createTestRecord({ description: "Test", result: "x".repeat(600), toolUses: 2, completedAt: 3000, lifetimeUsage: { input: 100, output: 200, cacheWrite: 0 } });
     const details = buildNotificationDetails(record, 100);
     expect(details.resultPreview).toHaveLength(101); // 100 chars + "…"
     expect(details.resultPreview.endsWith("…")).toBe(true);
@@ -141,7 +141,7 @@ describe("buildEventData", () => {
   });
 
   it("omits tokens when total is zero", () => {
-    const record = { ...baseRecord, lifetimeUsage: { input: 0, output: 0, cacheWrite: 0 } };
+    const record = createTestRecord({ type: "Explore", description: "Search files", result: "Found 3 files", toolUses: 5, lifetimeUsage: { input: 0, output: 0, cacheWrite: 0 } });
     const data = buildEventData(record);
     expect(data.tokens).toBeUndefined();
   });
@@ -149,7 +149,7 @@ describe("buildEventData", () => {
   it("uses Date.now() fallback when completedAt is undefined", () => {
     vi.useFakeTimers();
     vi.setSystemTime(5000);
-    const record = { ...baseRecord, completedAt: undefined };
+    const record = createTestRecord({ type: "Explore", description: "Search files", result: "Found 3 files", toolUses: 5, lifetimeUsage: { input: 1000, output: 500, cacheWrite: 0 }, completedAt: undefined });
     const data = buildEventData(record);
     expect(data.durationMs).toBe(4000); // 5000 - 1000
     vi.useRealTimers();
@@ -208,7 +208,7 @@ describe("createNotificationSystem", () => {
   it("sendCompletion skips nudge when resultConsumed", () => {
     const deps = makeDeps();
     const system = createNotificationSystem(deps);
-    const record = { ...baseRecord, resultConsumed: true };
+    const record = createTestRecord({ resultConsumed: true });
     system.sendCompletion(record);
     vi.advanceTimersByTime(300);
     expect(deps.sendMessage).not.toHaveBeenCalled();

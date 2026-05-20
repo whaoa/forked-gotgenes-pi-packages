@@ -34,38 +34,37 @@ describe("toSubagentRecord", () => {
   });
 
   it("strips session from the record", () => {
-    const record = { ...baseRecord, session: { dispose: () => {} } as any };
+    const record = createTestRecord({ session: { dispose: () => {} } as any });
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("session");
   });
 
   it("strips abortController from the record", () => {
-    const record = { ...baseRecord, abortController: new AbortController() };
+    const record = createTestRecord({ abortController: new AbortController() });
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("abortController");
   });
 
   it("strips promise from the record", () => {
-    const record = { ...baseRecord, promise: Promise.resolve("done") };
+    const record = createTestRecord({ promise: Promise.resolve("done") });
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("promise");
   });
 
   it("strips pendingSteers from the record", () => {
-    const record = { ...baseRecord, pendingSteers: ["hurry up"] };
+    const record = createTestRecord({ pendingSteers: ["hurry up"] });
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("pendingSteers");
   });
 
   it("strips resultConsumed, toolCallId, outputFile, worktree, invocation", () => {
-    const record = {
-      ...baseRecord,
+    const record = createTestRecord({
       resultConsumed: true,
       toolCallId: "tool-1",
       outputFile: "/tmp/out.jsonl",
       worktree: { path: "/tmp/wt", branch: "wt-branch" },
       invocation: { modelName: "haiku" },
-    };
+    });
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("resultConsumed");
     expect(result).not.toHaveProperty("toolCallId");

@@ -3,9 +3,11 @@
  */
 
 import type { ThinkingLevel } from "@earendil-works/pi-ai";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { LifetimeUsage } from "./usage.js";
 
+export type { AgentRecordInit, AgentRecordStatus } from "./agent-record.js";
+
+export { AgentRecord } from "./agent-record.js";
 export type { ThinkingLevel };
 
 /** Agent type: any string name (built-in defaults or user-defined). */
@@ -53,43 +55,6 @@ export interface AgentConfig {
   enabled?: boolean;
   /** Where this agent was loaded from */
   source?: "default" | "project" | "global";
-}
-
-export interface AgentRecord {
-  id: string;
-  type: SubagentType;
-  description: string;
-  status: "queued" | "running" | "completed" | "steered" | "aborted" | "stopped" | "error";
-  result?: string;
-  error?: string;
-  toolUses: number;
-  startedAt: number;
-  completedAt?: number;
-  session?: AgentSession;
-  abortController?: AbortController;
-  promise?: Promise<string>;
-  /** Set when result was already consumed via get_subagent_result — suppresses completion notification. */
-  resultConsumed?: boolean;
-  /** Steering messages queued before the session was ready. */
-  pendingSteers?: string[];
-  /** Worktree info if the agent is running in an isolated worktree. */
-  worktree?: { path: string; branch: string };
-  /** Worktree cleanup result after agent completion. */
-  worktreeResult?: { hasChanges: boolean; branch?: string };
-  /** The tool_use_id from the original Agent tool call. */
-  toolCallId?: string;
-  /** Path to the persisted session transcript file. */
-  outputFile?: string;
-  /**
-   * Lifetime usage breakdown, accumulated via `message_end` events. Survives
-   * compaction. Total = input + output + cacheWrite (cacheRead deliberately
-   * excluded — see issue #38). Initialized to zeros at spawn.
-   */
-  lifetimeUsage: LifetimeUsage;
-  /** Number of times this agent's session has compacted. Initialized to 0 at spawn. */
-  compactionCount: number;
-  /** Resolved spawn params, captured for UI display. Fixed at spawn time. */
-  invocation?: AgentInvocation;
 }
 
 export interface AgentInvocation {
