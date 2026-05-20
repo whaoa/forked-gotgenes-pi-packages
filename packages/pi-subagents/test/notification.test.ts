@@ -7,8 +7,8 @@ import {
   formatTaskNotification,
   getStatusLabel,
 } from "../src/notification.js";
-import type { AgentRecord } from "../src/types.js";
 import type { AgentActivity } from "../src/ui/agent-widget.js";
+import { createTestRecord } from "./helpers/make-record.js";
 
 // ---- Pure helper tests ----
 
@@ -45,18 +45,7 @@ describe("getStatusLabel", () => {
 });
 
 describe("formatTaskNotification", () => {
-  const baseRecord: AgentRecord = {
-    id: "agent-1",
-    type: "general-purpose",
-    description: "Test task",
-    status: "completed",
-    result: "All done.",
-    toolUses: 3,
-    startedAt: 1000,
-    completedAt: 2000,
-    compactionCount: 0,
-    lifetimeUsage: { input: 500, output: 500, cacheWrite: 0 },
-  };
+  const baseRecord = createTestRecord();
 
   it("produces valid XML structure", () => {
     const xml = formatTaskNotification(baseRecord, 500);
@@ -93,18 +82,13 @@ describe("formatTaskNotification", () => {
 });
 
 describe("buildNotificationDetails", () => {
-  const baseRecord: AgentRecord = {
-    id: "agent-1",
-    type: "general-purpose",
+  const baseRecord = createTestRecord({
     description: "Test",
-    status: "completed",
     result: "Done.",
     toolUses: 2,
-    startedAt: 1000,
     completedAt: 3000,
-    compactionCount: 0,
     lifetimeUsage: { input: 100, output: 200, cacheWrite: 0 },
-  };
+  });
 
   it("maps record fields to notification shape", () => {
     const details = buildNotificationDetails(baseRecord, 500);
@@ -133,18 +117,13 @@ describe("buildNotificationDetails", () => {
 });
 
 describe("buildEventData", () => {
-  const baseRecord: AgentRecord = {
-    id: "agent-1",
+  const baseRecord = createTestRecord({
     type: "Explore",
     description: "Search files",
-    status: "completed",
     result: "Found 3 files",
     toolUses: 5,
-    startedAt: 1000,
-    completedAt: 2000,
-    compactionCount: 0,
     lifetimeUsage: { input: 1000, output: 500, cacheWrite: 0 },
-  };
+  });
 
   it("includes all expected fields", () => {
     const data = buildEventData(baseRecord);
@@ -197,18 +176,12 @@ describe("createNotificationSystem", () => {
     };
   }
 
-  const baseRecord: AgentRecord = {
-    id: "agent-1",
-    type: "general-purpose",
+  const baseRecord = createTestRecord({
     description: "Test",
-    status: "completed",
     result: "Done.",
     toolUses: 2,
-    startedAt: 1000,
-    completedAt: 2000,
-    compactionCount: 0,
     lifetimeUsage: { input: 100, output: 200, cacheWrite: 0 },
-  };
+  });
 
   it("cancelNudge prevents a scheduled nudge from firing", () => {
     const deps = makeDeps();
