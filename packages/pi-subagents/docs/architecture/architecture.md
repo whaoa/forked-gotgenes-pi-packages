@@ -59,7 +59,7 @@ There is also a `Symbol.for("pi-subagents:manager")` export on `globalThis` that
 
 ```text
   ┌────────────────────────────────────────────────────────┐
-  │  @earendil-works/pi-subagents  (this package)          │
+  │  @gotgenes/pi-subagents  (this package)                 │
   │                                                        │
   │  Exports:                                              │
   │    SubagentsAPI interface                              │
@@ -131,7 +131,7 @@ After removal and `index.ts` decomposition, the core shrinks from ~6,300 to ~5,4
 
 ## SubagentsAPI
 
-The `SubagentsAPI` interface, accessor functions, and serializable types are exported directly from this package (`@earendil-works/pi-subagents`).
+The `SubagentsAPI` interface, accessor functions, and serializable types are exported directly from this package (`@gotgenes/pi-subagents`).
 No separate API package is needed.
 
 Consumers declare this package as an optional peer dependency:
@@ -139,10 +139,10 @@ Consumers declare this package as an optional peer dependency:
 ```json
 {
   "peerDependencies": {
-    "@earendil-works/pi-subagents": ">=2.0.0"
+    "@gotgenes/pi-subagents": ">=2.0.0"
   },
   "peerDependenciesMeta": {
-    "@earendil-works/pi-subagents": { "optional": true }
+    "@gotgenes/pi-subagents": { "optional": true }
   }
 }
 ```
@@ -150,7 +150,7 @@ Consumers declare this package as an optional peer dependency:
 At runtime, consumers use dynamic import for type-safe access to the accessor functions:
 
 ```typescript
-const { getSubagentsAPI } = await import("@earendil-works/pi-subagents");
+const { getSubagentsAPI } = await import("@gotgenes/pi-subagents");
 const api = getSubagentsAPI();
 if (api) {
   api.spawn("Explore", "Check for stale TODOs");
@@ -238,14 +238,14 @@ They are fire-and-forget broadcast events — no request IDs, no reply channels.
 
 ```typescript
 // package.json:
-// "peerDependencies": { "@earendil-works/pi-subagents": ">=2.0.0" }
-// "peerDependenciesMeta": { "@earendil-works/pi-subagents": { "optional": true } }
+// "peerDependencies": { "@gotgenes/pi-subagents": ">=2.0.0" }
+// "peerDependenciesMeta": { "@gotgenes/pi-subagents": { "optional": true } }
 
 export default function (pi) {
   pi.on("session_start", async (event, ctx) => {
     let getSubagentsAPI;
     try {
-      ({ getSubagentsAPI } = await import("@earendil-works/pi-subagents"));
+      ({ getSubagentsAPI } = await import("@gotgenes/pi-subagents"));
     } catch {
       return; // pi-subagents not installed
     }
@@ -269,7 +269,7 @@ export default function (pi) {
     const { id } = data as { id: string };
     let getSubagentsAPI;
     try {
-      ({ getSubagentsAPI } = await import("@earendil-works/pi-subagents"));
+      ({ getSubagentsAPI } = await import("@gotgenes/pi-subagents"));
     } catch {
       return;
     }
@@ -330,7 +330,7 @@ Resolve model strings inside the adapter (fixing upstream [tintinweb/pi-subagent
 Extracted tools, notifications, activity tracking, and the `/agents` command into separate modules.
 `src/index.ts` shrank from ~1,619 lines to ~265 lines.
 
-### Phase 6 (future): Extract UI to `@earendil-works/pi-subagents-ui`
+### Phase 6 (future): Extract UI to `@gotgenes/pi-subagents-ui`
 
 Move `ui/agent-widget.ts`, `ui/conversation-viewer.ts`, the `/agents` command, notifications, and activity tracking to a separate extension that consumes `SubagentsAPI` + lifecycle events.
 This phase is deferred until the API boundary is proven stable in production.
@@ -364,52 +364,56 @@ Together they eliminate module-scope mutable state, create a testable functional
 
 These build on Phase 1 and should land after it.
 
-4. **gotgenes/pi-packages#84** ✓ — Extract `GitWorktreeManager` class from `worktree.ts`
+1. **gotgenes/pi-packages#84** ✓ — Extract `GitWorktreeManager` class from `worktree.ts`
    - Added `WorktreeManager` interface and `GitWorktreeManager` class that captures `cwd` at construction.
    - Prerequisite for #72 — separated the real-object extraction from the DI refactor.
 
-5. **gotgenes/pi-packages#72** ✓ — Dependency-inject `AgentManager`'s collaborators
+2. **gotgenes/pi-packages#72** ✓ — Dependency-inject `AgentManager`'s collaborators
    - Defined `AgentRunner` interface (execution boundary) and `ResumeOptions` type in `agent-runner.ts`.
    - Converted `AgentManager` constructor from 6 positional parameters to an `AgentManagerOptions` bag with injected `AgentRunner` and `WorktreeManager`.
    - Removed all runtime imports of `agent-runner.ts` and `worktree.ts` from `agent-manager.ts` (only `import type` remains).
    - Migrated all tests from `vi.mock()` module stubs to `vi.fn()` interface stubs.
 
-6. **gotgenes/pi-packages#70** — Extract event handlers into `src/handlers/`
+3. **gotgenes/pi-packages#87** — Evolve `SubagentRuntime` from data bag to object with methods
+   - Add session-context methods (`setSessionContext`, `clearSessionContext`) and widget delegation methods (`setUICtx`, `onTurnStart`, `markFinished`, `updateWidget`, `ensureTimer`).
+   - Prerequisite for #70 — without runtime methods, extracted handlers would move LoD violations and output-argument smells into handler classes.
+
+4. **gotgenes/pi-packages#70** — Extract event handlers into `src/handlers/`
    - Move the four inline lambdas (`session_start`, `session_before_switch`, `session_shutdown`, `tool_execution_start`) into named handler modules.
-   - Requires Issue #69 because handlers need the `SubagentRuntime` as their deps bag.
+   - Requires Issues #69 and #87 because handlers need the `SubagentRuntime` with methods as their deps.
    - Target: `src/index.ts` ≤150 lines.
 
 ### Phase 3: Interface polish
 
 Small cleanups that are safest after the structural changes settle.
 
-7. **gotgenes/pi-packages#66** — Replace `as any` casts with proper SDK types
+1. **gotgenes/pi-packages#66** — Replace `as any` casts with proper SDK types
    - Type-only change in the tool/menu factory dep interfaces.
    - Best done after Issues #69 and #70 when the interfaces are stable.
 
-8. **gotgenes/pi-packages#77** — Add `projectAgentsDir` to `AgentMenuDeps`
+2. **gotgenes/pi-packages#77** — Add `projectAgentsDir` to `AgentMenuDeps`
    - Remove the inline `process.cwd()` lambda from the menu handler.
 
 ### Phase 4: Features and cross-cutting concerns
 
-9. **gotgenes/pi-packages#61** — Port transcript logging to Pi's official JSONL session format
+1. **gotgenes/pi-packages#61** — Port transcript logging to Pi's official JSONL session format
    - Feature work that should happen after structural refactoring is complete so the output-file subsystem has a stable home.
 
-10. **gotgenes/pi-packages#22** — Parent-session resolution for `nicobailon/pi-subagents` children
-    - Cross-extension issue that spans `pi-permission-system` and `pi-subagents`.
-    - Requires coordination on env-var conventions.
-    - Not blocked by the structural refactor but logically separate from it.
+2. **gotgenes/pi-packages#22** — Parent-session resolution for `nicobailon/pi-subagents` children
+   - Cross-extension issue that spans `pi-permission-system` and `pi-subagents`.
+   - Requires coordination on env-var conventions.
+   - Not blocked by the structural refactor but logically separate from it.
 
 ### Dependency graph
 
 ```text
-#69 (SubagentRuntime) ✓ ─┬─► #70 (handler extraction)
-                         │
-#71 (pure assembler) ✓   │
-#80 (config lookup) ✓    │
-#76 (cwd injection) ✓    │
-#84 (WorktreeManager) ✓  │
-#72 (AgentManager DI) ✓ ─┘──(optional)──► #70
+#69 (SubagentRuntime) ✓ ──► #87 (runtime methods) ─┬─► #70 (handler extraction)
+                                                   │
+#71 (pure assembler) ✓                              │
+#80 (config lookup) ✓                               │
+#76 (cwd injection) ✓                               │
+#84 (WorktreeManager) ✓                             │
+#72 (AgentManager DI) ✓ ────────────────────────────┘──(optional)──► #70
 
 #66 (type casts) ◄─────(after structural changes settle)
 #77 (projectAgentsDir) ◄─(after #66 or parallel)
@@ -423,16 +427,16 @@ Small cleanups that are safest after the structural changes settle.
 The recommended sequence is:
 
 ```text
-#69 ✓ → #71 ✓ → #80 ✓ → #76 ✓ → #84 ✓ → #72 ✓ → #70 → #66 → #77 → #61
+#69 ✓ → #71 ✓ → #80 ✓ → #76 ✓ → #84 ✓ → #72 ✓ → #87 → #70 → #66 → #77 → #61
 ```
 
-Phases 1 and 2 are complete.
-The next issue is #70 (handler extraction), which unblocks Phase 3.
+Phase 1 is complete; Phase 2 is in progress.
+The next issue is #87 (runtime methods), which unblocks #70 (handler extraction).
 Issue #22 is a parallel cross-extension track and does not gate the structural work.
 
 ## Relationship with upstream
 
-This fork ([earendil-works/pi-subagents]) is now a hard fork of [tintinweb/pi-subagents].
+This fork (`@gotgenes/pi-subagents` in the [gotgenes/pi-packages] monorepo) is now a hard fork of [tintinweb/pi-subagents].
 The decomposition diverges materially from upstream's direction.
 
 The three upstream PRs (#71, #72, #73) remain open.
@@ -443,5 +447,5 @@ Upstream fixes and ideas are cherry-picked when they align with this fork's scop
 The upstream test suite is run periodically as a regression canary for the agent-runner core.
 
 [earendil-works/pi#4207]: https://github.com/earendil-works/pi/issues/4207
-[earendil-works/pi-subagents]: https://github.com/earendil-works/pi-subagents
+[gotgenes/pi-packages]: https://github.com/gotgenes/pi-packages
 [tintinweb/pi-subagents]: https://github.com/tintinweb/pi-subagents
