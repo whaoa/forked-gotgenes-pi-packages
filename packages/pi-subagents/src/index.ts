@@ -13,7 +13,7 @@
 import { join } from "node:path";
 import { defineTool, type ExtensionAPI, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { AgentManager } from "./agent-manager.js";
-import { getAgentConversation, normalizeMaxTurns, steerAgent } from "./agent-runner.js";
+import { getAgentConversation, normalizeMaxTurns, resumeAgent, runAgent, steerAgent } from "./agent-runner.js";
 import { getAvailableTypes, getDefaultAgentNames, getUserAgentNames, registerAgents, resolveAgentConfig, } from "./agent-types.js";
 import { loadCustomAgents } from "./custom-agents.js";
 import { type ModelRegistry, resolveModel } from "./model-resolver.js";
@@ -33,6 +33,7 @@ import {
   AgentWidget,
   type UICtx,
 } from "./ui/agent-widget.js";
+import { GitWorktreeManager } from "./worktree.js";
 
 export default function (pi: ExtensionAPI) {
   // ---- Register custom notification renderer ----
@@ -61,49 +62,55 @@ export default function (pi: ExtensionAPI) {
   });
 
   // Background completion: emit lifecycle event and delegate to notification system
-  const manager = new AgentManager(process.cwd(), (record) => {
-    // Emit lifecycle event based on terminal status
-    const isError = record.status === "error" || record.status === "stopped" || record.status === "aborted";
-    const eventData = buildEventData(record);
-    if (isError) {
-      pi.events.emit("subagents:failed", eventData);
-    } else {
-      pi.events.emit("subagents:completed", eventData);
-    }
+  const manager = new AgentManager({
+    runner: { run: runAgent, resume: resumeAgent },
+    worktrees: new GitWorktreeManager(process.cwd()),
+    onComplete: (record) => {
+      // Emit lifecycle event based on terminal status
+      const isError = record.status === "error" || record.status === "stopped" || record.status === "aborted";
+      const eventData = buildEventData(record);
+      if (isError) {
+        pi.events.emit("subagents:failed", eventData);
+      } else {
+        pi.events.emit("subagents:completed", eventData);
+      }
 
-    // Persist final record for cross-extension history reconstruction
-    pi.appendEntry("subagents:record", {
-      id: record.id, type: record.type, description: record.description,
-      status: record.status, result: record.result, error: record.error,
-      startedAt: record.startedAt, completedAt: record.completedAt,
-    });
+      // Persist final record for cross-extension history reconstruction
+      pi.appendEntry("subagents:record", {
+        id: record.id, type: record.type, description: record.description,
+        status: record.status, result: record.result, error: record.error,
+        startedAt: record.startedAt, completedAt: record.completedAt,
+      });
 
-    // Skip notification if result was already consumed via get_subagent_result
-    if (record.resultConsumed) {
-      notifications.cleanupCompleted(record.id);
-      return;
-    }
+      // Skip notification if result was already consumed via get_subagent_result
+      if (record.resultConsumed) {
+        notifications.cleanupCompleted(record.id);
+        return;
+      }
 
-    notifications.sendCompletion(record);
-  }, undefined, (record) => {
-    // Emit started event when agent transitions to running (including from queue)
-    pi.events.emit("subagents:started", {
-      id: record.id,
-      type: record.type,
-      description: record.description,
-    });
-  }, (record, info) => {
-    // Emit compacted event when agent's session compacts (preserves count on record).
-    pi.events.emit("subagents:compacted", {
-      id: record.id,
-      type: record.type,
-      description: record.description,
-      reason: info.reason,
-      tokensBefore: info.tokensBefore,
-      compactionCount: record.compactionCount,
-    });
-  },
-  () => ({ defaultMaxTurns: runtime.defaultMaxTurns, graceTurns: runtime.graceTurns }));
+      notifications.sendCompletion(record);
+    },
+    onStart: (record) => {
+      // Emit started event when agent transitions to running (including from queue)
+      pi.events.emit("subagents:started", {
+        id: record.id,
+        type: record.type,
+        description: record.description,
+      });
+    },
+    onCompact: (record, info) => {
+      // Emit compacted event when agent's session compacts (preserves count on record).
+      pi.events.emit("subagents:compacted", {
+        id: record.id,
+        type: record.type,
+        description: record.description,
+        reason: info.reason,
+        tokensBefore: info.tokensBefore,
+        compactionCount: record.compactionCount,
+      });
+    },
+    getRunConfig: () => ({ defaultMaxTurns: runtime.defaultMaxTurns, graceTurns: runtime.graceTurns }),
+  });
 
   // Typed service published via Symbol.for() for cross-extension access.
   // Consumers: const { getSubagentsService } = await import("@gotgenes/pi-subagents");
