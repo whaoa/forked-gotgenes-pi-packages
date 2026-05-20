@@ -1,3 +1,4 @@
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { AgentRecord } from "../types.js";
 import { formatDuration, getDisplayName } from "../ui/agent-widget.js";
@@ -8,7 +9,7 @@ import { formatLifetimeTokens, textResult } from "./helpers.js";
 export interface GetResultDeps {
   getRecord: (id: string) => AgentRecord | undefined;
   cancelNudge: (key: string) => void;
-  getConversation: (session: unknown) => string | undefined;
+  getConversation: (session: AgentSession) => string | undefined;
 }
 
 /** Create the get_subagent_result tool definition (without Pi SDK wrapper). */
