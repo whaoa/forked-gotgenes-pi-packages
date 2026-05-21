@@ -20,16 +20,16 @@ export interface AgentMenuManager {
   getRecord: (id: string) => AgentRecord | undefined;
   /** Used by generate wizard to spawn an agent that writes the .md file. */
   spawnAndWait: (ctx: ExtensionContext, type: string, prompt: string, opts: Omit<SpawnOptions, "isBackground">) => Promise<AgentRecord>;
-  /** Drain the concurrency queue after maxConcurrent has been updated on SettingsManager. */
-  notifyConcurrencyChanged: () => void;
 }
 
 /** Narrow settings interface required by the agent menu. */
 export interface AgentMenuSettings {
-  maxConcurrent: number;
-  defaultMaxTurns: number | undefined;
-  graceTurns: number;
-  saveAndNotify(msg: string): { message: string; level: "info" | "warning" };
+  readonly maxConcurrent: number;
+  readonly defaultMaxTurns: number | undefined;
+  readonly graceTurns: number;
+  applyMaxConcurrent(n: number): { message: string; level: "info" | "warning" };
+  applyDefaultMaxTurns(n: number): { message: string; level: "info" | "warning" };
+  applyGraceTurns(n: number): { message: string; level: "info" | "warning" };
 }
 
 export interface AgentMenuDeps {
@@ -617,9 +617,8 @@ ${systemPrompt}
       if (val) {
         const n = parseInt(val, 10);
         if (n >= 1) {
-          deps.settings.maxConcurrent = n;
-          deps.manager.notifyConcurrencyChanged();
-          notifyApplied(ctx, `Max concurrency set to ${n}`);
+          const toast = deps.settings.applyMaxConcurrent(n);
+          ctx.ui.notify(toast.message, toast.level);
         } else {
           ctx.ui.notify("Must be a positive integer.", "warning");
         }
@@ -631,12 +630,9 @@ ${systemPrompt}
       );
       if (val) {
         const n = parseInt(val, 10);
-        if (n === 0) {
-          deps.settings.defaultMaxTurns = undefined;
-          notifyApplied(ctx, "Default max turns set to unlimited");
-        } else if (n >= 1) {
-          deps.settings.defaultMaxTurns = n;
-          notifyApplied(ctx, `Default max turns set to ${n}`);
+        if (n >= 0) {
+          const toast = deps.settings.applyDefaultMaxTurns(n);
+          ctx.ui.notify(toast.message, toast.level);
         } else {
           ctx.ui.notify("Must be 0 (unlimited) or a positive integer.", "warning");
         }
@@ -649,18 +645,13 @@ ${systemPrompt}
       if (val) {
         const n = parseInt(val, 10);
         if (n >= 1) {
-          deps.settings.graceTurns = n;
-          notifyApplied(ctx, `Grace turns set to ${n}`);
+          const toast = deps.settings.applyGraceTurns(n);
+          ctx.ui.notify(toast.message, toast.level);
         } else {
           ctx.ui.notify("Must be a positive integer.", "warning");
         }
       }
     }
-  }
-
-  function notifyApplied(ctx: ExtensionContext, successMsg: string) {
-    const { message, level } = deps.settings.saveAndNotify(successMsg);
-    ctx.ui.notify(message, level as "info" | "warning" | "error");
   }
 
   // Return the handler function
