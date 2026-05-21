@@ -7,198 +7,345 @@ issue_title: Change denied tool message
 
 ## Problem Statement
 
-When a tool call is denied — either by policy or by the user at an interactive prompt — the extension appends a "Hard stop" suffix to the denial reason returned to the agent:
+When a tool call is denied, the extension appends a "Hard stop" suffix to the denial reason returned to the agent:
 
 > Hard stop: this permission denial is policy-enforced.
 > Do not retry or investigate bypasses; report the block to the user.
 
-This aggressive language causes the LLM to interpret the denial as a blanket ban on *all* similar operations (e.g., all writes), not just the specific call that was denied.
-The result is reduced utility: the agent avoids subsequent tool calls it would otherwise be allowed to make.
+This causes two problems:
+
+1. The aggressive language makes the LLM interpret the denial as a blanket ban on *all* similar operations (e.g., all writes), not just the specific call that was denied.
+2. No denial message identifies `pi-permission-system` as the extension making the decision — the agent has no way to know where the policy lives or which extension blocked it.
+
+Both problems trace to a structural issue: denial message text is scattered across 6 gate files and 2 shared hint functions, with no single point of control.
 
 ## Goals
 
-- Replace every "Hard stop" denial suffix with informative, scoped language that describes *what* was denied, *who* denied it (policy rule vs. user prompt), and *why* (including any user-supplied reason), without prescribing what the agent should do next.
-- Consolidate the three inline "Hard stop" strings in gate descriptors into calls to shared formatting functions, eliminating text duplication.
-- Update all test assertions that match on "Hard stop" to reflect the new wording.
+- Centralize all denial message formatting into a single "sink" module so message text, tone, and attribution are controlled in one place.
+- Attribute every denial to `pi-permission-system` so the agent knows which extension is gatekeeping.
+- Remove all "Hard stop" / "Do not retry" behavioral instructions.
+- Replace with informative, scoped messages that describe *what* was denied, *who* denied it (policy rule vs. user at prompt), and *why* (including any user-supplied reason), without prescribing what the agent should do next.
 
 ## Non-Goals
 
-- Making the denial message user-configurable (possible follow-up).
-- Refactoring the gate descriptor structure or the `GateDescriptor.messages` interface.
-- Changing the "ask" prompt wording (the messages shown to the *user* when asking for approval).
-- Changing the `unavailableReason` messages (no "Hard stop" language there).
-- Changing the skill-read denial message (it already omits "Hard stop").
+- Making the denial message text user-configurable (possible follow-up).
+- Changing `applyPermissionGate` — it stays unchanged; the runner constructs the `messages` it needs from the new formatter.
+- Changing the "ask" prompt wording (messages shown to the *user* when asking for approval).
+- Moving `formatAskPrompt` / `formatSkillAskPrompt` / `formatMissingToolNameReason` / `formatUnknownToolReason` — these are prompt or pre-check messages, not denial messages.
 
 ## Background
 
-Denial messages are produced in two categories across four source files:
+### Current architecture (formatting pushed upstream)
 
-### Centralized hint functions
+Each of the 6 gate functions pre-formats three message strings (`denyReason`, `unavailableReason`, `userDeniedReason`) and embeds them in the `GateDescriptor.messages` object.
+The runner passes those strings to `applyPermissionGate`, which returns the appropriate one as the block reason.
+Neither the runner nor `applyPermissionGate` has any control over message content — they are dumb pass-throughs.
 
-| Function                                | File                                                | Callers                                                                                                                                                              |
-| --------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `formatPermissionHardStopHint(result)`  | `src/permission-prompts.ts`                         | `formatDenyReason`, `formatUserDeniedReason`                                                                                                                         |
-| `formatExternalDirectoryHardStopHint()` | `src/handlers/gates/external-directory-messages.ts` | `formatExternalDirectoryDenyReason`, `formatExternalDirectoryUserDeniedReason`, `formatBashExternalDirectoryDenyReason`, plus inline in `bash-external-directory.ts` |
+```text
+Gate (6 files)         Descriptor          Runner           applyPermissionGate
+──────────────         ──────────          ──────           ───────────────────
+Pre-formats 3    →     Carries pre-   →    Passes to   →    Returns pre-formatted
+message strings        formatted strings   gate function     string as block reason
+```
 
-### Inline "Hard stop" strings (not calling shared functions)
+This is why:
 
-| Location                                   | Context                                               |
-| ------------------------------------------ | ----------------------------------------------------- |
-| `src/handlers/gates/path.ts` line 63       | `userDeniedReason` callback in `describePathGate`     |
-| `src/handlers/gates/path.ts` line 105      | `formatPathDenyReason()` function body                |
-| `src/handlers/gates/bash-path.ts` line 125 | `userDeniedReason` callback in `describeBashPathGate` |
+- The "Hard stop" text ended up duplicated in 5 places (2 functions + 3 inline strings).
+- No gate thought to mention `pi-permission-system` — each composes its own text independently.
+- Changing tone or attribution requires editing every gate.
 
-All three inline strings use identical wording scoped to path denial.
-They should call a shared function so the message text lives in one place.
+### Denial message sources (current)
 
-### Test assertions referencing "Hard stop"
-
-| Test file                                                  | Count |
-| ---------------------------------------------------------- | ----- |
-| `tests/permission-prompts.test.ts`                         | 3     |
-| `tests/handlers/external-directory-integration.test.ts`    | 3     |
-| `tests/bash-external-directory.test.ts`                    | 1     |
-| `tests/handlers/gates/external-directory-messages.test.ts` | 4     |
-
-Total: 11 assertions.
+| Source                                    | File                                                | What it formats                       |
+| ----------------------------------------- | --------------------------------------------------- | ------------------------------------- |
+| `formatPermissionHardStopHint`            | `src/permission-prompts.ts`                         | Tool/bash/MCP "Hard stop" suffix      |
+| `formatDenyReason`                        | `src/permission-prompts.ts`                         | Tool/bash/MCP policy deny             |
+| `formatUserDeniedReason`                  | `src/permission-prompts.ts`                         | Tool/bash/MCP user deny               |
+| `formatExternalDirectoryHardStopHint`     | `src/handlers/gates/external-directory-messages.ts` | External-directory "Hard stop" suffix |
+| `formatExternalDirectoryDenyReason`       | `src/handlers/gates/external-directory-messages.ts` | External-directory policy deny        |
+| `formatExternalDirectoryUserDeniedReason` | `src/handlers/gates/external-directory-messages.ts` | External-directory user deny          |
+| `formatBashExternalDirectoryDenyReason`   | `src/handlers/gates/external-directory-messages.ts` | Bash external-directory policy deny   |
+| `formatPathDenyReason`                    | `src/handlers/gates/path.ts`                        | Path policy deny                      |
+| Inline in `path.ts`                       | `src/handlers/gates/path.ts`                        | Path user deny                        |
+| Inline in `bash-path.ts`                  | `src/handlers/gates/bash-path.ts`                   | Bash-path user deny                   |
+| Inline in `bash-external-directory.ts`    | `src/handlers/gates/bash-external-directory.ts`     | Bash external-directory user deny     |
+| Inline in `skill-read.ts`                 | `src/handlers/gates/skill-read.ts`                  | Skill-read user deny                  |
 
 ### Relevant AGENTS.md constraints
 
 - Keep scope tight; prefer small, reversible changes.
-- Preserve intentional behavior unless there is a clear reason to change it.
-- The skill-read gate already omits "Hard stop" — this change aligns the other gates with that precedent.
+- Prefer explicit configuration over hidden behavior.
+- Keep modules focused and composable (one concern per file).
 
 ## Design Overview
 
-### Message strategy
+### Target architecture (formatting at the sink)
 
-The existing denial messages already contain the informative parts — subject, operation, matched pattern, and (for user denials) the user-supplied reason.
-The "Hard stop" suffix adds no information; it only carries behavioral instructions that cause over-suppression.
+```text
+Gate (6 files)         Descriptor             Runner (the sink)
+──────────────         ──────────             ─────────────────
+Builds structured  →   Carries               Calls formatDenialMessage()
+DenialContext           DenialContext     →    to produce messages, then
+(no message text)       (no messages)         passes them to applyPermissionGate
+```
 
-The change **removes the "Hard stop" suffix** and, where the base message does not already indicate the denial source, appends a short clause noting it was policy-enforced.
-No behavioral instructions ("do not retry", "report the block") are included.
+Gates provide *what happened* as structured data.
+The runner — the single point where block reasons are finalized — constructs the `messages` object by calling a centralized formatter.
+`applyPermissionGate` stays unchanged; it still receives `messages` as before.
 
-### Concrete message changes
+### `DenialContext` discriminated union
 
-#### Policy-deny suffix (tool/bash/MCP gate)
+Each gate surface carries the minimum fields the formatter needs:
 
-Before: `"Hard stop: this permission denial is policy-enforced. Do not retry or investigate bypasses; report the block to the user."`
+```typescript
+type DenialContext =
+  | {
+      kind: "tool";
+      check: PermissionCheckResult;
+      agentName?: string;
+      input?: unknown;
+    }
+  | {
+      kind: "path";
+      toolName: string;
+      pathValue: string;
+      agentName?: string;
+    }
+  | {
+      kind: "external_directory";
+      toolName: string;
+      pathValue: string;
+      cwd: string;
+      agentName?: string;
+    }
+  | {
+      kind: "bash_external_directory";
+      command: string;
+      externalPaths: string[];
+      cwd: string;
+      agentName?: string;
+    }
+  | {
+      kind: "bash_path";
+      command: string;
+      pathValue: string;
+      agentName?: string;
+    }
+  | {
+      kind: "skill_read";
+      skillName: string;
+      readPath: string;
+      agentName?: string;
+    };
+```
 
-After: empty string (the base message from `formatDenyReason` already says "is not permitted" and includes the matched pattern).
+### Centralized formatter
 
-The `formatPermissionHardStopHint` function is **removed** and its two call sites in `formatDenyReason` and `formatUserDeniedReason` drop the suffix concatenation.
+A single module (`src/denial-messages.ts`) exports three functions:
 
-#### Policy-deny suffix (external-directory gate)
+```typescript
+export const EXTENSION_TAG = "[pi-permission-system]";
 
-Before: `"Hard stop: this external directory permission denial is policy-enforced. Do not retry this path, do not attempt a filesystem bypass, and report the block to the user."`
+export function formatDenyReason(ctx: DenialContext): string;
+export function formatUnavailableReason(ctx: DenialContext): string;
+export function formatUserDeniedReason(ctx: DenialContext, denialReason?: string): string;
+```
 
-After: empty string (the base messages already say "is not permitted" with full context).
+Each function switches on `ctx.kind` to produce surface-specific text and appends `EXTENSION_TAG`.
+All denial message text lives in this one file.
 
-The `formatExternalDirectoryHardStopHint` function is **removed** and all call sites drop the suffix concatenation.
+Example outputs:
 
-#### Path-gate inline strings
+```text
+Agent 'builder' is not permitted to run 'write' (matched 'write'). [pi-permission-system]
+User denied tool 'write'. Reason: too risky. [pi-permission-system]
+User denied access to path '/etc/passwd'. [pi-permission-system]
+Current agent is not permitted to access path '/etc/passwd' via tool 'read'. [pi-permission-system]
+```
 
-Before (inline in `path.ts` and `bash-path.ts`): `"Hard stop: this path permission denial is policy-enforced. Do not retry this path, do not attempt a filesystem bypass, and report the block to the user."`
+### Runner as the glue
 
-After: the inline strings are removed entirely.
-`formatPathDenyReason` already says "is not permitted to access path '…' via tool '…'" — no suffix needed.
-The `userDeniedReason` callbacks already say "User denied access to path '…'" with the user-supplied reason — no suffix needed.
+In `runGateCheck`, after resolving the permission state and before calling `applyPermissionGate`, the runner constructs the `messages` object:
+
+```typescript
+const messages = {
+  denyReason: formatDenyReason(descriptor.denialContext),
+  unavailableReason: formatUnavailableReason(descriptor.denialContext),
+  userDeniedReason: (decision) =>
+    formatUserDeniedReason(descriptor.denialContext, decision.denialReason),
+};
+```
+
+`applyPermissionGate` and `PermissionGateParams.messages` are unchanged.
+
+### Lift-and-shift migration
+
+To avoid a big-bang rewrite, the migration is incremental:
+
+1. Add `denialContext` as an **optional** field on `GateDescriptor` alongside `messages`.
+2. Update the runner to construct `messages` from `denialContext` when present, falling back to `descriptor.messages` when not.
+3. Migrate each gate to provide `denialContext` instead of `messages`, one family at a time.
+4. Once all gates use `denialContext`, make it required and remove `messages` from `GateDescriptor`.
 
 ### Result shape
 
-No interface or type changes.
-`GateDescriptor.messages.denyReason` and `GateDescriptor.messages.userDeniedReason` remain `string` / `(decision) => string`.
-The strings are simply shorter.
+`GateOutcome` (returned by the runner to the orchestrator) is unchanged: `{ action: "block"; reason: string }`.
+`PermissionGateParams` and `applyPermissionGate` are unchanged.
+The `GateDescriptor.messages` field is replaced by `denialContext` — this is the only interface change.
 
 ## Module-Level Changes
 
-### `src/permission-prompts.ts`
+### `src/denial-messages.ts` (NEW)
 
-- **Remove** `formatPermissionHardStopHint` export.
-- **Update** `formatDenyReason` — drop the `. ${formatPermissionHardStopHint(result)}` suffix.
-- **Update** `formatUserDeniedReason` — drop the `${formatPermissionHardStopHint(result)}` suffix.
+- **Add** `DenialContext` discriminated union type.
+- **Add** `EXTENSION_TAG` constant.
+- **Add** `formatDenyReason(ctx)`, `formatUnavailableReason(ctx)`, `formatUserDeniedReason(ctx, denialReason?)`.
+- All denial message text for all 6 surfaces lives here.
 
-### `src/handlers/gates/external-directory-messages.ts`
+### `src/handlers/gates/descriptor.ts`
 
-- **Remove** `formatExternalDirectoryHardStopHint` export.
-- **Update** `formatExternalDirectoryDenyReason` — drop the `${formatExternalDirectoryHardStopHint()}` suffix.
-- **Update** `formatExternalDirectoryUserDeniedReason` — drop the `${formatExternalDirectoryHardStopHint()}` suffix.
-- **Update** `formatBashExternalDirectoryDenyReason` — drop the `${formatExternalDirectoryHardStopHint()}` suffix.
+- **Add** `denialContext: DenialContext` to `GateDescriptor` (optional during migration, required at end).
+- **Remove** `messages` from `GateDescriptor` (final step).
 
-### `src/handlers/gates/bash-external-directory.ts`
+### `src/handlers/gates/runner.ts`
 
-- **Update** `userDeniedReason` callback — drop the `${formatExternalDirectoryHardStopHint()}` suffix.
-- **Remove** the `formatExternalDirectoryHardStopHint` import (no longer needed).
+- **Add** import of formatter functions from `../../denial-messages`.
+- **Add** `messages` construction from `descriptor.denialContext` before passing to `applyPermissionGate`.
+- **Remove** usage of `descriptor.messages` (final step).
+
+### `src/handlers/gates/tool.ts`
+
+- **Replace** `messages` construction with `denialContext: { kind: "tool", check, agentName, input }`.
+- **Remove** imports of `formatDenyReason`, `formatUserDeniedReason` from `../../permission-prompts`.
 
 ### `src/handlers/gates/path.ts`
 
-- **Update** `formatPathDenyReason` — remove the inline " Hard stop: …" suffix from the template literal.
-- **Update** `userDeniedReason` callback in `describePathGate` — remove the inline " Hard stop: …" suffix.
+- **Replace** `messages` construction with `denialContext: { kind: "path", toolName, pathValue, agentName }`.
+- **Remove** `formatPathDenyReason` export (absorbed into `denial-messages.ts`).
 
 ### `src/handlers/gates/bash-path.ts`
 
-- **Update** `userDeniedReason` callback in `describeBashPathGate` — remove the inline " Hard stop: …" suffix.
+- **Replace** `messages` construction with `denialContext: { kind: "bash_path", command, pathValue: worstToken, agentName }`.
+- **Remove** import of `formatPathDenyReason` from `./path`.
+
+### `src/handlers/gates/external-directory.ts`
+
+- **Replace** `messages` construction with `denialContext: { kind: "external_directory", toolName, pathValue, cwd, agentName }`.
+- **Remove** imports of `formatExternalDirectoryDenyReason`, `formatExternalDirectoryUserDeniedReason` from `./external-directory-messages`.
+
+### `src/handlers/gates/bash-external-directory.ts`
+
+- **Replace** `messages` construction with `denialContext: { kind: "bash_external_directory", command, externalPaths, cwd, agentName }`.
+- **Remove** imports of `formatBashExternalDirectoryDenyReason`, `formatExternalDirectoryHardStopHint` from `./external-directory-messages`.
+
+### `src/handlers/gates/skill-read.ts`
+
+- **Replace** `messages` construction with `denialContext: { kind: "skill_read", skillName, readPath, agentName }`.
+- **Remove** imports of `formatSkillPathDenyReason` from `../../permission-prompts`.
+
+### `src/handlers/gates/external-directory-messages.ts`
+
+- **Delete** entire file (all functions absorbed into `denial-messages.ts`).
+
+### `src/permission-prompts.ts`
+
+- **Remove** `formatPermissionHardStopHint` (deleted).
+- **Remove** `formatDenyReason` (moved to `denial-messages.ts`).
+- **Remove** `formatUserDeniedReason` (moved to `denial-messages.ts`).
+- **Remove** `formatSkillPathDenyReason` (moved to `denial-messages.ts`).
+- **Keep** `formatMissingToolNameReason`, `formatUnknownToolReason` (pre-check messages, not denial messages).
+- **Keep** `formatAskPrompt`, `formatSkillAskPrompt`, `formatSkillPathAskPrompt` (user-facing prompts, not denial messages).
+
+### `src/permission-gate.ts`
+
+- **No change.**
 
 ### Removed-symbol audit
 
-`formatPermissionHardStopHint` and `formatExternalDirectoryHardStopHint` are the only exports being removed.
+Symbols removed from public module exports:
 
-Import sites:
+- `formatPermissionHardStopHint` — internal to `permission-prompts.ts`, imported in `tests/permission-prompts.test.ts`.
+- `formatDenyReason` — imported in `src/handlers/gates/tool.ts`, `tests/permission-prompts.test.ts`.
+- `formatUserDeniedReason` — imported in `src/handlers/gates/tool.ts`, `tests/permission-prompts.test.ts`.
+- `formatSkillPathDenyReason` — imported in `src/handlers/gates/skill-read.ts`, `tests/permission-prompts.test.ts`.
+- `formatPathDenyReason` — imported in `src/handlers/gates/bash-path.ts`, `tests/handlers/gates/path.test.ts` (if it exists).
+- `formatExternalDirectoryHardStopHint` — imported in `src/handlers/gates/bash-external-directory.ts`, `tests/handlers/external-directory-integration.test.ts`, `tests/handlers/gates/external-directory-messages.test.ts`.
+- `formatExternalDirectoryDenyReason` — imported in `src/handlers/gates/external-directory.ts`, `tests/handlers/external-directory-integration.test.ts`, `tests/handlers/gates/external-directory-messages.test.ts`.
+- `formatExternalDirectoryUserDeniedReason` — imported in `src/handlers/gates/external-directory.ts`, `tests/handlers/gates/external-directory-messages.test.ts`.
+- `formatBashExternalDirectoryDenyReason` — imported in `src/handlers/gates/bash-external-directory.ts`, `tests/handlers/gates/external-directory-messages.test.ts`.
+- `formatBashExternalDirectoryAskPrompt` — imported in `src/handlers/gates/bash-external-directory.ts`, `tests/handlers/gates/external-directory-messages.test.ts`.
+  **Note:** this is an ask-prompt function, not a denial message.
+  Move to `permission-prompts.ts` (or keep in a reduced `external-directory-messages.ts`) rather than deleting.
+- `formatExternalDirectoryAskPrompt` — imported in `src/handlers/gates/external-directory.ts`, `tests/handlers/gates/external-directory-messages.test.ts`.
+  Same treatment as above — ask-prompt, not denial message.
 
-- `formatPermissionHardStopHint` — only used internally in `permission-prompts.ts` (not imported elsewhere in `src/`).
-  Tests: imported in `tests/permission-prompts.test.ts`.
-- `formatExternalDirectoryHardStopHint` — imported in `src/handlers/gates/bash-external-directory.ts` and `tests/handlers/external-directory-integration.test.ts` and `tests/handlers/gates/external-directory-messages.test.ts`.
-
-All import sites are updated in the plan.
+All import sites are covered in the gate migration steps.
 
 ## Test Impact Analysis
 
-### New tests enabled
+### New tests
 
-No new test surfaces are created — the change is purely a message-text update.
+1. `tests/denial-messages.test.ts` (NEW) — comprehensive tests for `formatDenyReason`, `formatUnavailableReason`, `formatUserDeniedReason` across all 6 `DenialContext` kinds.
+   Every test asserts the presence of `[pi-permission-system]` and the absence of "Hard stop".
+   This single test file replaces denial-message assertions currently spread across 4 test files.
 
 ### Tests that must change
 
-1. `tests/permission-prompts.test.ts` — 3 assertions checking `toContain("Hard stop")` must be replaced with assertions on the updated text (e.g., `not.toContain("Hard stop")` or positive match on the informative portion).
-   The test for `formatPermissionHardStopHint` must be **removed** (function no longer exists).
-2. `tests/handlers/gates/external-directory-messages.test.ts` — 4 assertions checking `toContain("Hard stop")` must be updated.
-   The test for `formatExternalDirectoryHardStopHint` must be **removed**.
-3. `tests/handlers/external-directory-integration.test.ts` — 3 assertions checking `toContain("Hard stop")` must be updated.
-   The import of `formatExternalDirectoryHardStopHint` must be removed.
-4. `tests/bash-external-directory.test.ts` — 1 assertion checking `toContain("Hard stop")` must be updated.
+1. `tests/permission-prompts.test.ts` — remove tests for `formatPermissionHardStopHint`, `formatDenyReason`, `formatUserDeniedReason`, `formatSkillPathDenyReason` (moved to `denial-messages.test.ts`).
+   Keep tests for `formatAskPrompt`, `formatSkillAskPrompt`, `formatMissingToolNameReason`, `formatUnknownToolReason`.
+2. `tests/handlers/gates/external-directory-messages.test.ts` — delete or reduce to only ask-prompt tests (if ask-prompt functions remain in this file).
+3. `tests/handlers/external-directory-integration.test.ts` — replace `toContain("Hard stop")` with `toContain("[pi-permission-system]")`.
+   Remove import of `formatExternalDirectoryHardStopHint`.
+4. `tests/bash-external-directory.test.ts` — replace `toContain("Hard stop")` with `toContain("[pi-permission-system]")`.
+5. Gate test files that construct mock `GateDescriptor` objects with `messages` — update to use `denialContext` instead.
 
 ### Tests that stay as-is
 
-All other permission-prompt and gate tests that do not assert on "Hard stop" text remain unchanged.
-Tests for `formatDenyReason`, `formatUserDeniedReason`, and the gate descriptor shapes still exercise the same code paths — they just produce shorter strings.
+- Tests for `applyPermissionGate` (interface unchanged).
+- Tests for permission resolution, wildcard matching, session rules — unrelated to message formatting.
+- Tests for ask-prompt formatting functions.
 
 ## TDD Order
 
-1. **Red → Green:** Update `formatPermissionHardStopHint` tests and remove the function.
-   Update `formatDenyReason` and `formatUserDeniedReason` tests to expect no "Hard stop" suffix.
-   Implement the changes in `src/permission-prompts.ts`.
-   Commit: `feat: remove "Hard stop" suffix from tool/bash/MCP denial messages (#78)`
-2. **Red → Green:** Update `formatExternalDirectoryHardStopHint` tests and remove the function.
-   Update `formatExternalDirectoryDenyReason`, `formatExternalDirectoryUserDeniedReason`, and `formatBashExternalDirectoryDenyReason` tests to expect no "Hard stop" suffix.
-   Implement the changes in `src/handlers/gates/external-directory-messages.ts`.
-   Commit: `feat: remove "Hard stop" suffix from external-directory denial messages (#78)`
-3. **Red → Green:** Update `bash-external-directory.ts` inline `userDeniedReason` callback and its test assertion.
-   Remove the `formatExternalDirectoryHardStopHint` import.
-   Commit: `feat: remove "Hard stop" suffix from bash external-directory user-denied message (#78)`
-4. **Red → Green:** Update `path.ts` `formatPathDenyReason` and `userDeniedReason` callback inline strings.
-   Update `bash-path.ts` `userDeniedReason` callback inline string.
-   Update `external-directory-integration.test.ts` assertions and imports.
-   Update `bash-external-directory.test.ts` assertion.
-   Commit: `feat: remove "Hard stop" suffix from path denial messages (#78)`
+1. **Red → Green:** Create `src/denial-messages.ts` with `DenialContext` type, `EXTENSION_TAG`, and the three formatter functions covering all 6 context kinds.
+   Create `tests/denial-messages.test.ts` with comprehensive tests asserting correct output for each kind, presence of `[pi-permission-system]`, and absence of "Hard stop".
+   Commit: `feat: add centralized denial message formatter (#78)`
+2. **Red → Green:** Add optional `denialContext` to `GateDescriptor`.
+   Update `runGateCheck` to construct `messages` from `denialContext` when present, falling back to `descriptor.messages`.
+   Add runner tests verifying the formatter path.
+   Commit: `refactor: wire runner to construct messages from denialContext (#78)`
+3. **Red → Green:** Migrate tool gate and path gate to `denialContext`.
+   Remove `formatDenyReason`, `formatUserDeniedReason`, `formatPermissionHardStopHint` from `permission-prompts.ts`.
+   Remove `formatPathDenyReason` from `path.ts`.
+   Update `tests/permission-prompts.test.ts` to remove migrated tests.
+   Commit: `refactor: migrate tool and path gates to denialContext (#78)`
+4. **Red → Green:** Migrate external-directory gate and bash-external-directory gate to `denialContext`.
+   Move ask-prompt functions (`formatExternalDirectoryAskPrompt`, `formatBashExternalDirectoryAskPrompt`) to `permission-prompts.ts`.
+   Delete `external-directory-messages.ts`.
+   Update `tests/handlers/gates/external-directory-messages.test.ts` and `tests/handlers/external-directory-integration.test.ts`.
+   Commit: `refactor: migrate external-directory gates to denialContext (#78)`
+5. **Red → Green:** Migrate bash-path gate and skill-read gate to `denialContext`.
+   Remove `formatSkillPathDenyReason` from `permission-prompts.ts`.
+   Update `tests/bash-external-directory.test.ts`.
+   Commit: `refactor: migrate bash-path and skill-read gates to denialContext (#78)`
+6. **Red → Green:** Make `denialContext` required on `GateDescriptor`, remove `messages`.
+   Remove the fallback path in the runner.
+   Update any remaining test fixtures constructing descriptors with `messages`.
+   Run `pnpm run check` to verify no type errors remain.
+   Commit: `refactor!: remove messages from GateDescriptor (#78)`
 
 ## Risks and Mitigations
 
-| Risk                                                                               | Mitigation                                                                                                                                                                                                                     |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| LLM now retries denied operations in a loop because the message is too permissive. | The base messages still clearly state "is not permitted" / "User denied", which is sufficient for modern LLMs to understand denial. The skill-read gate has shipped without "Hard stop" language with no observed retry loops. |
-| Removing exported functions breaks downstream consumers.                           | Both functions are internal to the package — not re-exported from the package entry point. The only consumers are internal callers and test imports.                                                                           |
-| Subtle wording differences across the 5 gate surfaces confuse the LLM.             | Each message already describes the specific denied operation (tool name, path, MCP target) — surface-specific context is preserved.                                                                                            |
+| Risk                                                                      | Mitigation                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LLM retries denied operations because messages are less aggressive.       | Base messages still clearly state "is not permitted" / "User denied". The skill-read gate has shipped without "Hard stop" with no observed retry loops. The `[pi-permission-system]` attribution adds clarity the old messages lacked. |
+| Large blast radius — 6 gate files, runner, descriptor, 2 deleted modules. | Lift-and-shift migration: `denialContext` is added alongside `messages`, gates migrate incrementally, `messages` is removed only after all gates are migrated. Each step leaves the repo green.                                        |
+| `DenialContext` union grows unwieldy as new surfaces are added.           | Each variant is small (3–5 fields). New surfaces add one variant to the union and one branch to each formatter function — no existing code changes.                                                                                    |
+| Ask-prompt functions in `external-directory-messages.ts` are collateral.  | They move to `permission-prompts.ts` where sibling ask-prompt functions already live. Imports update but behavior is unchanged.                                                                                                        |
 
 ## Open Questions
 
-- If retry loops are observed after shipping, consider adding a lightweight scoped note like "This denial applies to this specific operation." as a suffix — but defer until evidence emerges.
+- The skill-read gate currently produces denial messages without "Hard stop" and without extension attribution.
+  After this change it gains `[pi-permission-system]` attribution via the centralized formatter — verify this is desirable (likely yes).
+- Should `EXTENSION_TAG` reference the `EXTENSION_ID` constant from `extension-config.ts` rather than duplicating the string?
+  Using the existing constant keeps the name in one place, but adds an import dependency from the denial-messages module to the config module.
