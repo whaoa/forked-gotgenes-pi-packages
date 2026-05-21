@@ -5,7 +5,6 @@ import type { RunConfig } from "../src/runtime.js";
 import type { AgentRecord } from "../src/types.js";
 import type { WorktreeManager } from "../src/worktree.js";
 
-const mockPi = {} as any;
 const mockCtx = { cwd: "/tmp" } as any;
 
 const mockSession = () => ({ dispose: vi.fn() } as any);
@@ -60,7 +59,7 @@ describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)",
       seenConsumed = r.resultConsumed;
     } }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -80,7 +79,7 @@ describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)",
       seenConsumed = r.resultConsumed;
     } }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -99,7 +98,7 @@ describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)",
       completedRecord = r;
     } }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -115,7 +114,7 @@ describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)",
       onCompleteCalled = true;
     } }));
 
-    await manager.spawnAndWait(mockPi, mockCtx, "general-purpose", "test", {
+    await manager.spawnAndWait(mockCtx, "general-purpose", "test", {
       description: "test",
     });
 
@@ -135,7 +134,7 @@ describe("AgentManager — completion callbacks", () => {
       throw new Error("stale extension context");
     } }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -169,7 +168,7 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
   it("clearCompleted removes completed records", async () => {
     ({ manager } = createManager());
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -188,12 +187,12 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
     };
     ({ manager } = createManager({ maxConcurrent: 1, runner }));
 
-    const id1 = manager.spawn(mockPi, mockCtx, "general-purpose", "test1", {
+    const id1 = manager.spawn(mockCtx, "general-purpose", "test1", {
       description: "running agent",
       isBackground: true,
     });
     // Second agent should be queued (limit=1)
-    const id2 = manager.spawn(mockPi, mockCtx, "general-purpose", "test2", {
+    const id2 = manager.spawn(mockCtx, "general-purpose", "test2", {
       description: "queued agent",
       isBackground: true,
     });
@@ -226,7 +225,7 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
     };
     ({ manager } = createManager({ runner }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -244,7 +243,7 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
     };
     ({ manager } = createManager({ runner }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -273,7 +272,7 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
     };
     ({ manager } = createManager({ runner }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -299,7 +298,7 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
     };
     ({ manager } = createManager({ runner }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -329,7 +328,7 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
       compactSeen.push({ count: record.compactionCount, reason: info.reason });
     } }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -360,7 +359,7 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
     };
     ({ manager } = createManager({ runner }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -392,7 +391,7 @@ describe("AgentManager — getRunConfig threads defaultMaxTurns and graceTurns i
     let runner: AgentRunner;
     ({ manager, runner } = createManager({ getRunConfig }));
 
-    manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -408,7 +407,7 @@ describe("AgentManager — getRunConfig threads defaultMaxTurns and graceTurns i
     let runner: AgentRunner;
     ({ manager, runner } = createManager());
 
-    manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -432,7 +431,7 @@ describe("AgentManager — parent session threading", () => {
     let runner: AgentRunner;
     ({ manager, runner } = createManager());
 
-    manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
       parentSessionFile: "/sessions/parent.jsonl",
@@ -473,7 +472,7 @@ describe("AgentManager — isolation: worktree fails loud, no silent fallback", 
       resume: vi.fn(),
     };
     ({ manager } = createManager({ runner, worktrees }));
-    expect(() => manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    expect(() => manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isolation: "worktree",
     })).toThrow(/isolation: "worktree"/);
@@ -496,7 +495,7 @@ describe("AgentManager — dependency injection via options bag", () => {
     let runner: AgentRunner;
     ({ manager, runner } = createManager());
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -519,7 +518,7 @@ describe("AgentManager — dependency injection via options bag", () => {
     };
     ({ manager } = createManager({ runner }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isBackground: true,
     });
@@ -539,7 +538,7 @@ describe("AgentManager — dependency injection via options bag", () => {
     };
     ({ manager } = createManager({ worktrees }));
 
-    manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isolation: "worktree",
       isBackground: true,
@@ -556,7 +555,7 @@ describe("AgentManager — dependency injection via options bag", () => {
     };
     ({ manager } = createManager({ worktrees }));
 
-    const id = manager.spawn(mockPi, mockCtx, "general-purpose", "test", {
+    const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
       isolation: "worktree",
       isBackground: true,
@@ -594,10 +593,10 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
     ({ manager } = createManager({ runner, maxConcurrent: 1 }));
 
     // Spawn two background agents — first runs, second queues
-    const id1 = manager.spawn(mockPi, mockCtx, "general-purpose", "test1", {
+    const id1 = manager.spawn(mockCtx, "general-purpose", "test1", {
       description: "first", isBackground: true,
     });
-    const id2 = manager.spawn(mockPi, mockCtx, "general-purpose", "test2", {
+    const id2 = manager.spawn(mockCtx, "general-purpose", "test2", {
       description: "second", isBackground: true,
     });
 
@@ -627,10 +626,10 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
     ({ manager } = createManager({ runner, maxConcurrent: 1 }));
 
     // First runs, second queues
-    const id1 = manager.spawn(mockPi, mockCtx, "general-purpose", "a", {
+    const id1 = manager.spawn(mockCtx, "general-purpose", "a", {
       description: "a", isBackground: true,
     });
-    const id2 = manager.spawn(mockPi, mockCtx, "general-purpose", "b", {
+    const id2 = manager.spawn(mockCtx, "general-purpose", "b", {
       description: "b", isBackground: true,
     });
 
@@ -665,10 +664,10 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
       onStart: (record) => { startedIds.push(record.id); },
     }));
 
-    const id1 = manager.spawn(mockPi, mockCtx, "general-purpose", "a", {
+    const id1 = manager.spawn(mockCtx, "general-purpose", "a", {
       description: "a", isBackground: true,
     });
-    const id2 = manager.spawn(mockPi, mockCtx, "general-purpose", "b", {
+    const id2 = manager.spawn(mockCtx, "general-purpose", "b", {
       description: "b", isBackground: true,
     });
 

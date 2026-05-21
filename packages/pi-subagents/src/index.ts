@@ -186,8 +186,8 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool(defineTool(createAgentTool({
     manager: {
-      spawn: (ctx, type, prompt, opts) => manager.spawn(pi, ctx, type, prompt, opts),
-      spawnAndWait: (ctx, type, prompt, opts) => manager.spawnAndWait(pi, ctx, type, prompt, opts),
+      spawn: (ctx, type, prompt, opts) => manager.spawn(ctx, type, prompt, opts),
+      spawnAndWait: (ctx, type, prompt, opts) => manager.spawnAndWait(ctx, type, prompt, opts),
       resume: (id, prompt, signal) => manager.resume(id, prompt, signal),
       getRecord: (id) => manager.getRecord(id),
       getMaxConcurrent: () => manager.getMaxConcurrent(),
@@ -230,7 +230,7 @@ export default function (pi: ExtensionAPI) {
     manager: {
       listAgents: () => manager.listAgents(),
       getRecord: (id) => manager.getRecord(id),
-      spawnAndWait: (piArg, ctx, type, prompt, opts) => manager.spawnAndWait(piArg ?? pi, ctx, type, prompt, opts),
+      spawnAndWait: (ctx, type, prompt, opts) => manager.spawnAndWait(ctx, type, prompt, opts),
       getMaxConcurrent: () => manager.getMaxConcurrent(),
       setMaxConcurrent: (n) => manager.setMaxConcurrent(n),
     },

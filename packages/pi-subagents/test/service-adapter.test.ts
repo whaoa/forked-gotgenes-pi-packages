@@ -221,7 +221,6 @@ describe("createSubagentsService — spawn", () => {
     const id = svc.spawn("Explore", "check TODOs", { model: "sonnet", maxTurns: 5 });
     expect(id).toBe("spawned-id");
     expect(deps.manager.spawn).toHaveBeenCalledWith(
-      expect.anything(), // pi
       expect.anything(), // ctx
       "Explore",
       "check TODOs",
@@ -238,8 +237,7 @@ describe("createSubagentsService — spawn", () => {
     const svc = createSubagentsService(deps);
     svc.spawn("Plan", "plan work", { foreground: true });
     expect(deps.manager.spawn).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
+      expect.anything(), // ctx
       "Plan",
       "plan work",
       expect.objectContaining({ isBackground: false }),
@@ -252,8 +250,7 @@ describe("createSubagentsService — spawn", () => {
     const longPrompt = "x".repeat(200);
     svc.spawn("Explore", longPrompt);
     expect(deps.manager.spawn).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
+      expect.anything(), // ctx
       "Explore",
       longPrompt,
       expect.objectContaining({ description: "x".repeat(80) }),
@@ -265,8 +262,7 @@ describe("createSubagentsService — spawn", () => {
     const svc = createSubagentsService(deps);
     svc.spawn("Explore", "long prompt here", { description: "short desc" });
     expect(deps.manager.spawn).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
+      expect.anything(), // ctx
       "Explore",
       "long prompt here",
       expect.objectContaining({ description: "short desc" }),

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { SpawnOptions } from "../agent-manager.js";
 import {
   BUILTIN_TOOL_NAMES,
@@ -21,7 +21,7 @@ export interface AgentMenuManager {
   listAgents: () => AgentRecord[];
   getRecord: (id: string) => AgentRecord | undefined;
   /** Used by generate wizard to spawn an agent that writes the .md file. */
-  spawnAndWait: (pi: ExtensionAPI | null, ctx: ExtensionContext, type: string, prompt: string, opts: Omit<SpawnOptions, "isBackground">) => Promise<AgentRecord>;
+  spawnAndWait: (ctx: ExtensionContext, type: string, prompt: string, opts: Omit<SpawnOptions, "isBackground">) => Promise<AgentRecord>;
   getMaxConcurrent: () => number;
   setMaxConcurrent: (n: number) => void;
 }
@@ -487,7 +487,6 @@ Guidelines for choosing settings:
 Write the file using the write tool. Only write the file, nothing else.`;
 
     const record = await deps.manager.spawnAndWait(
-      null,
       ctx,
       "general-purpose",
       generatePrompt,

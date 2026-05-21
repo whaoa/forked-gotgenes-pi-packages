@@ -8,7 +8,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
-import type { AgentSession, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { AgentRecord } from "./agent-record.js";
 import type { AgentRunner, ToolActivity } from "./agent-runner.js";
 import { debugLog } from "./debug.js";
@@ -37,7 +37,6 @@ export interface AgentManagerOptions {
 }
 
 interface SpawnArgs {
-  pi: ExtensionAPI;
   ctx: ExtensionContext;
   type: SubagentType;
   prompt: string;
@@ -129,7 +128,6 @@ export class AgentManager {
    * If the concurrency limit is reached, the agent is queued.
    */
   spawn(
-    pi: ExtensionAPI,
     ctx: ExtensionContext,
     type: SubagentType,
     prompt: string,
@@ -148,7 +146,7 @@ export class AgentManager {
     });
     this.agents.set(id, record);
 
-    const args: SpawnArgs = { pi, ctx, type, prompt, options };
+    const args: SpawnArgs = { ctx, type, prompt, options };
 
     if (options.isBackground && !options.bypassQueue && this.runningBackground >= this.maxConcurrent) {
       // Queue it — will be started when a running agent completes
@@ -317,13 +315,12 @@ export class AgentManager {
    * Foreground agents bypass the concurrency queue.
    */
   async spawnAndWait(
-    pi: ExtensionAPI,
     ctx: ExtensionContext,
     type: SubagentType,
     prompt: string,
     options: Omit<SpawnOptions, "isBackground">,
   ): Promise<AgentRecord> {
-    const id = this.spawn(pi, ctx, type, prompt, { ...options, isBackground: false });
+    const id = this.spawn(ctx, type, prompt, { ...options, isBackground: false });
     const record = this.agents.get(id)!;
     await record.promise;
     return record;
