@@ -55,6 +55,7 @@ Run `pnpm run check` (`tsc --noEmit`) for type-only changes.
   Either fold them into one step or introduce the new type alongside the old one and migrate callers incrementally.
 - When a plan adds a parameter that flows through callback chains, the "Module-Level Changes" section must list every file in the chain.
 - When a TDD step changes a shared interface, run `pnpm run check` immediately after that step's commit.
+- When a TDD step changes an interface that has a single call site (e.g., a deps bag constructed in `index.ts`), the step must include updating that call site — the type checker will not allow the interface change and the call-site update to land in separate commits.
 - When adding a field to a shared interface, grep for ALL test files that construct a compatible mock — not just factory helpers.
 - When a TDD plan converts an interface to a class, grep for `{ ...variable` spread patterns in tests — spreading a class instance produces a plain object that lacks the class's methods and private fields.
   Replace with `createTestX({ ...overrides })` factory calls or direct field mutation.
