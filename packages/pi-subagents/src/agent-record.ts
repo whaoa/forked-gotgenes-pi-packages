@@ -5,12 +5,20 @@
  * by the class and exposed via transition methods. External code reads these
  * fields through public properties but cannot write them directly.
  *
- * Non-transition state (session, toolUses, lifetimeUsage, etc.) remains public.
+ * Stats (toolUses, lifetimeUsage, compactionCount) are owned by the class and
+ * accumulated via mutation methods (incrementToolUses, addUsage, incrementCompactions).
+ *
+ * Phase-specific collaborators (execution, worktreeState, notification) are attached
+ * after construction as lifecycle information becomes available.
  */
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { ExecutionState } from "./execution-state.js";
+import type { NotificationState } from "./notification-state.js";
 import type { AgentInvocation, SubagentType } from "./types.js";
 import type { LifetimeUsage } from "./usage.js";
+import { addUsage } from "./usage.js";
+import type { WorktreeState } from "./worktree-state.js";
 
 export type AgentRecordStatus =
 	| "queued"
@@ -68,10 +76,17 @@ export class AgentRecord {
 	private _completedAt?: number;
 	get completedAt(): number | undefined { return this._completedAt; }
 
-	// Non-transition mutable state
-	toolUses: number;
-	lifetimeUsage: LifetimeUsage;
-	compactionCount: number;
+	// Stats — accumulated via mutation methods, readable via getters
+	private _toolUses: number;
+	get toolUses(): number { return this._toolUses; }
+
+	private _lifetimeUsage: LifetimeUsage;
+	get lifetimeUsage(): Readonly<LifetimeUsage> { return this._lifetimeUsage; }
+
+	private _compactionCount: number;
+	get compactionCount(): number { return this._compactionCount; }
+
+	// Legacy mutable fields — being migrated to phase-specific collaborators (steps 5–12)
 	session?: AgentSession;
 	abortController?: AbortController;
 	promise?: Promise<string>;
@@ -81,6 +96,11 @@ export class AgentRecord {
 	worktreeResult?: { hasChanges: boolean; branch?: string };
 	toolCallId?: string;
 	outputFile?: string;
+
+	// Phase-specific collaborators — each born complete when their info becomes available
+	execution?: ExecutionState;
+	worktreeState?: WorktreeState;
+	notification?: NotificationState;
 
 	constructor(init: AgentRecordInit) {
 		this.id = init.id;
@@ -94,9 +114,9 @@ export class AgentRecord {
 		this._startedAt = init.startedAt ?? Date.now();
 		this._completedAt = init.completedAt;
 
-		this.toolUses = init.toolUses ?? 0;
-		this.lifetimeUsage = init.lifetimeUsage ?? { input: 0, output: 0, cacheWrite: 0 };
-		this.compactionCount = init.compactionCount ?? 0;
+		this._toolUses = init.toolUses ?? 0;
+		this._lifetimeUsage = init.lifetimeUsage ?? { input: 0, output: 0, cacheWrite: 0 };
+		this._compactionCount = init.compactionCount ?? 0;
 		this.abortController = init.abortController;
 		this.session = init.session;
 		this.promise = init.promise;
@@ -106,6 +126,21 @@ export class AgentRecord {
 		this.worktreeResult = init.worktreeResult;
 		this.toolCallId = init.toolCallId;
 		this.outputFile = init.outputFile;
+	}
+
+	/** Increment tool use count. Called by record-observer on tool_execution_end. */
+	incrementToolUses(): void {
+		this._toolUses++;
+	}
+
+	/** Accumulate a usage delta into lifetimeUsage. Called by record-observer on message_end. */
+	addUsage(delta: { input: number; output: number; cacheWrite: number }): void {
+		addUsage(this._lifetimeUsage, delta);
+	}
+
+	/** Increment compaction count. Called by record-observer on compaction_end. */
+	incrementCompactions(): void {
+		this._compactionCount++;
 	}
 
 	/** Transition to running state. Sets status and startedAt. */

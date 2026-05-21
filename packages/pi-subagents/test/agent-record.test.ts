@@ -306,6 +306,39 @@ describe("AgentRecord — markStopped", () => {
 	});
 });
 
+describe("AgentRecord — incrementToolUses", () => {
+	it("starts at 0 and increments by 1 each call", () => {
+		const record = new AgentRecord({ id: "1", type: "general-purpose", description: "test" });
+		expect(record.toolUses).toBe(0);
+		record.incrementToolUses();
+		expect(record.toolUses).toBe(1);
+		record.incrementToolUses();
+		expect(record.toolUses).toBe(2);
+	});
+});
+
+describe("AgentRecord — addUsage", () => {
+	it("accumulates usage deltas into lifetimeUsage", () => {
+		const record = new AgentRecord({ id: "1", type: "general-purpose", description: "test" });
+		expect(record.lifetimeUsage).toEqual({ input: 0, output: 0, cacheWrite: 0 });
+		record.addUsage({ input: 100, output: 50, cacheWrite: 10 });
+		expect(record.lifetimeUsage).toEqual({ input: 100, output: 50, cacheWrite: 10 });
+		record.addUsage({ input: 200, output: 80, cacheWrite: 20 });
+		expect(record.lifetimeUsage).toEqual({ input: 300, output: 130, cacheWrite: 30 });
+	});
+});
+
+describe("AgentRecord — incrementCompactions", () => {
+	it("starts at 0 and increments by 1 each call", () => {
+		const record = new AgentRecord({ id: "1", type: "general-purpose", description: "test" });
+		expect(record.compactionCount).toBe(0);
+		record.incrementCompactions();
+		expect(record.compactionCount).toBe(1);
+		record.incrementCompactions();
+		expect(record.compactionCount).toBe(2);
+	});
+});
+
 describe("AgentRecord — resetForResume", () => {
 	it("sets status to 'running' and new startedAt", () => {
 		const record = new AgentRecord({

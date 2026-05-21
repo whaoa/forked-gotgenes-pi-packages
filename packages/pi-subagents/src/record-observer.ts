@@ -7,7 +7,6 @@
 
 import type { CompactionInfo } from "./agent-manager.js";
 import type { AgentRecord } from "./agent-record.js";
-import { addUsage } from "./usage.js";
 
 /** Narrow session interface — only the subscribe method needed by the observer. */
 interface SubscribableSession {
@@ -22,9 +21,9 @@ export interface RecordObserverOptions {
  * Subscribe to session events and accumulate stats on the agent record.
  *
  * Handles:
- * - `tool_execution_end` → `record.toolUses++`
- * - `message_end` (assistant, with usage) → `addUsage(record.lifetimeUsage, …)`
- * - `compaction_end` (not aborted) → `record.compactionCount++`, call `onCompact`
+ * - `tool_execution_end` → `record.incrementToolUses()`
+ * - `message_end` (assistant, with usage) → `record.addUsage(…)`
+ * - `compaction_end` (not aborted) → `record.incrementCompactions()`, call `onCompact`
  *
  * @returns An unsubscribe function.
  */
@@ -35,13 +34,13 @@ export function subscribeRecordObserver(
 ): () => void {
   return session.subscribe((event: any) => {
     if (event.type === "tool_execution_end") {
-      record.toolUses++;
+      record.incrementToolUses();
     }
 
     if (event.type === "message_end" && event.message?.role === "assistant") {
       const u = event.message.usage;
       if (u) {
-        addUsage(record.lifetimeUsage, {
+        record.addUsage({
           input: u.input ?? 0,
           output: u.output ?? 0,
           cacheWrite: u.cacheWrite ?? 0,
@@ -50,7 +49,7 @@ export function subscribeRecordObserver(
     }
 
     if (event.type === "compaction_end" && !event.aborted && event.result) {
-      record.compactionCount++;
+      record.incrementCompactions();
       options?.onCompact?.(record, {
         reason: event.reason,
         tokensBefore: event.result.tokensBefore,
