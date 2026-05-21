@@ -394,7 +394,7 @@ Each step is sequenced so it makes the next step easier.
 These three extractions are independent and can proceed in any order.
 Each eliminates a category of global/closure state and gives orphaned callbacks a natural home.
 
-#### A1. `AgentTypeRegistry` class
+#### A1. `AgentTypeRegistry` class (#108)
 
 Wrap the module-scoped `agents` Map and free functions in `agent-types.ts` into an injectable class.
 `reloadCustomAgents` (currently a callback threaded through `AgentToolDeps` and `AgentMenuDeps`) becomes `registry.reload()`.
@@ -402,7 +402,7 @@ Wrap the module-scoped `agents` Map and free functions in `agent-types.ts` into 
 
 Impact: eliminates global mutable state, enables test isolation without module resets, removes `reloadCustomAgents` callback from 2 dependency bags.
 
-#### A2. `SettingsManager` class
+#### A2. `SettingsManager` class (#109)
 
 Encapsulate the settings load/save/apply cycle into a class that owns the in-memory values and the persistence layer.
 Absorbs `SettingsAppliers`, `applyAndEmitLoaded`, `saveAndEmitChanged` from free functions in `settings.ts`.
@@ -410,7 +410,7 @@ The 6 settings-related fields in `AgentMenuDeps` (`getDefaultMaxTurns`, `setDefa
 
 Impact: reduces `AgentMenuDeps` from 13 → 8 fields.
 
-#### A3. `AgentActivityTracker` class
+#### A3. `AgentActivityTracker` class (#110)
 
 Wrap the 7-field mutable `AgentActivity` interface with transition methods (`onToolStart()`, `onToolEnd()`, `onMessageUpdate()`, `onTurnEnd()`).
 `ui-observer.ts` calls tracker methods instead of writing raw fields.
@@ -418,7 +418,7 @@ The notification system, widget, and agent-tool receive a proper collaborator in
 
 Impact: eliminates output-argument writes in `ui-observer.ts`, makes the mutation contract explicit.
 
-### Step B: Split `AgentRecord` lifecycle state
+### Step B: Split `AgentRecord` lifecycle state (#111)
 
 `AgentRecord` is currently constructed in `spawn()` before most of its state exists, then mutated across 4 files as information trickles in.
 The fix is not setter methods — it's splitting along lifecycle boundaries so each object is born complete.
@@ -431,7 +431,7 @@ The fix is not setter methods — it's splitting along lifecycle boundaries so e
 Each piece is born complete at the moment its information is available.
 The record doesn't accumulate half-baked state — it receives fully constructed collaborators.
 
-### Step C: Replace `AgentManager` callbacks with observer
+### Step C: Replace `AgentManager` callbacks with observer (#112)
 
 Replace the `onStart`/`onComplete`/`onCompact` callback parameters with an `AgentManagerObserver` interface (or typed event emitter).
 The observer methods receive the same data the callbacks receive today.
@@ -442,12 +442,12 @@ The observer methods receive the same data the callbacks receive today.
 
 With the registry class, settings manager, and observer in place, the dependency bags shrink naturally.
 
-#### D1. Disambiguate `SpawnOptions`
+#### D1. Disambiguate `SpawnOptions` (#113)
 
 Rename the internal `SpawnOptions` in `agent-manager.ts` to `AgentSpawnConfig` (or similar) to distinguish it from the JSON-friendly public `SpawnOptions` in `service.ts`.
 The two types serve different consumers and should not share a name.
 
-#### D2. Narrow `AgentToolDeps` and `AgentMenuDeps`
+#### D2. Narrow `AgentToolDeps` and `AgentMenuDeps` (#114)
 
 | Bag             | Before    | After | How                                                                                     |
 | --------------- | --------- | ----- | --------------------------------------------------------------------------------------- |
@@ -456,12 +456,12 @@ The two types serve different consumers and should not share a name.
 
 ### Step E: Decompose large files and relocate types (parallel)
 
-#### E1. Split `agent-tool.ts` foreground/background
+#### E1. Split `agent-tool.ts` foreground/background (#115)
 
 Extract the foreground execution loop (spinner, streaming, result rendering) and background spawn path into separate modules.
 The 654-line file splits along a natural seam.
 
-#### E2. Type housekeeping
+#### E2. Type housekeeping (#116)
 
 - Move `NotificationDetails` from `types.ts` to `notification.ts`.
 - Move `DEFAULT_AGENT_NAMES` from `types.ts` to the registry.
