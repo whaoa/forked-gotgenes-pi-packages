@@ -98,13 +98,14 @@ function createSession(finalText: string) {
   return { session, listeners };
 }
 
-const ctx = {
+import type { ParentSnapshot } from "../src/types.js";
+
+const snapshot: ParentSnapshot = {
   cwd: "/tmp",
-  model: undefined,
+  model: undefined as unknown,
   modelRegistry: { find: vi.fn(), getAvailable: vi.fn(() => []) },
-  getSystemPrompt: vi.fn(() => "parent prompt"),
-  sessionManager: { getBranch: vi.fn(() => []) },
-} as any;
+  systemPrompt: "parent prompt",
+};
 
 const exec = vi.fn();
 
@@ -127,7 +128,7 @@ describe("agent-runner final output capture", () => {
     const { session } = createSession("LOCKED");
     createAgentSession.mockResolvedValue({ session });
 
-    const result = await runAgent(ctx, "Explore", "Say LOCKED", { exec });
+    const result = await runAgent(snapshot, "Explore", "Say LOCKED", { exec });
 
     expect(result.responseText).toBe("LOCKED");
   });
@@ -136,7 +137,7 @@ describe("agent-runner final output capture", () => {
     const { session } = createSession("BOUND");
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "Explore", "Say BOUND", { exec });
+    await runAgent(snapshot, "Explore", "Say BOUND", { exec });
 
     expect(session.bindExtensions).toHaveBeenCalledTimes(1);
     expect(session.bindExtensions).toHaveBeenCalledWith(
@@ -152,7 +153,7 @@ describe("agent-runner final output capture", () => {
     const { session } = createSession("CONFIGURED");
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "Explore", "Say CONFIGURED", { exec, cwd: "/tmp/worktree" });
+    await runAgent(snapshot, "Explore", "Say CONFIGURED", { exec, cwd: "/tmp/worktree" });
 
     expect(getAgentDir).toHaveBeenCalledTimes(1);
     expect(defaultResourceLoaderCtor).toHaveBeenCalledWith(expect.objectContaining({
@@ -171,7 +172,7 @@ describe("agent-runner final output capture", () => {
     const { session } = createSession("ISOLATED");
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "Explore", "Say ISOLATED", { exec });
+    await runAgent(snapshot, "Explore", "Say ISOLATED", { exec });
 
     // noContextFiles skips AGENTS.md/CLAUDE.md at the loader source;
     // appendSystemPromptOverride suppresses APPEND_SYSTEM.md (no flag equivalent).
@@ -190,7 +191,7 @@ describe("agent-runner final output capture", () => {
     const { session } = createSession("WITH_FILE");
     createAgentSession.mockResolvedValue({ session });
 
-    const result = await runAgent(ctx, "Explore", "go", { exec });
+    const result = await runAgent(snapshot, "Explore", "go", { exec });
 
     expect(result.sessionFile).toBe("/sessions/child.jsonl");
   });
@@ -199,7 +200,7 @@ describe("agent-runner final output capture", () => {
     const { session } = createSession("LINKED");
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "Explore", "go", {
+    await runAgent(snapshot, "Explore", "go", {
       exec,
       parentSessionFile: "/sessions/parent.jsonl",
       parentSessionId: "parent-id-123",
@@ -240,7 +241,7 @@ describe("agent-runner usage callback wiring", () => {
       session.messages.push({ role: "assistant", content: [{ type: "text", text: "OK" }] });
     });
 
-    await runAgent(ctx, "Explore", "go", {
+    await runAgent(snapshot, "Explore", "go", {
       exec,
       onAssistantUsage: (u) => seen.push(u),
     });
@@ -261,7 +262,7 @@ describe("agent-runner usage callback wiring", () => {
       session.messages.push({ role: "assistant", content: [{ type: "text", text: "OK" }] });
     });
 
-    await runAgent(ctx, "Explore", "go", {
+    await runAgent(snapshot, "Explore", "go", {
       exec,
       onAssistantUsage: (u) => seen.push(u),
     });
@@ -279,7 +280,7 @@ describe("agent-runner usage callback wiring", () => {
       session.messages.push({ role: "assistant", content: [{ type: "text", text: "OK" }] });
     });
 
-    await runAgent(ctx, "Explore", "go", { exec, onAssistantUsage: cb });
+    await runAgent(snapshot, "Explore", "go", { exec, onAssistantUsage: cb });
 
     expect(cb).not.toHaveBeenCalled();
   });
@@ -323,7 +324,7 @@ describe("agent-runner usage callback wiring", () => {
       session.messages.push({ role: "assistant", content: [{ type: "text", text: "OK" }] });
     });
 
-    await runAgent(ctx, "Explore", "go", {
+    await runAgent(snapshot, "Explore", "go", {
       exec,
       onCompaction: (info) => seen.push(info),
     });
@@ -350,7 +351,7 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
       session.messages.push({ role: "assistant", content: [{ type: "text", text: "done" }] });
     });
 
-    const result = await runAgent(ctx, "Explore", "go", {
+    const result = await runAgent(snapshot, "Explore", "go", {
       exec,
       defaultMaxTurns: 2,
       graceTurns: 1,
@@ -373,7 +374,7 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
       session.messages.push({ role: "assistant", content: [{ type: "text", text: "done" }] });
     });
 
-    const result = await runAgent(ctx, "Explore", "go", {
+    const result = await runAgent(snapshot, "Explore", "go", {
       exec,
       defaultMaxTurns: 1,
       graceTurns: 3,
@@ -396,7 +397,7 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
       session.messages.push({ role: "assistant", content: [{ type: "text", text: "done" }] });
     });
 
-    await runAgent(ctx, "Explore", "go", {
+    await runAgent(snapshot, "Explore", "go", {
       exec,
       maxTurns: 3,       // explicit per-call limit
       defaultMaxTurns: 1, // should be overridden

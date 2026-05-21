@@ -3,7 +3,6 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSession,
   type AgentSessionEvent,
@@ -13,11 +12,11 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { buildParentContext, extractText } from "./context.js";
+import { extractText } from "./context.js";
 import { detectEnv } from "./env.js";
 import { assembleSessionConfig } from "./session-config.js";
 import { deriveSubagentSessionDir } from "./session-dir.js";
-import type { ShellExec, SubagentType, ThinkingLevel } from "./types.js";
+import type { ParentSnapshot, ShellExec, SubagentType, ThinkingLevel } from "./types.js";
 
 /** Names of tools registered by this extension that subagents must NOT inherit. */
 const EXCLUDED_TOOL_NAMES = ["Agent", "get_subagent_result", "steer_subagent"];
@@ -78,7 +77,6 @@ export interface RunOptions {
   maxTurns?: number;
   signal?: AbortSignal;
   isolated?: boolean;
-  inheritContext?: boolean;
   thinkingLevel?: ThinkingLevel;
   /** Override working directory (e.g. for worktree isolation). */
   cwd?: string;
@@ -148,7 +146,7 @@ export interface ResumeOptions {
  * SDK session orchestration in runAgent/resumeAgent.
  */
 export interface AgentRunner {
-  run(ctx: ExtensionContext, type: SubagentType, prompt: string, options: RunOptions): Promise<RunResult>;
+  run(snapshot: ParentSnapshot, type: SubagentType, prompt: string, options: RunOptions): Promise<RunResult>;
   resume(session: AgentSession, prompt: string, options?: ResumeOptions): Promise<string>;
 }
 
@@ -198,23 +196,23 @@ function forwardAbortSignal(
 }
 
 export async function runAgent(
-  ctx: ExtensionContext,
+  snapshot: ParentSnapshot,
   type: SubagentType,
   prompt: string,
   options: RunOptions,
 ): Promise<RunResult> {
   // Resolve working directory upfront — needed for detectEnv before assembly.
-  const effectiveCwd = options.cwd ?? ctx.cwd;
+  const effectiveCwd = options.cwd ?? snapshot.cwd;
   const env = await detectEnv(options.exec, effectiveCwd);
 
   // Assemble session configuration (synchronous, no SDK objects).
   const cfg = assembleSessionConfig(
     type,
     {
-      cwd: ctx.cwd,
-      parentSystemPrompt: ctx.getSystemPrompt(),
-      parentModel: ctx.model,
-      modelRegistry: ctx.modelRegistry,
+      cwd: snapshot.cwd,
+      parentSystemPrompt: snapshot.systemPrompt,
+      parentModel: snapshot.model,
+      modelRegistry: snapshot.modelRegistry,
     },
     {
       cwd: options.cwd,
@@ -258,7 +256,7 @@ export async function runAgent(
     agentDir,
     sessionManager,
     settingsManager: SettingsManager.create(cfg.effectiveCwd, agentDir),
-    modelRegistry: ctx.modelRegistry,
+    modelRegistry: snapshot.modelRegistry as any,
     model: cfg.model as Model<any> | undefined,
     tools: cfg.toolNames,
     resourceLoader: loader,
@@ -377,13 +375,10 @@ export async function runAgent(
   const collector = collectResponseText(session);
   const cleanupAbort = forwardAbortSignal(session, options.signal);
 
-  // Build the effective prompt: optionally prepend parent context
+  // Prepend parent context if it was captured at spawn time
   let effectivePrompt = prompt;
-  if (options.inheritContext) {
-    const parentContext = buildParentContext(ctx);
-    if (parentContext) {
-      effectivePrompt = parentContext + prompt;
-    }
+  if (snapshot.parentContext) {
+    effectivePrompt = snapshot.parentContext + prompt;
   }
 
   try {

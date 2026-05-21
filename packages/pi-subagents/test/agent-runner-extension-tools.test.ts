@@ -130,13 +130,14 @@ function createSessionWithExtensionToolRegistration(
   return session;
 }
 
-const ctx = {
+import type { ParentSnapshot } from "../src/types.js";
+
+const snapshot: ParentSnapshot = {
   cwd: "/tmp",
-  model: undefined,
+  model: undefined as unknown,
   modelRegistry: { find: vi.fn(), getAvailable: vi.fn(() => []) },
-  getSystemPrompt: vi.fn(() => "parent prompt"),
-  sessionManager: { getBranch: vi.fn(() => []) },
-} as any;
+  systemPrompt: "parent prompt",
+};
 
 const exec = vi.fn();
 
@@ -175,7 +176,7 @@ describe("Patch 2: post-bind active-tool re-filter", () => {
     );
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "test-agent", "go", { exec });
+    await runAgent(snapshot, "test-agent", "go", { exec });
 
     // Should be called twice: once before bind, once after.
     expect(session.setActiveToolsByName).toHaveBeenCalledTimes(2);
@@ -199,7 +200,7 @@ describe("Patch 2: post-bind active-tool re-filter", () => {
     );
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "test-agent", "go", { exec });
+    await runAgent(snapshot, "test-agent", "go", { exec });
 
     // Second (post-bind) call is the re-filter; it should include the
     // extension-registered tool since extensions: true allows everything.
@@ -217,7 +218,7 @@ describe("Patch 2: post-bind active-tool re-filter", () => {
     );
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "test-agent", "go", { exec });
+    await runAgent(snapshot, "test-agent", "go", { exec });
 
     const postBindArgs = session.setActiveToolsByName.mock.calls[1][0];
     // Built-in tools are always allowed.
@@ -237,7 +238,7 @@ describe("Patch 2: post-bind active-tool re-filter", () => {
     );
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "test-agent", "go", { exec });
+    await runAgent(snapshot, "test-agent", "go", { exec });
 
     const postBindArgs = session.setActiveToolsByName.mock.calls[1][0];
     expect(postBindArgs).toContain("read");
@@ -253,7 +254,7 @@ describe("Patch 2: post-bind active-tool re-filter", () => {
     );
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "test-agent", "go", { exec });
+    await runAgent(snapshot, "test-agent", "go", { exec });
 
     const postBindArgs = session.setActiveToolsByName.mock.calls[1][0];
     expect(postBindArgs).toContain("read");
@@ -278,7 +279,7 @@ describe("Patch 2: post-bind active-tool re-filter", () => {
     );
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "test-agent", "go", { exec });
+    await runAgent(snapshot, "test-agent", "go", { exec });
 
     expect(session.setActiveToolsByName).toHaveBeenCalledTimes(2);
     const postBindArgs = session.setActiveToolsByName.mock.calls[1][0];
@@ -299,7 +300,7 @@ describe("Patch 2: post-bind active-tool re-filter", () => {
     );
     createAgentSession.mockResolvedValue({ session });
 
-    await runAgent(ctx, "test-agent", "go", { exec });
+    await runAgent(snapshot, "test-agent", "go", { exec });
 
     expect(session.setActiveToolsByName).not.toHaveBeenCalled();
   });
