@@ -55,6 +55,9 @@ export default function (pi: ExtensionAPI) {
     updateWidget: () => runtime.updateWidget(),
   });
 
+  // Bridge: local variable for maxConcurrent until SettingsManager wired (Cycle 6, #109).
+  let maxConcurrent = 4;
+
   // Background completion: emit lifecycle event and delegate to notification system
   const manager = new AgentManager({
     runner: { run: runAgent, resume: resumeAgent },
@@ -105,6 +108,7 @@ export default function (pi: ExtensionAPI) {
         compactionCount: record.compactionCount,
       });
     },
+    getMaxConcurrent: () => maxConcurrent,
     getRunConfig: () => ({ defaultMaxTurns: runtime.defaultMaxTurns, graceTurns: runtime.graceTurns }),
   });
 
@@ -169,7 +173,7 @@ export default function (pi: ExtensionAPI) {
   // to stderr and falls back to defaults.
   applyAndEmitLoaded(
     {
-      setMaxConcurrent: (n) => manager.setMaxConcurrent(n),
+      setMaxConcurrent: (n) => { maxConcurrent = Math.max(1, n); manager.notifyConcurrencyChanged(); },
       setDefaultMaxTurns: (n) => { runtime.defaultMaxTurns = normalizeMaxTurns(n); },
       setGraceTurns: (n) => { runtime.graceTurns = Math.max(1, n); },
     },
@@ -184,7 +188,7 @@ export default function (pi: ExtensionAPI) {
       spawnAndWait: (ctx, type, prompt, opts) => manager.spawnAndWait(ctx, type, prompt, opts),
       resume: (id, prompt, signal) => manager.resume(id, prompt, signal),
       getRecord: (id) => manager.getRecord(id),
-      getMaxConcurrent: () => manager.getMaxConcurrent(),
+      getMaxConcurrent: () => maxConcurrent,
       listAgents: () => manager.listAgents(),
     },
     widget: {
@@ -225,14 +229,14 @@ export default function (pi: ExtensionAPI) {
   // Bridge: satisfies AgentMenuSettings using existing runtime/manager state.
   // Replaced by SettingsManager in Cycle 6 (issue #109).
   const menuSettings = {
-    get maxConcurrent() { return manager.getMaxConcurrent(); },
-    set maxConcurrent(n: number) { manager.setMaxConcurrent(n); },
+    get maxConcurrent() { return maxConcurrent; },
+    set maxConcurrent(n: number) { maxConcurrent = Math.max(1, n); },
     get defaultMaxTurns() { return runtime.defaultMaxTurns; },
     set defaultMaxTurns(n: number | undefined) { runtime.defaultMaxTurns = normalizeMaxTurns(n); },
     get graceTurns() { return runtime.graceTurns; },
     set graceTurns(n: number) { runtime.graceTurns = Math.max(1, n); },
     saveAndNotify: (successMsg: string) => saveAndEmitChanged(
-      { maxConcurrent: manager.getMaxConcurrent(), defaultMaxTurns: runtime.defaultMaxTurns ?? 0, graceTurns: runtime.graceTurns },
+      { maxConcurrent, defaultMaxTurns: runtime.defaultMaxTurns ?? 0, graceTurns: runtime.graceTurns },
       successMsg,
       (event, payload) => pi.events.emit(event, payload),
     ),

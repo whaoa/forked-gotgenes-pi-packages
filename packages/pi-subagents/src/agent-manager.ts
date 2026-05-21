@@ -32,7 +32,8 @@ export interface AgentManagerOptions {
   worktrees: WorktreeManager;
   exec: ShellExec;
   registry: AgentTypeRegistry;
-  maxConcurrent?: number;
+  /** Injected getter for the concurrency limit — owned by SettingsManager. */
+  getMaxConcurrent?: () => number;
   getRunConfig?: () => RunConfig;
   onStart?: OnAgentStart;
   onComplete?: OnAgentComplete;
@@ -84,7 +85,7 @@ export class AgentManager {
   private readonly worktrees: WorktreeManager;
   private readonly exec: ShellExec;
   private readonly registry: AgentTypeRegistry;
-  private maxConcurrent: number;
+  private readonly _getMaxConcurrent: () => number;
   private getRunConfig?: () => RunConfig;
 
   /** Queue of background agents waiting to start. */
@@ -101,21 +102,18 @@ export class AgentManager {
     this.onStart = options.onStart;
     this.onCompact = options.onCompact;
     this.getRunConfig = options.getRunConfig;
-    this.maxConcurrent = options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
+    this._getMaxConcurrent = options.getMaxConcurrent ?? (() => DEFAULT_MAX_CONCURRENT);
     // Cleanup completed agents after 10 minutes (but keep sessions for resume)
     this.cleanupInterval = setInterval(() => this.cleanup(), 60_000);
     this.cleanupInterval.unref();
   }
 
-  /** Update the max concurrent background agents limit. */
-  setMaxConcurrent(n: number) {
-    this.maxConcurrent = Math.max(1, n);
-    // Start queued agents if the new limit allows
+  /**
+   * Drain the concurrency queue after SettingsManager has updated maxConcurrent.
+   * Call this whenever the concurrency limit increases so queued agents can start.
+   */
+  notifyConcurrencyChanged(): void {
     this.drainQueue();
-  }
-
-  getMaxConcurrent(): number {
-    return this.maxConcurrent;
   }
 
   /**
@@ -144,7 +142,7 @@ export class AgentManager {
     const snapshot = buildParentSnapshot(ctx, options.inheritContext);
     const args: SpawnArgs = { snapshot, type, prompt, options };
 
-    if (options.isBackground && !options.bypassQueue && this.runningBackground >= this.maxConcurrent) {
+    if (options.isBackground && !options.bypassQueue && this.runningBackground >= this._getMaxConcurrent()) {
       // Queue it — will be started when a running agent completes
       this.queue.push({ id, args });
       return id;
@@ -284,7 +282,7 @@ export class AgentManager {
 
   /** Start queued agents up to the concurrency limit. */
   private drainQueue() {
-    while (this.queue.length > 0 && this.runningBackground < this.maxConcurrent) {
+    while (this.queue.length > 0 && this.runningBackground < this._getMaxConcurrent()) {
       const next = this.queue.shift()!;
       const record = this.agents.get(next.id);
       if (!record || record.status !== "queued") continue;

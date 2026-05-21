@@ -44,7 +44,7 @@ function createManager(overrides?: {
   onComplete?: OnAgentComplete;
   onStart?: OnAgentStart;
   onCompact?: OnAgentCompact;
-  maxConcurrent?: number;
+  getMaxConcurrent?: () => number;
   getRunConfig?: () => RunConfig;
 }) {
   const runner: AgentRunner = overrides?.runner ?? {
@@ -69,7 +69,7 @@ function createManager(overrides?: {
     onComplete: overrides?.onComplete,
     onStart: overrides?.onStart,
     onCompact: overrides?.onCompact,
-    maxConcurrent: overrides?.maxConcurrent,
+    getMaxConcurrent: overrides?.getMaxConcurrent,
     getRunConfig: overrides?.getRunConfig,
   });
   return { manager, runner, worktrees };
@@ -214,7 +214,7 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
       run: vi.fn().mockImplementation(() => new Promise(() => {})),
       resume: vi.fn(),
     };
-    ({ manager } = createManager({ maxConcurrent: 1, runner }));
+    ({ manager } = createManager({ getMaxConcurrent: () => 1, runner }));
 
     const id1 = manager.spawn(mockCtx, "general-purpose", "test1", {
       description: "running agent",
@@ -621,7 +621,7 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
       }),
       resume: vi.fn(),
     };
-    ({ manager } = createManager({ runner, maxConcurrent: 1 }));
+    ({ manager } = createManager({ runner, getMaxConcurrent: () => 1 }));
 
     // Spawn two background agents — first runs, second queues
     const id1 = manager.spawn(mockCtx, "general-purpose", "test1", {
@@ -654,7 +654,7 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
       run: vi.fn().mockImplementation(() => new Promise(() => {})),
       resume: vi.fn(),
     };
-    ({ manager } = createManager({ runner, maxConcurrent: 1 }));
+    ({ manager } = createManager({ runner, getMaxConcurrent: () => 1 }));
 
     // First runs, second queues
     const id1 = manager.spawn(mockCtx, "general-purpose", "a", {
@@ -691,7 +691,7 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
     };
     ({ manager } = createManager({
       runner,
-      maxConcurrent: 1,
+      getMaxConcurrent: () => 1,
       onStart: (record) => { startedIds.push(record.id); },
     }));
 
