@@ -13,7 +13,7 @@
 import { join } from "node:path";
 import { defineTool, type ExtensionAPI, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { AgentManager } from "./agent-manager.js";
-import { getAgentConversation, normalizeMaxTurns, resumeAgent, runAgent, steerAgent } from "./agent-runner.js";
+import { getAgentConversation, resumeAgent, runAgent, steerAgent } from "./agent-runner.js";
 import { AgentTypeRegistry } from "./agent-types.js";
 import { loadCustomAgents } from "./custom-agents.js";
 import { SessionLifecycleHandler, ToolStartHandler } from "./handlers/index.js";

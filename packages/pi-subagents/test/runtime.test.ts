@@ -4,8 +4,6 @@ import { createSubagentRuntime, SubagentRuntime } from "../src/runtime.js";
 describe("createSubagentRuntime", () => {
   it("returns correct defaults", () => {
     const runtime = createSubagentRuntime();
-    expect(runtime.defaultMaxTurns).toBeUndefined();
-    expect(runtime.graceTurns).toBe(5);
     expect(runtime.currentCtx).toBeUndefined();
     expect(runtime.widget).toBeNull();
     expect(runtime.agentActivity).toBeInstanceOf(Map);
@@ -14,11 +12,7 @@ describe("createSubagentRuntime", () => {
 
   it("fields are independently mutable", () => {
     const runtime = createSubagentRuntime();
-    runtime.defaultMaxTurns = 30;
-    runtime.graceTurns = 10;
     runtime.currentCtx = { pi: {}, ctx: {} };
-    expect(runtime.defaultMaxTurns).toBe(30);
-    expect(runtime.graceTurns).toBe(10);
     expect(runtime.currentCtx).toEqual({ pi: {}, ctx: {} });
   });
 
@@ -40,12 +34,8 @@ describe("createSubagentRuntime", () => {
     const a = createSubagentRuntime();
     const b = createSubagentRuntime();
 
-    a.defaultMaxTurns = 20;
-    a.graceTurns = 3;
     a.agentActivity.set("x", {} as any);
 
-    expect(b.defaultMaxTurns).toBeUndefined();
-    expect(b.graceTurns).toBe(5);
     expect(b.agentActivity.size).toBe(0);
   });
 

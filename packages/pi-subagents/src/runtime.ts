@@ -24,12 +24,6 @@ export interface RunConfig {
  * Tests construct a fresh runtime per test for full isolation.
  */
 export class SubagentRuntime {
-  // ── Execution config (was module-scope in agent-runner.ts) ──────────────
-  /** Default max turns for all agents. undefined = unlimited. */
-  defaultMaxTurns: number | undefined = undefined;
-  /** Additional turns allowed after the soft-limit steer message. */
-  graceTurns: number = 5;
-
   // ── Session state (was closure-scoped in index.ts) ───────────────────────
   /** Active Pi session context — set on session_start, cleared on session_shutdown. */
   currentCtx: { pi: unknown; ctx: unknown } | undefined = undefined;
