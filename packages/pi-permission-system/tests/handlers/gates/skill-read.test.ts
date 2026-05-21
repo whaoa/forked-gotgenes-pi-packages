@@ -108,9 +108,9 @@ describe("describeSkillReadGate", () => {
     const result = describeSkillReadGate(makeTcc(), () => [
       makeSkillEntry({ name: "librarian" }),
     ]) as GateDescriptor;
-    expect(result.messages.denyReason).toContain("librarian");
-    expect(result.messages.unavailableReason).toContain("librarian");
-    const deniedMsg = result.messages.userDeniedReason({
+    expect(result.messages!.denyReason).toContain("librarian");
+    expect(result.messages!.unavailableReason).toContain("librarian");
+    const deniedMsg = result.messages!.userDeniedReason({
       approved: false,
       state: "denied",
     });

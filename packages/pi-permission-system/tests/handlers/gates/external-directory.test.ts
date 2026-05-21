@@ -141,8 +141,8 @@ describe("describeExternalDirectoryGate", () => {
       makeTcc({ input: { path: "/outside/project/file.ts" } }),
       ["/test/agent"],
     ) as GateDescriptor;
-    expect(result.messages.denyReason).toContain("/outside/project/file.ts");
-    expect(result.messages.unavailableReason).toContain(
+    expect(result.messages!.denyReason).toContain("/outside/project/file.ts");
+    expect(result.messages!.unavailableReason).toContain(
       "/outside/project/file.ts",
     );
   });

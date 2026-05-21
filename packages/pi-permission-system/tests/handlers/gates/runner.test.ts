@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { DenialContext } from "../../../src/denial-messages";
+import { EXTENSION_TAG } from "../../../src/denial-messages";
 import type {
   GateDescriptor,
   GateRunnerDeps,
@@ -357,5 +359,139 @@ describe("runGateCheck", () => {
     // No sessionApproval on descriptor
     await runGateCheck(makeDescriptor(), null, "tc-1", deps);
     expect(deps.approveSessionRule).not.toHaveBeenCalled();
+  });
+
+  describe("denialContext formatting", () => {
+    function makeDenialContextDescriptor(
+      denialContext: DenialContext,
+      overrides: Partial<GateDescriptor> = {},
+    ): GateDescriptor {
+      return {
+        surface: "write",
+        input: {},
+        denialContext,
+        promptDetails: {
+          source: "tool_call",
+          agentName: null,
+          message: "Allow tool 'write'?",
+          toolCallId: "tc-1",
+          toolName: "write",
+        },
+        logContext: {
+          source: "tool_call",
+          toolCallId: "tc-1",
+          toolName: "write",
+        },
+        decision: {
+          surface: "write",
+          value: "write",
+        },
+        ...overrides,
+      };
+    }
+
+    it("uses denialContext to format denyReason with extension tag", async () => {
+      const deps = makeRunnerDeps({
+        checkPermission: vi.fn().mockReturnValue(makeCheckResult("deny")),
+      });
+      const ctx: DenialContext = {
+        kind: "tool",
+        check: makeCheckResult("deny"),
+        agentName: "test-agent",
+      };
+      const result = await runGateCheck(
+        makeDenialContextDescriptor(ctx),
+        "test-agent",
+        "tc-1",
+        deps,
+      );
+      expect(result.action).toBe("block");
+      if (result.action === "block") {
+        expect(result.reason).toContain(EXTENSION_TAG);
+        expect(result.reason).not.toContain("Hard stop");
+      }
+    });
+
+    it("uses denialContext to format unavailableReason with extension tag", async () => {
+      const deps = makeRunnerDeps({
+        checkPermission: vi.fn().mockReturnValue(makeCheckResult("ask")),
+        canConfirm: vi.fn().mockReturnValue(false),
+      });
+      const ctx: DenialContext = {
+        kind: "tool",
+        check: makeCheckResult("ask"),
+      };
+      const result = await runGateCheck(
+        makeDenialContextDescriptor(ctx),
+        null,
+        "tc-1",
+        deps,
+      );
+      expect(result.action).toBe("block");
+      if (result.action === "block") {
+        expect(result.reason).toContain(EXTENSION_TAG);
+        expect(result.reason).toContain("no interactive UI");
+      }
+    });
+
+    it("uses denialContext to format userDeniedReason with extension tag", async () => {
+      const deps = makeRunnerDeps({
+        checkPermission: vi.fn().mockReturnValue(makeCheckResult("ask")),
+        promptPermission: vi.fn().mockResolvedValue({
+          approved: false,
+          state: "denied",
+          denialReason: "too risky",
+        }),
+      });
+      const ctx: DenialContext = {
+        kind: "tool",
+        check: makeCheckResult("ask"),
+      };
+      const result = await runGateCheck(
+        makeDenialContextDescriptor(ctx),
+        null,
+        "tc-1",
+        deps,
+      );
+      expect(result.action).toBe("block");
+      if (result.action === "block") {
+        expect(result.reason).toContain(EXTENSION_TAG);
+        expect(result.reason).toContain("too risky");
+      }
+    });
+
+    it("prefers denialContext over legacy messages when both are present", async () => {
+      const deps = makeRunnerDeps({
+        checkPermission: vi.fn().mockReturnValue(makeCheckResult("deny")),
+      });
+      const ctx: DenialContext = {
+        kind: "tool",
+        check: makeCheckResult("deny"),
+      };
+      const descriptor = makeDenialContextDescriptor(ctx, {
+        messages: {
+          denyReason: "LEGACY DENY",
+          unavailableReason: "LEGACY UNAVAILABLE",
+          userDeniedReason: () => "LEGACY USER DENIED",
+        },
+      });
+      const result = await runGateCheck(descriptor, null, "tc-1", deps);
+      expect(result.action).toBe("block");
+      if (result.action === "block") {
+        expect(result.reason).not.toContain("LEGACY");
+        expect(result.reason).toContain(EXTENSION_TAG);
+      }
+    });
+
+    it("falls back to legacy messages when denialContext is absent", async () => {
+      const deps = makeRunnerDeps({
+        checkPermission: vi.fn().mockReturnValue(makeCheckResult("deny")),
+      });
+      const result = await runGateCheck(makeDescriptor(), null, "tc-1", deps);
+      expect(result.action).toBe("block");
+      if (result.action === "block") {
+        expect(result.reason).toBe("Tool 'read' is denied.");
+      }
+    });
   });
 });

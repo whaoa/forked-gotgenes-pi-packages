@@ -144,7 +144,7 @@ describe("describeBashPathGate", () => {
       checkPermission,
       getSessionRuleset,
     )) as GateDescriptor;
-    expect(result.messages.denyReason).toContain(".env");
+    expect(result.messages!.denyReason).toContain(".env");
     expect(result.promptDetails.message).toContain(".env");
   });
 

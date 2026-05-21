@@ -149,8 +149,8 @@ describe("describeBashExternalDirectoryGate", () => {
       vi.fn().mockReturnValue([]),
     );
     const desc = result as GateDescriptor;
-    expect(desc.messages.denyReason).toContain("cat /outside/file.ts");
-    expect(desc.messages.unavailableReason).toContain("cat /outside/file.ts");
+    expect(desc.messages!.denyReason).toContain("cat /outside/file.ts");
+    expect(desc.messages!.unavailableReason).toContain("cat /outside/file.ts");
   });
 
   it("promptDetails includes command and tool_call source", async () => {

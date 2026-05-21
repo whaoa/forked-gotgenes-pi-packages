@@ -83,8 +83,8 @@ describe("describeToolGate", () => {
   it("populates messages.denyReason via formatDenyReason", () => {
     const check = makeCheckResult("deny", { toolName: "read" });
     const desc = describeToolGate(makeTcc(), check);
-    expect(desc.messages.denyReason).toContain("read");
-    expect(desc.messages.denyReason).toContain("not permitted");
+    expect(desc.messages!.denyReason).toContain("read");
+    expect(desc.messages!.denyReason).toContain("not permitted");
   });
 
   it("populates messages.unavailableReason with bash command when tool is bash", () => {
@@ -96,8 +96,8 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "rm -rf /" } }),
       check,
     );
-    expect(desc.messages.unavailableReason).toContain("rm -rf /");
-    expect(desc.messages.unavailableReason).toContain("no interactive UI");
+    expect(desc.messages!.unavailableReason).toContain("rm -rf /");
+    expect(desc.messages!.unavailableReason).toContain("no interactive UI");
   });
 
   it("populates messages.unavailableReason with tool name for non-bash tools", () => {
@@ -105,20 +105,20 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "write" }),
       makeCheckResult("ask"),
     );
-    expect(desc.messages.unavailableReason).toContain("write");
-    expect(desc.messages.unavailableReason).toContain("no interactive UI");
+    expect(desc.messages!.unavailableReason).toContain("write");
+    expect(desc.messages!.unavailableReason).toContain("no interactive UI");
   });
 
   it("populates messages.unavailableReason with mcp for mcp tool", () => {
     const check = makeCheckResult("ask", { toolName: "mcp", target: "s:t" });
     const desc = describeToolGate(makeTcc({ toolName: "mcp" }), check);
-    expect(desc.messages.unavailableReason).toContain("mcp");
+    expect(desc.messages!.unavailableReason).toContain("mcp");
   });
 
   it("populates messages.userDeniedReason as a function", () => {
     const check = makeCheckResult("ask", { toolName: "read" });
     const desc = describeToolGate(makeTcc(), check);
-    const reason = desc.messages.userDeniedReason({
+    const reason = desc.messages!.userDeniedReason({
       approved: false,
       state: "denied",
       denialReason: "too risky",

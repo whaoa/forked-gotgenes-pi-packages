@@ -1,3 +1,8 @@
+import {
+  formatDenyReason,
+  formatUnavailableReason,
+  formatUserDeniedReason,
+} from "../../denial-messages";
 import type { PermissionPromptDecision } from "../../permission-dialog";
 import { applyPermissionGate } from "../../permission-gate";
 import type { PermissionCheckResult } from "../../types";
@@ -81,6 +86,19 @@ export async function runGateCheck(
         : undefined
     : undefined;
 
+  // Construct messages from denialContext (preferred) or fall back to legacy messages.
+  const messages = descriptor.denialContext
+    ? {
+        denyReason: formatDenyReason(descriptor.denialContext),
+        unavailableReason: formatUnavailableReason(descriptor.denialContext),
+        userDeniedReason: (decision: PermissionPromptDecision) =>
+          formatUserDeniedReason(
+            descriptor.denialContext!,
+            decision.denialReason,
+          ),
+      }
+    : descriptor.messages!;
+
   let autoApproved = false;
   const gateResult = await applyPermissionGate({
     state: check.state,
@@ -96,7 +114,7 @@ export async function runGateCheck(
     },
     writeLog: deps.writeReviewLog,
     logContext: { ...descriptor.logContext, agentName },
-    messages: descriptor.messages,
+    messages,
   });
 
   // 4. Determine whether session approval was granted

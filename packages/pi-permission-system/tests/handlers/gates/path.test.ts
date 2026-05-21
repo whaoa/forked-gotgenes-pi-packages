@@ -175,8 +175,8 @@ describe("describePathGate", () => {
       checkPermission,
       getSessionRuleset,
     ) as GateDescriptor;
-    expect(result.messages.denyReason).toContain(".env");
-    expect(result.messages.unavailableReason).toContain(".env");
+    expect(result.messages!.denyReason).toContain(".env");
+    expect(result.messages!.unavailableReason).toContain(".env");
   });
 
   it("descriptor decision uses surface 'path' and the file path as value", () => {
