@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.3.0](https://github.com/gotgenes/pi-packages/compare/pi-subagents-v6.2.0...pi-subagents-v6.3.0) (2026-05-21)
+
+
+### Features
+
+* add record observer for direct session subscription ([#100](https://github.com/gotgenes/pi-packages/issues/100)) ([3776345](https://github.com/gotgenes/pi-packages/commit/37763454609d38d55c85f89bb051b8c592d425bf))
+* add UI observer for direct session subscription ([#100](https://github.com/gotgenes/pi-packages/issues/100)) ([5b35e80](https://github.com/gotgenes/pi-packages/commit/5b35e80e784d96883ee44bf5e890284efa1047ef))
+
+
+### Documentation
+
+* plan callback-threading replacement with session subscription ([#100](https://github.com/gotgenes/pi-packages/issues/100)) ([7a8e262](https://github.com/gotgenes/pi-packages/commit/7a8e262ebaf99cba017aac00691cc3614ef8c80a))
+* **retro:** add retro notes for issue [#99](https://github.com/gotgenes/pi-packages/issues/99) ([b596d0c](https://github.com/gotgenes/pi-packages/commit/b596d0c34862542d0ebb9fae67dd90e9fc660a8b))
+
 ## [6.2.0](https://github.com/gotgenes/pi-packages/compare/pi-subagents-v6.1.0...pi-subagents-v6.2.0) (2026-05-21)
 
 
