@@ -25,9 +25,10 @@ describe("createTestRecord", () => {
 		expect(record.toolUses).toBe(3);
 	});
 
-	it("allows adding optional fields not in defaults", () => {
-		const record = createTestRecord({ session: {} as any });
-		expect(record.session).toEqual({});
+	it("allows setting promise (optional field not in defaults)", () => {
+		const promise = Promise.resolve("done");
+		const record = createTestRecord({ promise });
+		expect(record.promise).toBe(promise);
 	});
 
 	it("allows overriding defaults to undefined", () => {

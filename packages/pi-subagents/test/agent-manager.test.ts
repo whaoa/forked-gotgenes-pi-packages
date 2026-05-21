@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NotificationState } from "../src/notification-state.js";
 
 vi.mock("../src/parent-snapshot.js", () => ({
   buildParentSnapshot: vi.fn((_ctx: any, _inherit?: boolean) => ({
@@ -75,17 +76,17 @@ function createManager(overrides?: {
   return { manager, runner, worktrees };
 }
 
-describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)", () => {
+describe("AgentManager — Bug 1 race condition (notification.resultConsumed vs onComplete)", () => {
   let manager: AgentManager;
 
   afterEach(() => {
     manager?.dispose();
   });
 
-  it("reproduces bug: onComplete fires with resultConsumed=false when set after await", async () => {
+  it("reproduces bug: onComplete fires with resultConsumed=false when markConsumed called after await", async () => {
     let seenConsumed: boolean | undefined;
     ({ manager } = createManager({ onComplete: (r) => {
-      seenConsumed = r.resultConsumed;
+      seenConsumed = r.notification?.resultConsumed;
     } }));
 
     const id = manager.spawn(mockCtx, "general-purpose", "test", {
@@ -93,19 +94,20 @@ describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)",
       isBackground: true,
     });
     const record = manager.getRecord(id)!;
+    record.notification = new NotificationState("tc-1");
 
     // Simulate the buggy get_subagent_result: await THEN mark consumed
     await record.promise;
-    record.resultConsumed = true; // too late — onComplete already fired
+    record.notification.markConsumed(); // too late — onComplete already fired
 
-    // onComplete saw resultConsumed as falsy (undefined) — would queue a notification (the bug)
+    // onComplete saw resultConsumed as false — would queue a notification (the bug)
     expect(seenConsumed).toBeFalsy();
   });
 
-  it("fix: onComplete sees resultConsumed=true when pre-marked before await", async () => {
+  it("fix: onComplete sees resultConsumed=true when markConsumed called before await", async () => {
     let seenConsumed: boolean | undefined;
     ({ manager } = createManager({ onComplete: (r) => {
-      seenConsumed = r.resultConsumed;
+      seenConsumed = r.notification?.resultConsumed;
     } }));
 
     const id = manager.spawn(mockCtx, "general-purpose", "test", {
@@ -113,15 +115,16 @@ describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)",
       isBackground: true,
     });
     const record = manager.getRecord(id)!;
+    record.notification = new NotificationState("tc-1");
 
     // The fix: pre-mark BEFORE awaiting
-    record.resultConsumed = true;
+    record.notification.markConsumed();
     await record.promise;
 
     expect(seenConsumed).toBe(true);
   });
 
-  it("normal case: onComplete fires with resultConsumed falsy when no explicit polling", async () => {
+  it("normal case: onComplete fires with no notification when agent was not spawned via tool", async () => {
     let completedRecord: AgentRecord | undefined;
     ({ manager } = createManager({ onComplete: (r) => {
       completedRecord = r;
@@ -134,7 +137,7 @@ describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)",
     await manager.getRecord(id)!.promise;
 
     expect(completedRecord).toBeDefined();
-    expect(completedRecord!.resultConsumed).toBeFalsy();
+    expect(completedRecord!.notification).toBeUndefined();
   });
 
   it("onComplete is not called for foreground agents", async () => {

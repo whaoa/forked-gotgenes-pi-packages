@@ -1,20 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
+import { NotificationState } from "../src/notification-state.js";
 import type { SubagentsService } from "../src/service.js";
 import { type AdapterDeps, createSubagentsService, toSubagentRecord } from "../src/service-adapter.js";
 import type { AgentRecord } from "../src/types.js";
+import { WorktreeState } from "../src/worktree-state.js";
 import { createTestRecord } from "./helpers/make-record.js";
 
 describe("toSubagentRecord", () => {
-  const baseRecord = createTestRecord({
-    id: "abc-123",
-    type: "Explore",
-    description: "Check stale TODOs",
-    result: "Found 3 stale TODOs",
-    toolUses: 5,
-    lifetimeUsage: { input: 100, output: 200, cacheWrite: 50 },
-    compactionCount: 1,
-    worktreeResult: { hasChanges: true, branch: "agent/abc-123" },
-  });
+  const baseRecord = (() => {
+    const r = createTestRecord({
+      id: "abc-123",
+      type: "Explore",
+      description: "Check stale TODOs",
+      result: "Found 3 stale TODOs",
+      toolUses: 5,
+      lifetimeUsage: { input: 100, output: 200, cacheWrite: 50 },
+      compactionCount: 1,
+    });
+    r.worktreeState = new WorktreeState({ path: "/tmp/wt", branch: "agent/abc-123" });
+    r.worktreeState.recordCleanup({ hasChanges: true, branch: "agent/abc-123" });
+    return r;
+  })();
 
   it("includes all serializable fields", () => {
     const result = toSubagentRecord(baseRecord);
@@ -33,10 +39,11 @@ describe("toSubagentRecord", () => {
     });
   });
 
-  it("strips session from the record", () => {
-    const record = createTestRecord({ session: { dispose: () => {} } as any });
+  it("strips execution from the record", () => {
+    const record = createTestRecord();
+    record.execution = { session: { dispose: () => {} } as any, outputFile: undefined };
     const result = toSubagentRecord(record);
-    expect(result).not.toHaveProperty("session");
+    expect(result).not.toHaveProperty("execution");
   });
 
   it("strips abortController from the record", () => {
@@ -51,27 +58,23 @@ describe("toSubagentRecord", () => {
     expect(result).not.toHaveProperty("promise");
   });
 
-  it("strips session, abortController, promise, outputFile, and other runtime fields from the record", () => {
-    const record = createTestRecord({ session: {} as any, abortController: new AbortController(), promise: Promise.resolve("x") });
+  it("strips abortController, promise, and collaborator fields from the record", () => {
+    const record = createTestRecord({ abortController: new AbortController(), promise: Promise.resolve("x") });
     const result = toSubagentRecord(record);
-    expect(result).not.toHaveProperty("session");
     expect(result).not.toHaveProperty("abortController");
     expect(result).not.toHaveProperty("promise");
+    expect(result).not.toHaveProperty("execution");
+    expect(result).not.toHaveProperty("notification");
+    expect(result).not.toHaveProperty("worktreeState");
   });
 
-  it("strips resultConsumed, toolCallId, outputFile, worktree, invocation", () => {
-    const record = createTestRecord({
-      resultConsumed: true,
-      toolCallId: "tool-1",
-      outputFile: "/tmp/out.jsonl",
-      worktree: { path: "/tmp/wt", branch: "wt-branch" },
-      invocation: { modelName: "haiku" },
-    });
+  it("strips invocation and collaborator fields from the serialized output", () => {
+    const record = createTestRecord({ invocation: { modelName: "haiku" } });
+    record.notification = new NotificationState("tc-1");
     const result = toSubagentRecord(record);
-    expect(result).not.toHaveProperty("resultConsumed");
-    expect(result).not.toHaveProperty("toolCallId");
-    expect(result).not.toHaveProperty("outputFile");
-    expect(result).not.toHaveProperty("worktree");
+    expect(result).not.toHaveProperty("notification");
+    expect(result).not.toHaveProperty("execution");
+    expect(result).not.toHaveProperty("worktreeState");
     expect(result).not.toHaveProperty("invocation");
   });
 
@@ -110,7 +113,6 @@ describe("createSubagentsService — getRecord and listAgents", () => {
     type: "Explore",
     description: "task A",
     lifetimeUsage: { input: 10, output: 20, cacheWrite: 5 },
-    session: { dispose: () => {} } as any,
     abortController: new AbortController(),
   });
 
@@ -354,11 +356,8 @@ describe("createSubagentsService — steer, abort, waitForAll, hasRunning", () =
     });
 
     it("queues message and returns true when session not ready", async () => {
-      const record = createTestRecord({
-        id: "a-1",
-        status: "running",
-        session: undefined,
-      });
+      const record = createTestRecord({ id: "a-1", status: "running" });
+      // No execution state — session not yet created
       const deps = createDeps();
       (deps.manager.getRecord as ReturnType<typeof vi.fn>).mockReturnValue(record);
       const svc = createSubagentsService(deps);
@@ -368,11 +367,8 @@ describe("createSubagentsService — steer, abort, waitForAll, hasRunning", () =
 
     it("delegates to session.steer and returns true when session is ready", async () => {
       const mockSteer = vi.fn(async () => {});
-      const record = createTestRecord({
-        id: "a-1",
-        status: "running",
-        session: { steer: mockSteer } as any,
-      });
+      const record = createTestRecord({ id: "a-1", status: "running" });
+      record.execution = { session: { steer: mockSteer } as any, outputFile: undefined };
       const deps = createDeps();
       (deps.manager.getRecord as ReturnType<typeof vi.fn>).mockReturnValue(record);
       const svc = createSubagentsService(deps);

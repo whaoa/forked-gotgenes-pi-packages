@@ -88,7 +88,7 @@ export default function (pi: ExtensionAPI) {
       });
 
       // Skip notification if result was already consumed via get_subagent_result
-      if (record.notification?.resultConsumed ?? record.resultConsumed) {
+      if (record.notification?.resultConsumed) {
         notifications.cleanupCompleted(record.id);
         return;
       }

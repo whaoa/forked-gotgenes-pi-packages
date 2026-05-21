@@ -12,7 +12,6 @@
  * after construction as lifecycle information becomes available.
  */
 
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { ExecutionState } from "./execution-state.js";
 import type { NotificationState } from "./notification-state.js";
 import type { AgentInvocation, SubagentType } from "./types.js";
@@ -38,18 +37,9 @@ export interface AgentRecordInit {
 	completedAt?: number;
 	result?: string;
 	error?: string;
-	toolUses?: number;
-	lifetimeUsage?: LifetimeUsage;
-	compactionCount?: number;
 	abortController?: AbortController;
 	invocation?: AgentInvocation;
-	session?: AgentSession;
 	promise?: Promise<string>;
-	resultConsumed?: boolean;
-	worktree?: { path: string; branch: string };
-	worktreeResult?: { hasChanges: boolean; branch?: string };
-	toolCallId?: string;
-	outputFile?: string;
 }
 
 export class AgentRecord {
@@ -85,15 +75,10 @@ export class AgentRecord {
 	private _compactionCount: number;
 	get compactionCount(): number { return this._compactionCount; }
 
-	// Legacy mutable fields — being migrated to phase-specific collaborators (steps 5–12)
-	session?: AgentSession;
-	abortController?: AbortController;
+	/** AbortController for cancelling this agent. Set at construction; used only by AgentManager. */
+	readonly abortController?: AbortController;
+	/** Promise for the full agent run (including post-processing). Set once by AgentManager. */
 	promise?: Promise<string>;
-	resultConsumed?: boolean;
-	worktree?: { path: string; branch: string };
-	worktreeResult?: { hasChanges: boolean; branch?: string };
-	toolCallId?: string;
-	outputFile?: string;
 
 	// Phase-specific collaborators — each born complete when their info becomes available
 	execution?: ExecutionState;
@@ -112,17 +97,11 @@ export class AgentRecord {
 		this._startedAt = init.startedAt ?? Date.now();
 		this._completedAt = init.completedAt;
 
-		this._toolUses = init.toolUses ?? 0;
-		this._lifetimeUsage = init.lifetimeUsage ?? { input: 0, output: 0, cacheWrite: 0 };
-		this._compactionCount = init.compactionCount ?? 0;
+		this._toolUses = 0;
+		this._lifetimeUsage = { input: 0, output: 0, cacheWrite: 0 };
+		this._compactionCount = 0;
 		this.abortController = init.abortController;
-		this.session = init.session;
 		this.promise = init.promise;
-		this.resultConsumed = init.resultConsumed;
-		this.worktree = init.worktree;
-		this.worktreeResult = init.worktreeResult;
-		this.toolCallId = init.toolCallId;
-		this.outputFile = init.outputFile;
 	}
 
 	/** Increment tool use count. Called by record-observer on tool_execution_end. */

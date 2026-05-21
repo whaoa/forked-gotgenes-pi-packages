@@ -53,21 +53,29 @@ describe("createGetResultTool", () => {
     expect(result.content[0].text).toContain("Error: timeout");
   });
 
-  it("marks result as consumed and cancels nudge for completed agent", async () => {
+  it("marks notification consumed and cancels nudge for completed agent", async () => {
+    const record = createTestRecord();
+    record.notification = new NotificationState("tc-1");
+    const records = new Map([["agent-1", record]]);
+    const deps = makeDeps(records);
+    await execute(deps, { agent_id: "agent-1" });
+    expect(record.notification.resultConsumed).toBe(true);
+    expect(deps.cancelNudge).toHaveBeenCalledWith("agent-1");
+  });
+
+  it("still cancels nudge for completed agent without NotificationState", async () => {
     const record = createTestRecord();
     const records = new Map([["agent-1", record]]);
     const deps = makeDeps(records);
     await execute(deps, { agent_id: "agent-1" });
-    expect(record.resultConsumed).toBe(true);
     expect(deps.cancelNudge).toHaveBeenCalledWith("agent-1");
   });
 
-  it("does not mark consumed for running agent", async () => {
+  it("does not cancel nudge for running agent", async () => {
     const record = createTestRecord({ status: "running", completedAt: undefined });
     const records = new Map([["agent-1", record]]);
     const deps = makeDeps(records);
     await execute(deps, { agent_id: "agent-1" });
-    expect(record.resultConsumed).toBeUndefined();
     expect(deps.cancelNudge).not.toHaveBeenCalled();
   });
 
@@ -96,7 +104,8 @@ describe("createGetResultTool", () => {
   });
 
   it("includes conversation when verbose=true", async () => {
-    const record = createTestRecord({ session: {} as any });
+    const record = createTestRecord();
+    record.execution = { session: {} as any, outputFile: undefined };
     const records = new Map([["agent-1", record]]);
     const deps = makeDeps(records);
     deps.getConversation.mockReturnValue("User: hello\nAssistant: hi");

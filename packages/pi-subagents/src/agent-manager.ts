@@ -191,8 +191,6 @@ export class AgentManager {
         );
       }
       record.worktreeState = new WorktreeState(wt);
-      // Keep legacy field in sync during migration
-      record.worktree = wt;
       worktreeCwd = wt.path;
     }
 
@@ -230,11 +228,7 @@ export class AgentManager {
         // before the run completes (e.g. in background agent status messages).
         const outputFile = session.sessionManager?.getSessionFile?.() ?? undefined;
         // Set the execution-state collaborator — born complete at session creation.
-        const execution: ExecutionState = { session, outputFile };
-        record.execution = execution;
-        // Keep legacy fields in sync during migration
-        record.session = session;
-        if (outputFile) record.outputFile = outputFile;
+        record.execution = { session, outputFile };
         // Flush any steers that arrived before the session was ready
         const buffered = this.pendingSteers.get(id);
         if (buffered?.length) {
@@ -259,8 +253,6 @@ export class AgentManager {
         if (record.worktreeState) {
           const wtResult = this.worktrees.cleanup(record.worktreeState, options.description);
           record.worktreeState.recordCleanup(wtResult);
-          // Keep legacy field in sync during migration
-          record.worktreeResult = wtResult;
           if (wtResult.hasChanges && wtResult.branch) {
             finalResult += `\n\n---\nChanges saved to branch \`${wtResult.branch}\`. Merge with: \`git merge ${wtResult.branch}\``;
           }
@@ -271,8 +263,8 @@ export class AgentManager {
         else if (steered) record.markSteered(finalResult);
         else record.markCompleted(finalResult);
 
-        record.session = session;
-        if (sessionFile) record.outputFile = sessionFile;
+        // Update execution collaborator with final session/outputFile from runner
+        record.execution = { session, outputFile: sessionFile ?? record.execution?.outputFile };
 
         if (options.isBackground) {
           this.runningBackground--;
@@ -292,8 +284,7 @@ export class AgentManager {
           try {
             const wtResult = this.worktrees.cleanup(record.worktreeState, options.description);
             record.worktreeState.recordCleanup(wtResult);
-            // Keep legacy field in sync during migration
-            record.worktreeResult = wtResult;
+
           } catch (err) { debugLog("cleanupWorktree on agent error", err); }
         }
 
@@ -350,16 +341,17 @@ export class AgentManager {
     signal?: AbortSignal,
   ): Promise<AgentRecord | undefined> {
     const record = this.agents.get(id);
-    if (!record?.session) return undefined;
+    const session = record?.execution?.session;
+    if (!session) return undefined;
 
     record.resetForResume(Date.now());
 
-    const unsubResume = subscribeRecordObserver(record.session, record, {
+    const unsubResume = subscribeRecordObserver(session, record, {
       onCompact: (r, info) => this.onCompact?.(r, info),
     });
 
     try {
-      const responseText = await this.runner.resume(record.session, prompt, {
+      const responseText = await this.runner.resume(session, prompt, {
         signal,
       });
       record.markCompleted(responseText);
@@ -401,8 +393,7 @@ export class AgentManager {
 
   /** Dispose a record's session and remove it from the map. */
   private removeRecord(id: string, record: AgentRecord): void {
-    record.session?.dispose?.();
-    record.session = undefined;
+    record.execution?.session?.dispose?.();
     this.agents.delete(id);
     this.pendingSteers.delete(id);
   }
@@ -477,7 +468,7 @@ export class AgentManager {
     // Clear queue
     this.queue = [];
     for (const record of this.agents.values()) {
-      record.session?.dispose();
+      record.execution?.session?.dispose();
     }
     this.agents.clear();
     // Prune any orphaned git worktrees (crash recovery)

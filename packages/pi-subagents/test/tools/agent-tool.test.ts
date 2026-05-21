@@ -111,7 +111,8 @@ describe("Agent tool — resume path", () => {
 
   it("returns no-session when agent has no active session", async () => {
     const deps = makeDeps();
-    deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord({ session: undefined }));
+    // No execution state set — session not yet created
+    deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord());
     const result = await execute(deps, {
       prompt: "continue",
       description: "resume",
@@ -123,7 +124,9 @@ describe("Agent tool — resume path", () => {
 
   it("returns result text on successful resume", async () => {
     const deps = makeDeps();
-    deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord({ session: {} as any }));
+    const resumeRecord = createTestRecord();
+    resumeRecord.execution = { session: {} as any, outputFile: undefined };
+    deps.manager.getRecord = vi.fn().mockReturnValue(resumeRecord);
     deps.manager.resume = vi.fn().mockResolvedValue(createTestRecord({ result: "Resumed output." }));
     const result = await execute(deps, {
       prompt: "continue",

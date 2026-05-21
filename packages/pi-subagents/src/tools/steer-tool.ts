@@ -48,7 +48,7 @@ export function createSteerTool(deps: SteerToolDeps) {
           `Agent "${params.agent_id}" is not running (status: ${record.status}). Cannot steer a non-running agent.`,
         );
       }
-      const session = record.execution?.session ?? record.session;
+      const session = record.execution?.session;
       if (!session) {
         // Session not ready yet — queue via manager for delivery once initialized
         deps.queueSteer(record.id, params.message);

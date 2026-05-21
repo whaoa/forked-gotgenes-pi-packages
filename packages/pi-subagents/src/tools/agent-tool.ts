@@ -382,7 +382,7 @@ Guidelines:
             `Agent not found: "${params.resume}". It may have been cleaned up.`,
           );
         }
-        if (!existing.session) {
+        if (!existing.execution?.session) {
           return textResult(
             `Agent "${params.resume}" has no active session to resume.`,
           );
@@ -433,8 +433,6 @@ Guidelines:
         if (record) {
           // Born complete: notification-state object owns toolCallId + resultConsumed.
           record.notification = new NotificationState(toolCallId);
-          // Keep legacy field in sync during migration
-          record.toolCallId = toolCallId;
         }
 
         deps.agentActivity.set(id, bgState);
@@ -455,7 +453,7 @@ Guidelines:
             `Agent ID: ${id}\n` +
             `Type: ${displayName}\n` +
             `Description: ${params.description}\n` +
-            ((record?.execution?.outputFile ?? record?.outputFile) ? `Output file: ${record?.execution?.outputFile ?? record?.outputFile}\n` : "") +
+            (record?.execution?.outputFile ? `Output file: ${record.execution.outputFile}\n` : "") +
             (isQueued
               ? `Position: queued (max ${deps.manager.getMaxConcurrent()} concurrent)\n`
               : "") +
@@ -529,7 +527,7 @@ Guidelines:
               fgState.setSession(session);
               unsubUI = subscribeUIObserver(session, fgState, streamUpdate);
               for (const a of deps.manager.listAgents()) {
-                if (a.session === session) {
+                if (a.execution?.session === session) {
                   fgId = a.id;
                   deps.agentActivity.set(a.id, fgState);
                   deps.widget.ensureTimer();

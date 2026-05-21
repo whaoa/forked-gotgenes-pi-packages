@@ -86,7 +86,7 @@ export function createSubagentsService(deps: AdapterDeps): SubagentsService {
       if (!record || record.status !== "running") {
         return false;
       }
-      const session = record.execution?.session ?? record.session;
+      const session = record.execution?.session;
       if (!session) {
         // Session not ready yet — queue via manager for delivery once initialized
         return manager.queueSteer(id, message);
@@ -124,7 +124,7 @@ export function toSubagentRecord(record: AgentRecord): SubagentRecord {
   if (record.result !== undefined) out.result = record.result;
   if (record.error !== undefined) out.error = record.error;
   if (record.completedAt !== undefined) out.completedAt = record.completedAt;
-  const worktreeResult = record.worktreeState?.cleanupResult ?? record.worktreeResult;
+  const worktreeResult = record.worktreeState?.cleanupResult;
   if (worktreeResult !== undefined) out.worktreeResult = worktreeResult;
 
   return out;

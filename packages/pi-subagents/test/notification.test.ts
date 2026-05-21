@@ -70,18 +70,14 @@ describe("formatTaskNotification", () => {
     expect(xml).toContain("No output.");
   });
 
-  it("includes toolCallId when present (legacy field)", () => {
-    const record = createTestRecord({ toolCallId: "tc-123" });
+  it("includes toolCallId from record.notification when present", () => {
+    const record = createTestRecord();
+    record.notification = new NotificationState("tc-123");
     const xml = formatTaskNotification(record, 500);
     expect(xml).toContain("<tool-use-id>tc-123</tool-use-id>");
   });
 
-  it("includes toolCallId from record.notification when present", () => {
-    const record = createTestRecord();
-    record.notification = new NotificationState("notif-456");
-    const xml = formatTaskNotification(record, 500);
-    expect(xml).toContain("<tool-use-id>notif-456</tool-use-id>");
-  });
+
 
   it("excludes toolCallId when absent", () => {
     const xml = formatTaskNotification(baseRecord, 500);
@@ -214,10 +210,12 @@ describe("createNotificationSystem", () => {
     expect(deps.sendMessage).toHaveBeenCalledOnce();
   });
 
-  it("sendCompletion skips nudge when resultConsumed", () => {
+  it("sendCompletion skips nudge when notification.resultConsumed is true", () => {
     const deps = makeDeps();
     const system = createNotificationSystem(deps);
-    const record = createTestRecord({ resultConsumed: true });
+    const record = createTestRecord();
+    record.notification = new NotificationState("tc-1");
+    record.notification.markConsumed();
     system.sendCompletion(record);
     vi.advanceTimersByTime(300);
     expect(deps.sendMessage).not.toHaveBeenCalled();

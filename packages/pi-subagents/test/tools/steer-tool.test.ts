@@ -39,7 +39,8 @@ describe("createSteerTool", () => {
   });
 
   it("queues steer when session is not ready", async () => {
-    const record = createTestRecord({ status: "running", session: undefined });
+    // No execution state set — session not yet created
+    const record = createTestRecord({ status: "running" });
     const records = new Map([["agent-1", record]]);
     const deps = makeDeps(records);
     const result = await execute(deps, { agent_id: "agent-1", message: "redirect" });
@@ -52,11 +53,13 @@ describe("createSteerTool", () => {
   });
 
   it("sends steer and emits event on success", async () => {
-    const record = createTestRecord({ status: "running", session: { fake: true } as any });
+    const record = createTestRecord({ status: "running" });
+    const fakeSession = { fake: true } as any;
+    record.execution = { session: fakeSession, outputFile: undefined };
     const records = new Map([["agent-1", record]]);
     const deps = makeDeps(records);
     const result = await execute(deps, { agent_id: "agent-1", message: "change plan" });
-    expect(deps.steerAgent).toHaveBeenCalledWith(record.session, "change plan");
+    expect(deps.steerAgent).toHaveBeenCalledWith(fakeSession, "change plan");
     expect(deps.emitEvent).toHaveBeenCalledWith("subagents:steered", {
       id: "agent-1",
       message: "change plan",
@@ -66,7 +69,8 @@ describe("createSteerTool", () => {
   });
 
   it("returns error message when steerAgent throws", async () => {
-    const record = createTestRecord({ status: "running", session: { fake: true } as any });
+    const record = createTestRecord({ status: "running" });
+    record.execution = { session: { fake: true } as any, outputFile: undefined };
     const records = new Map([["agent-1", record]]);
     const deps = makeDeps(records);
     deps.steerAgent.mockRejectedValue(new Error("session closed"));

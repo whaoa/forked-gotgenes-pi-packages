@@ -51,23 +51,21 @@ describe("AgentRecord — constructor", () => {
 		expect(record.completedAt).toBe(2000);
 	});
 
-	it("passes through optional non-transition fields", () => {
+	it("passes through optional identity fields", () => {
 		const controller = new AbortController();
 		const record = new AgentRecord({
 			id: "1",
 			type: "general-purpose",
 			description: "test",
-			toolUses: 5,
-			compactionCount: 2,
-			lifetimeUsage: { input: 100, output: 50, cacheWrite: 10 },
 			abortController: controller,
 			invocation: { modelName: "haiku" },
 		});
-		expect(record.toolUses).toBe(5);
-		expect(record.compactionCount).toBe(2);
-		expect(record.lifetimeUsage).toEqual({ input: 100, output: 50, cacheWrite: 10 });
 		expect(record.abortController).toBe(controller);
 		expect(record.invocation).toEqual({ modelName: "haiku" });
+		// Stats always start at zero — set via mutation methods after construction
+		expect(record.toolUses).toBe(0);
+		expect(record.compactionCount).toBe(0);
+		expect(record.lifetimeUsage).toEqual({ input: 0, output: 0, cacheWrite: 0 });
 	});
 
 	it("leaves optional fields undefined when not provided", () => {
@@ -79,10 +77,10 @@ describe("AgentRecord — constructor", () => {
 		expect(record.result).toBeUndefined();
 		expect(record.error).toBeUndefined();
 		expect(record.completedAt).toBeUndefined();
-		expect(record.session).toBeUndefined();
 		expect(record.promise).toBeUndefined();
-		expect(record.worktree).toBeUndefined();
-		expect(record.outputFile).toBeUndefined();
+		expect(record.execution).toBeUndefined();
+		expect(record.worktreeState).toBeUndefined();
+		expect(record.notification).toBeUndefined();
 	});
 });
 

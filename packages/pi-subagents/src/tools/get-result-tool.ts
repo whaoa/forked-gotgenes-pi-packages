@@ -57,7 +57,6 @@ export function createGetResultTool(deps: GetResultDeps) {
         // Pre-mark consumed BEFORE awaiting — onComplete fires inside .then() and
         // always runs before this await resumes. Prevents a redundant notification.
         record.notification?.markConsumed();
-        record.resultConsumed = true; // keep legacy in sync during migration
         deps.cancelNudge(params.agent_id);
         await record.promise;
       }
@@ -65,7 +64,7 @@ export function createGetResultTool(deps: GetResultDeps) {
       const displayName = getDisplayName(record.type, deps.registry);
       const duration = formatDuration(record.startedAt, record.completedAt);
       const tokens = formatLifetimeTokens(record);
-      const contextPercent = getSessionContextPercent(record.execution?.session ?? record.session);
+      const contextPercent = getSessionContextPercent(record.execution?.session);
       const statsParts = [`Tool uses: ${record.toolUses}`];
       if (tokens) statsParts.push(tokens);
       if (contextPercent !== null) statsParts.push(`Context: ${Math.round(contextPercent)}%`);
@@ -88,13 +87,12 @@ export function createGetResultTool(deps: GetResultDeps) {
       // Mark result as consumed — suppresses the completion notification
       if (record.status !== "running" && record.status !== "queued") {
         record.notification?.markConsumed();
-        record.resultConsumed = true; // keep legacy in sync during migration
         deps.cancelNudge(params.agent_id);
       }
 
       // Verbose: include full conversation
-      if (params.verbose && (record.execution?.session ?? record.session)) {
-        const conversation = deps.getConversation(record.execution?.session ?? record.session!);
+      if (params.verbose && record.execution?.session) {
+        const conversation = deps.getConversation(record.execution.session);
         if (conversation) {
           output += `\n\n--- Agent Conversation ---\n${conversation}`;
         }
