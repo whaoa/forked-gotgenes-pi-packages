@@ -64,22 +64,6 @@ export interface AgentInvocation {
   isolation?: IsolationMode;
 }
 
-/** Details attached to custom notification messages for visual rendering. */
-export interface NotificationDetails {
-  id: string;
-  description: string;
-  status: string;
-  toolUses: number;
-  turnCount: number;
-  maxTurns?: number;
-  totalTokens: number;
-  durationMs: number;
-  outputFile?: string;
-  error?: string;
-  resultPreview: string;
-
-}
-
 /**
  * Plain data snapshot of the parent session state captured at spawn time.
  * Replaces live `ExtensionContext` references so queued agents don't read stale state.

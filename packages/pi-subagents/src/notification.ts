@@ -1,7 +1,22 @@
 import { debugLog } from "./debug.js";
-import type { AgentRecord, NotificationDetails } from "./types.js";
+import type { AgentRecord } from "./types.js";
 import type { AgentActivityTracker } from "./ui/agent-activity-tracker.js";
 import { getLifetimeTotal, getSessionContextPercent } from "./usage.js";
+
+/** Details attached to custom notification messages for visual rendering. */
+export interface NotificationDetails {
+  id: string;
+  description: string;
+  status: string;
+  toolUses: number;
+  turnCount: number;
+  maxTurns?: number;
+  totalTokens: number;
+  durationMs: number;
+  outputFile?: string;
+  error?: string;
+  resultPreview: string;
+}
 
 // ---- Pure helpers (exported for unit testing) ----
 

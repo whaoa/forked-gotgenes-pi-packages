@@ -1,6 +1,6 @@
 import { describe, expect, it, } from "vitest";
+import type { NotificationDetails } from "../src/notification.js";
 import { createNotificationRenderer } from "../src/renderer.js";
-import type { NotificationDetails } from "../src/types.js";
 
 /** Minimal theme stub — returns text wrapped with the style name for assertion. */
 function stubTheme() {

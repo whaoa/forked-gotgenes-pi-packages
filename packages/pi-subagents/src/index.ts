@@ -18,7 +18,7 @@ import { AgentTypeRegistry } from "./agent-types.js";
 import { loadCustomAgents } from "./custom-agents.js";
 import { SessionLifecycleHandler, ToolStartHandler } from "./handlers/index.js";
 import { type ModelRegistry, resolveModel } from "./model-resolver.js";
-import { buildEventData, createNotificationSystem } from "./notification.js";
+import { buildEventData, createNotificationSystem, type NotificationDetails } from "./notification.js";
 import { createNotificationRenderer } from "./renderer.js";
 import { createSubagentRuntime } from "./runtime.js";
 import { publishSubagentsService, unpublishSubagentsService } from "./service.js";
@@ -28,7 +28,6 @@ import { createAgentTool } from "./tools/agent-tool.js";
 import { createGetResultTool } from "./tools/get-result-tool.js";
 import { getModelLabelFromConfig } from "./tools/helpers.js";
 import { createSteerTool } from "./tools/steer-tool.js";
-import { type NotificationDetails } from "./types.js";
 import { createAgentsMenuHandler } from "./ui/agent-menu.js";
 import {
   AgentWidget,
