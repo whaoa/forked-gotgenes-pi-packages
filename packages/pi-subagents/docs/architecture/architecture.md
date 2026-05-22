@@ -385,7 +385,7 @@ Each step is sequenced so it makes the next step easier.
 | ~~Settings relay~~             | ~~`AgentMenuDeps` (13 fields)~~          | **Fixed #109**: `SettingsManager` class; 6 callback fields collapsed to `settings: SettingsManager`; `AgentMenuDeps` now 8 fields                                         |
 | ~~Post-construction mutation~~ | ~~`AgentRecord` non-transition state~~   | **Fixed #111**: `ExecutionState`, `WorktreeState`, `NotificationState` collaborators; `pendingSteers` moved to `AgentManager`; stats encapsulated behind mutation methods |
 | ~~Fire-and-forget callbacks~~  | ~~`AgentManagerOptions`~~                | **Fixed #112**: `AgentManagerObserver` interface; `observer` replaces 3 callbacks; `index.ts` constructs one observer object instead of 3 closure lambdas                 |
-| Duplicate `SpawnOptions`       | `service.ts` + `agent-manager.ts`        | Two incompatible shapes (JSON-friendly vs runtime types) with the same name                                                                                               |
+| ~~Duplicate `SpawnOptions`~~   | ~~`service.ts` + `agent-manager.ts`~~    | **Fixed #113**: internal type renamed to `AgentSpawnConfig`; public `SpawnOptions` in `service.ts` unchanged                                                              |
 | Type dumping ground            | `types.ts`                               | `NotificationDetails` used only by notification/renderer; ~~`DEFAULT_AGENT_NAMES` moved to `AgentTypeRegistry` (#108)~~; `AgentConfig` (21 fields) consumers use 2–4 each |
 | Wide dependency bags           | `AgentToolDeps` (7), `AgentMenuDeps` (8) | Settings narrowed (#109); registry narrowed (#108); more narrowing planned in D steps                                                                                     |
 
@@ -456,10 +456,11 @@ The record doesn't accumulate half-baked state — it receives fully constructed
 
 With the registry class, settings manager, and observer in place, the dependency bags shrink naturally.
 
-#### D1. Disambiguate `SpawnOptions` (#113)
+#### D1. Disambiguate `SpawnOptions` (#113) ✅
 
-Rename the internal `SpawnOptions` in `agent-manager.ts` to `AgentSpawnConfig` (or similar) to distinguish it from the JSON-friendly public `SpawnOptions` in `service.ts`.
-The two types serve different consumers and should not share a name.
+**Done.**
+Internal `SpawnOptions` in `agent-manager.ts` renamed to `AgentSpawnConfig`.
+Public `SpawnOptions` in `service.ts` is unchanged.
 
 #### D2. Narrow `AgentToolDeps` and `AgentMenuDeps` (#114)
 
