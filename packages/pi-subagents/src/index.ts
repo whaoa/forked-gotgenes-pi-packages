@@ -11,19 +11,32 @@
  */
 
 import { join } from "node:path";
-import { defineTool, type ExtensionAPI, getAgentDir } from "@earendil-works/pi-coding-agent";
+import {
+  createAgentSession,
+  DefaultResourceLoader,
+  defineTool,
+  type ExtensionAPI,
+  getAgentDir,
+  SettingsManager as SdkSettingsManager,
+  SessionManager,
+} from "@earendil-works/pi-coding-agent";
 import { AgentManager, type AgentManagerObserver } from "./agent-manager.js";
-import { getAgentConversation, resumeAgent, runAgent, steerAgent } from "./agent-runner.js";
+import { createAgentRunner, getAgentConversation, type RunnerIO, steerAgent } from "./agent-runner.js";
 import { AgentTypeRegistry } from "./agent-types.js";
 import { loadCustomAgents } from "./custom-agents.js";
+import { detectEnv } from "./env.js";
 import { SessionLifecycleHandler, ToolStartHandler } from "./handlers/index.js";
+import { buildMemoryBlock, buildReadOnlyMemoryBlock } from "./memory.js";
 import { type ModelRegistry, resolveModel } from "./model-resolver.js";
 import { buildEventData, type NotificationDetails, NotificationManager } from "./notification.js";
+import { buildAgentPrompt } from "./prompts.js";
 import { createNotificationRenderer } from "./renderer.js";
 import { createSubagentRuntime } from "./runtime.js";
 import { publishSubagentsService, unpublishSubagentsService } from "./service.js";
 import { createSubagentsService } from "./service-adapter.js";
+import { deriveSubagentSessionDir } from "./session-dir.js";
 import { SettingsManager } from "./settings.js";
+import { preloadSkills } from "./skill-loader.js";
 import { createAgentTool } from "./tools/agent-tool.js";
 import { createGetResultTool } from "./tools/get-result-tool.js";
 import { getModelLabelFromConfig } from "./tools/helpers.js";
@@ -120,8 +133,24 @@ export default function (pi: ExtensionAPI) {
     },
   };
 
+  const runnerIO: RunnerIO = {
+    detectEnv,
+    getAgentDir,
+    createResourceLoader: (opts) => new DefaultResourceLoader(opts as any),
+    deriveSessionDir: deriveSubagentSessionDir,
+    createSessionManager: (cwd, dir) => SessionManager.create(cwd, dir),
+    createSettingsManager: (cwd, dir) => SdkSettingsManager.create(cwd, dir),
+    createSession: (opts) => createAgentSession(opts as any),
+    assemblerIO: {
+      preloadSkills,
+      buildMemoryBlock,
+      buildReadOnlyMemoryBlock,
+      buildAgentPrompt,
+    },
+  };
+
   const manager = new AgentManager({
-    runner: { run: runAgent, resume: resumeAgent },
+    runner: createAgentRunner(runnerIO),
     worktrees: new GitWorktreeManager(process.cwd()),
     exec: (cmd, args, opts) => pi.exec(cmd, args, opts),
     registry,

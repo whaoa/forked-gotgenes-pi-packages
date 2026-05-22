@@ -82,6 +82,36 @@ vi.mock("../src/session-dir.js", () => ({
 
 import { resumeAgent, runAgent } from "../src/agent-runner.js";
 
+// ── RunnerIO stub factory ──────────────────────────────────────────────────────
+
+// Return type deliberately unannotated so vi.fn() stubs keep their Mock<...> methods
+// (mockResolvedValue, mockReturnValue, mock.calls, etc.). The inferred type is
+// still structurally compatible with RunnerIO for the runAgent() call site.
+function createRunnerIO() {
+  return {
+    detectEnv: vi.fn().mockResolvedValue({ isGitRepo: false, branch: "", platform: "linux" }),
+    getAgentDir: vi.fn().mockReturnValue("/mock/agent-dir"),
+    createResourceLoader: vi.fn().mockReturnValue({ reload: vi.fn().mockResolvedValue(undefined) }),
+    deriveSessionDir: vi.fn().mockReturnValue("/mock/session-dir/tasks"),
+    createSessionManager: vi.fn().mockReturnValue({
+      newSession: vi.fn(),
+      getSessionFile: vi.fn().mockReturnValue("/sessions/child.jsonl"),
+    }),
+    createSettingsManager: vi.fn().mockReturnValue({}),
+    createSession: vi.fn(),
+    assemblerIO: {
+      preloadSkills: vi.fn().mockReturnValue([]),
+      buildMemoryBlock: vi.fn().mockReturnValue(""),
+      buildReadOnlyMemoryBlock: vi.fn().mockReturnValue(""),
+      buildAgentPrompt: vi.fn().mockReturnValue("system prompt"),
+    },
+  };
+}
+
+let io: ReturnType<typeof createRunnerIO>;
+
+// ── Session mock factory ───────────────────────────────────────────────────────
+
 function createSession(finalText: string) {
   const listeners: Array<(event: any) => void> = [];
   const session = {
@@ -117,6 +147,8 @@ const snapshot: ParentSnapshot = {
 const exec = vi.fn();
 
 beforeEach(() => {
+  io = createRunnerIO();
+  // Legacy hoisted-mock resets (dead code after RunnerIO injection; removed in next commit).
   createAgentSession.mockReset();
   defaultResourceLoaderCtor.mockClear();
   getAgentDir.mockClear();
@@ -133,18 +165,18 @@ beforeEach(() => {
 describe("agent-runner final output capture", () => {
   it("returns the final assistant text even when no text_delta events were streamed", async () => {
     const { session } = createSession("LOCKED");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
-    const result = await runAgent(snapshot, "Explore", "Say LOCKED", { exec, registry: mockAgentLookup });
+    const result = await runAgent(snapshot, "Explore", "Say LOCKED", { exec, registry: mockAgentLookup }, io);
 
     expect(result.responseText).toBe("LOCKED");
   });
 
   it("binds extensions before prompting", async () => {
     const { session } = createSession("BOUND");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
-    await runAgent(snapshot, "Explore", "Say BOUND", { exec, registry: mockAgentLookup });
+    await runAgent(snapshot, "Explore", "Say BOUND", { exec, registry: mockAgentLookup }, io);
 
     expect(session.bindExtensions).toHaveBeenCalledTimes(1);
     expect(session.bindExtensions).toHaveBeenCalledWith({});
@@ -156,18 +188,18 @@ describe("agent-runner final output capture", () => {
 
   it("passes effective cwd and agentDir to the loader and settings manager", async () => {
     const { session } = createSession("CONFIGURED");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
-    await runAgent(snapshot, "Explore", "Say CONFIGURED", { exec, cwd: "/tmp/worktree" , registry: mockAgentLookup });
+    await runAgent(snapshot, "Explore", "Say CONFIGURED", { exec, cwd: "/tmp/worktree", registry: mockAgentLookup }, io);
 
-    expect(getAgentDir).toHaveBeenCalledTimes(1);
-    expect(defaultResourceLoaderCtor).toHaveBeenCalledWith(expect.objectContaining({
+    expect(io.getAgentDir).toHaveBeenCalledTimes(1);
+    expect(io.createResourceLoader).toHaveBeenCalledWith(expect.objectContaining({
       cwd: "/tmp/worktree",
       agentDir: "/mock/agent-dir",
     }));
-    expect(settingsManagerCreate).toHaveBeenCalledWith("/tmp/worktree", "/mock/agent-dir");
-    expect(sessionManagerCreate).toHaveBeenCalledWith("/tmp/worktree", "/mock/session-dir/tasks");
-    expect(createAgentSession).toHaveBeenCalledWith(expect.objectContaining({
+    expect(io.createSettingsManager).toHaveBeenCalledWith("/tmp/worktree", "/mock/agent-dir");
+    expect(io.createSessionManager).toHaveBeenCalledWith("/tmp/worktree", "/mock/session-dir/tasks");
+    expect(io.createSession).toHaveBeenCalledWith(expect.objectContaining({
       cwd: "/tmp/worktree",
       agentDir: "/mock/agent-dir",
     }));
@@ -175,44 +207,44 @@ describe("agent-runner final output capture", () => {
 
   it("suppresses AGENTS.md/CLAUDE.md/APPEND_SYSTEM.md for subagents", async () => {
     const { session } = createSession("ISOLATED");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
-    await runAgent(snapshot, "Explore", "Say ISOLATED", { exec, registry: mockAgentLookup });
+    await runAgent(snapshot, "Explore", "Say ISOLATED", { exec, registry: mockAgentLookup }, io);
 
     // noContextFiles skips AGENTS.md/CLAUDE.md at the loader source;
     // appendSystemPromptOverride suppresses APPEND_SYSTEM.md (no flag equivalent).
-    expect(defaultResourceLoaderCtor).toHaveBeenCalledWith(
+    expect(io.createResourceLoader).toHaveBeenCalledWith(
       expect.objectContaining({
         noContextFiles: true,
         appendSystemPromptOverride: expect.any(Function),
       }),
     );
     // The override returns an empty list so any loaded sources are discarded.
-    const ctorArgs = defaultResourceLoaderCtor.mock.calls[0][0];
-    expect(ctorArgs.appendSystemPromptOverride(["would-be-loaded"])).toEqual([]);
+    const loaderOpts = io.createResourceLoader.mock.calls[0][0];
+    expect(loaderOpts.appendSystemPromptOverride()).toEqual([]);
   });
 
   it("returns sessionFile from the persisted SessionManager in RunResult", async () => {
     const { session } = createSession("WITH_FILE");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
-    const result = await runAgent(snapshot, "Explore", "go", { exec, registry: mockAgentLookup });
+    const result = await runAgent(snapshot, "Explore", "go", { exec, registry: mockAgentLookup }, io);
 
     expect(result.sessionFile).toBe("/sessions/child.jsonl");
   });
 
   it("calls newSession with parentSession when parentSessionId is provided", async () => {
     const { session } = createSession("LINKED");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
     await runAgent(snapshot, "Explore", "go", {
       exec,
       parentSessionFile: "/sessions/parent.jsonl",
       parentSessionId: "parent-id-123",
       registry: mockAgentLookup,
-    });
+    }, io);
 
-    const sm = sessionManagerCreate.mock.results[0].value;
+    const sm = io.createSessionManager.mock.results[0].value;
     expect(sm.newSession).toHaveBeenCalledWith({ parentSession: "parent-id-123" });
   });
 
@@ -240,7 +272,7 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
 
   it("uses options.defaultMaxTurns as the fallback turn limit when no per-call maxTurns is set", async () => {
     const { session, listeners } = createSession("done");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
     // 2 turns → soft limit; 3rd turn → abort (graceTurns=1)
     session.prompt = vi.fn(async () => {
@@ -255,7 +287,7 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
       defaultMaxTurns: 2,
       graceTurns: 1,
       registry: mockAgentLookup,
-    } as any);
+    } as any, io);
 
     expect(session.steer).toHaveBeenCalledWith(expect.stringContaining("turn limit"));
     expect(session.abort).toHaveBeenCalled();
@@ -264,7 +296,7 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
 
   it("options.graceTurns extends the grace window after the soft-limit steer", async () => {
     const { session, listeners } = createSession("done");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
     // maxTurns=1, graceTurns=3 → need 4 turns total to abort
     session.prompt = vi.fn(async () => {
@@ -279,7 +311,7 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
       defaultMaxTurns: 1,
       graceTurns: 3,
       registry: mockAgentLookup,
-    } as any);
+    } as any, io);
 
     // Steered at turn 1, but not aborted (turn 3 < 1+3=4)
     expect(result.steered).toBe(true);
@@ -289,7 +321,7 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
 
   it("options.maxTurns takes precedence over options.defaultMaxTurns", async () => {
     const { session, listeners } = createSession("done");
-    createAgentSession.mockResolvedValue({ session });
+    io.createSession.mockResolvedValue({ session });
 
     // maxTurns=3 (explicit) should win over defaultMaxTurns=1
     session.prompt = vi.fn(async () => {
@@ -300,11 +332,11 @@ describe("agent-runner RunOptions — defaultMaxTurns and graceTurns", () => {
 
     await runAgent(snapshot, "Explore", "go", {
       exec,
-      maxTurns: 3,       // explicit per-call limit
+      maxTurns: 3, // explicit per-call limit
       defaultMaxTurns: 1, // should be overridden
       graceTurns: 1,
       registry: mockAgentLookup,
-    } as any);
+    } as any, io);
 
     // Only 2 turns fired, maxTurns=3, so steer should NOT be called
     expect(session.steer).not.toHaveBeenCalled();

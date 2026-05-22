@@ -6,21 +6,12 @@ import type { Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
   type AgentSessionEvent,
-  createAgentSession,
-  DefaultResourceLoader,
-  getAgentDir,
-  SessionManager,
-  SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentConfigLookup } from "./agent-types.js";
 import { extractText } from "./context.js";
-import { detectEnv } from "./env.js";
-import { buildMemoryBlock, buildReadOnlyMemoryBlock } from "./memory.js";
+import type { EnvInfo } from "./env.js";
 import type { ParentSnapshot } from "./parent-snapshot.js";
-import { buildAgentPrompt } from "./prompts.js";
 import { type AssemblerIO, assembleSessionConfig } from "./session-config.js";
-import { deriveSubagentSessionDir } from "./session-dir.js";
-import { preloadSkills } from "./skill-loader.js";
 import type { ShellExec, SubagentType, ThinkingLevel } from "./types.js";
 
 /** Names of tools registered by this extension that subagents must NOT inherit. */
@@ -68,6 +59,63 @@ export function normalizeMaxTurns(n: number | undefined): number | undefined {
   return Math.max(1, n);
 }
 
+// ── IO boundary ───────────────────────────────────────────────────────────────
+
+/** Minimal resource-loader contract used by the runner. */
+export interface ResourceLoaderLike {
+  reload(): Promise<void>;
+}
+
+/** Minimal session-manager contract used by the runner. */
+export interface SessionManagerLike {
+  newSession(opts: { parentSession?: string }): void;
+  getSessionFile(): string | undefined;
+}
+
+/** Options passed to RunnerIO.createResourceLoader. */
+export interface ResourceLoaderOptions {
+  cwd: string;
+  agentDir: string;
+  noExtensions?: boolean;
+  noSkills?: boolean;
+  noPromptTemplates?: boolean;
+  noThemes?: boolean;
+  noContextFiles?: boolean;
+  systemPromptOverride?: () => string;
+  appendSystemPromptOverride?: () => unknown[];
+}
+
+/** Options passed to RunnerIO.createSession. */
+export interface CreateSessionOptions {
+  cwd: string;
+  agentDir: string;
+  sessionManager: SessionManagerLike;
+  settingsManager: unknown;
+  modelRegistry: unknown;
+  model?: unknown;
+  tools: string[];
+  resourceLoader: ResourceLoaderLike;
+  thinkingLevel?: ThinkingLevel;
+}
+
+/**
+ * IO boundary injected into runAgent().
+ *
+ * Decouples the runner from direct Pi SDK imports and sibling-module IO,
+ * making it testable via plain stub objects without vi.mock().
+ */
+export interface RunnerIO {
+  detectEnv: (exec: ShellExec, cwd: string) => Promise<EnvInfo>;
+  getAgentDir: () => string;
+  createResourceLoader: (opts: ResourceLoaderOptions) => ResourceLoaderLike;
+  deriveSessionDir: (parentSessionFile: string | undefined, effectiveCwd: string) => string;
+  createSessionManager: (cwd: string, sessionDir: string) => SessionManagerLike;
+  createSettingsManager: (cwd: string, agentDir: string) => unknown;
+  createSession: (opts: CreateSessionOptions) => Promise<{ session: AgentSession }>;
+  assemblerIO: AssemblerIO;
+}
+
+// ── Public interfaces ─────────────────────────────────────────────────────────
 
 export interface RunOptions {
   /** Shell-exec callback for detectEnv — injected from pi.exec(). */
@@ -126,6 +174,20 @@ export interface AgentRunner {
 }
 
 /**
+ * Create an AgentRunner backed by the given IO boundary.
+ *
+ * Captures io at construction time so AgentManager remains IO-unaware.
+ */
+export function createAgentRunner(io: RunnerIO): AgentRunner {
+  return {
+    run: (snapshot, type, prompt, options) => runAgent(snapshot, type, prompt, options, io),
+    resume: resumeAgent,
+  };
+}
+
+// ── Private helpers ───────────────────────────────────────────────────────────
+
+/**
  * Subscribe to a session and collect the last assistant message text.
  * Returns an object with a `getText()` getter and an `unsubscribe` function.
  */
@@ -170,23 +232,20 @@ function forwardAbortSignal(
   return () => signal.removeEventListener("abort", onAbort);
 }
 
+// ── Public functions ──────────────────────────────────────────────────────────
+
 export async function runAgent(
   snapshot: ParentSnapshot,
   type: SubagentType,
   prompt: string,
   options: RunOptions,
+  io: RunnerIO,
 ): Promise<RunResult> {
   // Resolve working directory upfront — needed for detectEnv before assembly.
   const effectiveCwd = options.cwd ?? snapshot.cwd;
-  const env = await detectEnv(options.exec, effectiveCwd);
+  const env = await io.detectEnv(options.exec, effectiveCwd);
 
   // Assemble session configuration (synchronous, no SDK objects).
-  const io: AssemblerIO = {
-    preloadSkills,
-    buildMemoryBlock,
-    buildReadOnlyMemoryBlock,
-    buildAgentPrompt,
-  };
   const cfg = assembleSessionConfig(
     type,
     {
@@ -203,10 +262,10 @@ export async function runAgent(
     },
     env,
     options.registry,
-    io,
+    io.assemblerIO,
   );
 
-  const agentDir = getAgentDir();
+  const agentDir = io.getAgentDir();
 
   // Load extensions/skills: true or string[] → load; false → don't.
   // Suppress AGENTS.md/CLAUDE.md and APPEND_SYSTEM.md — upstream's
@@ -214,7 +273,7 @@ export async function runAgent(
   // would defeat prompt_mode: replace and isolated: true. Parent context, if
   // wanted, reaches the subagent via prompt_mode: append (parentSystemPrompt
   // is embedded in systemPromptOverride) or inherit_context (conversation).
-  const loader = new DefaultResourceLoader({
+  const loader = io.createResourceLoader({
     cwd: cfg.effectiveCwd,
     agentDir,
     noExtensions: cfg.extensions === false,
@@ -230,25 +289,21 @@ export async function runAgent(
   // Create a persisted SessionManager so transcripts are written in Pi's
   // official JSONL format. Falls back to a temp directory when the parent
   // session is not persisted (e.g. headless/API mode).
-  const sessionDir = deriveSubagentSessionDir(options.parentSessionFile, cfg.effectiveCwd);
-  const sessionManager = SessionManager.create(cfg.effectiveCwd, sessionDir);
+  const sessionDir = io.deriveSessionDir(options.parentSessionFile, cfg.effectiveCwd);
+  const sessionManager = io.createSessionManager(cfg.effectiveCwd, sessionDir);
   sessionManager.newSession({ parentSession: options.parentSessionId });
 
-  const sessionOpts: Parameters<typeof createAgentSession>[0] = {
+  const { session } = await io.createSession({
     cwd: cfg.effectiveCwd,
     agentDir,
     sessionManager,
-    settingsManager: SettingsManager.create(cfg.effectiveCwd, agentDir),
-    modelRegistry: snapshot.modelRegistry as any,
-    model: cfg.model as Model<any> | undefined,
+    settingsManager: io.createSettingsManager(cfg.effectiveCwd, agentDir),
+    modelRegistry: snapshot.modelRegistry,
+    model: cfg.model,
     tools: cfg.toolNames,
     resourceLoader: loader,
-  };
-  if (cfg.thinkingLevel) {
-    sessionOpts.thinkingLevel = cfg.thinkingLevel;
-  }
-
-  const { session } = await createAgentSession(sessionOpts);
+    thinkingLevel: cfg.thinkingLevel,
+  });
 
   // Filter active tools: remove our own tools to prevent nesting,
   // apply extension allowlist if specified, and apply disallowedTools denylist.
