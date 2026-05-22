@@ -12,7 +12,7 @@
 
 import { join } from "node:path";
 import { defineTool, type ExtensionAPI, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { AgentManager } from "./agent-manager.js";
+import { AgentManager, type AgentManagerObserver } from "./agent-manager.js";
 import { getAgentConversation, resumeAgent, runAgent, steerAgent } from "./agent-runner.js";
 import { AgentTypeRegistry } from "./agent-types.js";
 import { loadCustomAgents } from "./custom-agents.js";
@@ -64,14 +64,18 @@ export default function (pi: ExtensionAPI) {
   });
   settings.load();
 
-  // Background completion: emit lifecycle event and delegate to notification system
-  const manager = new AgentManager({
-    runner: { run: runAgent, resume: resumeAgent },
-    worktrees: new GitWorktreeManager(process.cwd()),
-    exec: (cmd, args, opts) => pi.exec(cmd, args, opts),
-    registry,
-    onComplete: (record) => {
-      // Emit lifecycle event based on terminal status
+  // Observer: receives agent lifecycle notifications and dispatches events/notifications.
+  const observer: AgentManagerObserver = {
+    onAgentStarted(record) {
+      // Emit started event when agent transitions to running (including from queue).
+      pi.events.emit("subagents:started", {
+        id: record.id,
+        type: record.type,
+        description: record.description,
+      });
+    },
+    onAgentCompleted(record) {
+      // Emit lifecycle event based on terminal status.
       const isError = record.status === "error" || record.status === "stopped" || record.status === "aborted";
       const eventData = buildEventData(record);
       if (isError) {
@@ -80,14 +84,14 @@ export default function (pi: ExtensionAPI) {
         pi.events.emit("subagents:completed", eventData);
       }
 
-      // Persist final record for cross-extension history reconstruction
+      // Persist final record for cross-extension history reconstruction.
       pi.appendEntry("subagents:record", {
         id: record.id, type: record.type, description: record.description,
         status: record.status, result: record.result, error: record.error,
         startedAt: record.startedAt, completedAt: record.completedAt,
       });
 
-      // Skip notification if result was already consumed via get_subagent_result
+      // Skip notification if result was already consumed via get_subagent_result.
       if (record.notification?.resultConsumed) {
         notifications.cleanupCompleted(record.id);
         return;
@@ -95,15 +99,7 @@ export default function (pi: ExtensionAPI) {
 
       notifications.sendCompletion(record);
     },
-    onStart: (record) => {
-      // Emit started event when agent transitions to running (including from queue)
-      pi.events.emit("subagents:started", {
-        id: record.id,
-        type: record.type,
-        description: record.description,
-      });
-    },
-    onCompact: (record, info) => {
+    onAgentCompacted(record, info) {
       // Emit compacted event when agent's session compacts (preserves count on record).
       pi.events.emit("subagents:compacted", {
         id: record.id,
@@ -114,6 +110,14 @@ export default function (pi: ExtensionAPI) {
         compactionCount: record.compactionCount,
       });
     },
+  };
+
+  const manager = new AgentManager({
+    runner: { run: runAgent, resume: resumeAgent },
+    worktrees: new GitWorktreeManager(process.cwd()),
+    exec: (cmd, args, opts) => pi.exec(cmd, args, opts),
+    registry,
+    observer,
     getMaxConcurrent: () => settings.maxConcurrent,
     getRunConfig: () => settings,
   });

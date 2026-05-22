@@ -10,7 +10,7 @@ vi.mock("../src/parent-snapshot.js", () => ({
   })),
 }));
 
-import { AgentManager, type OnAgentCompact, type OnAgentComplete, type OnAgentStart } from "../src/agent-manager.js";
+import { AgentManager, type AgentManagerObserver } from "../src/agent-manager.js";
 import type { AgentRunner } from "../src/agent-runner.js";
 import { AgentTypeRegistry } from "../src/agent-types.js";
 import type { RunConfig } from "../src/runtime.js";
@@ -42,9 +42,7 @@ const mockSession = () => {
 function createManager(overrides?: {
   runner?: AgentRunner;
   worktrees?: WorktreeManager;
-  onComplete?: OnAgentComplete;
-  onStart?: OnAgentStart;
-  onCompact?: OnAgentCompact;
+  observer?: Partial<AgentManagerObserver>;
   getMaxConcurrent?: () => number;
   getRunConfig?: () => RunConfig;
 }) {
@@ -62,14 +60,19 @@ function createManager(overrides?: {
     cleanup: vi.fn(() => ({ hasChanges: false })),
     prune: vi.fn(),
   };
+  const observer: AgentManagerObserver | undefined = overrides?.observer
+    ? {
+        onAgentStarted: overrides.observer.onAgentStarted ?? (() => {}),
+        onAgentCompleted: overrides.observer.onAgentCompleted ?? (() => {}),
+        onAgentCompacted: overrides.observer.onAgentCompacted ?? (() => {}),
+      }
+    : undefined;
   const manager = new AgentManager({
     runner,
     worktrees,
     exec: vi.fn(),
     registry: testRegistry,
-    onComplete: overrides?.onComplete,
-    onStart: overrides?.onStart,
-    onCompact: overrides?.onCompact,
+    observer,
     getMaxConcurrent: overrides?.getMaxConcurrent,
     getRunConfig: overrides?.getRunConfig,
   });
@@ -85,9 +88,9 @@ describe("AgentManager — Bug 1 race condition (notification.resultConsumed vs 
 
   it("reproduces bug: onComplete fires with resultConsumed=false when markConsumed called after await", async () => {
     let seenConsumed: boolean | undefined;
-    ({ manager } = createManager({ onComplete: (r) => {
+    ({ manager } = createManager({ observer: { onAgentCompleted: (r) => {
       seenConsumed = r.notification?.resultConsumed;
-    } }));
+    } } }));
 
     const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
@@ -106,9 +109,9 @@ describe("AgentManager — Bug 1 race condition (notification.resultConsumed vs 
 
   it("fix: onComplete sees resultConsumed=true when markConsumed called before await", async () => {
     let seenConsumed: boolean | undefined;
-    ({ manager } = createManager({ onComplete: (r) => {
+    ({ manager } = createManager({ observer: { onAgentCompleted: (r) => {
       seenConsumed = r.notification?.resultConsumed;
-    } }));
+    } } }));
 
     const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
@@ -126,9 +129,9 @@ describe("AgentManager — Bug 1 race condition (notification.resultConsumed vs 
 
   it("normal case: onComplete fires with no notification when agent was not spawned via tool", async () => {
     let completedRecord: AgentRecord | undefined;
-    ({ manager } = createManager({ onComplete: (r) => {
+    ({ manager } = createManager({ observer: { onAgentCompleted: (r) => {
       completedRecord = r;
-    } }));
+    } } }));
 
     const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
@@ -142,9 +145,9 @@ describe("AgentManager — Bug 1 race condition (notification.resultConsumed vs 
 
   it("onComplete is not called for foreground agents", async () => {
     let onCompleteCalled = false;
-    ({ manager } = createManager({ onComplete: () => {
+    ({ manager } = createManager({ observer: { onAgentCompleted: () => {
       onCompleteCalled = true;
-    } }));
+    } } }));
 
     await manager.spawnAndWait(mockCtx, "general-purpose", "test", {
       description: "test",
@@ -162,9 +165,9 @@ describe("AgentManager — completion callbacks", () => {
   });
 
   it("does not let onComplete errors turn a completed agent into a failed run", async () => {
-    ({ manager } = createManager({ onComplete: () => {
+    ({ manager } = createManager({ observer: { onAgentCompleted: () => {
       throw new Error("stale extension context");
-    } }));
+    } } }));
 
     const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
@@ -358,9 +361,9 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
       resume: vi.fn(),
     };
 
-    ({ manager } = createManager({ runner, onCompact: (record, info) => {
+    ({ manager } = createManager({ runner, observer: { onAgentCompacted: (record, info) => {
       compactSeen.push({ count: record.compactionCount, reason: info.reason });
-    } }));
+    } } }));
 
     const id = manager.spawn(mockCtx, "general-purpose", "test", {
       description: "test",
@@ -735,7 +738,7 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
     ({ manager } = createManager({
       runner,
       getMaxConcurrent: () => 1,
-      onStart: (record) => { startedIds.push(record.id); },
+      observer: { onAgentStarted: (record) => { startedIds.push(record.id); } },
     }));
 
     const id1 = manager.spawn(mockCtx, "general-purpose", "a", {

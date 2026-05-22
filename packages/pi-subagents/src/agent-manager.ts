@@ -13,7 +13,6 @@ import { AgentRecord } from "./agent-record.js";
 import type { AgentRunner } from "./agent-runner.js";
 import { AgentTypeRegistry } from "./agent-types.js";
 import { debugLog } from "./debug.js";
-import type { ExecutionState } from "./execution-state.js";
 import { buildParentSnapshot } from "./parent-snapshot.js";
 import { subscribeRecordObserver } from "./record-observer.js";
 import type { RunConfig } from "./runtime.js";
@@ -21,9 +20,6 @@ import type { AgentInvocation, IsolationMode, ParentSnapshot, ShellExec, Subagen
 import type { WorktreeManager } from "./worktree.js";
 import { WorktreeState } from "./worktree-state.js";
 
-export type OnAgentComplete = (record: AgentRecord) => void;
-export type OnAgentStart = (record: AgentRecord) => void;
-export type OnAgentCompact = (record: AgentRecord, info: CompactionInfo) => void;
 export type CompactionInfo = { reason: "manual" | "threshold" | "overflow"; tokensBefore: number };
 
 /** Observer interface for agent lifecycle notifications. */
@@ -44,9 +40,7 @@ export interface AgentManagerOptions {
   /** Injected getter for the concurrency limit — owned by SettingsManager. */
   getMaxConcurrent?: () => number;
   getRunConfig?: () => RunConfig;
-  onStart?: OnAgentStart;
-  onComplete?: OnAgentComplete;
-  onCompact?: OnAgentCompact;
+  observer?: AgentManagerObserver;
 }
 
 interface SpawnArgs {
@@ -87,9 +81,7 @@ export interface SpawnOptions {
 export class AgentManager {
   private agents = new Map<string, AgentRecord>();
   private cleanupInterval: ReturnType<typeof setInterval>;
-  private onComplete?: OnAgentComplete;
-  private onStart?: OnAgentStart;
-  private onCompact?: OnAgentCompact;
+  private readonly observer?: AgentManagerObserver;
   private readonly runner: AgentRunner;
   private readonly worktrees: WorktreeManager;
   private readonly exec: ShellExec;
@@ -109,9 +101,7 @@ export class AgentManager {
     this.worktrees = options.worktrees;
     this.exec = options.exec;
     this.registry = options.registry;
-    this.onComplete = options.onComplete;
-    this.onStart = options.onStart;
-    this.onCompact = options.onCompact;
+    this.observer = options.observer;
     this.getRunConfig = options.getRunConfig;
     this._getMaxConcurrent = options.getMaxConcurrent ?? (() => DEFAULT_MAX_CONCURRENT);
     // Cleanup completed agents after 10 minutes (but keep sessions for resume)
@@ -203,7 +193,7 @@ export class AgentManager {
 
     record.markRunning(Date.now());
     if (options.isBackground) this.runningBackground++;
-    this.onStart?.(record);
+    this.observer?.onAgentStarted(record);
 
     // Wire parent abort signal to stop the subagent when the parent is interrupted
     let detachParentSignal: (() => void) | undefined;
@@ -246,7 +236,7 @@ export class AgentManager {
         }
         // Subscribe record observer for stats accumulation
         unsubRecordObserver = subscribeRecordObserver(session, record, {
-          onCompact: (r, info) => this.onCompact?.(r, info),
+          onCompact: (r, info) => this.observer?.onAgentCompacted(r, info),
         });
         options.onSessionCreated?.(session);
       },
@@ -275,7 +265,7 @@ export class AgentManager {
 
         if (options.isBackground) {
           this.runningBackground--;
-          try { this.onComplete?.(record); } catch (err) { debugLog("onComplete callback", err); }
+          try { this.observer?.onAgentCompleted(record); } catch (err) { debugLog("onAgentCompleted observer", err); }
           this.drainQueue();
         }
         return responseText;
@@ -297,7 +287,7 @@ export class AgentManager {
 
         if (options.isBackground) {
           this.runningBackground--;
-          this.onComplete?.(record);
+          this.observer?.onAgentCompleted(record);
           this.drainQueue();
         }
         return "";
@@ -318,7 +308,7 @@ export class AgentManager {
         // Late failure (e.g. strict worktree-isolation) — surface on the record
         // so the user/agent can see it via /agents, then keep draining.
         record.markError(err);
-        this.onComplete?.(record);
+        this.observer?.onAgentCompleted(record);
       }
     }
   }
@@ -354,7 +344,7 @@ export class AgentManager {
     record.resetForResume(Date.now());
 
     const unsubResume = subscribeRecordObserver(session, record, {
-      onCompact: (r, info) => this.onCompact?.(r, info),
+      onCompact: (r, info) => this.observer?.onAgentCompacted(r, info),
     });
 
     try {
