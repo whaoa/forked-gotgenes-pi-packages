@@ -6,6 +6,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
   type AgentSessionEvent,
+  type SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentConfigLookup } from "./agent-types.js";
 import { extractText } from "./context.js";
@@ -82,7 +83,8 @@ export interface ResourceLoaderOptions {
   noThemes?: boolean;
   noContextFiles?: boolean;
   systemPromptOverride?: () => string;
-  appendSystemPromptOverride?: () => unknown[];
+  /** Override the append system prompt. Receives the current base value; return the replacement. */
+  appendSystemPromptOverride?: (base: string[]) => string[];
 }
 
 /** Options passed to RunnerIO.createSession. */
@@ -90,7 +92,7 @@ export interface CreateSessionOptions {
   cwd: string;
   agentDir: string;
   sessionManager: SessionManagerLike;
-  settingsManager: unknown;
+  settingsManager: SettingsManager;
   modelRegistry: unknown;
   model?: unknown;
   tools: string[];
@@ -110,7 +112,7 @@ export interface RunnerIO {
   createResourceLoader: (opts: ResourceLoaderOptions) => ResourceLoaderLike;
   deriveSessionDir: (parentSessionFile: string | undefined, effectiveCwd: string) => string;
   createSessionManager: (cwd: string, sessionDir: string) => SessionManagerLike;
-  createSettingsManager: (cwd: string, agentDir: string) => unknown;
+  createSettingsManager: (cwd: string, agentDir: string) => SettingsManager;
   createSession: (opts: CreateSessionOptions) => Promise<{ session: AgentSession }>;
   assemblerIO: AssemblerIO;
 }

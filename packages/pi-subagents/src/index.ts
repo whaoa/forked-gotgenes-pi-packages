@@ -136,7 +136,7 @@ export default function (pi: ExtensionAPI) {
   const runnerIO: RunnerIO = {
     detectEnv,
     getAgentDir,
-    createResourceLoader: (opts) => new DefaultResourceLoader(opts as any),
+    createResourceLoader: (opts) => new DefaultResourceLoader(opts),
     deriveSessionDir: deriveSubagentSessionDir,
     createSessionManager: (cwd, dir) => SessionManager.create(cwd, dir),
     createSettingsManager: (cwd, dir) => SdkSettingsManager.create(cwd, dir),
