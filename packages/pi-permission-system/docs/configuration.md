@@ -69,15 +69,32 @@ Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`) use simple replace
 
 ## Runtime Knobs
 
-| Key                         | Default | Description                                                                                             |
-| --------------------------- | ------- | ------------------------------------------------------------------------------------------------------- |
-| `debugLog`                  | `false` | Enables verbose diagnostic logging to `logs/pi-permission-system-debug.jsonl`                           |
-| `permissionReviewLog`       | `true`  | Enables the permission request/denial review log at `logs/pi-permission-system-permission-review.jsonl` |
-| `yoloMode`                  | `false` | Auto-approves `ask` results instead of prompting when yolo mode is enabled                              |
-| `piInfrastructureReadPaths` | `[]`    | Extra directories to auto-allow for reads, bypassing the `external_directory` gate (supports `~`)       |
+| Key                         | Default | Description                                                                                                                                          |
+| --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `debugLog`                  | `false` | Enables verbose diagnostic logging to `logs/pi-permission-system-debug.jsonl`                                                                        |
+| `permissionReviewLog`       | `true`  | Enables the permission request/denial review log at `logs/pi-permission-system-permission-review.jsonl`                                              |
+| `yoloMode`                  | `false` | Auto-approves `ask` results instead of prompting when yolo mode is enabled                                                                           |
+| `piInfrastructureReadPaths` | `[]`    | Extra directories to auto-allow for reads, bypassing the `external_directory` gate. Supports `~`/`$HOME` expansion and wildcard patterns (`*`, `?`). |
 
 Both logs write to `~/.pi/agent/extensions/pi-permission-system/logs/`.
 No debug output is printed to the terminal.
+
+### `piInfrastructureReadPaths` patterns
+
+Each entry is either a plain directory prefix or a wildcard pattern.
+Plain entries match any path that starts with the given directory (after `~`/`$HOME` expansion).
+Wildcard entries use `*` (any characters, including `/`) and `?` (exactly one character).
+`*` and `**` are equivalent — both cross directory boundaries.
+
+Example — allow reads from a Homebrew-managed Pi install at any version:
+
+```jsonc
+{
+  "piInfrastructureReadPaths": [
+    "/opt/homebrew/**/@earendil-works/pi-coding-agent/**"
+  ]
+}
+```
 
 ---
 
