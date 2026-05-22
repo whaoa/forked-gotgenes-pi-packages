@@ -39,7 +39,8 @@ git log --oneline <previous-tag-or-base>..HEAD
 
 The comment should include:
 
-- The commit hash that lands the change ("Implemented in `<sha>` …").
+- The commit hash that lands the change ("Implemented in <sha> …").
+  Write the SHA as plain text — no backticks — so GitHub auto-links it to the commit.
 - A short bullet list of feature/breaking commits.
 - One sentence on user-visible behavior change.
 - A note flagging any breaking change (matches `feat!:` commits).
