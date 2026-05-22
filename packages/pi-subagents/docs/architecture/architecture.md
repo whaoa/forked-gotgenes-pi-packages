@@ -384,13 +384,13 @@ Each step is sequenced so it makes the next step easier.
 | Smell                          | Location                                     | Evidence                                                                                                                                                                          |
 | ------------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ~~Global mutable state~~       | ~~`agent-types.ts`~~                         | **Fixed #108**: `AgentTypeRegistry` class; `reloadCustomAgents` callback removed from `AgentToolDeps` and `AgentMenuDeps`                                                         |
-| Closure bag as class           | `createNotificationSystem()`                 | Returns 4 functions sharing closure state (`pendingNudges`, timers)                                                                                                               |
+| ~~Closure bag as class~~       | ~~`createNotificationSystem()`~~             | **Fixed #116**: `NotificationManager` class; `pendingNudges` and timer state are private fields                                                                                   |
 | ~~Mutable state bag~~          | ~~`AgentActivity` (7 fields)~~               | **Fixed #110**: `AgentActivityTracker` class; `ui-observer.ts` calls transition methods; widget, notification, agent-tool use read-only accessors                                 |
 | ~~Settings relay~~             | ~~`AgentMenuDeps` (13 fields)~~              | **Fixed #109**: `SettingsManager` class; 6 callback fields collapsed to `settings: SettingsManager`; `AgentMenuDeps` now 8 fields                                                 |
 | ~~Post-construction mutation~~ | ~~`AgentRecord` non-transition state~~       | **Fixed #111**: `ExecutionState`, `WorktreeState`, `NotificationState` collaborators; `pendingSteers` moved to `AgentManager`; stats encapsulated behind mutation methods         |
 | ~~Fire-and-forget callbacks~~  | ~~`AgentManagerOptions`~~                    | **Fixed #112**: `AgentManagerObserver` interface; `observer` replaces 3 callbacks; `index.ts` constructs one observer object instead of 3 closure lambdas                         |
 | ~~Duplicate `SpawnOptions`~~   | ~~`service.ts` + `agent-manager.ts`~~        | **Fixed #113**: internal type renamed to `AgentSpawnConfig`; public `SpawnOptions` in `service.ts` unchanged                                                                      |
-| Type dumping ground            | `types.ts`                                   | `NotificationDetails` used only by notification/renderer; ~~`DEFAULT_AGENT_NAMES` moved to `AgentTypeRegistry` (#108)~~; `AgentConfig` (21 fields) consumers use 2–4 each         |
+| ~~Type dumping ground~~        | ~~`types.ts`~~                               | **Fixed #116**: `NotificationDetails` → `notification.ts`; `ParentSnapshot` → `parent-snapshot.ts`; `EnvInfo` → `env.ts`; `AgentIdentity` and `AgentPromptConfig` narrow subsets  |
 | ~~Wide dependency bags~~       | ~~`AgentToolDeps` (9), `AgentMenuDeps` (8)~~ | **Fixed #114**: `AgentToolDeps` 9 → 6; `AgentMenuDeps` 8 → 7; `emitEvent` removed from both; description text derived from registry; `agentActivity` narrowed to typed interfaces |
 
 ### Step A: Extract state into classes (foundation, parallel)
@@ -487,29 +487,28 @@ Fixed two upstream API gaps before extracting: `onSessionCreated` now receives `
 Extracted `foreground-runner.ts` (~175 lines) and `background-spawner.ts` (~116 lines).
 `agent-tool.ts` reduced from 579 → 411 lines (orchestrator + rendering).
 
-#### E2. Type housekeeping (#116)
+#### ~~E2. Type housekeeping (#116)~~ — **Done**
 
-- Move `NotificationDetails` from `types.ts` to `notification.ts`.
-- Move `DEFAULT_AGENT_NAMES` from `types.ts` to the registry.
-- Move `ParentSnapshot` from `types.ts` to `parent-snapshot.ts`.
-- Move `EnvInfo` from `types.ts` to `env.ts`.
-- Convert `createNotificationSystem` closure to `NotificationManager` class.
-- Convert `ConversationViewer` constructor from 6 positional parameters to an options bag.
-- Define narrow `AgentConfig` subset interfaces for consumers that use 2–4 fields of the 21-field type.
+- Moved `NotificationDetails` from `types.ts` to `notification.ts`.
+- Moved `ParentSnapshot` from `types.ts` to `parent-snapshot.ts` (`DEFAULT_AGENT_NAMES` was already moved in #108).
+- Moved `EnvInfo` from `types.ts` to `env.ts`.
+- Converted `createNotificationSystem` closure to `NotificationManager` class.
+- Converted `ConversationViewer` constructor from 7 positional parameters to `ConversationViewerOptions` bag.
+- Defined `AgentIdentity` and `AgentPromptConfig` narrow subsets; `AgentConfig extends` both; `buildAgentPrompt` narrowed to `AgentPromptConfig`.
 
 ### Expected impact
 
-| Metric                                     | Before                                                                           | After   |
-| ------------------------------------------ | -------------------------------------------------------------------------------- | ------- |
-| Module-scoped mutable state                | ~~1 (`agent-types.ts` Map)~~                                                     | **0** ✓ |
-| Closure-bag "classes"                      | ~~2~~ 1 (`createNotificationSystem`; settings free functions **fixed #109**)     | 0       |
-| Externally-mutated state bags              | ~~2~~ ~~1~~ **0** (`AgentRecord` **fixed #111**; `AgentActivity` **fixed #110**) | 0 ✓     |
-| `AgentManagerOptions` fields               | 8                                                                                | 5       |
-| `AgentToolDeps` fields                     | ~~9~~ **6** (−3 text fields derived; −1 emitEvent → observer; activity narrowed) | 6 ✓     |
-| `AgentMenuDeps` fields                     | ~~13~~ **7** (−6 settings #109; −1 registry #108; −1 dead emitEvent #114)        | 7 ✓     |
-| `SpawnOptions` callback fields             | 1 (`onSessionCreated`)                                                           | 0       |
-| Callbacks threaded through deps            | ~~8~~ 0 remaining settings callbacks (**fixed #109**); `emitEvent` ×3 remain     | 0       |
-| Types in `types.ts` without a natural home | 4                                                                                | 0       |
+| Metric                                     | Before                                                                                 | After   |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- | ------- |
+| Module-scoped mutable state                | ~~1 (`agent-types.ts` Map)~~                                                           | **0** ✓ |
+| Closure-bag "classes"                      | ~~2~~ ~~1~~ **0** (`createNotificationSystem` **fixed #116**; settings **fixed #109**) | 0 ✓     |
+| Externally-mutated state bags              | ~~2~~ ~~1~~ **0** (`AgentRecord` **fixed #111**; `AgentActivity` **fixed #110**)       | 0 ✓     |
+| `AgentManagerOptions` fields               | 8                                                                                      | 5       |
+| `AgentToolDeps` fields                     | ~~9~~ **6** (−3 text fields derived; −1 emitEvent → observer; activity narrowed)       | 6 ✓     |
+| `AgentMenuDeps` fields                     | ~~13~~ **7** (−6 settings #109; −1 registry #108; −1 dead emitEvent #114)              | 7 ✓     |
+| `SpawnOptions` callback fields             | 1 (`onSessionCreated`)                                                                 | 0       |
+| Callbacks threaded through deps            | ~~8~~ 0 remaining settings callbacks (**fixed #109**); `emitEvent` ×3 remain           | 0       |
+| Types in `types.ts` without a natural home | ~~4~~ **0** ✓ (all moved #116)                                                         | 0 ✓     |
 
 ### Dependency graph
 
