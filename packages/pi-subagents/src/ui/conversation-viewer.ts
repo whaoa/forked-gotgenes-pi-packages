@@ -20,6 +20,16 @@ const MIN_VIEWPORT = 3;
 /** Height ceiling shared by the overlay's `maxHeight` and the viewer's internal viewport cap. */
 export const VIEWPORT_HEIGHT_PCT = 70;
 
+export interface ConversationViewerOptions {
+  tui: TUI;
+  session: AgentSession;
+  record: AgentRecord;
+  activity: AgentActivityTracker | undefined;
+  theme: Theme;
+  done: (result: undefined) => void;
+  registry: AgentConfigLookup;
+}
+
 export class ConversationViewer implements Component {
   private scrollOffset = 0;
   private autoScroll = true;
@@ -27,16 +37,23 @@ export class ConversationViewer implements Component {
   private lastInnerW = 0;
   private closed = false;
 
-  constructor(
-    private tui: TUI,
-    private session: AgentSession,
-    private record: AgentRecord,
-    private activity: AgentActivityTracker | undefined,
-    private theme: Theme,
-    private done: (result: undefined) => void,
-    private registry: AgentConfigLookup,
-  ) {
-    this.unsubscribe = session.subscribe(() => {
+  private tui: TUI;
+  private session: AgentSession;
+  private record: AgentRecord;
+  private activity: AgentActivityTracker | undefined;
+  private theme: Theme;
+  private done: (result: undefined) => void;
+  private registry: AgentConfigLookup;
+
+  constructor(options: ConversationViewerOptions) {
+    this.tui = options.tui;
+    this.session = options.session;
+    this.record = options.record;
+    this.activity = options.activity;
+    this.theme = options.theme;
+    this.done = options.done;
+    this.registry = options.registry;
+    this.unsubscribe = options.session.subscribe(() => {
       if (this.closed) return;
       this.tui.requestRender();
     });

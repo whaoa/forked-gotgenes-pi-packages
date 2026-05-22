@@ -220,7 +220,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
 
     await ctx.ui.custom<undefined>(
       (tui: any, theme: any, _keybindings: any, done: any) => {
-        return new ConversationViewer(tui, session, record, activity, theme, done, deps.registry);
+        return new ConversationViewer({ tui, session, record, activity, theme, done, registry: deps.registry });
       },
       {
         overlay: true,
