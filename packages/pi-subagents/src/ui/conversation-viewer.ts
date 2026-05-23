@@ -8,7 +8,7 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { type Component, matchesKey, type TUI, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { AgentConfigLookup } from "../config/agent-types";
-import { extractText } from "../context";
+import { extractText } from "../session/context";
 import type { AgentRecord } from "../types";
 import { getLifetimeTotal, getSessionContextPercent } from "../usage";
 import type { AgentActivityTracker } from "./agent-activity-tracker";

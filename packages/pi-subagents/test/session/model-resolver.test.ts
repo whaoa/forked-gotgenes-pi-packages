@@ -3,7 +3,7 @@ import {
   type ModelRegistry,
   resolveInvocationModel,
   resolveModel,
-} from "#src/model-resolver";
+} from "#src/session/model-resolver";
 
 // Mock model entries matching typical pi model registry shape
 const MODELS = [

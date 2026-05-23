@@ -23,7 +23,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { debugLog } from "./debug";
+import { debugLog } from "../debug";
 import { isSymlink, isUnsafeName, safeReadFile } from "./memory";
 
 export interface PreloadedSkill {

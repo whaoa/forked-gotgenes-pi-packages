@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { AgentConfigLookup } from "#src/config/agent-types";
-import type { AssemblerIO } from "#src/session-config";
-import type { PreloadedSkill } from "#src/skill-loader";
+import type { AssemblerIO } from "#src/session/session-config";
+import type { PreloadedSkill } from "#src/session/skill-loader";
 import type { AgentConfig } from "#src/types";
 
 const mockResolveAgentConfig = vi.fn((): AgentConfig => ({
@@ -27,7 +27,7 @@ const mockAgentLookup: AgentConfigLookup = {
   getToolNamesForType: mockGetToolNamesForType,
 };
 
-import { assembleSessionConfig } from "#src/session-config";
+import { assembleSessionConfig } from "#src/session/session-config";
 
 const mockEnv = { isGitRepo: false, branch: "", platform: "linux" };
 

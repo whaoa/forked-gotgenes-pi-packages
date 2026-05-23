@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { detectEnv } from "#src/env";
+import { detectEnv } from "#src/session/env";
 import type { ShellExec } from "#src/types";
 
 /** ShellExec stub that shells out via child_process. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AgentTypeRegistry } from "#src/config/agent-types";
-import type { EnvInfo } from "#src/env";
-import { buildAgentPrompt } from "#src/prompts";
+import type { EnvInfo } from "#src/session/env";
+import { buildAgentPrompt } from "#src/session/prompts";
 import type { AgentConfig } from "#src/types";
 
 const testRegistry = new AgentTypeRegistry(() => new Map());

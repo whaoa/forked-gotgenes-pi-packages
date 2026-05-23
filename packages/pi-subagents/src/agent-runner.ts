@@ -9,10 +9,10 @@ import {
   type SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentConfigLookup } from "./config/agent-types";
-import { extractText } from "./context";
-import type { EnvInfo } from "./env";
 import type { ParentSnapshot } from "./parent-snapshot";
-import { type AssemblerIO, assembleSessionConfig } from "./session-config";
+import { extractText } from "./session/context";
+import type { EnvInfo } from "./session/env";
+import { type AssemblerIO, assembleSessionConfig } from "./session/session-config";
 import type { ShellExec, SubagentType, ThinkingLevel } from "./types";
 
 /** Names of tools registered by this extension that subagents must NOT inherit. */

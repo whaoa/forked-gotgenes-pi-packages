@@ -4,7 +4,7 @@ const { buildParentContextMock } = vi.hoisted(() => ({
   buildParentContextMock: vi.fn((): string => ""),
 }));
 
-vi.mock("#src/context", () => ({
+vi.mock("#src/session/context", () => ({
   buildParentContext: buildParentContextMock,
 }));
 
