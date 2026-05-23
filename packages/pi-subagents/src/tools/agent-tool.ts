@@ -1,9 +1,9 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
-import type { AgentSpawnConfig } from "../agent-manager";
 import { AgentTypeRegistry } from "../config/agent-types";
-import type { ParentSnapshot } from "../parent-snapshot";
+import type { AgentSpawnConfig } from "../lifecycle/agent-manager";
+import type { ParentSnapshot } from "../lifecycle/parent-snapshot";
 
 import type { AgentRecord } from "../types";
 import { AgentActivityTracker } from "../ui/agent-activity-tracker";

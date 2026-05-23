@@ -8,7 +8,7 @@
 import { join } from "node:path";
 
 import { BUILTIN_TOOL_NAMES } from "../config/agent-types";
-import type { ParentSnapshot } from "../parent-snapshot";
+import type { ParentSnapshot } from "../lifecycle/parent-snapshot";
 import type { AgentRecord } from "../types";
 import type { AgentFileOps } from "./agent-file-ops";
 import type { MenuUI } from "./agent-menu";

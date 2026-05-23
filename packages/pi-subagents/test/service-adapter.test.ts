@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { NotificationState } from "#src/notification-state";
+import { WorktreeState } from "#src/lifecycle/worktree-state";
+import { NotificationState } from "#src/observation/notification-state";
 import type { SubagentsService } from "#src/service";
 import type { AgentManagerLike } from "#src/service-adapter";
 import { createSubagentsService, toSubagentRecord } from "#src/service-adapter";
 import type { AgentRecord } from "#src/types";
-import { WorktreeState } from "#src/worktree-state";
 import { createTestRecord } from "./helpers/make-record";
 import { createMockSession, toAgentSession } from "./helpers/mock-session";
 

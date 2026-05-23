@@ -10,7 +10,7 @@
  *   - test/agent-runner.test.ts — RunOptions.defaultMaxTurns / graceTurns integration
  */
 import { describe, expect, it } from "vitest";
-import { normalizeMaxTurns } from "#src/agent-runner";
+import { normalizeMaxTurns } from "#src/lifecycle/agent-runner";
 
 describe("normalizeMaxTurns", () => {
   it("treats undefined as unlimited", () => {

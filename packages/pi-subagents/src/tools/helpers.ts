@@ -1,7 +1,7 @@
 import type { AgentConfigLookup } from "../config/agent-types";
+import { getLifetimeTotal, type LifetimeUsage } from "../lifecycle/usage";
 import { AgentActivityTracker } from "../ui/agent-activity-tracker";
 import { type AgentDetails, formatTokens } from "../ui/display";
-import { getLifetimeTotal, type LifetimeUsage } from "../usage";
 
 /** Parenthetical status note for completed agent result text. */
 export function getStatusNote(status: string): string {

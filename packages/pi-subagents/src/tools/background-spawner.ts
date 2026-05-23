@@ -1,5 +1,5 @@
-import type { AgentSpawnConfig } from "../agent-manager";
-import type { ParentSnapshot } from "../parent-snapshot";
+import type { AgentSpawnConfig } from "../lifecycle/agent-manager";
+import type { ParentSnapshot } from "../lifecycle/parent-snapshot";
 import type { AgentRecord } from "../types";
 import { AgentActivityTracker } from "../ui/agent-activity-tracker";
 import { subscribeUIObserver } from "../ui/ui-observer";

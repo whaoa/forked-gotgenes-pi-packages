@@ -18,7 +18,7 @@ const mockAgentLookup = {
 };
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { resumeAgent, runAgent } from "#src/agent-runner";
+import { resumeAgent, runAgent } from "#src/lifecycle/agent-runner";
 
 // ── RunnerIO stub factory ──────────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ function createSession(finalText: string) {
   return { session, listeners };
 }
 
-import type { ParentSnapshot } from "#src/parent-snapshot";
+import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 
 const snapshot: ParentSnapshot = {
   cwd: "/tmp",

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgentRecord } from "#src/agent-record";
-import { subscribeRecordObserver } from "#src/record-observer";
-import { createMockSession } from "./helpers/mock-session";
+import { AgentRecord } from "#src/lifecycle/agent-record";
+import { subscribeRecordObserver } from "#src/observation/record-observer";
+import { createMockSession } from "../helpers/mock-session";
 
 function makeRecord(overrides?: Partial<ConstructorParameters<typeof AgentRecord>[0]>) {
   return new AgentRecord({

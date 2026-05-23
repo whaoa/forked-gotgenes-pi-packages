@@ -8,12 +8,12 @@ import {
   type AgentSessionEvent,
   type SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentConfigLookup } from "./config/agent-types";
+import type { AgentConfigLookup } from "../config/agent-types";
+import { extractText } from "../session/context";
+import type { EnvInfo } from "../session/env";
+import { type AssemblerIO, assembleSessionConfig } from "../session/session-config";
+import type { ShellExec, SubagentType, ThinkingLevel } from "../types";
 import type { ParentSnapshot } from "./parent-snapshot";
-import { extractText } from "./session/context";
-import type { EnvInfo } from "./session/env";
-import { type AssemblerIO, assembleSessionConfig } from "./session/session-config";
-import type { ShellExec, SubagentType, ThinkingLevel } from "./types";
 
 /** Names of tools registered by this extension that subagents must NOT inherit. */
 const EXCLUDED_TOOL_NAMES = ["Agent", "get_subagent_result", "steer_subagent"];

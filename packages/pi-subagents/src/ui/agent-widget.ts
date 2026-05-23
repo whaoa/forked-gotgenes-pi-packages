@@ -5,8 +5,8 @@
  * Uses the callback form of setWidget for themed rendering.
  */
 
-import type { AgentManager } from "../agent-manager";
 import { AgentTypeRegistry } from "../config/agent-types";
+import type { AgentManager } from "../lifecycle/agent-manager";
 import type { AgentActivityTracker } from "./agent-activity-tracker";
 import { ERROR_STATUSES, type Theme } from "./display";
 import { renderWidgetLines } from "./widget-renderer";

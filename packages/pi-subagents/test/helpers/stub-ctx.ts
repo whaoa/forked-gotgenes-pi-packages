@@ -6,7 +6,7 @@
  * 'as any' while documenting the intent.
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { ParentSnapshot } from "#src/parent-snapshot";
+import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 
 export const STUB_CTX = {} as unknown as ExtensionContext;
 

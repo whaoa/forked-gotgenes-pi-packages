@@ -7,9 +7,9 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
-import { normalizeMaxTurns } from "../agent-runner";
 import type { AgentTypeRegistry } from "../config/agent-types";
 import { resolveAgentInvocationConfig } from "../config/invocation-config";
+import { normalizeMaxTurns } from "../lifecycle/agent-runner";
 import { resolveInvocationModel } from "../session/model-resolver";
 import type { AgentInvocation, IsolationMode, SubagentType, ThinkingLevel } from "../types";
 import {

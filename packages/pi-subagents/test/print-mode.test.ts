@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("#src/agent-runner", async () => {
-  const actual = await vi.importActual<typeof import("#src/agent-runner")>("#src/agent-runner");
+vi.mock("#src/lifecycle/agent-runner", async () => {
+  const actual = await vi.importActual<typeof import("#src/lifecycle/agent-runner")>("#src/lifecycle/agent-runner");
   return {
     ...actual,
     runAgent: vi.fn(),
   };
 });
 
-import { runAgent } from "#src/agent-runner";
 import subagentsExtension from "#src/index";
+import { runAgent } from "#src/lifecycle/agent-runner";
 import { createMockSession, toAgentSession } from "./helpers/mock-session";
 
 function makePi() {

@@ -41,7 +41,7 @@ const mockAgentLookup = {
   getToolNamesForType: vi.fn((): string[] => agentConfigMock.current.builtinToolNames ?? ["read"]),
 };
 
-import { runAgent } from "#src/agent-runner";
+import { runAgent } from "#src/lifecycle/agent-runner";
 
 // ── RunnerIO stub factory ──────────────────────────────────────────────────────
 
@@ -101,7 +101,7 @@ function createSessionWithExtensionToolRegistration(
   return session;
 }
 
-import type { ParentSnapshot } from "#src/parent-snapshot";
+import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 
 const snapshot: ParentSnapshot = {
   cwd: "/tmp",

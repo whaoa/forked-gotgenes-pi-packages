@@ -1,4 +1,4 @@
-import { AgentRecord, type AgentRecordInit } from "#src/agent-record";
+import { AgentRecord, type AgentRecordInit } from "#src/lifecycle/agent-record";
 
 export function createTestRecord(overrides: Partial<AgentRecordInit> & {
 	/** Legacy shorthand: set toolUses via incrementToolUses(). */

@@ -7,9 +7,9 @@
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { AgentConfigLookup } from "../config/agent-types";
+import type { LifetimeUsage, SessionLike } from "../lifecycle/usage";
+import { getLifetimeTotal, getSessionContextPercent } from "../lifecycle/usage";
 import type { SubagentType } from "../types";
-import type { LifetimeUsage, SessionLike } from "../usage";
-import { getLifetimeTotal, getSessionContextPercent } from "../usage";
 import {
 	describeActivity,
 	formatMs,

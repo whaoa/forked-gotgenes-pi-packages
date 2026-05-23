@@ -20,14 +20,15 @@ import {
   SettingsManager as SdkSettingsManager,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { AgentManager, type AgentManagerObserver } from "./agent-manager";
-import { createAgentRunner, getAgentConversation, type RunnerIO, steerAgent } from "./agent-runner";
 import { AgentTypeRegistry } from "./config/agent-types";
 import { loadCustomAgents } from "./config/custom-agents";
 import { SessionLifecycleHandler, ToolStartHandler } from "./handlers/index";
-import { buildEventData, type NotificationDetails, NotificationManager } from "./notification";
-import { buildParentSnapshot } from "./parent-snapshot";
-import { createNotificationRenderer } from "./renderer";
+import { AgentManager, type AgentManagerObserver } from "./lifecycle/agent-manager";
+import { createAgentRunner, getAgentConversation, type RunnerIO, steerAgent } from "./lifecycle/agent-runner";
+import { buildParentSnapshot } from "./lifecycle/parent-snapshot";
+import { GitWorktreeManager } from "./lifecycle/worktree";
+import { buildEventData, type NotificationDetails, NotificationManager } from "./observation/notification";
+import { createNotificationRenderer } from "./observation/renderer";
 import { createSubagentRuntime } from "./runtime";
 import { publishSubagentsService, unpublishSubagentsService } from "./service";
 import { createSubagentsService } from "./service-adapter";
@@ -48,7 +49,6 @@ import {
   AgentWidget,
   type UICtx,
 } from "./ui/agent-widget";
-import { GitWorktreeManager } from "./worktree";
 
 export default function (pi: ExtensionAPI) {
   // ---- Register custom notification renderer ----

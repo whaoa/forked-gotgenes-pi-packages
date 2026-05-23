@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getLifetimeTotal, getSessionContextPercent, getSessionTokens } from "#src/usage";
+import { getLifetimeTotal, getSessionContextPercent, getSessionTokens } from "#src/lifecycle/usage";
 
 // Regression for issue #38 — token semantics + context indicator
 describe("usage", () => {

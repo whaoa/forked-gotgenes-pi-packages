@@ -9,7 +9,7 @@ vi.mock("#src/session/context", () => ({
 }));
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { buildParentSnapshot } from "#src/parent-snapshot";
+import { buildParentSnapshot } from "#src/lifecycle/parent-snapshot";
 
 function makeCtx(overrides: Record<string, unknown> = {}) {
   return {

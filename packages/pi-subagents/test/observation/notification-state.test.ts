@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NotificationState } from "#src/notification-state";
+import { NotificationState } from "#src/observation/notification-state";
 
 describe("NotificationState — constructor", () => {
 	it("stores toolCallId", () => {

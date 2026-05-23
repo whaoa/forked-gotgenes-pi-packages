@@ -1,6 +1,6 @@
 import { wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { AgentTypeRegistry } from "../config/agent-types";
-import type { ParentSnapshot } from "../parent-snapshot";
+import type { ParentSnapshot } from "../lifecycle/parent-snapshot";
 import type { ModelRegistry } from "../session/model-resolver";
 import type { AgentConfig, AgentRecord } from "../types";
 import type { AgentActivityTracker } from "./agent-activity-tracker";

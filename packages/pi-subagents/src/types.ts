@@ -5,7 +5,7 @@
 import type { ThinkingLevel } from "@earendil-works/pi-ai";
 
 
-export { AgentRecord } from "./agent-record";
+export { AgentRecord } from "./lifecycle/agent-record";
 export type { ThinkingLevel };
 
 /** Agent type: any string name (built-in defaults or user-defined). */

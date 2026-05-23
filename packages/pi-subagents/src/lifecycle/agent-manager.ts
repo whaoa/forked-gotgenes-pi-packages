@@ -9,15 +9,15 @@
 import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import { AgentTypeRegistry } from "../config/agent-types";
+import { debugLog } from "../debug";
+import { NotificationState } from "../observation/notification-state";
+import { subscribeRecordObserver } from "../observation/record-observer";
+import type { RunConfig } from "../runtime";
+import type { AgentInvocation, IsolationMode, ShellExec, SubagentType, ThinkingLevel } from "../types";
 import { AgentRecord } from "./agent-record";
 import type { AgentRunner } from "./agent-runner";
-import { AgentTypeRegistry } from "./config/agent-types";
-import { debugLog } from "./debug";
-import { NotificationState } from "./notification-state";
 import type { ParentSnapshot } from "./parent-snapshot";
-import { subscribeRecordObserver } from "./record-observer";
-import type { RunConfig } from "./runtime";
-import type { AgentInvocation, IsolationMode, ShellExec, SubagentType, ThinkingLevel } from "./types";
 import type { WorktreeManager } from "./worktree";
 import { WorktreeState } from "./worktree-state";
 
