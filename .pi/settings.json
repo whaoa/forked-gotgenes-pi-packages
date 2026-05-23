@@ -20,6 +20,11 @@
       "skills": []
     },
     { "source": "npm:@gotgenes/pi-subagents", "extensions": [], "skills": [] },
+    {
+      "source": "npm:@gotgenes/pi-session-tools",
+      "extensions": [],
+      "skills": []
+    },
 
     "npm:pi-prompt-template-model",
     "npm:pi-web-access",
