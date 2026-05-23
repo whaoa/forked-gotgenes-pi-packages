@@ -4,6 +4,9 @@
     "packages/pi-autoformat": {
       "component": "pi-autoformat"
     },
+    "packages/pi-colgrep": {
+      "component": "pi-colgrep"
+    },
     "packages/pi-github-tools": {
       "component": "pi-github-tools"
     },

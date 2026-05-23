@@ -16,6 +16,7 @@ fi
 
 packages=(
   "packages/pi-autoformat:@gotgenes/pi-autoformat"
+  "packages/pi-colgrep:@gotgenes/pi-colgrep"
   "packages/pi-github-tools:@gotgenes/pi-github-tools"
   "packages/pi-permission-system:@gotgenes/pi-permission-system"
   "packages/pi-subagents:@gotgenes/pi-subagents"
