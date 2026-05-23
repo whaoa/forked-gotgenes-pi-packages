@@ -2,10 +2,10 @@ import {
   formatDenyReason,
   formatUnavailableReason,
   formatUserDeniedReason,
-} from "../../denial-messages";
-import type { PermissionPromptDecision } from "../../permission-dialog";
-import { applyPermissionGate } from "../../permission-gate";
-import type { PermissionCheckResult } from "../../types";
+} from "#src/denial-messages";
+import type { PermissionPromptDecision } from "#src/permission-dialog";
+import { applyPermissionGate } from "#src/permission-gate";
+import type { PermissionCheckResult } from "#src/types";
 import type { GateDescriptor, GateRunnerDeps } from "./descriptor";
 import { deriveResolution } from "./helpers";
 import type { GateOutcome } from "./types";

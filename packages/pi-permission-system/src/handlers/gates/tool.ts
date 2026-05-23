@@ -1,8 +1,8 @@
-import { getPathBearingToolPath, PATH_BEARING_TOOLS } from "../../path-utils";
-import { suggestSessionPattern } from "../../pattern-suggest";
-import { formatAskPrompt } from "../../permission-prompts";
-import { getPermissionLogContext } from "../../tool-input-preview";
-import type { PermissionCheckResult } from "../../types";
+import { getPathBearingToolPath, PATH_BEARING_TOOLS } from "#src/path-utils";
+import { suggestSessionPattern } from "#src/pattern-suggest";
+import { formatAskPrompt } from "#src/permission-prompts";
+import { getPermissionLogContext } from "#src/tool-input-preview";
+import type { PermissionCheckResult } from "#src/types";
 import type { GateDescriptor } from "./descriptor";
 import { deriveDecisionValue } from "./helpers";
 import type { ToolCallContext } from "./types";

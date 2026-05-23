@@ -3,8 +3,8 @@ import {
   isPathOutsideWorkingDirectory,
   isPiInfrastructureRead,
   normalizePathForComparison,
-} from "../../path-utils";
-import { deriveApprovalPattern } from "../../session-rules";
+} from "#src/path-utils";
+import { deriveApprovalPattern } from "#src/session-rules";
 import type { GateResult } from "./descriptor";
 import { formatExternalDirectoryAskPrompt } from "./external-directory-messages";
 import type { ToolCallContext } from "./types";

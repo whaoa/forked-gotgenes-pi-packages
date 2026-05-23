@@ -1,9 +1,9 @@
-import type { DenialContext } from "../../denial-messages";
-import type { PermissionPromptDecision } from "../../permission-dialog";
-import type { PermissionDecisionEvent } from "../../permission-events";
-import type { PromptPermissionDetails } from "../../permission-prompter";
-import type { Rule } from "../../rule";
-import type { PermissionCheckResult, PermissionState } from "../../types";
+import type { DenialContext } from "#src/denial-messages";
+import type { PermissionPromptDecision } from "#src/permission-dialog";
+import type { PermissionDecisionEvent } from "#src/permission-events";
+import type { PromptPermissionDetails } from "#src/permission-prompter";
+import type { Rule } from "#src/rule";
+import type { PermissionCheckResult, PermissionState } from "#src/types";
 
 // ── Descriptor types ───────────────────────────────────────────────────────
 

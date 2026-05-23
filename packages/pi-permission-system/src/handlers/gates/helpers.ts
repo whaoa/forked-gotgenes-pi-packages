@@ -1,5 +1,5 @@
-import type { PermissionDecisionResolution } from "../../permission-events";
-import type { PermissionCheckResult } from "../../types";
+import type { PermissionDecisionResolution } from "#src/permission-events";
+import type { PermissionCheckResult } from "#src/types";
 
 /**
  * Derive the human-readable value for a decision event from a check result.

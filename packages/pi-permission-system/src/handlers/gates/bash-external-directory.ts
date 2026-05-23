@@ -1,7 +1,7 @@
-import { getNonEmptyString, toRecord } from "../../common";
-import type { Rule } from "../../rule";
-import { deriveApprovalPattern } from "../../session-rules";
-import type { PermissionCheckResult } from "../../types";
+import { getNonEmptyString, toRecord } from "#src/common";
+import type { Rule } from "#src/rule";
+import { deriveApprovalPattern } from "#src/session-rules";
+import type { PermissionCheckResult } from "#src/types";
 import { extractExternalPathsFromBashCommand } from "./bash-path-extractor";
 import type { GateResult } from "./descriptor";
 import { formatBashExternalDirectoryAskPrompt } from "./external-directory-messages";

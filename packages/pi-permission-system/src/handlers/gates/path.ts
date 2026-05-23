@@ -1,7 +1,7 @@
-import { getPathBearingToolPath } from "../../path-utils";
-import type { Rule } from "../../rule";
-import { deriveApprovalPattern } from "../../session-rules";
-import type { PermissionCheckResult } from "../../types";
+import { getPathBearingToolPath } from "#src/path-utils";
+import type { Rule } from "#src/rule";
+import { deriveApprovalPattern } from "#src/session-rules";
+import type { PermissionCheckResult } from "#src/types";
 import type { GateDescriptor, GateResult } from "./descriptor";
 import type { ToolCallContext } from "./types";
 
