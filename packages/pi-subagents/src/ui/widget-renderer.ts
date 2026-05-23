@@ -12,7 +12,6 @@ import type { LifetimeUsage, SessionLike } from "../usage.js";
 import { getLifetimeTotal, getSessionContextPercent } from "../usage.js";
 import {
 	describeActivity,
-	ERROR_STATUSES,
 	formatMs,
 	formatSessionTokens,
 	formatTurns,
