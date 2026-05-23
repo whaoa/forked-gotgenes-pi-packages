@@ -1,0 +1,146 @@
+/**
+ * spawn-config.ts — Pure config resolution for the Agent tool.
+ *
+ * Extracts all config resolution logic from execute: type resolution,
+ * invocation config merge, model resolution, max-turns normalization,
+ * tag building, and detail-base construction.
+ */
+
+import type { Model } from "@earendil-works/pi-ai";
+import { normalizeMaxTurns } from "../agent-runner.js";
+import type { AgentTypeRegistry } from "../agent-types.js";
+import { resolveAgentInvocationConfig } from "../invocation-config.js";
+import { resolveInvocationModel } from "../model-resolver.js";
+import type { AgentInvocation, IsolationMode, SubagentType, ThinkingLevel } from "../types.js";
+import {
+  type AgentDetails,
+  buildInvocationTags,
+  getDisplayName,
+  getPromptModeLabel,
+} from "../ui/display.js";
+
+/** Model info extracted from the parent session context. */
+export interface ModelInfo {
+  parentModel: { id: string; name?: string } | undefined;
+  modelRegistry: unknown;
+}
+
+/** Fully resolved config for spawning an agent. */
+export interface ResolvedSpawnConfig {
+  subagentType: string;
+  rawType: SubagentType;
+  fellBack: boolean;
+  displayName: string;
+  prompt: string;
+  description: string;
+  model: Model<any> | undefined;
+  effectiveMaxTurns: number | undefined;
+  thinking: ThinkingLevel | undefined;
+  inheritContext: boolean;
+  runInBackground: boolean;
+  isolated: boolean;
+  isolation: IsolationMode | undefined;
+  modelName: string | undefined;
+  agentInvocation: AgentInvocation;
+  agentTags: string[];
+  detailBase: Pick<AgentDetails, "displayName" | "description" | "subagentType" | "modelName" | "tags">;
+}
+
+/** Error result when model resolution fails. */
+export interface SpawnConfigError {
+  error: string;
+}
+
+/**
+ * Resolve all config for an Agent tool invocation.
+ *
+ * Pure function — no SDK types, no side effects.
+ * Returns either a fully resolved config or an error.
+ */
+export function resolveSpawnConfig(
+  params: Record<string, unknown>,
+  registry: AgentTypeRegistry,
+  modelInfo: ModelInfo,
+  settings: { readonly defaultMaxTurns: number | undefined },
+): ResolvedSpawnConfig | SpawnConfigError {
+  const rawType = params.subagent_type as SubagentType;
+  const resolved = registry.resolveType(rawType);
+  const subagentType = resolved ?? "general-purpose";
+  const fellBack = resolved === undefined;
+
+  const displayName = getDisplayName(subagentType, registry);
+
+  // Merge agent config defaults with tool-call params
+  const customConfig = registry.resolveAgentConfig(subagentType);
+  const resolvedConfig = resolveAgentInvocationConfig(customConfig, params);
+
+  // Resolve model
+  const resolution = resolveInvocationModel(
+    modelInfo.parentModel,
+    resolvedConfig.modelInput,
+    resolvedConfig.modelFromParams,
+    modelInfo.modelRegistry as any,
+  );
+  if (resolution.error) return { error: resolution.error };
+  const model = resolution.model;
+
+  const thinking = resolvedConfig.thinking;
+  const inheritContext = resolvedConfig.inheritContext;
+  const runInBackground = resolvedConfig.runInBackground;
+  const isolated = resolvedConfig.isolated;
+  const isolation = resolvedConfig.isolation;
+
+  // Compute display model name (only shown when different from parent)
+  const parentModelId = modelInfo.parentModel?.id;
+  const effectiveModelId = model?.id;
+  const modelName =
+    effectiveModelId && effectiveModelId !== parentModelId
+      ? (model?.name ?? effectiveModelId).replace(/^Claude\s+/i, "").toLowerCase()
+      : undefined;
+
+  const effectiveMaxTurns = normalizeMaxTurns(
+    resolvedConfig.maxTurns ?? settings.defaultMaxTurns,
+  );
+
+  const agentInvocation: AgentInvocation = {
+    modelName,
+    thinking,
+    maxTurns: normalizeMaxTurns(resolvedConfig.maxTurns),
+    isolated,
+    inheritContext,
+    runInBackground,
+    isolation,
+  };
+
+  const modeLabel = getPromptModeLabel(subagentType, registry);
+  const { tags: invocationTags } = buildInvocationTags(agentInvocation);
+  const agentTags = modeLabel ? [modeLabel, ...invocationTags] : invocationTags;
+
+  const detailBase = {
+    displayName,
+    description: params.description as string,
+    subagentType,
+    modelName,
+    tags: agentTags.length > 0 ? agentTags : undefined,
+  };
+
+  return {
+    subagentType,
+    rawType,
+    fellBack,
+    displayName,
+    prompt: params.prompt as string,
+    description: params.description as string,
+    model,
+    effectiveMaxTurns,
+    thinking,
+    inheritContext,
+    runInBackground,
+    isolated,
+    isolation,
+    modelName,
+    agentInvocation,
+    agentTags,
+    detailBase,
+  };
+}
