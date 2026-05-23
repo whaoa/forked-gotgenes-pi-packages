@@ -21,7 +21,6 @@ Before working on a specific package, load its `package-<name>` skill for archit
 - Use standard top-level imports only.
 - Keep modules focused and composable (one concern per file).
 - Prefer explicit configuration over hidden behavior.
-- When writing `promptGuidelines` for a tool registration, name the tool in every bullet — Pi flattens all tools' guidelines into one `Guidelines:` block without per-tool attribution (see [earendil-works/pi#4879](https://github.com/earendil-works/pi/issues/4879)).
 - This project uses **pnpm** exclusively — never `npm` or `npx`.
 - The tsconfig target is ES2024 (`noEmit: true`).
   ES2023 APIs (`findLast`, `findLastIndex`, `toReversed`, `toSorted`, `toSpliced`, `with`) and ES2024 APIs (`Promise.withResolvers`, `Object.groupBy`, `Map.groupBy`, `Array.fromAsync`) are available and preferred.

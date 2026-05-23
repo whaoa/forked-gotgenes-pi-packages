@@ -37,4 +37,4 @@ Released as `pi-colgrep-v1.3.0`.
 
 ### Changes made
 
-1. `AGENTS.md` — added `promptGuidelines` self-identification rule with link to earendil-works/pi#4879.
+1. `.pi/skills/code-design/SKILL.md` — added `promptGuidelines` self-identification rule under "Pi SDK boundaries" with link to earendil-works/pi#4879.

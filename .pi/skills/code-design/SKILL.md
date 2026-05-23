@@ -123,6 +123,8 @@ When writing event handlers that consume Pi SDK types, prefer lean local payload
 The SDK may not export all event interfaces, and exported types often require fields the handler does not read.
 Define a minimal interface with only the fields the handler uses.
 
+When writing `promptGuidelines` for a tool registration, name the tool in every bullet — Pi flattens all tools' guidelines into one `Guidelines:` block without per-tool attribution ([earendil-works/pi#4879](https://github.com/earendil-works/pi/issues/4879)).
+
 ## Tooling
 
 - This project uses **pnpm** exclusively (`"packageManager"` in root `package.json`; `pnpm-lock.yaml`).
