@@ -63,7 +63,7 @@ Released as `pi-subagents-v6.16.2`.
 
 - None observed — the session ran autonomously with no user corrections needed.
 
-#### What caused friction (user side)
+#### What caused friction (user side — planning)
 
 - The user had to explicitly ask for a plan review (“I'd like you to review the plan and judge its quality and clarity”) to surface three ordering bugs.
   The planning agent should have caught these during plan authoring — the testing skill already contains rules about TDD step ordering and shared interface changes.

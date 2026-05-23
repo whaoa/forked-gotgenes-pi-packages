@@ -30,7 +30,7 @@ export function compileWildcardPattern<TState>(
   // space-and-arguments portion optional so that e.g. "git *" matches both
   // "git status" and bare "git". Mirrors OpenCode wildcard semantics.
   if (escaped.endsWith(" .*")) {
-    escaped = escaped.slice(0, -3) + "( .*)?";
+    escaped = `${escaped.slice(0, -3)}( .*)?`;
   }
 
   return {
@@ -48,7 +48,7 @@ export function compileWildcardPatternEntries<TState>(
   );
 }
 
-function compileWildcardPatterns<TState>(
+function _compileWildcardPatterns<TState>(
   patterns: Record<string, TState>,
 ): CompiledWildcardPattern<TState>[] {
   return compileWildcardPatternEntries(Object.entries(patterns));

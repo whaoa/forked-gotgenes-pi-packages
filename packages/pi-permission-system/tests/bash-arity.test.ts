@@ -7,7 +7,7 @@ describe("ARITY dictionary", () => {
   });
 
   it("maps 'git' to arity 2", () => {
-    expect(ARITY["git"]).toBe(2);
+    expect(ARITY.git).toBe(2);
   });
 
   it("maps 'npm run' to arity 3", () => {
@@ -15,7 +15,7 @@ describe("ARITY dictionary", () => {
   });
 
   it("maps 'npm' to arity 2 (fallback when 'npm run' does not match)", () => {
-    expect(ARITY["npm"]).toBe(2);
+    expect(ARITY.npm).toBe(2);
   });
 
   it("maps 'docker compose' to arity 3", () => {
@@ -23,7 +23,7 @@ describe("ARITY dictionary", () => {
   });
 
   it("maps 'docker' to arity 2 (fallback)", () => {
-    expect(ARITY["docker"]).toBe(2);
+    expect(ARITY.docker).toBe(2);
   });
 });
 
