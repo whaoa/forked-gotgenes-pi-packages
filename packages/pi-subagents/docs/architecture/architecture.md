@@ -616,13 +616,13 @@ Phase 9 targets the next layer: observation model consolidation, `ExtensionConte
 
 ### Current smells
 
-| Smell                                            | Location                                                                  | Evidence                                                                                                                       | Severity |
-| ------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| `execute` does config resolution for its callees | `agent-tool.ts` (145-line `execute`)                                      | ~60 lines unpack config, resolve model, compute metadata, repack into 16-field bags for spawners; `ctx` threaded 4 layers deep | Medium   |
-| ~~Wide `ctx` in menu handlers~~                  | ~~`agent-menu.ts`, `agent-config-editor.ts`, `agent-creation-wizard.ts`~~ | Resolved by #146: `MenuUI` interface introduced; 42 `ctx as any` casts eliminated across 5 test files                          | Done     |
-| Direct SDK import in `conversation-viewer.ts`    | `conversation-viewer.test.ts`                                             | Hoisted `vi.mock("@earendil-works/pi-tui")` to intercept `wrapTextWithAnsi`                                                    | Low      |
-| ~~Widget mixes rendering, lifecycle, and state~~ | ~~`agent-widget.ts` (370 lines)~~                                         | Resolved by #148: rendering extracted to `widget-renderer.ts`; widget is now 198 lines                                         | Done     |
-| `deps.` prefix noise in function bodies          | remaining modules across tools, UI, service-adapter                       | Functions accept a `deps` bag and access every field as `deps.foo`; hides real dependencies and lengthens every call line      | Low      |
+| Smell                                             | Location                                                                  | Evidence                                                                                                                       | Severity |
+| ------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| `execute` does config resolution for its callees  | `agent-tool.ts` (145-line `execute`)                                      | ~60 lines unpack config, resolve model, compute metadata, repack into 16-field bags for spawners; `ctx` threaded 4 layers deep | Medium   |
+| ~~Wide `ctx` in menu handlers~~                   | ~~`agent-menu.ts`, `agent-config-editor.ts`, `agent-creation-wizard.ts`~~ | Resolved by #146: `MenuUI` interface introduced; 42 `ctx as any` casts eliminated across 5 test files                          | Done     |
+| ~~Direct SDK import in `conversation-viewer.ts`~~ | ~~`conversation-viewer.test.ts`~~                                         | Resolved by #147: `wrapText` injected via `ConversationViewerOptions`; `vi.mock("@earendil-works/pi-tui")` eliminated          | Done     |
+| ~~Widget mixes rendering, lifecycle, and state~~  | ~~`agent-widget.ts` (370 lines)~~                                         | Resolved by #148: rendering extracted to `widget-renderer.ts`; widget is now 198 lines                                         | Done     |
+| `deps.` prefix noise in function bodies           | remaining modules across tools, UI, service-adapter                       | Functions accept a `deps` bag and access every field as `deps.foo`; hides real dependencies and lengthens every call line      | Low      |
 
 ### Dependency bag convention
 
@@ -683,15 +683,15 @@ After Steps M and N, `ExtensionContext` appears only at true boundaries: `index.
 
 Impact: eliminated 42 `ctx as any` casts across 5 test files (`agent-menu.test.ts`: 8, `agent-config-editor.test.ts`: 20, `agent-creation-wizard.test.ts`: 14); tests construct plain `MenuUI`-shaped objects with no cast.
 
-### Step O: Inject text wrapping into ConversationViewer (#147)
+### Step O: Inject text wrapping into ConversationViewer (#147) ✓
 
-Accept a `wrapText` function via `ConversationViewerOptions`.
-`index.ts` passes the real `wrapTextWithAnsi` import.
-Tests inject a stub or the real function directly - no module-level mock needed.
+Accepted `wrapText: (text: string, width: number) => string[]` via `ConversationViewerOptions`.
+`agent-menu.ts` passes the real `wrapTextWithAnsi` import at the `ConversationViewer` construction site.
+Tests inject a stub or the real function directly via options — no module-level mock needed.
 
-Apply the dependency bag convention: `ConversationViewerOptions` is destructured in the constructor signature.
+Applied the dependency bag convention: `ConversationViewerOptions` is now destructured in the constructor signature.
 
-Impact: eliminates the hoisted `vi.mock("@earendil-works/pi-tui")` in `conversation-viewer.test.ts`.
+Impact: eliminated the hoisted `vi.mock("@earendil-works/pi-tui")` from `conversation-viewer.test.ts`; 1 test deleted (mock-mechanism sentinel); net −1 test.
 
 ### Step P: Split AgentWidget rendering (#148) ✓
 
