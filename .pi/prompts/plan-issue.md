@@ -41,7 +41,7 @@ Before reading anything, make sure the working tree is up to date with the remot
 Before writing the plan, load skills relevant to the change:
 
 - Always load the `package-<PKG>` skill (e.g., `package-pi-permission-system`) for package-specific architecture, priorities, and testing context.
-- If the plan involves code changes: load the `code-design` skill.
+- If the plan involves code changes: load the `code-design` skill and the `colgrep` skill for convention discovery during exploration.
 - If the plan involves test changes or TDD steps: load the `testing` skill.
 - If the plan involves markdown/doc changes: load the `markdown-conventions` skill.
 - If the plan adds fields to shared interfaces or touches wiring between layers: load the `design-review` skill and run its checklist on the affected modules.
