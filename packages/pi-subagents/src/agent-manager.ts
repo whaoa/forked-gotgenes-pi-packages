@@ -8,14 +8,13 @@
 
 import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
-import type { AgentSession, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { AgentRecord } from "./agent-record.js";
 import type { AgentRunner } from "./agent-runner.js";
 import { AgentTypeRegistry } from "./agent-types.js";
 import { debugLog } from "./debug.js";
 import { NotificationState } from "./notification-state.js";
 import type { ParentSnapshot } from "./parent-snapshot.js";
-import { buildParentSnapshot } from "./parent-snapshot.js";
 import { subscribeRecordObserver } from "./record-observer.js";
 import type { RunConfig } from "./runtime.js";
 import type { AgentInvocation, IsolationMode, ShellExec, SubagentType, ThinkingLevel } from "./types.js";
@@ -141,7 +140,7 @@ export class AgentManager {
    * If the concurrency limit is reached, the agent is queued.
    */
   spawn(
-    ctx: ExtensionContext,
+    snapshot: ParentSnapshot,
     type: SubagentType,
     prompt: string,
     options: AgentSpawnConfig,
@@ -167,7 +166,6 @@ export class AgentManager {
       this.observer?.onAgentCreated(record);
     }
 
-    const snapshot = buildParentSnapshot(ctx, options.inheritContext);
     const args: SpawnArgs = { snapshot, type, prompt, options };
 
     if (options.isBackground && !options.bypassQueue && this.runningBackground >= this._getMaxConcurrent()) {
@@ -332,12 +330,12 @@ export class AgentManager {
    * Foreground agents bypass the concurrency queue.
    */
   async spawnAndWait(
-    ctx: ExtensionContext,
+    snapshot: ParentSnapshot,
     type: SubagentType,
     prompt: string,
     options: Omit<AgentSpawnConfig, "isBackground">,
   ): Promise<AgentRecord> {
-    const id = this.spawn(ctx, type, prompt, { ...options, isBackground: false });
+    const id = this.spawn(snapshot, type, prompt, { ...options, isBackground: false });
     const record = this.agents.get(id)!;
     await record.promise;
     return record;

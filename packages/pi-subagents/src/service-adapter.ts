@@ -5,13 +5,16 @@
  * (stripping non-serializable fields), and session gating.
  */
 
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ModelRegistry } from "./model-resolver.js";
+import type { ParentSnapshot } from "./parent-snapshot.js";
+import { buildParentSnapshot } from "./parent-snapshot.js";
 import type { SubagentRecord, SubagentsService } from "./service.js";
 import type { AgentRecord } from "./types.js";
 
 /** Narrow interface for the AgentManager — avoids coupling to the concrete class. */
 export interface AgentManagerLike {
-  spawn(ctx: unknown, type: string, prompt: string, options: unknown): string;
+  spawn(snapshot: ParentSnapshot, type: string, prompt: string, options: unknown): string;
   getRecord(id: string): AgentRecord | undefined;
   listAgents(): AgentRecord[];
   abort(id: string): boolean;
@@ -55,7 +58,11 @@ export function createSubagentsService(deps: AdapterDeps): SubagentsService {
       const description = options?.description ?? prompt.slice(0, 80);
       const isBackground = !(options?.foreground ?? false);
 
-      return manager.spawn(session.ctx, type, prompt, {
+      const snapshot = buildParentSnapshot(
+        session.ctx as ExtensionContext,
+        options?.inheritContext,
+      );
+      return manager.spawn(snapshot, type, prompt, {
         description,
         model,
         maxTurns: options?.maxTurns,

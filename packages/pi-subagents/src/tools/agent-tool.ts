@@ -1,8 +1,9 @@
-import type { AgentToolResult, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
 import type { AgentSpawnConfig } from "../agent-manager.js";
 import { AgentTypeRegistry } from "../agent-types.js";
+import type { ParentSnapshot } from "../parent-snapshot.js";
 
 import type { AgentRecord, SubagentType } from "../types.js";
 import { AgentActivityTracker } from "../ui/agent-activity-tracker.js";
@@ -23,8 +24,8 @@ import { resolveSpawnConfig } from "./spawn-config.js";
 
 /** Narrow manager interface — only the methods the Agent tool calls. */
 export interface AgentToolManager {
-  spawn: (ctx: ExtensionContext, type: string, prompt: string, opts: AgentSpawnConfig) => string;
-  spawnAndWait: (ctx: ExtensionContext, type: string, prompt: string, opts: Omit<AgentSpawnConfig, "isBackground">) => Promise<AgentRecord>;
+  spawn: (snapshot: ParentSnapshot, type: string, prompt: string, opts: AgentSpawnConfig) => string;
+  spawnAndWait: (snapshot: ParentSnapshot, type: string, prompt: string, opts: Omit<AgentSpawnConfig, "isBackground">) => Promise<AgentRecord>;
   resume: (id: string, prompt: string, signal: AbortSignal) => Promise<AgentRecord | undefined>;
   getRecord: (id: string) => AgentRecord | undefined;
   getMaxConcurrent: () => number;

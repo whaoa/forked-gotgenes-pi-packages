@@ -109,6 +109,16 @@ describe("toSubagentRecord", () => {
   });
 });
 
+/** Minimal ctx stub that satisfies buildParentSnapshot. */
+function makeStubCtx() {
+  return {
+    cwd: "/tmp",
+    getSystemPrompt: () => "test prompt",
+    model: undefined,
+    modelRegistry: { find: () => null },
+  };
+}
+
 describe("createSubagentsService — getRecord and listAgents", () => {
   const recordA = createTestRecord({
     id: "a-1",
@@ -147,7 +157,7 @@ describe("createSubagentsService — getRecord and listAgents", () => {
     return createSubagentsService({
       manager,
       resolveModel: () => ({ id: "test" }),
-      getCtx: () => ({ pi: {}, ctx: {} }),
+      getCtx: () => ({ pi: {}, ctx: makeStubCtx() }),
       getModelRegistry: () => ({ find: () => null, getAll: () => [] }),
     });
   }
@@ -191,7 +201,7 @@ describe("createSubagentsService — spawn", () => {
         queueSteer: vi.fn(() => true),
       },
       resolveModel: vi.fn(() => ({ id: "claude-sonnet", provider: "anthropic" })),
-      getCtx: () => ({ pi: { fake: true }, ctx: { cwd: "/tmp" } }),
+      getCtx: () => ({ pi: { fake: true }, ctx: makeStubCtx() }),
       getModelRegistry: () => ({ find: () => null, getAll: () => [] }),
       ...overrides,
     };
@@ -302,7 +312,7 @@ describe("createSubagentsService — steer, abort, waitForAll, hasRunning", () =
         queueSteer: mockQueueSteer,
       },
       resolveModel: vi.fn(),
-      getCtx: () => ({ pi: {}, ctx: {} }),
+      getCtx: () => ({ pi: {}, ctx: makeStubCtx() }),
       getModelRegistry: () => ({ find: () => null, getAll: () => [] }),
       ...overrides,
     };

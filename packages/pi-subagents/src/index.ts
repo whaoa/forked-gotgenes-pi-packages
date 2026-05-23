@@ -29,6 +29,7 @@ import { SessionLifecycleHandler, ToolStartHandler } from "./handlers/index.js";
 import { buildMemoryBlock, buildReadOnlyMemoryBlock } from "./memory.js";
 import { type ModelRegistry, resolveModel } from "./model-resolver.js";
 import { buildEventData, type NotificationDetails, NotificationManager } from "./notification.js";
+import { buildParentSnapshot } from "./parent-snapshot.js";
 import { buildAgentPrompt } from "./prompts.js";
 import { createNotificationRenderer } from "./renderer.js";
 import { createSubagentRuntime } from "./runtime.js";
@@ -193,8 +194,8 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool(defineTool(createAgentTool({
     manager: {
-      spawn: (ctx, type, prompt, opts) => manager.spawn(ctx, type, prompt, opts),
-      spawnAndWait: (ctx, type, prompt, opts) => manager.spawnAndWait(ctx, type, prompt, opts),
+      spawn: (snapshot, type, prompt, opts) => manager.spawn(snapshot, type, prompt, opts),
+      spawnAndWait: (snapshot, type, prompt, opts) => manager.spawnAndWait(snapshot, type, prompt, opts),
       resume: (id, prompt, signal) => manager.resume(id, prompt, signal),
       getRecord: (id) => manager.getRecord(id),
       getMaxConcurrent: () => settings.maxConcurrent,
@@ -235,7 +236,7 @@ export default function (pi: ExtensionAPI) {
     manager: {
       listAgents: () => manager.listAgents(),
       getRecord: (id) => manager.getRecord(id),
-      spawnAndWait: (ctx, type, prompt, opts) => manager.spawnAndWait(ctx, type, prompt, opts),
+      spawnAndWait: (ctx, type, prompt, opts) => manager.spawnAndWait(buildParentSnapshot(ctx), type, prompt, opts),
     },
     registry,
     agentActivity: runtime.agentActivity,

@@ -3,18 +3,18 @@ import type { BackgroundDeps } from "../../src/tools/background-spawner.js";
 import type { ForegroundDeps } from "../../src/tools/foreground-runner.js";
 import { AgentActivityTracker } from "../../src/ui/agent-activity-tracker.js";
 import { createToolDeps } from "./make-deps.js";
-import { STUB_CTX } from "./stub-ctx.js";
+import { STUB_CTX, STUB_SNAPSHOT } from "./stub-ctx.js";
 
 describe("createToolDeps", () => {
 	describe("manager defaults", () => {
 		it("spawn returns 'agent-1'", () => {
 			const { manager } = createToolDeps();
-			expect(manager.spawn(STUB_CTX, "general-purpose", "prompt", { description: "test" })).toBe("agent-1");
+			expect(manager.spawn(STUB_SNAPSHOT, "general-purpose", "prompt", { description: "test" })).toBe("agent-1");
 		});
 
 		it("spawnAndWait resolves to a completed record", async () => {
 			const { manager } = createToolDeps();
-			const record = await manager.spawnAndWait(STUB_CTX, "general-purpose", "prompt", { description: "test" });
+			const record = await manager.spawnAndWait(STUB_SNAPSHOT, "general-purpose", "prompt", { description: "test" });
 			expect(record.status).toBe("completed");
 		});
 
@@ -82,7 +82,7 @@ describe("createToolDeps", () => {
 			const deps = createToolDeps({
 				manager: { ...createToolDeps().manager, spawn: customSpawn },
 			});
-			deps.manager.spawn(STUB_CTX, "t", "p", { description: "test" });
+			deps.manager.spawn(STUB_SNAPSHOT, "t", "p", { description: "test" });
 			expect(customSpawn).toHaveBeenCalledOnce();
 		});
 
