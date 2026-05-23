@@ -86,3 +86,4 @@ Test count: 806 → 805 (deleted mock-mechanism sentinel test).
 ### Changes made
 
 1. Appended this final retrospective entry to `packages/pi-subagents/docs/retro/0147-inject-wrap-text-into-conversation-viewer.md`.
+2. Separated `colgrep` skill loading into its own bullet in `.pi/prompts/plan-issue.md` to reduce pattern-matching shortcuts.
