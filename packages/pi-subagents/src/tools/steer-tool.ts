@@ -4,17 +4,14 @@ import type { AgentRecord } from "../types.js";
 import { getSessionContextPercent } from "../usage.js";
 import { formatLifetimeTokens, textResult } from "./helpers.js";
 
-/** Narrow deps — only the methods this tool's execute callback calls. */
-export interface SteerToolDeps {
-  getRecord: (id: string) => AgentRecord | undefined;
-  emitEvent: (name: string, data: unknown) => void;
-  steerAgent: (session: AgentSession, message: string) => Promise<void>;
-  /** Buffer a steer for an agent whose session isn't ready yet. */
-  queueSteer: (id: string, message: string) => boolean;
-}
-
 /** Create the steer_subagent tool definition (without Pi SDK wrapper). */
-export function createSteerTool(deps: SteerToolDeps) {
+export function createSteerTool(
+  getRecord: (id: string) => AgentRecord | undefined,
+  emitEvent: (name: string, data: unknown) => void,
+  steerAgent: (session: AgentSession, message: string) => Promise<void>,
+  /** Buffer a steer for an agent whose session isn't ready yet. */
+  queueSteer: (id: string, message: string) => boolean,
+) {
   return {
     name: "steer_subagent" as const,
     label: "Steer Agent",
@@ -38,7 +35,7 @@ export function createSteerTool(deps: SteerToolDeps) {
       _onUpdate: unknown,
       _ctx: unknown,
     ) => {
-      const record = deps.getRecord(params.agent_id);
+      const record = getRecord(params.agent_id);
       if (!record) {
         return textResult(
           `Agent not found: "${params.agent_id}". It may have been cleaned up.`,
@@ -52,16 +49,16 @@ export function createSteerTool(deps: SteerToolDeps) {
       const session = record.session;
       if (!session) {
         // Session not ready yet — queue via manager for delivery once initialized
-        deps.queueSteer(record.id, params.message);
-        deps.emitEvent("subagents:steered", { id: record.id, message: params.message });
+        queueSteer(record.id, params.message);
+        emitEvent("subagents:steered", { id: record.id, message: params.message });
         return textResult(
           `Steering message queued for agent ${record.id}. It will be delivered once the session initializes.`,
         );
       }
 
       try {
-        await deps.steerAgent(session, params.message);
-        deps.emitEvent("subagents:steered", { id: record.id, message: params.message });
+        await steerAgent(session, params.message);
+        emitEvent("subagents:steered", { id: record.id, message: params.message });
         const tokens = formatLifetimeTokens(record);
         const contextPercent = getSessionContextPercent(session);
         const stateParts: string[] = [];

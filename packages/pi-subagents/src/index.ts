@@ -236,12 +236,12 @@ export default function (pi: ExtensionAPI) {
 
   // ---- steer_subagent tool ----
 
-  pi.registerTool(defineTool(createSteerTool({
-    getRecord: (id) => manager.getRecord(id),
-    emitEvent: (name, data) => pi.events.emit(name, data),
-    steerAgent: (session, message) => steerAgent(session, message),
-    queueSteer: (id, message) => manager.queueSteer(id, message),
-  })));
+  pi.registerTool(defineTool(createSteerTool(
+    (id) => manager.getRecord(id),
+    (name, data) => pi.events.emit(name, data),
+    (session, message) => steerAgent(session, message),
+    (id, message) => manager.queueSteer(id, message),
+  )));
 
   // ---- /agents interactive menu ----
 

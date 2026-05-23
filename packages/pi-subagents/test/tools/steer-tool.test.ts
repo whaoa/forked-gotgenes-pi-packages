@@ -18,18 +18,25 @@ async function execute(
   deps: ReturnType<typeof makeDeps>,
   params: { agent_id: string; message: string },
 ) {
-  const tool = createSteerTool(deps);
+  const tool = createSteerTool(
+    deps.getRecord,
+    deps.emitEvent,
+    deps.steerAgent,
+    deps.queueSteer,
+  );
   return tool.execute("tc-1", params, new AbortController().signal, undefined, STUB_CTX);
 }
 
 describe("createSteerTool", () => {
   it("returns tool definition with correct name", () => {
-    const tool = createSteerTool(makeDeps());
+    const deps = makeDeps();
+    const tool = createSteerTool(deps.getRecord, deps.emitEvent, deps.steerAgent, deps.queueSteer);
     expect(tool.name).toBe("steer_subagent");
   });
 
   it("includes promptSnippet", () => {
-    const tool = createSteerTool(makeDeps());
+    const deps = makeDeps();
+    const tool = createSteerTool(deps.getRecord, deps.emitEvent, deps.steerAgent, deps.queueSteer);
     expect(tool.promptSnippet).toBe(
       "steer_subagent: Send a mid-run message to redirect a running background agent.",
     );
