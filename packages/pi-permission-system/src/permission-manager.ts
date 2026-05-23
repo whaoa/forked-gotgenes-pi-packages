@@ -296,8 +296,5 @@ function deriveSource(
   return rule.layer === "default" ? "default" : "tool";
 }
 
-// Keep isPermissionState and toRecord available for convenience — they are
-// used directly in some handler files that import from permission-manager.
-export { isPermissionState, toRecord } from "./common";
 // Re-export types that external modules import from this file.
 export type { PolicyLoader, ResolvedPolicyPaths } from "./policy-loader";
