@@ -41,6 +41,7 @@ import { createAgentTool } from "./tools/agent-tool.js";
 import { createGetResultTool } from "./tools/get-result-tool.js";
 import { getModelLabelFromConfig } from "./tools/helpers.js";
 import { createSteerTool } from "./tools/steer-tool.js";
+import { FsAgentFileOps } from "./ui/agent-file-ops.js";
 import { createAgentsMenuHandler } from "./ui/agent-menu.js";
 import {
   AgentWidget,
@@ -248,6 +249,7 @@ export default function (pi: ExtensionAPI) {
       return getModelLabelFromConfig(cfg.model);
     },
     settings,
+    fileOps: new FsAgentFileOps(),
     personalAgentsDir: join(getAgentDir(), 'agents'),
     projectAgentsDir: join(process.cwd(), '.pi', 'agents'),
   });

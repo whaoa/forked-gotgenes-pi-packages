@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -10,6 +10,8 @@ import {
 import type { ModelRegistry } from "../model-resolver.js";
 import type { AgentConfig, AgentRecord } from "../types.js";
 import type { AgentActivityTracker } from "./agent-activity-tracker.js";
+import { createAgentConfigEditor } from "./agent-config-editor.js";
+import type { AgentFileOps } from "./agent-file-ops.js";
 import { formatDuration, getDisplayName } from "./display.js";
 
 // ---- Deps interface ----
@@ -48,6 +50,7 @@ export interface AgentMenuDeps {
   getModelLabel: (type: string, registry?: ModelRegistry) => string;
   /** Settings manager — owns in-memory values and persistence. */
   settings: AgentMenuSettings;
+  fileOps: AgentFileOps;
   personalAgentsDir: string;
   projectAgentsDir: string;
 }
@@ -61,15 +64,12 @@ export interface AgentMenuDeps {
  * Returns a function suitable for `pi.registerCommand("agents", { handler })`.
  */
 export function createAgentsMenuHandler(deps: AgentMenuDeps) {
-  function findAgentFile(
-    name: string,
-  ): { path: string; location: "project" | "personal" } | undefined {
-    const projectPath = join(deps.projectAgentsDir, `${name}.md`);
-    if (existsSync(projectPath)) return { path: projectPath, location: "project" };
-    const personalPath = join(deps.personalAgentsDir, `${name}.md`);
-    if (existsSync(personalPath)) return { path: personalPath, location: "personal" };
-    return undefined;
-  }
+  const editor = createAgentConfigEditor({
+    fileOps: deps.fileOps,
+    registry: deps.registry,
+    personalAgentsDir: deps.personalAgentsDir,
+    projectAgentsDir: deps.projectAgentsDir,
+  });
 
   async function showAgentsMenu(ctx: ExtensionContext) {
     deps.registry.reload();
@@ -174,7 +174,7 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
       .replace(/^[•◦✕\s]+/, "")
       .trim();
     if (deps.registry.resolveType(agentName) != null) {
-      await showAgentDetail(ctx, agentName);
+      await editor.showAgentDetail(ctx, agentName);
       await showAllAgentsList(ctx);
     }
   }
@@ -231,177 +231,6 @@ export function createAgentsMenuHandler(deps: AgentMenuDeps) {
         },
       },
     );
-  }
-
-  async function showAgentDetail(ctx: ExtensionContext, name: string) {
-    if (deps.registry.resolveType(name) == null) {
-      ctx.ui.notify(`Agent config not found for "${name}".`, "warning");
-      return;
-    }
-    const cfg = deps.registry.resolveAgentConfig(name);
-
-    const file = findAgentFile(name);
-    const isDefault = cfg.isDefault === true;
-    const disabled = cfg.enabled === false;
-
-    let menuOptions: string[];
-    if (disabled && file) {
-      menuOptions = isDefault
-        ? ["Enable", "Edit", "Reset to default", "Delete", "Back"]
-        : ["Enable", "Edit", "Delete", "Back"];
-    } else if (isDefault && !file) {
-      menuOptions = ["Eject (export as .md)", "Disable", "Back"];
-    } else if (isDefault && file) {
-      menuOptions = ["Edit", "Disable", "Reset to default", "Delete", "Back"];
-    } else {
-      menuOptions = ["Edit", "Disable", "Delete", "Back"];
-    }
-
-    const choice = await ctx.ui.select(name, menuOptions);
-    if (!choice || choice === "Back") return;
-
-    if (choice === "Edit" && file) {
-      const content = readFileSync(file.path, "utf-8");
-      const edited = await ctx.ui.editor(`Edit ${name}`, content);
-      if (edited !== undefined && edited !== content) {
-        const { writeFileSync } = await import("node:fs");
-        writeFileSync(file.path, edited, "utf-8");
-        deps.registry.reload();
-        ctx.ui.notify(`Updated ${file.path}`, "info");
-      }
-    } else if (choice === "Delete") {
-      if (file) {
-        const confirmed = await ctx.ui.confirm(
-          "Delete agent",
-          `Delete ${name} from ${file.location} (${file.path})?`,
-        );
-        if (confirmed) {
-          unlinkSync(file.path);
-          deps.registry.reload();
-          ctx.ui.notify(`Deleted ${file.path}`, "info");
-        }
-      }
-    } else if (choice === "Reset to default" && file) {
-      const confirmed = await ctx.ui.confirm(
-        "Reset to default",
-        `Delete override ${file.path} and restore embedded default?`,
-      );
-      if (confirmed) {
-        unlinkSync(file.path);
-        deps.registry.reload();
-        ctx.ui.notify(`Restored default ${name}`, "info");
-      }
-    } else if (choice.startsWith("Eject")) {
-      await ejectAgent(ctx, name, cfg);
-    } else if (choice === "Disable") {
-      await disableAgent(ctx, name);
-    } else if (choice === "Enable") {
-      await enableAgent(ctx, name);
-    }
-  }
-
-  async function ejectAgent(ctx: ExtensionContext, name: string, cfg: AgentConfig) {
-    const location = await ctx.ui.select("Choose location", [
-      "Project (.pi/agents/)",
-      `Personal (${deps.personalAgentsDir})`,
-    ]);
-    if (!location) return;
-
-    const targetDir = location.startsWith("Project")
-      ? deps.projectAgentsDir
-      : deps.personalAgentsDir;
-    mkdirSync(targetDir, { recursive: true });
-
-    const targetPath = join(targetDir, `${name}.md`);
-    if (existsSync(targetPath)) {
-      const overwrite = await ctx.ui.confirm(
-        "Overwrite",
-        `${targetPath} already exists. Overwrite?`,
-      );
-      if (!overwrite) return;
-    }
-
-    const fmFields: string[] = [];
-    fmFields.push(`description: ${cfg.description}`);
-    if (cfg.displayName) fmFields.push(`display_name: ${cfg.displayName}`);
-    fmFields.push(`tools: ${cfg.builtinToolNames?.join(", ") || "all"}`);
-    if (cfg.model) fmFields.push(`model: ${cfg.model}`);
-    if (cfg.thinking) fmFields.push(`thinking: ${cfg.thinking}`);
-    if (cfg.maxTurns) fmFields.push(`max_turns: ${cfg.maxTurns}`);
-    fmFields.push(`prompt_mode: ${cfg.promptMode}`);
-    if (cfg.extensions === false) fmFields.push("extensions: false");
-    else if (Array.isArray(cfg.extensions))
-      fmFields.push(`extensions: ${cfg.extensions.join(", ")}`);
-    if (cfg.skills === false) fmFields.push("skills: false");
-    else if (Array.isArray(cfg.skills))
-      fmFields.push(`skills: ${cfg.skills.join(", ")}`);
-    if (cfg.disallowedTools?.length)
-      fmFields.push(`disallowed_tools: ${cfg.disallowedTools.join(", ")}`);
-    if (cfg.inheritContext) fmFields.push("inherit_context: true");
-    if (cfg.runInBackground) fmFields.push("run_in_background: true");
-    if (cfg.isolated) fmFields.push("isolated: true");
-    if (cfg.memory) fmFields.push(`memory: ${cfg.memory}`);
-    if (cfg.isolation) fmFields.push(`isolation: ${cfg.isolation}`);
-
-    const content = `---\n${fmFields.join("\n")}\n---\n\n${cfg.systemPrompt}\n`;
-
-    const { writeFileSync } = await import("node:fs");
-    writeFileSync(targetPath, content, "utf-8");
-    deps.registry.reload();
-    ctx.ui.notify(`Ejected ${name} to ${targetPath}`, "info");
-  }
-
-  async function disableAgent(ctx: ExtensionContext, name: string) {
-    const file = findAgentFile(name);
-    if (file) {
-      const content = readFileSync(file.path, "utf-8");
-      if (content.includes("\nenabled: false\n")) {
-        ctx.ui.notify(`${name} is already disabled.`, "info");
-        return;
-      }
-      const updated = content.replace(/^---\n/, "---\nenabled: false\n");
-      const { writeFileSync } = await import("node:fs");
-      writeFileSync(file.path, updated, "utf-8");
-      deps.registry.reload();
-      ctx.ui.notify(`Disabled ${name} (${file.path})`, "info");
-      return;
-    }
-
-    const location = await ctx.ui.select("Choose location", [
-      "Project (.pi/agents/)",
-      `Personal (${deps.personalAgentsDir})`,
-    ]);
-    if (!location) return;
-
-    const targetDir = location.startsWith("Project")
-      ? deps.projectAgentsDir
-      : deps.personalAgentsDir;
-    mkdirSync(targetDir, { recursive: true });
-
-    const targetPath = join(targetDir, `${name}.md`);
-    const { writeFileSync } = await import("node:fs");
-    writeFileSync(targetPath, "---\nenabled: false\n---\n", "utf-8");
-    deps.registry.reload();
-    ctx.ui.notify(`Disabled ${name} (${targetPath})`, "info");
-  }
-
-  async function enableAgent(ctx: ExtensionContext, name: string) {
-    const file = findAgentFile(name);
-    if (!file) return;
-
-    const content = readFileSync(file.path, "utf-8");
-    const updated = content.replace(/^(---\n)enabled: false\n/, "$1");
-    const { writeFileSync } = await import("node:fs");
-
-    if (updated.trim() === "---\n---" || updated.trim() === "---\n---\n") {
-      unlinkSync(file.path);
-      deps.registry.reload();
-      ctx.ui.notify(`Enabled ${name} (removed ${file.path})`, "info");
-    } else {
-      writeFileSync(file.path, updated, "utf-8");
-      deps.registry.reload();
-      ctx.ui.notify(`Enabled ${name} (${file.path})`, "info");
-    }
   }
 
   async function showCreateWizard(ctx: ExtensionContext) {

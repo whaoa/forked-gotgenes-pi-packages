@@ -40,6 +40,17 @@ const testDefaultAgentConfig: AgentConfig = {
 /** Real registry for all tests. Methods are spied on per-test as needed. */
 const testRegistry = new AgentTypeRegistry(() => new Map());
 
+function makeFileOps() {
+  return {
+    exists: vi.fn((): boolean => false),
+    read: vi.fn((): string | undefined => undefined),
+    write: vi.fn(),
+    remove: vi.fn(),
+    ensureDir: vi.fn(),
+    findAgentFile: vi.fn((): string | undefined => undefined),
+  };
+}
+
 function makeDeps(overrides: Partial<AgentMenuDeps> = {}): AgentMenuDeps {
   return {
     manager: {
@@ -67,6 +78,7 @@ function makeDeps(overrides: Partial<AgentMenuDeps> = {}): AgentMenuDeps {
         level: "info",
       })),
     },
+    fileOps: makeFileOps(),
     personalAgentsDir: "/home/.pi/agents",
     projectAgentsDir: "/test-project/.pi/agents",
     ...overrides,
@@ -150,10 +162,11 @@ describe("createAgentsMenuHandler", () => {
   });
 });
 
-describe("agent menu — projectAgentsDir injection", () => {
-  it("uses injected projectAgentsDir when resolving agent files", async () => {
+describe("agent menu — delegates to config editor", () => {
+  it("passes fileOps with correct dirs to the config editor", async () => {
     vi.spyOn(testRegistry, "getAllTypes").mockReturnValue(["test-agent"]);
-    const deps = makeDeps({ projectAgentsDir: "/test-project/.pi/agents" });
+    const fileOps = makeFileOps();
+    const deps = makeDeps({ fileOps, projectAgentsDir: "/test-project/.pi/agents" });
     let selectCall = 0;
     const ctx = makeCtx([]);
     ctx.ui.select = vi.fn().mockImplementation((_title: string, options: string[]) => {
@@ -166,7 +179,10 @@ describe("agent menu — projectAgentsDir injection", () => {
     const handler = createAgentsMenuHandler(deps);
     await handler(ctx as any);
 
-    expect(mockExistsSync).toHaveBeenCalledWith("/test-project/.pi/agents/test-agent.md");
+    expect(fileOps.findAgentFile).toHaveBeenCalledWith(
+      "test-agent",
+      ["/test-project/.pi/agents", "/home/.pi/agents"],
+    );
   });
 });
 
