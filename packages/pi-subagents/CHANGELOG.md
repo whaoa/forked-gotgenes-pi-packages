@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.13.0](https://github.com/gotgenes/pi-packages/compare/pi-subagents-v6.12.1...pi-subagents-v6.13.0) (2026-05-23)
+
+
+### Features
+
+* add AgentFileOps interface and FsAgentFileOps ([#136](https://github.com/gotgenes/pi-packages/issues/136)) ([9625de6](https://github.com/gotgenes/pi-packages/commit/9625de60ace3cf58ad59c2d533f18fd7cdb8bba9))
+
+
+### Documentation
+
+* plan agent-menu decomposition ([#136](https://github.com/gotgenes/pi-packages/issues/136)) ([41ca6a6](https://github.com/gotgenes/pi-packages/commit/41ca6a6612cbc167a5b3d336ffb94d3f9666868f))
+* **retro:** add retro notes for issue [#135](https://github.com/gotgenes/pi-packages/issues/135) ([83e255b](https://github.com/gotgenes/pi-packages/commit/83e255b4a5e6a56a287c933e4a5fa0b28121529e))
+* update architecture for agent-menu decomposition ([#136](https://github.com/gotgenes/pi-packages/issues/136)) ([dba90e8](https://github.com/gotgenes/pi-packages/commit/dba90e86693e3480004a7c305d5082cb5a930d3f))
+
 ## [6.12.1](https://github.com/gotgenes/pi-packages/compare/pi-subagents-v6.12.0...pi-subagents-v6.12.1) (2026-05-22)
 
 
