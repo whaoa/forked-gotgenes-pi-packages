@@ -5,6 +5,8 @@
   "type": "module",
   "files": [
     "src",
+    "skills",
+    "THIRD_PARTY_LICENSES",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -47,6 +49,9 @@
   "pi": {
     "extensions": [
       "./src/extension.ts"
+    ],
+    "skills": [
+      "./skills"
     ]
   },
   "peerDependencies": {
