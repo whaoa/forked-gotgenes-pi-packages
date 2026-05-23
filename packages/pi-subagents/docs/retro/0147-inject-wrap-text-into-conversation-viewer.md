@@ -48,3 +48,41 @@ Full suite 50 files, 805 tests, all green.
 - Cycle 2 was a single Edit call replacing the entire mock block + the two dynamic imports + `beforeEach`.
   The autoformatter then cleaned up import ordering automatically.
 - Architecture doc updated: smells table row struck-through and Step O marked ✓.
+
+## Stage: Final Retrospective (2026-05-23T11:45:00Z)
+
+### Session summary
+
+Planned, implemented, shipped, and released issue #147 across a single session chain.
+Two TDD cycles completed cleanly; CI passed; issue closed; `pi-subagents-v6.17.0` released.
+Test count: 806 → 805 (deleted mock-mechanism sentinel test).
+
+### Observations
+
+#### What went well
+
+- Python script for bulk constructor edits worked first-try on 17 call sites with per-test regex capture groups.
+  This is now a proven pattern — #116 and #147 both used it successfully for `ConversationViewer` constructor changes.
+- Two-cycle TDD approach (Cycle 1: add DI with mock still present; Cycle 2: remove mock) gave a stable intermediate state and caught the missing `wrapTextWithAnsi` import before proceeding.
+- Scope was tight: 3 files changed, 2 commits of substance, no rework on the production code.
+
+#### What caused friction (agent side)
+
+1. `instruction-violation` — Failed to load the `colgrep` skill during planning.
+   Constructed the path by pattern (`.pi/skills/colgrep/SKILL.md`) instead of using the `<location>` listed in the `<available_skills>` block (`packages/pi-colgrep/skills/colgrep/SKILL.md`).
+   Got ENOENT and silently moved on.
+   Impact: user-caught; required a follow-up exchange to load the skill and re-review the plan.
+   No rework needed — the plan was already correct.
+2. `wrong-abstraction` — Cycle 2 Edit replaced the entire `vi.mock` block + dynamic imports as one chunk, leaving the `ConversationViewer` static import stranded after `const testRegistry` instead of at the top with other imports.
+   Impact: user-caught ("Wait, we have a dynamic import?"); required a follow-up edit and amend into the retro commit.
+3. `missing-context` — Plan stated "11+" constructor call sites; actual count was 16 (11 render-width-safety + 5 safety-net).
+   The grep output during planning showed all 16 but the count wasn't verified.
+   Impact: no rework — the Python script handled all 17 (16 test + 1 production) regardless.
+
+#### What caused friction (user side)
+
+- No friction identified — user interventions were timely and precise.
+
+### Changes made
+
+1. Appended this final retrospective entry to `packages/pi-subagents/docs/retro/0147-inject-wrap-text-into-conversation-viewer.md`.
