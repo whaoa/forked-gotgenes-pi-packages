@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AgentTypeRegistry } from "../src/agent-types.js";
 import type { Theme } from "../src/ui/display.js";
 import type { WidgetActivity, WidgetAgent } from "../src/ui/widget-renderer.js";
-import { renderFinishedLine, renderRunningLines } from "../src/ui/widget-renderer.js";
+import { renderFinishedLine, renderRunningLines, renderWidgetLines } from "../src/ui/widget-renderer.js";
 
 /** Minimal theme stub — wraps text with markup tags for assertion. */
 function stubTheme(): Theme {
@@ -221,5 +221,37 @@ describe("renderRunningLines", () => {
 		const [header] = renderRunningLines(agent, undefined, testRegistry, 0, theme);
 
 		expect(header).not.toContain("token");
+	});
+});
+
+describe("renderWidgetLines", () => {
+	const theme = stubTheme();
+
+	it("renders a single running agent with heading and tree connectors", () => {
+		const agent = makeAgent({ status: "running", completedAt: undefined });
+		const activity = makeActivity({ turnCount: 1 });
+		const activityMap = new Map<string, WidgetActivity>([["agent-1", activity]]);
+
+		const lines = renderWidgetLines({
+			agents: [agent],
+			activityMap,
+			registry: testRegistry,
+			spinnerFrame: 0,
+			terminalWidth: 200,
+			theme,
+			shouldShowFinished: () => true,
+		});
+
+		// Heading with active indicator
+		expect(lines[0]).toContain("●");
+		expect(lines[0]).toContain("Agents");
+		// Header line with └─ (last item uses └─ not ├─)
+		expect(lines[1]).toContain("└─");
+		expect(lines[1]).toContain("**Agent**");
+		// Activity line — uses space indent (not │) since it's the last agent
+		expect(lines[2]).not.toContain("│");
+		expect(lines[2]).toContain("⎿");
+		// Total: 3 lines (heading + header + activity)
+		expect(lines).toHaveLength(3);
 	});
 });
