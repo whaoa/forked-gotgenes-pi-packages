@@ -83,37 +83,6 @@ describe("subscribeUIObserver", () => {
 		expect(updateCount).toBe(1);
 	});
 
-	it("accumulates lifetimeUsage on message_end with assistant usage", () => {
-		const session = createMockSession();
-		const tracker = new AgentActivityTracker();
-		let updateCount = 0;
-		subscribeUIObserver(session, tracker, () => updateCount++);
-
-		session.emit({
-			type: "message_end",
-			message: { role: "assistant", usage: { input: 100, output: 50, cacheWrite: 10 } },
-		});
-		expect(tracker.lifetimeUsage).toEqual({ input: 100, output: 50, cacheWrite: 10 });
-		expect(updateCount).toBe(1);
-
-		session.emit({
-			type: "message_end",
-			message: { role: "assistant", usage: { input: 200, output: 80, cacheWrite: 20 } },
-		});
-		expect(tracker.lifetimeUsage).toEqual({ input: 300, output: 130, cacheWrite: 30 });
-	});
-
-	it("ignores message_end without usage", () => {
-		const session = createMockSession();
-		const tracker = new AgentActivityTracker();
-		let updateCount = 0;
-		subscribeUIObserver(session, tracker, () => updateCount++);
-
-		session.emit({ type: "message_end", message: { role: "assistant" } });
-		expect(tracker.lifetimeUsage).toEqual({ input: 0, output: 0, cacheWrite: 0 });
-		expect(updateCount).toBe(0);
-	});
-
 	it("returned function unsubscribes from session", () => {
 		const session = createMockSession();
 		const tracker = new AgentActivityTracker();

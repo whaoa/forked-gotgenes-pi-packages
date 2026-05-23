@@ -63,12 +63,14 @@ export async function runForeground(
 
   const fgState = new AgentActivityTracker(config.effectiveMaxTurns);
   let unsubUI: (() => void) | undefined;
+  let recordRef: AgentRecord | undefined;
 
   const streamUpdate = () => {
+    const toolUses = recordRef?.toolUses ?? 0;
     const details: AgentDetails = {
       ...config.detailBase,
-      toolUses: fgState.toolUses,
-      tokens: formatLifetimeTokens(fgState),
+      toolUses,
+      tokens: recordRef ? formatLifetimeTokens(recordRef) : "",
       turnCount: fgState.turnCount,
       maxTurns: fgState.maxTurns,
       durationMs: Date.now() - startedAt,
@@ -77,7 +79,7 @@ export async function runForeground(
       spinnerFrame: spinnerFrame % SPINNER.length,
     };
     onUpdate?.({
-      content: [{ type: "text", text: `${fgState.toolUses} tool uses...` }],
+      content: [{ type: "text", text: `${toolUses} tool uses...` }],
       details: details as any,
     });
   };
@@ -110,6 +112,7 @@ export async function runForeground(
         parentSessionId: params.parentSessionId,
         onSessionCreated: (session, record) => {
           fgState.setSession(session);
+          recordRef = record;
           unsubUI = subscribeUIObserver(session, fgState, streamUpdate);
           fgId = record.id;
           agentActivity.set(record.id, fgState);
@@ -132,7 +135,7 @@ export async function runForeground(
     widget.markFinished(fgId);
   }
 
-  const tokenText = formatLifetimeTokens(fgState);
+  const tokenText = formatLifetimeTokens(record);
   const details = buildDetails(config.detailBase, record, fgState, { tokens: tokenText });
 
   const fallbackNote = config.fellBack

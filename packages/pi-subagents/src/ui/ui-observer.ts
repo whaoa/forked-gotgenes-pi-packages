@@ -61,16 +61,5 @@ export function subscribeUIObserver(
 			onUpdate?.();
 		}
 
-		if (event.type === "message_end" && event.message?.role === "assistant") {
-			const u = event.message.usage;
-			if (u) {
-				tracker.onUsageUpdate({
-					input: u.input ?? 0,
-					output: u.output ?? 0,
-					cacheWrite: u.cacheWrite ?? 0,
-				});
-				onUpdate?.();
-			}
-		}
 	});
 }

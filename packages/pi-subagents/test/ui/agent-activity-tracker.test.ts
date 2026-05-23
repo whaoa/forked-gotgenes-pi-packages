@@ -8,11 +8,6 @@ describe("AgentActivityTracker", () => {
 			expect(tracker.turnCount).toBe(1);
 		});
 
-		it("sets initial toolUses to 0", () => {
-			const tracker = new AgentActivityTracker();
-			expect(tracker.toolUses).toBe(0);
-		});
-
 		it("sets initial responseText to empty string", () => {
 			const tracker = new AgentActivityTracker();
 			expect(tracker.responseText).toBe("");
@@ -21,11 +16,6 @@ describe("AgentActivityTracker", () => {
 		it("sets initial activeTools to empty map", () => {
 			const tracker = new AgentActivityTracker();
 			expect(tracker.activeTools.size).toBe(0);
-		});
-
-		it("sets initial lifetimeUsage to zeroes", () => {
-			const tracker = new AgentActivityTracker();
-			expect(tracker.lifetimeUsage).toEqual({ input: 0, output: 0, cacheWrite: 0 });
 		});
 
 		it("sets session to undefined initially", () => {
@@ -123,21 +113,6 @@ describe("AgentActivityTracker", () => {
 		});
 	});
 
-	describe("onUsageUpdate", () => {
-		it("accumulates usage into lifetimeUsage", () => {
-			const tracker = new AgentActivityTracker();
-			tracker.onUsageUpdate({ input: 100, output: 50, cacheWrite: 10 });
-			expect(tracker.lifetimeUsage).toEqual({ input: 100, output: 50, cacheWrite: 10 });
-		});
-
-		it("accumulates across multiple calls", () => {
-			const tracker = new AgentActivityTracker();
-			tracker.onUsageUpdate({ input: 100, output: 50, cacheWrite: 10 });
-			tracker.onUsageUpdate({ input: 200, output: 80, cacheWrite: 20 });
-			expect(tracker.lifetimeUsage).toEqual({ input: 300, output: 130, cacheWrite: 30 });
-		});
-	});
-
 	describe("setSession", () => {
 		it("stores the session reference", () => {
 			const tracker = new AgentActivityTracker();
@@ -154,10 +129,5 @@ describe("AgentActivityTracker", () => {
 			expect(tools).toBeDefined();
 		});
 
-		it("lifetimeUsage returns a Readonly object (TypeScript compile guard)", () => {
-			const tracker = new AgentActivityTracker();
-			const usage: Readonly<{ input: number; output: number; cacheWrite: number }> = tracker.lifetimeUsage;
-			expect(usage).toBeDefined();
-		});
 	});
 });

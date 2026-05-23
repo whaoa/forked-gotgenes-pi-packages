@@ -155,11 +155,11 @@ export class ConversationViewer implements Component {
     const duration = formatDuration(this.record.startedAt, this.record.completedAt);
 
     const headerParts: string[] = [duration];
-    const toolUses = this.activity?.toolUses ?? this.record.toolUses;
+    const toolUses = this.record.toolUses;
     if (toolUses > 0) headerParts.unshift(`${toolUses} tool${toolUses === 1 ? "" : "s"}`);
-    const tokens = getLifetimeTotal(this.activity?.lifetimeUsage);
+    const tokens = getLifetimeTotal(this.record.lifetimeUsage);
     if (tokens > 0) {
-      const percent = getSessionContextPercent(this.activity?.session);
+      const percent = getSessionContextPercent(this.record.session);
       headerParts.push(formatSessionTokens(tokens, percent, th, this.record.compactionCount));
     }
 
