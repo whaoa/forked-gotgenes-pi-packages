@@ -366,7 +366,7 @@ describe("buildAgentPrompt", () => {
       );
     });
 
-    it("prepends <active_agent name=...> tag in append mode", () => {
+    it("includes <active_agent name=...> tag in append mode after inherited prompt", () => {
       const config: AgentConfig = {
         name: "general-purpose",
         description: "Twin",
@@ -385,9 +385,12 @@ describe("buildAgentPrompt", () => {
         env,
         "Parent prompt content.",
       );
-      expect(
-        prompt.startsWith('<active_agent name="general-purpose"/>\n\n'),
-      ).toBe(true);
+      const tagIdx = prompt.indexOf('<active_agent name="general-purpose"/>');
+      const inheritedIdx = prompt.indexOf("<inherited_system_prompt>");
+      expect(tagIdx).toBeGreaterThan(-1);
+      expect(inheritedIdx).toBeGreaterThan(-1);
+      // Shared inherited content comes first; agent-specific tag follows
+      expect(inheritedIdx).toBeLessThan(tagIdx);
     });
 
     it("uses agent name verbatim in the tag (no escaping or normalization)", () => {
@@ -423,6 +426,7 @@ describe("buildAgentPrompt", () => {
       const replacePrompt = buildAgentPrompt(replaceConfig, "/workspace", env);
       const tagIdx = replacePrompt.indexOf('<active_agent name="agent-a"/>');
       const envIdx = replacePrompt.indexOf("# Environment");
+      // Replace mode: tag is still prepended at position 0
       expect(tagIdx).toBe(0);
       expect(envIdx).toBeGreaterThan(tagIdx);
 
@@ -446,7 +450,8 @@ describe("buildAgentPrompt", () => {
       );
       const tagIdxB = appendPrompt.indexOf('<active_agent name="agent-b"/>');
       const envIdxB = appendPrompt.indexOf("# Environment");
-      expect(tagIdxB).toBe(0);
+      // Append mode: tag follows inherited content (not at index 0) but still precedes env block
+      expect(tagIdxB).toBeGreaterThan(0);
       expect(envIdxB).toBeGreaterThan(tagIdxB);
     });
   });
