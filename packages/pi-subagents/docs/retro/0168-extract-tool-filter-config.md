@@ -21,3 +21,19 @@ The change is a pure internal refactoring — `SessionConfig` is not exported fr
 - `agent-runner-extension-tools.test.ts` exercises tool filtering end-to-end via `runAgent` and never references `SessionConfig` fields directly — it serves as a zero-change regression canary for this refactoring.
 - The plan has only 2 TDD steps because the refactoring is mechanical and behavior-preserving.
   Step 1 handles the interface change + assembler + tests; step 2 handles the consumer (`filterActiveTools` + `runAgent`).
+
+## Stage: Implementation — TDD (2026-05-24T19:30:00Z)
+
+### Session summary
+
+Completed both refactoring steps cleanly.
+`ToolFilterConfig` is now exported from `session-config.ts`, nested as `SessionConfig.toolFilter`, and consumed by `filterActiveTools` as a single named argument.
+All 805 tests continue to pass; no new tests were added (pure structural refactoring with no behavior change).
+
+### Observations
+
+- Step 1 left intentional type errors in `agent-runner.ts` (expected: the consumer hadn't been updated yet); committing mid-step-1 was correct because the session-config tests were green in isolation.
+- The autoformatter ran on `agent-runner.ts` after the Step 2 edits (Biome reformatted the two condensed filter-call lines); the committed diff was already formatted.
+- All 9 flat-field assertions in `session-config.test.ts` (`result.toolNames`, `result.extensions`, `result.disallowedSet`) were correctly migrated to `result.toolFilter.*` — grep confirmed no stragglers.
+- `agent-runner-extension-tools.test.ts` required zero changes, confirming its role as a regression canary.
+- Architecture doc updated: `SessionConfig` row in the wide-interface table marked `✓ done`; Step 5 narrative updated to reflect actual field count (10 → 8, not 11 → 8 as the issue stated).
