@@ -9,11 +9,10 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { type Component, matchesKey, type TUI, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { AgentConfigLookup } from "#src/config/agent-types";
 import { getLifetimeTotal, getSessionContextPercent } from "#src/lifecycle/usage";
-import { extractText } from "#src/session/context";
 import type { AgentRecord } from "#src/types";
 import type { AgentActivityTracker } from "#src/ui/agent-activity-tracker";
-import { buildInvocationTags, describeActivity, formatDuration, formatSessionTokens, getDisplayName, getPromptModeLabel, type Theme } from "#src/ui/display";
-import { getToolCallName, isBashExecution } from "#src/ui/message-formatters";
+import { buildInvocationTags, formatDuration, formatSessionTokens, getDisplayName, getPromptModeLabel, type Theme } from "#src/ui/display";
+import { formatMessage, formatStreamingIndicator } from "#src/ui/message-formatters";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -220,76 +219,31 @@ export class ConversationViewer implements Component {
     if (width <= 0) return [];
 
     const th = this.theme;
+    const ctx = { theme: th, wrapText: this.wrapText };
     const messages = this.session.messages;
-    const lines: string[] = [];
 
     if (messages.length === 0) {
-      lines.push(th.fg("dim", "(waiting for first message...)"));
-      return lines;
+      return [th.fg("dim", "(waiting for first message...)")];
     }
 
+    const lines: string[] = [];
     let needsSeparator = false;
     for (const msg of messages) {
-      if (msg.role === "user") {
-        const text = typeof msg.content === "string"
-          ? msg.content
-          : extractText(msg.content);
-        if (!text.trim()) continue;
-        if (needsSeparator) lines.push(th.fg("dim", "───"));
-        lines.push(th.fg("accent", "[User]"));
-        for (const line of this.wrapText(text.trim(), width)) {
-          lines.push(line);
-        }
-      } else if (msg.role === "assistant") {
-        const textParts: string[] = [];
-        const toolCalls: string[] = [];
-        for (const c of msg.content) {
-          if (c.type === "text" && c.text) textParts.push(c.text);
-          else if (c.type === "toolCall") {
-            toolCalls.push(getToolCallName(c));
-          }
-        }
-        if (needsSeparator) lines.push(th.fg("dim", "───"));
-        lines.push(th.bold("[Assistant]"));
-        if (textParts.length > 0) {
-          for (const line of this.wrapText(textParts.join("\n").trim(), width)) {
-            lines.push(line);
-          }
-        }
-        for (const name of toolCalls) {
-          lines.push(truncateToWidth(th.fg("muted", `  [Tool: ${name}]`), width));
-        }
-      } else if (msg.role === "toolResult") {
-        const text = extractText(msg.content);
-        const truncated = text.length > 500 ? text.slice(0, 500) + "... (truncated)" : text;
-        if (!truncated.trim()) continue;
-        if (needsSeparator) lines.push(th.fg("dim", "───"));
-        lines.push(th.fg("dim", "[Result]"));
-        for (const line of this.wrapText(truncated.trim(), width)) {
-          lines.push(th.fg("dim", line));
-        }
-      } else if (isBashExecution(msg)) {
-        if (needsSeparator) lines.push(th.fg("dim", "───"));
-        lines.push(truncateToWidth(th.fg("muted", `  $ ${msg.command}`), width));
-        if (msg.output.trim()) {
-          const out = msg.output.length > 500
-            ? msg.output.slice(0, 500) + "... (truncated)"
-            : msg.output;
-          for (const line of this.wrapText(out.trim(), width)) {
-            lines.push(th.fg("dim", line));
-          }
-        }
-      } else {
-        continue;
-      }
+      const formatted = formatMessage(msg as unknown as { role: string; [key: string]: unknown }, width, ctx);
+      if (!formatted) continue;
+      if (needsSeparator) lines.push(th.fg("dim", "───"));
+      lines.push(...formatted);
       needsSeparator = true;
     }
 
     // Streaming indicator for running agents
     if (this.record.status === "running" && this.activity) {
-      const act = describeActivity(this.activity.activeTools, this.activity.responseText);
-      lines.push("");
-      lines.push(truncateToWidth(th.fg("accent", "▍ ") + th.fg("dim", act), width));
+      lines.push(...formatStreamingIndicator(
+        this.activity.activeTools,
+        this.activity.responseText,
+        width,
+        th,
+      ));
     }
 
     return lines.map(l => truncateToWidth(l, width));
