@@ -40,23 +40,23 @@ export function spawnBackground(
   agentActivity: AgentActivityAccess,
   params: BackgroundParams,
 ) {
-  const { config } = params;
-  const bgState = new AgentActivityTracker(config.effectiveMaxTurns);
+  const { identity, execution, presentation } = params.config;
+  const bgState = new AgentActivityTracker(execution.effectiveMaxTurns);
 
   let id: string;
   try {
-    id = manager.spawn(params.snapshot, config.subagentType, config.prompt, {
+    id = manager.spawn(params.snapshot, identity.subagentType, execution.prompt, {
       parentSessionFile: params.parentSessionFile,
       parentSessionId: params.parentSessionId,
-      description: config.description,
-      model: config.model,
-      maxTurns: config.effectiveMaxTurns,
-      isolated: config.isolated,
-      inheritContext: config.inheritContext,
-      thinkingLevel: config.thinking,
+      description: execution.description,
+      model: execution.model,
+      maxTurns: execution.effectiveMaxTurns,
+      isolated: execution.isolated,
+      inheritContext: execution.inheritContext,
+      thinkingLevel: execution.thinking,
       isBackground: true,
-      isolation: config.isolation,
-      invocation: config.agentInvocation,
+      isolation: execution.isolation,
+      invocation: execution.agentInvocation,
       toolCallId: params.toolCallId,
       onSessionCreated: (session) => {
         bgState.setSession(session);
@@ -77,8 +77,8 @@ export function spawnBackground(
   return textResult(
     `Agent ${isQueued ? "queued" : "started"} in background.\n` +
       `Agent ID: ${id}\n` +
-      `Type: ${config.displayName}\n` +
-      `Description: ${config.description}\n` +
+      `Type: ${identity.displayName}\n` +
+      `Description: ${execution.description}\n` +
       (record?.outputFile ? `Output file: ${record.outputFile}\n` : "") +
       (isQueued
         ? `Position: queued (max ${manager.getMaxConcurrent()} concurrent)\n`
@@ -87,7 +87,7 @@ export function spawnBackground(
       `Use get_subagent_result to retrieve full results, or steer_subagent to send it messages.\n` +
       `Do not duplicate this agent's work.`,
     {
-      ...config.detailBase,
+      ...presentation.detailBase,
       toolUses: 0,
       tokens: "",
       durationMs: 0,

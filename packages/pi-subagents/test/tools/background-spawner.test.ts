@@ -9,36 +9,42 @@ import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
 function makeConfig(overrides: Partial<ResolvedSpawnConfig> = {}): ResolvedSpawnConfig {
   return {
-    subagentType: "general-purpose",
-    rawType: "general-purpose",
-    fellBack: false,
-    displayName: "General-purpose",
-    prompt: "do something",
-    description: "bg task",
-    model: undefined,
-    effectiveMaxTurns: undefined,
-    thinking: undefined,
-    inheritContext: false,
-    runInBackground: true,
-    isolated: false,
-    isolation: undefined,
-    modelName: undefined,
-    agentInvocation: {
-      modelName: undefined,
+    identity: {
+      subagentType: "general-purpose",
+      rawType: "general-purpose",
+      fellBack: false,
+      displayName: "General-purpose",
+    },
+    execution: {
+      prompt: "do something",
+      description: "bg task",
+      model: undefined,
+      effectiveMaxTurns: undefined,
       thinking: undefined,
-      maxTurns: undefined,
-      isolated: false,
       inheritContext: false,
       runInBackground: true,
+      isolated: false,
       isolation: undefined,
+      agentInvocation: {
+        modelName: undefined,
+        thinking: undefined,
+        maxTurns: undefined,
+        isolated: false,
+        inheritContext: false,
+        runInBackground: true,
+        isolation: undefined,
+      },
     },
-    agentTags: [],
-    detailBase: {
-      displayName: "General-purpose",
-      description: "bg task",
-      subagentType: "general-purpose",
+    presentation: {
       modelName: undefined,
-      tags: undefined,
+      agentTags: [],
+      detailBase: {
+        displayName: "General-purpose",
+        description: "bg task",
+        subagentType: "general-purpose",
+        modelName: undefined,
+        tags: undefined,
+      },
     },
     ...overrides,
   };
@@ -78,7 +84,27 @@ describe("spawnBackground", () => {
 
   it("returns text result with agent ID and description", () => {
     const { manager, widget, agentActivity } = createToolDeps();
-    const result = spawnBackground(manager, widget, agentActivity, makeParams({ config: makeConfig({ description: "my task" }) }));
+    const result = spawnBackground(
+      manager,
+      widget,
+      agentActivity,
+      makeParams({
+        config: makeConfig({
+          execution: {
+            prompt: "do something",
+            description: "my task",
+            model: undefined,
+            effectiveMaxTurns: undefined,
+            thinking: undefined,
+            inheritContext: false,
+            runInBackground: true,
+            isolated: false,
+            isolation: undefined,
+            agentInvocation: { modelName: undefined, thinking: undefined, maxTurns: undefined, isolated: false, inheritContext: false, runInBackground: true, isolation: undefined },
+          },
+        }),
+      }),
+    );
     expect(result.content[0].text).toContain("agent-1");
     expect(result.content[0].text).toContain("my task");
   });
