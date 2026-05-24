@@ -38,3 +38,32 @@ Test count: 902 → 901 (one test removed).
 - `ui-observer.ts` had one analogous fix: `event.assistantMessageEvent?.type` → `.type` (the field is required on `MessageUpdateEvent`).
 - No test file changes were needed for `ui-observer.ts` — its existing tests all emit conforming events.
 - The plan's contravariance reasoning about mock session compatibility was correct: `pnpm run check` passed without updating `MockSession.subscribe`.
+
+## Stage: Final Retrospective (2026-05-24T20:41:42Z)
+
+### Session summary
+
+Clean two-step refactoring shipped as `pi-subagents-v6.19.1`.
+Both TDD steps completed in a single session with two minor deviations from the plan, both caught by pre-commit hooks.
+Test count: 902 → 901 (one non-conforming test removed).
+
+### Observations
+
+#### What went well
+
+- The plan's contravariance analysis of `MockSession.subscribe` vs `SubscribableSession` was correct — zero test infrastructure changes needed.
+- Pre-commit hooks (ESLint) caught both deviations from the plan at commit time, before they could reach CI.
+- The user providing the Pi source path (`~/development/pi/pi`) unblocked verification of `AssistantMessage.usage` field requirements without guesswork.
+
+#### What caused friction (agent side)
+
+- `missing-context` — The plan's Risk 3 said "keep `?? ""` for safety" on `TextContent.text`, but `@typescript-eslint/no-unnecessary-condition` rejected it at commit time because `TextContent.text: string` is non-optional.
+  Impact: one failed commit attempt, immediate fix (changed `.map((c) => c.text ?? "")` to `.map((c) => c.text)`).
+- `missing-context` — The plan's step 2 didn't anticipate the five additional lint errors surfaced by properly typing the `record-observer` callback: unnecessary optional chain on `event.message?.role`, unnecessary `if (u)` guard, and three unnecessary `?? 0` guards on usage fields.
+  Impact: added ~5 minutes of investigation to verify the SDK types were truly non-optional before removing guards; required removing one test case (`"ignores message_end without usage"`).
+  Both instances stem from the same root cause: the plan checked that the SDK types *existed* but didn't trace the *field optionality* of types downstream of `AgentSessionEvent` (specifically `AgentMessage.usage` and `Usage.{input,output,cacheWrite}`).
+
+#### What caused friction (user side)
+
+- The Pi source path (`~/development/pi/pi`) was provided reactively after I'd already spent several tool calls trying to locate `AgentMessage` type definitions in `node_modules`.
+  Sharing this path earlier (or noting it in the package skill) would have saved ~4 `grep`/`find` calls.
