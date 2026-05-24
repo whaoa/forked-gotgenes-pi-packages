@@ -220,7 +220,7 @@ sequenceDiagram
 
 ## Module organization
 
-The extension has 52 source files (7,461 LOC) organized into six domains plus entry-point wiring.
+The extension has 53 source files organized into six domains plus entry-point wiring.
 All eight domains have directories: `config/`, `session/`, `lifecycle/`, `observation/`, `service/`, `tools/`, `ui/`, and `handlers/`.
 Issue #164 moved the 26 previously flat root-level files into five new domain directories, reducing the root to 5 files + 8 directories.
 
@@ -272,6 +272,7 @@ src/
 │
 ├── tools/                          LLM-facing tool implementations
 │   ├── agent-tool.ts               Agent tool definition, validation, dispatch
+│   ├── result-renderer.ts          pure per-status result rendering
 │   ├── spawn-config.ts             pure config resolution
 │   ├── foreground-runner.ts        foreground execution loop
 │   ├── background-spawner.ts       background spawn setup
@@ -464,7 +465,6 @@ Functions with cyclomatic complexity ≥ 21 (critical threshold):
 
 | Function            | Cyclomatic | Cognitive | File                        | Concern                            |
 | ------------------- | ---------- | --------- | --------------------------- | ---------------------------------- |
-| `renderResult`      | 26         | 43        | `tools/agent-tool.ts`       | Formats agent result for LLM       |
 | `showAgentDetail`   | 25         | 33        | `ui/agent-config-editor.ts` | Agent detail/edit view             |
 | `renderWidgetLines` | 25         | 44        | `ui/widget-renderer.ts`     | Renders widget status lines        |
 | `ejectAgent`        | 21         | 20        | `ui/agent-config-editor.ts` | Eject agent to filesystem          |
