@@ -18,7 +18,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "lint:md": "rumdl check *.md docs/**/*.md skills/**/*.md",
-    "lint": "biome check . && pnpm run lint:md",
+    "lint": "biome check . && eslint . && pnpm run lint:md",
     "test": "vitest run",
     "test:watch": "vitest"
   },

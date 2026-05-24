@@ -8,11 +8,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "prepare": "command -v prek >/dev/null 2>&1 && prek install || echo 'prek not found — skipping hook install (see README)'",
+    "prepare": "command -v prek >/dev/null 2>&1 && prek install || echo 'prek not found \u2014 skipping hook install (see README)'",
     "check": "pnpm -r run check",
     "test": "pnpm -r run test",
-    "lint": "biome check . && rumdl check .",
-    "lint:fix": "biome check --write . && rumdl fmt .",
+    "lint": "biome check . && eslint packages/ && rumdl check .",
+    "lint:fix": "biome check --write . && eslint packages/ --fix && rumdl fmt .",
     "format": "biome format --write .",
     "fallow": "fallow",
     "fallow:audit": "fallow audit",

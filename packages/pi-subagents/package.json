@@ -50,7 +50,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:md": "rumdl check *.md docs/**/*.md",
-    "lint": "biome check . && pnpm run lint:md"
+    "lint": "biome check . && eslint . && pnpm run lint:md"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

@@ -36,7 +36,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
-    "lint": "biome check ."
+    "lint": "biome check . && eslint ."
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
