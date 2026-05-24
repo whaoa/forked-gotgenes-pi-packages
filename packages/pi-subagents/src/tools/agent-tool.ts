@@ -301,7 +301,7 @@ Guidelines:
       if ("error" in config) return textResult(config.error);
 
       // ---- Boundary extraction (after config so inheritContext is resolved) ----
-      const snapshot = buildSnapshot(config.inheritContext);
+      const snapshot = buildSnapshot(config.execution.inheritContext);
       const { parentSessionFile, parentSessionId } = getSessionInfo();
 
       // ---- Resume existing agent ----
@@ -327,12 +327,12 @@ Guidelines:
         }
         return textResult(
           record.result?.trim() ?? record.error?.trim() ?? "No output.",
-          buildDetails(config.detailBase, record),
+          buildDetails(config.presentation.detailBase, record),
         );
       }
 
       // ---- Background execution ----
-      if (config.runInBackground) {
+      if (config.execution.runInBackground) {
         return spawnBackground(
           manager,
           widget,
