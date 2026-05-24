@@ -91,7 +91,7 @@ export interface SessionManagerLike {
   getSessionFile(): string | undefined;
 }
 
-/** Options passed to RunnerIO.createResourceLoader. */
+/** Options passed to EnvironmentIO/SessionFactoryIO methods. */
 export interface ResourceLoaderOptions {
   cwd: string;
   agentDir: string;
@@ -105,7 +105,7 @@ export interface ResourceLoaderOptions {
   appendSystemPromptOverride?: (base: string[]) => string[];
 }
 
-/** Options passed to RunnerIO.createSession. */
+/** Options passed to SessionFactoryIO.createSession. */
 export interface CreateSessionOptions {
   cwd: string;
   agentDir: string;
@@ -119,21 +119,39 @@ export interface CreateSessionOptions {
 }
 
 /**
- * IO boundary injected into runAgent().
+ * Environment discovery — detect runtime context and resolve directories.
+ *
+ * Decouples the runner from direct process/SDK reads so each can be stubbed
+ * independently in tests.
+ */
+export interface EnvironmentIO {
+  detectEnv: (exec: ShellExec, cwd: string) => Promise<EnvInfo>;
+  getAgentDir: () => string;
+  deriveSessionDir: (parentSessionFile: string | undefined, effectiveCwd: string) => string;
+}
+
+/**
+ * Session factory — create SDK objects for a child agent session.
  *
  * Decouples the runner from direct Pi SDK imports and sibling-module IO,
  * making it testable via plain stub objects without vi.mock().
  */
-export interface RunnerIO {
-  detectEnv: (exec: ShellExec, cwd: string) => Promise<EnvInfo>;
-  getAgentDir: () => string;
+export interface SessionFactoryIO {
   createResourceLoader: (opts: ResourceLoaderOptions) => ResourceLoaderLike;
-  deriveSessionDir: (parentSessionFile: string | undefined, effectiveCwd: string) => string;
   createSessionManager: (cwd: string, sessionDir: string) => SessionManagerLike;
   createSettingsManager: (cwd: string, agentDir: string) => SettingsManager;
   createSession: (opts: CreateSessionOptions) => Promise<{ session: AgentSession }>;
   assemblerIO: AssemblerIO;
 }
+
+/**
+ * IO boundary injected into runAgent().
+ *
+ * Backward-compatible intersection of EnvironmentIO and SessionFactoryIO.
+ * Callers that previously constructed a RunnerIO object continue to satisfy
+ * both sub-interfaces via TypeScript's structural typing.
+ */
+export type RunnerIO = EnvironmentIO & SessionFactoryIO;
 
 // ── Public interfaces ─────────────────────────────────────────────────────────
 
