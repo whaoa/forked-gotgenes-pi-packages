@@ -136,6 +136,36 @@ describe("message-formatters", () => {
       const result = formatAssistantMessage(content, 80, ctx);
       expect(result).toEqual(["[bold:[Assistant]]"]);
     });
+
+    it("includes provider/model attribution when both present", () => {
+      const content = [{ type: "text", text: "hi" }];
+      const result = formatAssistantMessage(content, 80, ctx, {
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
+      });
+      expect(result).toEqual([
+        "[bold:[Assistant (anthropic/claude-sonnet-4-20250514)]]",
+        "hi",
+      ]);
+    });
+
+    it("includes provider-only attribution", () => {
+      const content = [{ type: "text", text: "hi" }];
+      const result = formatAssistantMessage(content, 80, ctx, { provider: "openai" });
+      expect(result).toEqual(["[bold:[Assistant (openai)]]", "hi"]);
+    });
+
+    it("includes model-only attribution", () => {
+      const content = [{ type: "text", text: "hi" }];
+      const result = formatAssistantMessage(content, 80, ctx, { model: "gpt-4o" });
+      expect(result).toEqual(["[bold:[Assistant (gpt-4o)]]", "hi"]);
+    });
+
+    it("omits attribution when both undefined", () => {
+      const content = [{ type: "text", text: "hi" }];
+      const result = formatAssistantMessage(content, 80, ctx, {});
+      expect(result).toEqual(["[bold:[Assistant]]", "hi"]);
+    });
   });
 
   describe("formatToolResult", () => {
@@ -322,6 +352,21 @@ describe("message-formatters", () => {
       const content = [{ type: "text", text: "response" }];
       const result = formatMessage({ role: "assistant", content }, 80, ctx);
       expect(result).toEqual(formatAssistantMessage(content, 80, ctx));
+    });
+
+    it("passes provider/model attribution through to formatAssistantMessage", () => {
+      const content = [{ type: "text", text: "response" }];
+      const result = formatMessage(
+        { role: "assistant", content, provider: "anthropic", model: "claude-sonnet-4-20250514" },
+        80,
+        ctx,
+      );
+      expect(result).toEqual(
+        formatAssistantMessage(content, 80, ctx, {
+          provider: "anthropic",
+          model: "claude-sonnet-4-20250514",
+        }),
+      );
     });
 
     it("delegates toolResult role to formatToolResult", () => {
