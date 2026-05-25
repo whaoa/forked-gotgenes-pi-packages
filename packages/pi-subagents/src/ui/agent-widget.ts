@@ -14,6 +14,42 @@ import { renderWidgetLines } from "#src/ui/widget-renderer";
 
 // ---- Types ----
 
+/** Minimal agent shape needed for widget lifecycle decisions. */
+interface AgentSummary {
+  readonly id: string;
+  readonly status: string;
+  readonly completedAt?: number;
+}
+
+/** Lightweight state snapshot used by AgentWidget.update() to decide what to show. */
+export interface WidgetState {
+  readonly runningCount: number;
+  readonly queuedCount: number;
+  readonly hasFinished: boolean;
+  /** True when runningCount > 0 || queuedCount > 0. Included for call-site readability. */
+  readonly hasActive: boolean;
+}
+
+/**
+ * Count agents by status and return a lightweight state snapshot.
+ * Pure function — no IO, no side effects. Exported for direct unit testing.
+ */
+export function assembleWidgetState(
+  agents: readonly AgentSummary[],
+  shouldShowFinished: (agentId: string, status: string) => boolean,
+): WidgetState {
+  let runningCount = 0;
+  let queuedCount = 0;
+  let hasFinished = false;
+  for (const a of agents) {
+    if (a.status === "running") { runningCount++; }
+    else if (a.status === "queued") { queuedCount++; }
+    else if (a.completedAt && shouldShowFinished(a.id, a.status)) { hasFinished = true; }
+  }
+  const hasActive = runningCount > 0 || queuedCount > 0;
+  return { runningCount, queuedCount, hasFinished, hasActive };
+}
+
 export type UICtx = {
   setStatus(key: string, text: string | undefined): void;
   setWidget(
