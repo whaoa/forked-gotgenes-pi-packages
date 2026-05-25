@@ -6,13 +6,13 @@
     "packages/*/src/service.ts"
   ],
   "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": ["tree-sitter-bash"],
+  "ignoreDependencies": ["tree-sitter-bash", "@gotgenes/pi-subagents"],
   "ignorePatterns": ["**/test/fixtures/**", "**/tests/fixtures/**"],
   "rules": {
     "unused-files": "warn",
-    "unused-exports": "warn",
+    "unused-exports": "error",
     "unused-types": "warn",
-    "unused-class-members": "warn",
+    "unused-class-members": "error",
     "circular-dependencies": "error",
     "unlisted-dependencies": "error",
     "unresolved-imports": "error"

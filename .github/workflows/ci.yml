@@ -35,7 +35,11 @@ jobs:
         if: github.event_name == 'pull_request'
         run: pnpm fallow audit
 
-      - name: Fallow check
+      - name: Fallow dead-code gate
+        if: github.ref == 'refs/heads/main'
+        run: pnpm fallow dead-code
+
+      - name: Fallow full report
         if: github.ref == 'refs/heads/main'
         continue-on-error: true
         run: pnpm fallow

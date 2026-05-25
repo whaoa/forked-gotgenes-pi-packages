@@ -148,6 +148,7 @@ export class AgentTool {
 		);
 	}
 
+	// fallow-ignore-next-line unused-class-member
 	toToolDefinition() {
 		const typeListText = this.typeListText;
 		const availableTypesText = this.availableTypesText;
