@@ -627,7 +627,7 @@ Health score target: 80+ (A).
 | Overwrite guard duplicated across UI modules (20 lines)          | A: Redundant   | 2      | 1    | 10       |
 | `settings.ts` calls SDK function `getAgentDir()` at module level | C: Coupling    | 2      | 1    | 10       |
 
-### Step 1: Convert remaining closure factories to classes
+### Step 1: Convert remaining closure factories to classes — [#214]
 
 Three closure factories survived Phase 11 — each captures deps in closure scope and returns a method bag, the exact pattern Phase 11 eliminated elsewhere.
 
@@ -645,7 +645,7 @@ Convert each to a class: deps become constructor parameters stored as private fi
 - Smell: C (coupling — deps hidden in closure scope instead of explicit on class)
 - Outcome: 0 remaining closure factories (excluding pure-function factories), deps visible as constructor parameters
 
-### Step 2: Decompose `buildParentContext` (cognitive 30)
+### Step 2: Decompose `buildParentContext` (cognitive 30) — [#215]
 
 `buildParentContext` in `session/context.ts` is the only remaining fallow refactoring target.
 The function loops over branch entries with 3 type-check branches, each with sub-branches for role or summary.
@@ -655,7 +655,7 @@ Extract per-entry-type formatters: `formatMessageEntry(entry)` and `formatCompac
 - Smell: B (oversized function)
 - Outcome: cognitive complexity < 10, function < 15 LOC
 
-### Step 3: Decompose `startAgent` in `agent-manager.ts`
+### Step 3: Decompose `startAgent` in `agent-manager.ts` — [#216]
 
 `startAgent` is a ~130-line private method that chains worktree setup → state transitions → observer notification → abort-signal wiring → runner invocation → `.then()` completion handler (~35 lines) → `.catch()` error handler (~15 lines).
 Both the `.then()` and `.catch()` blocks share common finalization logic (background counter decrement, observer notification, queue drain, worktree cleanup, detach signal).
@@ -670,7 +670,7 @@ Extract:
 - Smell: B (oversized method) + A (duplicated finalization logic in then/catch)
 - Outcome: no method > 40 LOC, `agent-manager.ts` < 480 LOC
 
-### Step 4: Extract overwrite guard from UI
+### Step 4: Extract overwrite guard from UI — [#217]
 
 The 20-line pattern duplicated between `agent-config-editor.ts:138–151` and `agent-creation-wizard.ts:231–250` checks file existence, prompts for confirmation, writes the file, reloads the registry, and notifies the user.
 Extract a shared `writeAgentFile(fileOps, ui, registry, targetPath, content, label)` function.
@@ -679,7 +679,7 @@ Extract a shared `writeAgentFile(fileOps, ui, registry, targetPath, content, lab
 - Smell: A (production duplication)
 - Outcome: 0 production clone groups
 
-### Step 5: Push SDK boundary in `settings.ts`
+### Step 5: Push SDK boundary in `settings.ts` — [#218]
 
 `globalPath()` calls `getAgentDir()` (a Pi SDK function) at invocation time.
 This hides a platform dependency inside a module that is otherwise pure configuration logic.
@@ -689,7 +689,7 @@ Inject `agentDir: string` as a constructor parameter to `SettingsManager` and pa
 - Smell: C (platform type threading)
 - Outcome: `settings.ts` has 0 Pi SDK imports, `loadSettings`/`saveSettings` become fully testable without SDK stubs
 
-### Step 6: Reduce test duplication — top 3 clone families
+### Step 6: Reduce test duplication — top 3 clone families — [#219]
 
 The three heaviest remaining clone families after Phase 12:
 
@@ -763,6 +763,7 @@ Detailed records are preserved in per-phase history files:
 | Phase 10           | #164, #165, #166, #167, #168, #169, #170, #171, #172       | Domain directories, ResolvedSpawnConfig, ParentSessionInfo, RunnerIO split, ToolFilterConfig, RunContext, buildContentLines, renderResult, content-items |
 | Phase 11           | #192, #193, #194, #195, #196                               | SessionContext, runtime queries, interface alignment, tool classes, runner/menu classes, index.ts simplification                                         |
 | Phase 12           | #205, #206, #207, #208                                     | renderWidgetLines, showAgentDetail, widget update, shared test fixtures                                                                                  |
+| Phase 13           | #214, #215, #216, #217, #218, #219                         | Closure-to-class, buildParentContext, startAgent decomp, overwrite guard, settings SDK, test duplication                                                 |
 
 The remaining open issue is #22 (parent-session resolution), a cross-extension track that does not gate the structural work.
 
@@ -790,3 +791,9 @@ The upstream test suite is run periodically as a regression canary for the agent
 [#206]: https://github.com/gotgenes/pi-packages/issues/206
 [#207]: https://github.com/gotgenes/pi-packages/issues/207
 [#208]: https://github.com/gotgenes/pi-packages/issues/208
+[#214]: https://github.com/gotgenes/pi-packages/issues/214
+[#215]: https://github.com/gotgenes/pi-packages/issues/215
+[#216]: https://github.com/gotgenes/pi-packages/issues/216
+[#217]: https://github.com/gotgenes/pi-packages/issues/217
+[#218]: https://github.com/gotgenes/pi-packages/issues/218
+[#219]: https://github.com/gotgenes/pi-packages/issues/219
