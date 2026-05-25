@@ -431,36 +431,38 @@ These are fire-and-forget broadcast events — no request IDs, no reply channels
 
 ### Health metrics
 
-| Metric                    | Value                        |
-| ------------------------- | ---------------------------- |
-| Health score              | 75/100 (B)                   |
-| Total LOC                 | 8,218 (53 files)             |
-| Dead code                 | 0 files, 0 exports           |
-| Maintainability index     | 90.7 (good)                  |
-| Avg cyclomatic complexity | 1.5                          |
-| P90 cyclomatic complexity | 2                            |
-| Production duplication    | 18 lines (1 clone group)     |
-| Test duplication          | 71 clone groups, 1,424 lines |
+| Metric                     | Value                                |
+| -------------------------- | ------------------------------------ |
+| Health score               | 78/100 (B)                           |
+| Total LOC                  | 8,180 (53 files)                     |
+| Test LOC                   | 12,026                               |
+| Dead code                  | 0 files, 0 exports                   |
+| Maintainability index      | 90.7 (good)                          |
+| Avg cyclomatic complexity  | 1.5                                  |
+| P90 cyclomatic complexity  | 2                                    |
+| Production duplication     | 20 lines (1 clone group)             |
+| Test duplication           | 59 clone groups, 1,046 lines         |
+| Fallow refactoring targets | 1 (buildParentContext, cognitive 30) |
 
 ### Dependency bag inventory
 
 These interfaces carry hidden dependencies that obscure true coupling.
 Bags with 10+ fields are the highest priority for decomposition.
 
-| Interface                   | Fields                                                 | Consumers                                         | Severity |
-| --------------------------- | ------------------------------------------------------ | ------------------------------------------------- | -------- |
-| `ResolvedSpawnConfig`       | 3 nested                                               | foreground-runner, background-spawner, agent-tool | ✓ done   |
-| `AgentSpawnConfig`          | 13 → 13 (ParentSessionInfo nested)                     | agent-manager (internal)                          | ✓ done   |
-| `RunOptions`                | 9 (`RunContext` nested)                                | agent-runner                                      | ✓ done   |
-| `SessionConfig`             | 8 (ToolFilterConfig nested)                            | agent-runner (output of assembler)                | ✓ done   |
-| `NotificationDetails`       | 10                                                     | notification                                      | Medium   |
-| `ResourceLoaderOptions`     | 10                                                     | agent-runner (SDK bridge)                         | Medium   |
-| `RunnerIO`                  | split → `EnvironmentIO` (3) + `SessionFactoryIO` (5+1) | agent-runner                                      | ✓ done   |
-| `CreateSessionOptions`      | 9                                                      | agent-runner (SDK bridge)                         | Medium   |
-| `AgentToolDeps`             | 8                                                      | agent-tool                                        | ✓ done   |
-| `AgentMenuDeps`             | 8                                                      | agent-menu                                        | Low      |
-| `ConversationViewerOptions` | 8                                                      | conversation-viewer                               | Low      |
-| `AgentRecordInit`           | 8                                                      | agent-record                                      | Low      |
+| Interface                   | Fields                                                 | Consumers                                         | Severity  |
+| --------------------------- | ------------------------------------------------------ | ------------------------------------------------- | --------- |
+| `ResolvedSpawnConfig`       | 3 nested                                               | foreground-runner, background-spawner, agent-tool | ✓ done    |
+| `AgentSpawnConfig`          | 13 → 13 (ParentSessionInfo nested)                     | agent-manager (internal)                          | ✓ done    |
+| `RunOptions`                | 9 (`RunContext` nested)                                | agent-runner                                      | ✓ done    |
+| `SessionConfig`             | 8 (ToolFilterConfig nested)                            | agent-runner (output of assembler)                | ✓ done    |
+| `NotificationDetails`       | 10                                                     | notification                                      | Low (DTO) |
+| `ResourceLoaderOptions`     | 10                                                     | agent-runner (SDK bridge)                         | Low (SDK) |
+| `RunnerIO`                  | split → `EnvironmentIO` (3) + `SessionFactoryIO` (5+1) | agent-runner                                      | ✓ done    |
+| `CreateSessionOptions`      | 9                                                      | agent-runner (SDK bridge)                         | Low (SDK) |
+| `AgentToolDeps`             | 8                                                      | agent-tool                                        | ✓ done    |
+| `AgentMenuDeps`             | 8                                                      | agent-menu                                        | ✓ done    |
+| `ConversationViewerOptions` | 8                                                      | conversation-viewer                               | Low       |
+| `AgentRecordInit`           | 8                                                      | agent-record                                      | Low       |
 
 ### Complexity hotspots
 
@@ -472,18 +474,22 @@ No functions remain above the critical threshold — all hotspots resolved in Ph
 
 Files with highest commit frequency × complexity (accelerating trend):
 
-| Score | File                  | Commits |
-| ----- | --------------------- | ------- |
-| 85.7  | `index.ts`            | 65      |
-| 35.9  | `agent-manager.ts`    | 31      |
-| 25.9  | `ui/agent-menu.ts`    | 26      |
-| 23.3  | `tools/agent-tool.ts` | 30      |
+| Score | File                        | Commits | Trend          |
+| ----- | --------------------------- | ------- | -------------- |
+| 43.3  | `index.ts`                  | 81      | ▲ accelerating |
+| 26.0  | `ui/agent-menu.ts`          | 33      | ▲ accelerating |
+| 13.6  | `tools/agent-tool.ts`       | 41      | ▲ accelerating |
+| 13.3  | `ui/conversation-viewer.ts` | 16      | ▲ accelerating |
+| 12.6  | `ui/agent-config-editor.ts` | 10      | ▼ cooling      |
+| 11.7  | `ui/agent-widget.ts`        | 14      | ▲ accelerating |
+
+Note: accelerating trends reflect recent refactoring phases, not feature churn.
+Once structural work stabilizes, these are expected to cool.
 
 ### Production duplication
 
-The 18-line clone group between `agent-runner.ts` and `message-formatters.ts` was resolved in #172.
-`ToolCallContent`, `getToolCallName`, and `extractAssistantContent` now live in `session/content-items.ts`.
-No known production duplication remains.
+The prior clone group between `agent-runner.ts` and `message-formatters.ts` was resolved in #172.
+One 20-line clone group remains between `agent-config-editor.ts:138–151` and `agent-creation-wizard.ts:231–250` — both implement the same overwrite-guard + write + reload + notify pattern.
 
 ### Proposed bag decompositions
 
@@ -600,51 +606,130 @@ Phase 11 converted all closure factories to classes, eliminating adapter closure
 Four layers: SessionContext typing → runtime query methods → interface alignment → class conversions → index.ts simplification.
 See [phase-11-closure-to-class.md](history/phase-11-closure-to-class.md) for details.
 
-## Improvement roadmap (Phase 12)
+## Phase 12 (complete)
 
-Phase 12 addresses the remaining fallow refactoring targets and test duplication.
-These are independent of Phase 11 and can proceed in parallel if desired.
+Phase 12 decomposed the three remaining high-complexity UI functions and extracted shared test fixtures.
+All four steps are closed: [#205], [#206], [#207], [#208].
 
-### Step 1: Decompose `renderWidgetLines` (cognitive 44) — [#205]
+## Improvement roadmap (Phase 13)
 
-`renderWidgetLines` in `ui/widget-renderer.ts` handles agent-status formatting, tree connectors, overflow, and empty states.
-Extract per-status renderers and a tree-connector utility.
+Phase 13 addresses the remaining fallow refactoring target, `agent-manager.ts` oversized method, production duplication, SDK boundary coupling, and the heaviest test clone families.
+Health score target: 80+ (A).
 
-- Target: `src/ui/widget-renderer.ts`
-- Outcome: cognitive complexity < 10
+### Findings summary
 
-### Step 2: Decompose `showAgentDetail` (cognitive 33) — [#206]
+| Finding                                                          | Category       | Impact | Risk | Priority |
+| ---------------------------------------------------------------- | -------------- | ------ | ---- | -------- |
+| 3 remaining closure factories (Phase 11 survivors)               | C: Coupling    | 4      | 2    | 16       |
+| `buildParentContext` cognitive 30 (only fallow target)           | B: Oversized   | 3      | 1    | 15       |
+| `startAgent` in agent-manager.ts (~130 LOC method)               | B: Oversized   | 4      | 3    | 12       |
+| Test duplication: 59 clone groups, 1,046 lines                   | D: Testability | 3      | 2    | 12       |
+| Overwrite guard duplicated across UI modules (20 lines)          | A: Redundant   | 2      | 1    | 10       |
+| `settings.ts` calls SDK function `getAgentDir()` at module level | C: Coupling    | 2      | 1    | 10       |
 
-`showAgentDetail` in `ui/agent-config-editor.ts` handles display, edit, eject, and delete flows.
-Extract sub-functions per menu action.
+### Step 1: Convert remaining closure factories to classes
 
-- Target: `src/ui/agent-config-editor.ts`
-- Outcome: cognitive complexity < 10
+Three closure factories survived Phase 11 — each captures deps in closure scope and returns a method bag, the exact pattern Phase 11 eliminated elsewhere.
 
-### Step 3: Decompose `update` in `agent-widget.ts` (cognitive 31) — [#207]
+| Factory                       | File                          | Captures                                 | Returns                                     |
+| ----------------------------- | ----------------------------- | ---------------------------------------- | ------------------------------------------- |
+| `createAgentConfigEditor()`   | `ui/agent-config-editor.ts`   | `fileOps`, `registry`, 2 dirs            | `{ showAgentDetail }` (7 nested async fns)  |
+| `createAgentCreationWizard()` | `ui/agent-creation-wizard.ts` | `fileOps`, `manager`, `registry`, 2 dirs | `{ showCreateWizard }` (3 nested async fns) |
+| `createSubagentsService()`    | `service/service-adapter.ts`  | `manager`, `resolveModel`, `runtime`     | 7-method `SubagentsService`                 |
 
-`update` mixes timer lifecycle, agent list assembly, render delegation, and visibility state.
-Extract `assembleWidgetState` (pure) and timer management.
+Convert each to a class: deps become constructor parameters stored as private fields, nested functions become private methods.
+`AgentsMenuHandler` already stores the factory return values as private fields, so the consumer side is already class-shaped.
+`createNotificationRenderer()` is excluded — it returns a pure render function with no captured state.
 
-- Target: `src/ui/agent-widget.ts`
-- Outcome: cognitive complexity < 10
+- Target: `src/ui/agent-config-editor.ts`, `src/ui/agent-creation-wizard.ts`, `src/service/service-adapter.ts`
+- Smell: C (coupling — deps hidden in closure scope instead of explicit on class)
+- Outcome: 0 remaining closure factories (excluding pure-function factories), deps visible as constructor parameters
 
-### Step 4: Extract shared test fixtures — [#208]
+### Step 2: Decompose `buildParentContext` (cognitive 30)
 
-The 3 heaviest clone families:
+`buildParentContext` in `session/context.ts` is the only remaining fallow refactoring target.
+The function loops over branch entries with 3 type-check branches, each with sub-branches for role or summary.
+Extract per-entry-type formatters: `formatMessageEntry(entry)` and `formatCompactionEntry(entry)`.
 
-- `agent-runner.test.ts` + `agent-runner-extension-tools.test.ts` (60-line shared setup)
-- `agent-menu.test.ts` + `agent-creation-wizard.test.ts` + `agent-config-editor.test.ts` (54+51+24 lines)
-- `agent-manager.test.ts` (18 internal clone groups, 210 duplicated lines)
+- Target: `src/session/context.ts`
+- Smell: B (oversized function)
+- Outcome: cognitive complexity < 10, function < 15 LOC
 
-Extract shared factories into `test/helpers/` modules.
+### Step 3: Decompose `startAgent` in `agent-manager.ts`
 
-- Target: new `test/helpers/runner-io.ts` and `test/helpers/ui-stubs.ts` modules
-- Outcome: test duplication reduced by ~250 lines
+`startAgent` is a ~130-line private method that chains worktree setup → state transitions → observer notification → abort-signal wiring → runner invocation → `.then()` completion handler (~35 lines) → `.catch()` error handler (~15 lines).
+Both the `.then()` and `.catch()` blocks share common finalization logic (background counter decrement, observer notification, queue drain, worktree cleanup, detach signal).
+
+Extract:
+
+1. `handleRunCompletion(record, options, result)` — worktree cleanup, state transition, execution update, observer notification.
+2. `handleRunError(record, options, err)` — error marking, worktree cleanup.
+3. `finalizeBackgroundRun(record)` — shared `runningBackground--`, observer, `drainQueue()`.
+
+- Target: `src/lifecycle/agent-manager.ts`
+- Smell: B (oversized method) + A (duplicated finalization logic in then/catch)
+- Outcome: no method > 40 LOC, `agent-manager.ts` < 480 LOC
+
+### Step 4: Extract overwrite guard from UI
+
+The 20-line pattern duplicated between `agent-config-editor.ts:138–151` and `agent-creation-wizard.ts:231–250` checks file existence, prompts for confirmation, writes the file, reloads the registry, and notifies the user.
+Extract a shared `writeAgentFile(fileOps, ui, registry, targetPath, content, label)` function.
+
+- Target: new `src/ui/agent-file-writer.ts`, consumers `src/ui/agent-config-editor.ts` and `src/ui/agent-creation-wizard.ts`
+- Smell: A (production duplication)
+- Outcome: 0 production clone groups
+
+### Step 5: Push SDK boundary in `settings.ts`
+
+`globalPath()` calls `getAgentDir()` (a Pi SDK function) at invocation time.
+This hides a platform dependency inside a module that is otherwise pure configuration logic.
+Inject `agentDir: string` as a constructor parameter to `SettingsManager` and pass the global settings path from the boundary in `index.ts`.
+
+- Target: `src/settings.ts`, `src/index.ts`
+- Smell: C (platform type threading)
+- Outcome: `settings.ts` has 0 Pi SDK imports, `loadSettings`/`saveSettings` become fully testable without SDK stubs
+
+### Step 6: Reduce test duplication — top 3 clone families
+
+The three heaviest remaining clone families after Phase 12:
+
+1. `agent-manager.test.ts` — 16 clone groups, 160 duplicated lines.
+   Extract shared setup/assertion helpers into `test/helpers/manager-stubs.ts`.
+2. `conversation-viewer.test.ts` — 8 clone groups, 91 duplicated lines.
+   Extract entry-builder helpers into existing `test/helpers/` or inline factory.
+3. `agent-config-editor.test.ts` — 5 clone groups, 42 duplicated lines.
+   Extract shared setup helpers.
+
+- Target: `test/lifecycle/agent-manager.test.ts`, `test/conversation-viewer.test.ts`, `test/ui/agent-config-editor.test.ts`
+- Smell: D (test duplication)
+- Outcome: test duplication reduced by ~200 lines (from 1,046 to < 850)
+
+### Step dependency diagram
+
+```mermaid
+flowchart LR
+    S1["Step 1\nclosure to class"]
+    S2["Step 2\nbuildParentContext"]
+    S3["Step 3\nstartAgent decomp"]
+    S4["Step 4\noverwrite guard"]
+    S5["Step 5\nsettings SDK"]
+    S6["Step 6\ntest duplication"]
+
+    S1 --> S4
+    S1 --> S6
+    S3 --> S6
+    S2 ~~~ S5
+```
+
+### Tracks
+
+1. **Track A — Structural** (Steps 1, 3): closure-to-class conversions and method decomposition.
+2. **Track B — Complexity and coupling** (Steps 2, 5): independent, can proceed in parallel with Track A.
+3. **Track C — Duplication** (Steps 4, 6): Step 4 depends on Step 1 (overwrite guard lives in files being converted); Step 6 depends on Steps 1 and 3 (production code they test changes first).
 
 ## Refactoring history
 
-Phases 1–5 and 7–11 are complete.
+Phases 1–5 and 7–12 are complete.
 Phase 6 (UI extraction to a separate package) is deferred.
 Detailed records are preserved in per-phase history files:
 
@@ -661,6 +746,7 @@ Detailed records are preserved in per-phase history files:
 | 9     | Observation consolidation, ctx elimination          | Complete | [phase-9-observation-ctx.md](history/phase-9-observation-ctx.md)                     |
 | 10    | Domain organization, bag decomposition, complexity  | Complete | [phase-10-structural-decomposition.md](history/phase-10-structural-decomposition.md) |
 | 11    | Closure factories to classes                        | Complete | [phase-11-closure-to-class.md](history/phase-11-closure-to-class.md)                 |
+| 12    | Complexity reduction and test fixture extraction    | Complete | [phase-12-complexity-test-fixtures.md](history/phase-12-complexity-test-fixtures.md) |
 
 ### Structural refactoring issues
 
