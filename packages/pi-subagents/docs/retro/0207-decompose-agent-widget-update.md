@@ -37,3 +37,20 @@ Three design changes were made to the original plan.
   `dispose` also skips stale-entry cleanup (the Map is about to be GC'd).
   Per the code-design skill's Sandi Metz principle, this is structural duplication that should not be extracted.
 - **Added complexity budget table:** Explicitly estimated cognitive complexity for each extracted function to verify the < 10 target is achievable across the board.
+
+## Stage: Implementation — TDD (2026-05-25T13:10:00Z)
+
+### Session summary
+
+Completed all three TDD steps from the plan.
+`assembleWidgetState` was extracted and tested with 16 unit tests covering all status combinations; `clearWidget` and `updateStatusBar` were extracted as private methods simplifying `update` to a thin orchestrator.
+Test count went from 868 to 884 (+16 tests across 55 files, up from 54).
+
+### Observations
+
+- No deviations from the plan.
+  The non-null assertion (`this.uiCtx!`) in `clearWidget` and `updateStatusBar` is safe because both methods are only called from `update` after the `if (!this.uiCtx) return` guard.
+- The `AgentSummary` interface and narrow test fixtures worked exactly as planned — test objects are plain 3-field literals, no `createTestRecord` needed.
+- The complexity hotspots table in `architecture.md` now has no rows (both `renderWidgetLines` from #205 and `update` from this issue are resolved).
+  The section note was updated to reflect that Phase 12 cleared all critical hotspots.
+- `pnpm fallow dead-code` (from repo root) passed with no issues.
