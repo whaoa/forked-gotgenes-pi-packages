@@ -31,7 +31,7 @@ import { buildEventData, type NotificationDetails, NotificationManager } from "#
 import { createNotificationRenderer } from "#src/observation/renderer";
 import { createSubagentRuntime } from "#src/runtime";
 import { publishSubagentsService, unpublishSubagentsService } from "#src/service/service";
-import { createSubagentsService } from "#src/service/service-adapter";
+import { SubagentsServiceAdapter } from "#src/service/service-adapter";
 import { detectEnv } from "#src/session/env";
 
 import { resolveModel } from "#src/session/model-resolver";
@@ -157,7 +157,7 @@ export default function (pi: ExtensionAPI) {
 
   // Typed service published via Symbol.for() for cross-extension access.
   // Consumers: const { getSubagentsService } = await import("@gotgenes/pi-subagents");
-  const service = createSubagentsService(manager, resolveModel, runtime);
+  const service = new SubagentsServiceAdapter(manager, resolveModel, runtime);
   publishSubagentsService(service);
 
   const lifecycle = new SessionLifecycleHandler(
