@@ -184,6 +184,30 @@ function buildSections(
 	return { finishedLines, runningLines, queuedLine };
 }
 
+/**
+ * Assemble widget lines when total body fits within MAX_WIDGET_LINES.
+ * Fixes the last tree connector: ├─ → └─, and │ → space for the running-agent activity line.
+ */
+function assembleWithinBudget(heading: string, sections: WidgetSections): string[] {
+	const { finishedLines, runningLines, queuedLine } = sections;
+	const lines: string[] = [heading, ...finishedLines];
+	for (const pair of runningLines) lines.push(...pair);
+	if (queuedLine) lines.push(queuedLine);
+
+	// Fix last connector: swap \u251C\u2500 \u2192 \u2514\u2500.
+	if (lines.length > 1) {
+		const last = lines.length - 1;
+		lines[last] = lines[last].replace("\u251C\u2500", "\u2514\u2500");
+		if (runningLines.length > 0 && !queuedLine) {
+			if (last >= 2) {
+				lines[last - 1] = lines[last - 1].replace("\u251C\u2500", "\u2514\u2500");
+				lines[last] = lines[last].replace("\u2502  ", "   ");
+			}
+		}
+	}
+	return lines;
+}
+
 /** Pure rendering of the widget body. Returns lines to display. */
 export function renderWidgetLines(params: {
 	agents: readonly WidgetAgent[];
@@ -219,27 +243,13 @@ export function renderWidgetLines(params: {
 	// Assemble with overflow cap (heading takes 1 line).
 	const maxBody = MAX_WIDGET_LINES - 1;
 	const totalBody = finishedLines.length + runningLines.length * 2 + (queuedLine ? 1 : 0);
-
-	const lines: string[] = [truncate(theme.fg(headingColor, headingIcon) + " " + theme.fg(headingColor, "Agents"))];
+	const heading = truncate(theme.fg(headingColor, headingIcon) + " " + theme.fg(headingColor, "Agents"));
 
 	if (totalBody <= maxBody) {
-		lines.push(...finishedLines);
-		for (const pair of runningLines) lines.push(...pair);
-		if (queuedLine) lines.push(queuedLine);
-
-		// Fix last connector: swap \u251C\u2500 \u2192 \u2514\u2500 and \u2502 \u2192 space for activity lines.
-		if (lines.length > 1) {
-			const last = lines.length - 1;
-			lines[last] = lines[last].replace("\u251C\u2500", "\u2514\u2500");
-			if (runningLines.length > 0 && !queuedLine) {
-				if (last >= 2) {
-					lines[last - 1] = lines[last - 1].replace("\u251C\u2500", "\u2514\u2500");
-					lines[last] = lines[last].replace("\u2502  ", "   ");
-				}
-			}
-		}
+		return assembleWithinBudget(heading, { finishedLines, runningLines, queuedLine });
 	} else {
 		// Overflow — prioritize: running > queued > finished.
+		const lines: string[] = [heading];
 		let budget = maxBody - 1;
 		let hiddenRunning = 0;
 		let hiddenFinished = 0;
@@ -272,7 +282,6 @@ export function renderWidgetLines(params: {
 		if (hiddenFinished > 0) overflowParts.push(`${hiddenFinished} finished`);
 		const overflowText = overflowParts.join(", ");
 		lines.push(truncate(theme.fg("dim", "\u2514\u2500") + ` ${theme.fg("dim", `+${hiddenRunning + hiddenFinished} more (${overflowText})`)}`));
+		return lines;
 	}
-
-	return lines;
 }
