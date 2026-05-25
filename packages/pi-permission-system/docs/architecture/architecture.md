@@ -410,24 +410,34 @@ This requires two detections:
 | [tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents)                 | none — runs fully in-process via `createAgentSession()`                                   | n/a — deferred to #29               |
 | [HazAT/pi-interactive-subagents](https://github.com/HazAT/pi-interactive-subagents) | `PI_SUBAGENT_NAME`, `PI_SUBAGENT_ID`, `PI_SUBAGENT_SESSION`, `PI_SUBAGENT_ACTIVITY_FILE`  | none set (see #98)                  |
 
-### Detection (`SUBAGENT_ENV_HINT_KEYS`)
+### Detection (`isSubagentExecutionContext`)
 
-`isSubagentExecutionContext()` returns `true` when any key in `SUBAGENT_ENV_HINT_KEYS` is set to a non-empty, non-whitespace value.
-A session-directory path-based fallback (child session dir is nested under `subagentSessionsDir`) acts as a secondary guard.
+`isSubagentExecutionContext()` checks three sources in priority order:
 
-### Parent-session resolution (`SUBAGENT_PARENT_SESSION_ENV_CANDIDATES`)
+1. **Explicit registry** — in-process subagent extensions register sessions via `PermissionsService.registerSubagentSession()` before calling `bindExtensions()`.
+   The `SubagentSessionRegistry` (keyed by session directory path) is checked first.
+2. **Env vars** (`SUBAGENT_ENV_HINT_KEYS`) — returns `true` when any key is set to a non-empty, non-whitespace value.
+   Used by process-based subagent extensions.
+3. **Filesystem path** — session-directory path-based fallback (child session dir is nested under `subagentSessionsDir`).
 
-`resolvePermissionForwardingTargetSessionId()` iterates `SUBAGENT_PARENT_SESSION_ENV_CANDIDATES` and returns the first non-empty, non-`"unknown"` value.
-Currently only `PI_AGENT_ROUTER_PARENT_SESSION_ID` is in the list.
+### Parent-session resolution (`resolvePermissionForwardingTargetSessionId`)
+
+`resolvePermissionForwardingTargetSessionId()` checks two sources in priority order:
+
+1. **Explicit registry** — if the caller provides a `sessionDir` and `registry`, the registry entry's `parentSessionId` is returned when present.
+   Used by in-process subagent extensions.
+2. **Env vars** (`SUBAGENT_PARENT_SESSION_ENV_CANDIDATES`) — iterates candidates and returns the first non-empty, non-`"unknown"` value.
+   Used by process-based subagent extensions.
+
 Neither nicobailon nor HazAT sets a parent-session env var today, so forwarding still fails for those extensions with an explicit log message pointing to #98.
 Adding a new env var candidate when an extension adopts the convention is a one-line change to the array.
 
-### Deferred: tintinweb in-process case
+### In-process case (resolved)
 
-tintinweb/pi-subagents calls `createAgentSession()` directly — no child process is spawned and no env vars are ever set.
-Env-var detection cannot help here.
-The solution requires an event bus RPC so the child can surface permission requests to the parent within the same process.
-Tracked in #29.
+In-process subagent extensions (e.g. `@gotgenes/pi-subagents`, tintinweb/pi-subagents) call `createAgentSession()` directly — no child process is spawned and no env vars are ever set.
+This is now handled by the `SubagentSessionRegistry` API on `PermissionsService`.
+The extension registers the child session before `bindExtensions()` and unregisters it in a `finally` block after the session completes.
+See `src/subagent-registry.ts` and the [cross-extension API docs](../cross-extension-api.md#registersubagentsession--unregistersubagentsession) for details.
 
 ### External convention guide
 
@@ -444,7 +454,14 @@ Pi's extension loader creates a fresh jiti instance per extension with `moduleCa
 
 The extension factory publishes a `PermissionsService` object via `publishPermissionsService()` during startup.
 Other extensions retrieve it with `getPermissionsService()` from `import("@gotgenes/pi-permission-system")`.
-The `package.json` `exports` field points to `src/service.ts`, which contains only the interface, the accessor functions, and the `Symbol.for()` key — no extension machinery.
+The `package.json` `exports` field points to `src/service.ts`, which contains the interface, the accessor functions, the `Symbol.for()` key, and the `SubagentSessionInfo` type — no extension machinery.
+
+The `PermissionsService` interface exposes four methods:
+
+- `checkPermission(surface, value?, agentName?)` — full policy query.
+- `getToolPermission(toolName, agentName?)` — tool-level permission state (`allow`/`deny`/`ask`) for pre-filtering.
+- `registerSubagentSession(sessionKey, info)` — register an in-process subagent session for detection and forwarding.
+- `unregisterSubagentSession(sessionKey)` — remove a registered session.
 
 The event-bus RPC (`permissions:rpc:check`) remains as a zero-dependency fallback for consumers who do not want to add an optional peer dep.
 It is deprecated in favor of the service accessor.
@@ -513,8 +530,9 @@ src/
 ├── tool-input-preview.ts      Loggable context from tool inputs
 ├── tool-registry.ts           ToolRegistry interface + tool name validation
 ├── active-agent.ts            Agent name detection from session/system prompt
-├── subagent-context.ts        Subagent execution context detection
-├── permission-forwarding.ts   Constants for cross-session forwarding
+├── subagent-context.ts        Subagent execution context detection (registry + env vars + filesystem)
+├── subagent-registry.ts       SubagentSessionRegistry class — in-process subagent session tracking
+├── permission-forwarding.ts   Constants for cross-session forwarding (registry + env var resolution)
 ├── forwarded-permissions/     Poll-based approval forwarding for subagents
 ├── session-logger.ts          SessionLogger interface + createSessionLogger() factory
 ├── logging.ts                 JSONL review/debug log writer
