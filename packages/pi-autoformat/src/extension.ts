@@ -59,6 +59,7 @@ type AutoformatExtensionContext = Pick<
  * name so any downstream importer that pinned to the old alias keeps working.
  * Internal usage prefers `ExtensionAPI` directly.
  */
+// fallow-ignore-next-line unused-type
 export type ExtensionApiLike = ExtensionAPI;
 
 const AUTOFORMAT_STATUS_KEY = AUTOFORMAT_EXTENSION_ID;
@@ -505,13 +506,15 @@ export function buildSteeringMessageContent(
       list += `, \u2026 and ${remaining} more`;
     }
     parts.push(
-      `[autoformat] Formatted ${changedFiles.length} file(s): ${list}`,
+      `[${AUTOFORMAT_EXTENSION_ID}] Formatted ${changedFiles.length} file(s): ${list}`,
     );
   }
 
   if (failureLines.length > 0) {
     if (changedFiles.length === 0) {
-      parts.push(["[autoformat] Failures:", ...failureLines].join("\n"));
+      parts.push(
+        [`[${AUTOFORMAT_EXTENSION_ID}] Failures:`, ...failureLines].join("\n"),
+      );
     } else {
       parts.push(["Failures:", ...failureLines].join("\n"));
     }
