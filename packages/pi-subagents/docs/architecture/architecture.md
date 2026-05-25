@@ -637,10 +637,10 @@ The 3 heaviest clone families:
 - `agent-menu.test.ts` + `agent-creation-wizard.test.ts` + `agent-config-editor.test.ts` (54+51+24 lines)
 - `agent-manager.test.ts` (18 internal clone groups, 210 duplicated lines)
 
-Extract shared factories into `test/fixtures/` modules.
+Extract shared factories into `test/helpers/` modules.
 
-- Target: new `test/fixtures/` modules
-- Outcome: test duplication reduced by ~400 lines
+- Target: new `test/helpers/runner-io.ts` and `test/helpers/ui-stubs.ts` modules
+- Outcome: test duplication reduced by ~250 lines
 
 ## Refactoring history
 
