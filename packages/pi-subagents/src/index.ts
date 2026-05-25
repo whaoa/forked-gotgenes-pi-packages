@@ -15,7 +15,6 @@ import { join } from "node:path";
 import {
   createAgentSession,
   DefaultResourceLoader,
-  defineTool,
   type ExtensionAPI,
   getAgentDir,
   SettingsManager as SdkSettingsManager,
@@ -40,16 +39,13 @@ import { buildAgentPrompt } from "#src/session/prompts";
 import { deriveSubagentSessionDir } from "#src/session/session-dir";
 import { preloadSkills } from "#src/session/skill-loader";
 import { SettingsManager } from "#src/settings";
-import { createAgentTool } from "#src/tools/agent-tool";
+import { AgentTool } from "#src/tools/agent-tool";
 import { GetResultTool } from "#src/tools/get-result-tool";
 import { getModelLabelFromConfig } from "#src/tools/helpers";
 import { SteerTool } from "#src/tools/steer-tool";
 import { FsAgentFileOps } from "#src/ui/agent-file-ops";
 import { createAgentsMenuHandler } from "#src/ui/agent-menu";
-import {
-  AgentWidget,
-  type UICtx,
-} from "#src/ui/agent-widget";
+import { AgentWidget } from "#src/ui/agent-widget";
 
 export default function (pi: ExtensionAPI) {
   // ---- Register custom notification renderer ----
@@ -185,27 +181,7 @@ export default function (pi: ExtensionAPI) {
 
   // ---- Agent tool ----
 
-  pi.registerTool(defineTool(createAgentTool({
-    manager: {
-      spawn: (snapshot, type, prompt, opts) => manager.spawn(snapshot, type, prompt, opts),
-      spawnAndWait: (snapshot, type, prompt, opts) => manager.spawnAndWait(snapshot, type, prompt, opts),
-      resume: (id, prompt, signal) => manager.resume(id, prompt, signal),
-      getRecord: (id) => manager.getRecord(id),
-    },
-    widget: {
-      setUICtx: (ctx) => runtime.setUICtx(ctx as UICtx),
-      ensureTimer: () => runtime.ensureTimer(),
-      update: () => runtime.update(),
-      markFinished: (id) => runtime.markFinished(id),
-    },
-    agentActivity: runtime.agentActivity,
-    registry,
-    agentDir: getAgentDir(),
-    settings,
-    buildSnapshot: runtime.buildSnapshot.bind(runtime),
-    getModelInfo: runtime.getModelInfo.bind(runtime),
-    getSessionInfo: runtime.getSessionInfo.bind(runtime),
-  })));
+  pi.registerTool(new AgentTool(manager, runtime, settings, registry, getAgentDir()).toToolDefinition());
 
   // ---- get_subagent_result tool ----
 

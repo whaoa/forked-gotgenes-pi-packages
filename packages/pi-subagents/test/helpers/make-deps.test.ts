@@ -29,31 +29,29 @@ describe("createToolDeps", () => {
 			const record = manager.getRecord("id-1");
 			expect(record?.status).toBe("completed");
 		});
-
-
 	});
 
-	describe("widget defaults", () => {
-		it("all widget methods are vi.fn stubs", () => {
-			const { widget } = createToolDeps();
-			widget.setUICtx({});
-			widget.ensureTimer();
-			widget.update();
-			widget.markFinished("id-1");
-			expect(widget.setUICtx).toHaveBeenCalledOnce();
-			expect(widget.ensureTimer).toHaveBeenCalledOnce();
-			expect(widget.update).toHaveBeenCalledOnce();
-			expect(widget.markFinished).toHaveBeenCalledWith("id-1");
+	describe("runtime defaults", () => {
+		it("all widget delegation methods are vi.fn stubs", () => {
+			const { runtime } = createToolDeps();
+			runtime.setUICtx({} as any);
+			runtime.ensureTimer();
+			runtime.update();
+			runtime.markFinished("id-1");
+			expect(runtime.setUICtx).toHaveBeenCalledOnce();
+			expect(runtime.ensureTimer).toHaveBeenCalledOnce();
+			expect(runtime.update).toHaveBeenCalledOnce();
+			expect(runtime.markFinished).toHaveBeenCalledWith("id-1");
+		});
+
+		it("agentActivity is an empty Map on the runtime", () => {
+			const { runtime } = createToolDeps();
+			expect(runtime.agentActivity).toBeInstanceOf(Map);
+			expect(runtime.agentActivity.get("x")).toBeUndefined();
 		});
 	});
 
 	describe("other fields", () => {
-		it("agentActivity is an empty Map", () => {
-			const { agentActivity } = createToolDeps();
-			expect(agentActivity).toBeInstanceOf(Map);
-			expect(agentActivity.get("x")).toBeUndefined();
-		});
-
 		it("agentDir is a non-empty string", () => {
 			expect(createToolDeps().agentDir).toBeTypeOf("string");
 		});
@@ -102,9 +100,9 @@ describe("createToolDeps", () => {
 			expect(bgManager.getRecord).toBeTypeOf("function");
 		});
 
-		it("widget satisfies BackgroundWidgetDeps structurally", () => {
-			const { widget } = createToolDeps();
-			const bgWidget: BackgroundWidgetDeps = widget;
+		it("runtime satisfies BackgroundWidgetDeps structurally", () => {
+			const { runtime } = createToolDeps();
+			const bgWidget: BackgroundWidgetDeps = runtime;
 			expect(bgWidget.ensureTimer).toBeTypeOf("function");
 			expect(bgWidget.update).toBeTypeOf("function");
 		});
@@ -115,20 +113,20 @@ describe("createToolDeps", () => {
 			expect(fgManager.spawnAndWait).toBeTypeOf("function");
 		});
 
-		it("widget satisfies ForegroundWidgetDeps structurally", () => {
-			const { widget } = createToolDeps();
-			const fgWidget: ForegroundWidgetDeps = widget;
+		it("runtime satisfies ForegroundWidgetDeps structurally", () => {
+			const { runtime } = createToolDeps();
+			const fgWidget: ForegroundWidgetDeps = runtime;
 			expect(fgWidget.ensureTimer).toBeTypeOf("function");
 			expect(fgWidget.markFinished).toBeTypeOf("function");
 		});
 
-		it("agentActivity satisfies AgentActivityAccess", () => {
-			const deps = createToolDeps();
+		it("runtime.agentActivity satisfies AgentActivityAccess", () => {
+			const { runtime } = createToolDeps();
 			const tracker = new AgentActivityTracker();
-			deps.agentActivity.set("id-1", tracker);
-			expect(deps.agentActivity.get("id-1")).toBe(tracker);
-			deps.agentActivity.delete("id-1");
-			expect(deps.agentActivity.get("id-1")).toBeUndefined();
+			runtime.agentActivity.set("id-1", tracker);
+			expect(runtime.agentActivity.get("id-1")).toBe(tracker);
+			runtime.agentActivity.delete("id-1");
+			expect(runtime.agentActivity.get("id-1")).toBeUndefined();
 		});
 	});
 });

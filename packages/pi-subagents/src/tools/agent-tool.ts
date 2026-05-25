@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions -- Pi SDK types are not fully exported; see upstream Pi SDK for type improvements */
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { AgentTypeRegistry } from "#src/config/agent-types";
@@ -15,71 +16,149 @@ import { AgentActivityTracker } from "#src/ui/agent-activity-tracker";
 import { type UICtx } from "#src/ui/agent-widget";
 import { type AgentDetails, getDisplayName } from "#src/ui/display";
 
-// ---- Deps interface ----
-
-/** Narrow manager interface — only the methods the Agent tool calls. */
-export interface AgentToolManager {
-  spawn: (snapshot: ParentSnapshot, type: string, prompt: string, opts: AgentSpawnConfig) => string;
-  spawnAndWait: (snapshot: ParentSnapshot, type: string, prompt: string, opts: Omit<AgentSpawnConfig, "isBackground">) => Promise<AgentRecord>;
-  resume: (id: string, prompt: string, signal: AbortSignal) => Promise<AgentRecord | undefined>;
-  getRecord: (id: string) => AgentRecord | undefined;
-}
-
-/** Narrow widget interface — only the methods the Agent tool calls. */
-export interface AgentToolWidget {
-  setUICtx: (ctx: unknown) => void;
-  ensureTimer: () => void;
-  update: () => void;
-  markFinished: (id: string) => void;
-}
+// ---- Shared interfaces (also used by background-spawner and foreground-runner) ----
 
 /**
  * Narrow read/write interface for the agent-tool's agentActivity access.
  * The full Map satisfies this structurally — no wrapper needed.
  */
 export interface AgentActivityAccess {
-  get(id: string): AgentActivityTracker | undefined;
-  set(id: string, tracker: AgentActivityTracker): void;
-  delete(id: string): void;
+	get(id: string): AgentActivityTracker | undefined;
+	set(id: string, tracker: AgentActivityTracker): void;
+	delete(id: string): void;
 }
 
-export interface AgentToolDeps {
-  manager: AgentToolManager;
-  widget: AgentToolWidget;
-  agentActivity: AgentActivityAccess;
-  registry: AgentTypeRegistry;
-  agentDir: string;
-  /** Narrow settings accessor — only the fields the Agent tool reads. */
-  settings: { readonly defaultMaxTurns: number | undefined; readonly maxConcurrent: number };
-  /** Build a ParentSnapshot from the current session context. */
-  buildSnapshot: (inheritContext: boolean) => ParentSnapshot;
-  /** Model info from the current session context. */
-  getModelInfo: () => ModelInfo;
-  /** Parent session identity from the current session context. */
-  getSessionInfo: () => { parentSessionFile: string; parentSessionId: string };
+// ---- Deps interfaces ----
+
+/** Narrow manager interface — only the methods the Agent tool calls. */
+export interface AgentToolManager {
+	spawn: (snapshot: ParentSnapshot, type: string, prompt: string, opts: AgentSpawnConfig) => string;
+	spawnAndWait: (snapshot: ParentSnapshot, type: string, prompt: string, opts: Omit<AgentSpawnConfig, "isBackground">) => Promise<AgentRecord>;
+	resume: (id: string, prompt: string, signal: AbortSignal) => Promise<AgentRecord | undefined>;
+	getRecord: (id: string) => AgentRecord | undefined;
 }
 
-// ---- Factory ----
+/** Narrow runtime interface — the Agent tool's slice of SubagentRuntime. */
+export interface AgentToolRuntime {
+	readonly agentActivity: AgentActivityAccess;
+	setUICtx(ctx: UICtx): void;
+	ensureTimer(): void;
+	update(): void;
+	markFinished(id: string): void;
+	buildSnapshot(inheritContext: boolean): ParentSnapshot;
+	getModelInfo(): ModelInfo;
+	getSessionInfo(): { parentSessionFile: string; parentSessionId: string };
+}
 
-/** Create the Agent tool definition (without Pi SDK wrapper). */
-export function createAgentTool({
-  manager,
-  widget,
-  agentActivity,
-  registry,
-  agentDir,
-  settings,
-  buildSnapshot,
-  getModelInfo,
-  getSessionInfo,
-}: AgentToolDeps) {
-  const typeListText = buildTypeListText(registry, agentDir);
-  const availableTypesText = registry.getAvailableTypes().join(", ");
-  return {
-    name: "Agent" as const,
-    label: "Agent",
-    promptSnippet: "Agent: Launch a specialized agent for complex, multi-step tasks.",
-    description: `Launch a new agent to handle complex, multi-step tasks autonomously.
+/** Narrow settings accessor — only the fields the Agent tool reads. */
+export type AgentToolSettings = {
+	readonly defaultMaxTurns: number | undefined;
+	readonly maxConcurrent: number;
+};
+
+// ---- Class ----
+
+export class AgentTool {
+	private readonly typeListText: string;
+	private readonly availableTypesText: string;
+
+	constructor(
+		private readonly manager: AgentToolManager,
+		private readonly runtime: AgentToolRuntime,
+		private readonly settings: AgentToolSettings,
+		private readonly registry: AgentTypeRegistry,
+		private readonly agentDir: string,
+	) {
+		this.typeListText = buildTypeListText(registry, agentDir);
+		this.availableTypesText = registry.getAvailableTypes().join(", ");
+	}
+
+	async execute(
+		toolCallId: string,
+		params: Record<string, unknown>,
+		signal: AbortSignal | undefined,
+		onUpdate: ((update: AgentToolResult<any>) => void) | undefined,
+		ctx: any,
+	) {
+		// Ensure we have UI context for widget rendering
+		this.runtime.setUICtx(ctx.ui as UICtx);
+
+		// Reload custom agents so new .pi/agents/*.md files are picked up without restart
+		this.registry.reload();
+
+		// ---- Config resolution (pure) ----
+		const config = resolveSpawnConfig(
+			params,
+			this.registry,
+			this.runtime.getModelInfo(),
+			this.settings,
+		);
+		if ("error" in config) return textResult(config.error);
+
+		// ---- Boundary extraction (after config so inheritContext is resolved) ----
+		const snapshot = this.runtime.buildSnapshot(config.execution.inheritContext);
+		const { parentSessionFile, parentSessionId } = this.runtime.getSessionInfo();
+		const parentSession: ParentSessionInfo = { parentSessionFile, parentSessionId, toolCallId };
+
+		// ---- Resume existing agent ----
+		if (params.resume) {
+			const existing = this.manager.getRecord(params.resume as string);
+			if (!existing) {
+				return textResult(
+					`Agent not found: "${params.resume}". It may have been cleaned up.`,
+				);
+			}
+			if (!existing.session) {
+				return textResult(
+					`Agent "${params.resume}" has no active session to resume.`,
+				);
+			}
+			const record = await this.manager.resume(
+				params.resume as string,
+				params.prompt as string,
+				signal ?? new AbortController().signal,
+			);
+			if (!record) {
+				return textResult(`Failed to resume agent "${params.resume}".`);
+			}
+			return textResult(
+				record.result?.trim() ?? record.error?.trim() ?? "No output.",
+				buildDetails(config.presentation.detailBase, record),
+			);
+		}
+
+		// ---- Background execution ----
+		if (config.execution.runInBackground) {
+			return spawnBackground(
+				this.manager,
+				this.runtime,
+				this.runtime.agentActivity,
+				{ config, snapshot, parentSession, settings: this.settings },
+			);
+		}
+
+		// ---- Foreground execution — stream progress via onUpdate ----
+		return runForeground(
+			this.manager,
+			this.runtime,
+			this.runtime.agentActivity,
+			{ config, snapshot, parentSession },
+			signal,
+			onUpdate,
+		);
+	}
+
+	toToolDefinition() {
+		const typeListText = this.typeListText;
+		const availableTypesText = this.availableTypesText;
+		const agentDir = this.agentDir;
+		const registry = this.registry;
+
+		return defineTool({
+			name: "Agent" as const,
+			label: "Agent",
+			promptSnippet: "Agent: Launch a specialized agent for complex, multi-step tasks.",
+			description: `Launch a new agent to handle complex, multi-step tasks autonomously.
 
 The Agent tool launches specialized agents that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
 
@@ -100,170 +179,102 @@ Guidelines:
 - Use thinking to control extended thinking level.
 - Use inherit_context if the agent needs the parent conversation history.
 - Use isolation: "worktree" to run the agent in an isolated git worktree (safe parallel file modifications).`,
-    parameters: Type.Object({
-      prompt: Type.String({
-        description: "The task for the agent to perform.",
-      }),
-      description: Type.String({
-        description: "A short (3-5 word) description of the task (shown in UI).",
-      }),
-      subagent_type: Type.String({
-        description: `The type of specialized agent to use. Available types: ${availableTypesText}. Custom agents from .pi/agents/<name>.md (project) or ${agentDir}/agents/<name>.md (global) are also available.`,
-      }),
-      model: Type.Optional(
-        Type.String({
-          description:
-            'Optional model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Omit to use the agent type\'s default.',
-        }),
-      ),
-      thinking: Type.Optional(
-        Type.String({
-          description:
-            "Thinking level: off, minimal, low, medium, high, xhigh. Overrides agent default.",
-        }),
-      ),
-      max_turns: Type.Optional(
-        Type.Number({
-          description:
-            "Maximum number of agentic turns before stopping. Omit for unlimited (default).",
-          minimum: 1,
-        }),
-      ),
-      run_in_background: Type.Optional(
-        Type.Boolean({
-          description:
-            "Set to true to run in background. Returns agent ID immediately. You will be notified on completion.",
-        }),
-      ),
-      resume: Type.Optional(
-        Type.String({
-          description: "Optional agent ID to resume from. Continues from previous context.",
-        }),
-      ),
-      isolated: Type.Optional(
-        Type.Boolean({
-          description: "If true, agent gets no extension/MCP tools — only built-in tools.",
-        }),
-      ),
-      inherit_context: Type.Optional(
-        Type.Boolean({
-          description:
-            "If true, fork parent conversation into the agent. Default: false (fresh context).",
-        }),
-      ),
-      isolation: Type.Optional(
-        Type.Literal("worktree", {
-          description:
-            'Set to "worktree" to run the agent in a temporary git worktree (isolated copy of the repo). Changes are saved to a branch on completion.',
-        }),
-      ),
-    }),
+			parameters: Type.Object({
+				prompt: Type.String({
+					description: "The task for the agent to perform.",
+				}),
+				description: Type.String({
+					description: "A short (3-5 word) description of the task (shown in UI).",
+				}),
+				subagent_type: Type.String({
+					description: `The type of specialized agent to use. Available types: ${availableTypesText}. Custom agents from .pi/agents/<name>.md (project) or ${agentDir}/agents/<name>.md (global) are also available.`,
+				}),
+				model: Type.Optional(
+					Type.String({
+						description:
+							'Optional model override. Accepts "provider/modelId" or fuzzy name (e.g. "haiku", "sonnet"). Omit to use the agent type\'s default.',
+					}),
+				),
+				thinking: Type.Optional(
+					Type.String({
+						description:
+							"Thinking level: off, minimal, low, medium, high, xhigh. Overrides agent default.",
+					}),
+				),
+				max_turns: Type.Optional(
+					Type.Number({
+						description:
+							"Maximum number of agentic turns before stopping. Omit for unlimited (default).",
+						minimum: 1,
+					}),
+				),
+				run_in_background: Type.Optional(
+					Type.Boolean({
+						description:
+							"Set to true to run in background. Returns agent ID immediately. You will be notified when it completes.",
+					}),
+				),
+				resume: Type.Optional(
+					Type.String({
+						description: "Optional agent ID to resume from. Continues from previous context.",
+					}),
+				),
+				isolated: Type.Optional(
+					Type.Boolean({
+						description: "If true, agent gets no extension/MCP tools — only built-in tools.",
+					}),
+				),
+				inherit_context: Type.Optional(
+					Type.Boolean({
+						description:
+							"If true, fork parent conversation into the agent. Default: false (fresh context).",
+					}),
+				),
+				isolation: Type.Optional(
+					Type.Literal("worktree", {
+						description:
+							'Set to "worktree" to run the agent in a temporary git worktree (isolated copy of the repo). Changes are saved to a branch on completion.',
+					}),
+				),
+			}),
 
-    // ---- Custom rendering: Claude Code style ----
+			// ---- Custom rendering: Claude Code style ----
 
-    renderCall(args: Record<string, unknown>, theme: any) {
-      const displayName = args.subagent_type
-        ? getDisplayName(args.subagent_type as string, registry)
-        : "Agent";
-      const desc = (args.description as string | undefined) ?? "";
-      return new Text(
-        "▸ " +
-          theme.fg("toolTitle", theme.bold(displayName)) +
-          (desc ? "  " + theme.fg("muted", desc) : ""),
-        0,
-        0,
-      );
-    },
+			renderCall(args: Record<string, unknown>, theme: any) {
+				const displayName = args.subagent_type
+					? getDisplayName(args.subagent_type as string, registry)
+					: "Agent";
+				const desc = (args.description as string | undefined) ?? "";
+				return new Text(
+					"▸ " +
+						theme.fg("toolTitle", theme.bold(displayName)) +
+						(desc ? "  " + theme.fg("muted", desc) : ""),
+					0,
+					0,
+				);
+			},
 
-    renderResult(result: any, { expanded, isPartial }: any, theme: any) {
-      const details = result.details as AgentDetails | undefined;
-      if (!details) {
-        const text = result.content[0]?.type === "text" ? result.content[0].text : "";
-        return new Text(text, 0, 0);
-      }
-      const resultText = result.content[0]?.type === "text" ? result.content[0].text : "";
-      return new Text(
-        renderAgentResult(details, resultText, expanded, isPartial, theme),
-        0,
-        0,
-      );
-    },
+			renderResult(result: any, { expanded, isPartial }: any, theme: any) {
+				const details = result.details as AgentDetails | undefined;
+				if (!details) {
+					const text = result.content[0]?.type === "text" ? result.content[0].text : "";
+					return new Text(text, 0, 0);
+				}
+				const resultText = result.content[0]?.type === "text" ? result.content[0].text : "";
+				return new Text(
+					renderAgentResult(details, resultText, expanded, isPartial, theme),
+					0,
+					0,
+				);
+			},
 
-    // ---- Execute ----
-
-    execute: async (
-      toolCallId: string,
-      params: Record<string, unknown>,
-      signal: AbortSignal | undefined,
-      onUpdate: ((update: AgentToolResult<any>) => void) | undefined,
-      ctx: any,
-    ) => {
-      // Ensure we have UI context for widget rendering
-      widget.setUICtx(ctx.ui as UICtx);
-
-      // Reload custom agents so new .pi/agents/*.md files are picked up without restart
-      registry.reload();
-
-      // ---- Config resolution (pure) ----
-      const config = resolveSpawnConfig(
-        params,
-        registry,
-        getModelInfo(),
-        settings,
-      );
-      if ("error" in config) return textResult(config.error);
-
-      // ---- Boundary extraction (after config so inheritContext is resolved) ----
-      const snapshot = buildSnapshot(config.execution.inheritContext);
-      const { parentSessionFile, parentSessionId } = getSessionInfo();
-      const parentSession: ParentSessionInfo = { parentSessionFile, parentSessionId, toolCallId };
-
-      // ---- Resume existing agent ----
-      if (params.resume) {
-        const existing = manager.getRecord(params.resume as string);
-        if (!existing) {
-          return textResult(
-            `Agent not found: "${params.resume}". It may have been cleaned up.`,
-          );
-        }
-        if (!existing.session) {
-          return textResult(
-            `Agent "${params.resume}" has no active session to resume.`,
-          );
-        }
-        const record = await manager.resume(
-          params.resume as string,
-          params.prompt as string,
-          signal ?? new AbortController().signal,
-        );
-        if (!record) {
-          return textResult(`Failed to resume agent "${params.resume}".`);
-        }
-        return textResult(
-          record.result?.trim() ?? record.error?.trim() ?? "No output.",
-          buildDetails(config.presentation.detailBase, record),
-        );
-      }
-
-      // ---- Background execution ----
-      if (config.execution.runInBackground) {
-        return spawnBackground(
-          manager,
-          widget,
-          agentActivity,
-          { config, snapshot, parentSession, settings },
-        );
-      }
-
-      // ---- Foreground execution — stream progress via onUpdate ----
-      return runForeground(
-        manager,
-        widget,
-        agentActivity,
-        { config, snapshot, parentSession },
-        signal,
-        onUpdate,
-      );
-    },
-  };
+			execute: (
+				toolCallId: string,
+				params: Record<string, unknown>,
+				signal: AbortSignal | undefined,
+				onUpdate: ((update: AgentToolResult<any>) => void) | undefined,
+				ctx: any,
+			) => this.execute(toolCallId, params, signal, onUpdate, ctx),
+		});
+	}
 }

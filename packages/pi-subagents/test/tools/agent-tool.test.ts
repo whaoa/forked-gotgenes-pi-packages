@@ -1,232 +1,235 @@
 import { describe, expect, it, vi } from "vitest";
-import { type AgentToolDeps, createAgentTool } from "#src/tools/agent-tool";
+import { AgentTool } from "#src/tools/agent-tool";
 import { createToolDeps } from "#test/helpers/make-deps";
 import { createTestRecord } from "#test/helpers/make-record";
 import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
 
 function makeCtx(overrides: Record<string, unknown> = {}) {
-  return {
-    ui: { fake: true },
-    ...overrides,
-  };
+	return {
+		ui: { fake: true },
+		...overrides,
+	};
+}
+
+function makeTool(deps: ReturnType<typeof createToolDeps>) {
+	return new AgentTool(deps.manager, deps.runtime, deps.settings, deps.registry, deps.agentDir);
 }
 
 async function execute(
-  deps: AgentToolDeps,
-  params: Record<string, unknown>,
-  ctx?: ReturnType<typeof makeCtx>,
+	deps: ReturnType<typeof createToolDeps>,
+	params: Record<string, unknown>,
+	ctx?: ReturnType<typeof makeCtx>,
 ) {
-  const tool = createAgentTool(deps);
-  return tool.execute(
-    "tc-1",
-    params,
-    new AbortController().signal,
-    vi.fn(),
-    ctx ?? makeCtx(),
-  );
+	return makeTool(deps).execute(
+		"tc-1",
+		params,
+		new AbortController().signal,
+		vi.fn(),
+		ctx ?? makeCtx(),
+	);
 }
 
-describe("createAgentTool", () => {
-  it("returns tool definition with correct name and label", () => {
-    const tool = createAgentTool(createToolDeps());
-    expect(tool.name).toBe("Agent");
-    expect(tool.label).toBe("Agent");
-  });
+describe("AgentTool", () => {
+	it("returns tool definition with correct name and label", () => {
+		const def = makeTool(createToolDeps()).toToolDefinition();
+		expect(def.name).toBe("Agent");
+		expect(def.label).toBe("Agent");
+	});
 
-  it("includes promptSnippet", () => {
-    const tool = createAgentTool(createToolDeps());
-    expect(tool.promptSnippet).toBe(
-      "Agent: Launch a specialized agent for complex, multi-step tasks.",
-    );
-  });
+	it("includes promptSnippet", () => {
+		const def = makeTool(createToolDeps()).toToolDefinition();
+		expect(def.promptSnippet).toBe(
+			"Agent: Launch a specialized agent for complex, multi-step tasks.",
+		);
+	});
 
-  it("derives type list from registry — includes default agents in description", () => {
-    const tool = createAgentTool(createToolDeps());
-    // testRegistry loads default agents: general-purpose, Explore, Plan
-    expect(tool.description).toContain("- general-purpose: General-purpose agent");
-    expect(tool.description).toContain("- Explore: Fast codebase exploration agent");
-  });
+	it("derives type list from registry — includes default agents in description", () => {
+		const def = makeTool(createToolDeps()).toToolDefinition();
+		// testRegistry loads default agents: general-purpose, Explore, Plan
+		expect(def.description).toContain("- general-purpose: General-purpose agent");
+		expect(def.description).toContain("- Explore: Fast codebase exploration agent");
+	});
 
-  it("calls registry.reload() on each execute", async () => {
-    const deps = createToolDeps();
-    const reloadSpy = vi.spyOn(deps.registry, "reload");
-    await execute(deps, {
-      prompt: "test",
-      description: "test",
-      subagent_type: "general-purpose",
-    });
-    expect(reloadSpy).toHaveBeenCalledOnce();
-    reloadSpy.mockRestore();
-  });
+	it("calls registry.reload() on each execute", async () => {
+		const deps = createToolDeps();
+		const reloadSpy = vi.spyOn(deps.registry, "reload");
+		await execute(deps, {
+			prompt: "test",
+			description: "test",
+			subagent_type: "general-purpose",
+		});
+		expect(reloadSpy).toHaveBeenCalledOnce();
+		reloadSpy.mockRestore();
+	});
 
-  it("sets UI context on widget at start of execute", async () => {
-    const deps = createToolDeps();
-    const ctx = makeCtx();
-    await execute(deps, {
-      prompt: "test",
-      description: "test",
-      subagent_type: "general-purpose",
-    }, ctx);
-    expect(deps.widget.setUICtx).toHaveBeenCalledWith(ctx.ui);
-  });
+	it("sets UI context on runtime at start of execute", async () => {
+		const deps = createToolDeps();
+		const ctx = makeCtx();
+		await execute(deps, {
+			prompt: "test",
+			description: "test",
+			subagent_type: "general-purpose",
+		}, ctx);
+		expect(deps.runtime.setUICtx).toHaveBeenCalledWith(ctx.ui);
+	});
 });
 
-describe("Agent tool — resume path", () => {
-  it("returns not-found when resume ID does not exist", async () => {
-    const deps = createToolDeps();
-    deps.manager.getRecord = vi.fn().mockReturnValue(undefined);
-    const result = await execute(deps, {
-      prompt: "continue",
-      description: "resume",
-      subagent_type: "general-purpose",
-      resume: "nonexistent",
-    });
-    expect(result.content[0].text).toContain("Agent not found");
-  });
+describe("AgentTool — resume path", () => {
+	it("returns not-found when resume ID does not exist", async () => {
+		const deps = createToolDeps();
+		deps.manager.getRecord = vi.fn().mockReturnValue(undefined);
+		const result = await execute(deps, {
+			prompt: "continue",
+			description: "resume",
+			subagent_type: "general-purpose",
+			resume: "nonexistent",
+		});
+		expect(result.content[0].text).toContain("Agent not found");
+	});
 
-  it("returns no-session when agent has no active session", async () => {
-    const deps = createToolDeps();
-    // No execution state set — session not yet created
-    deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord());
-    const result = await execute(deps, {
-      prompt: "continue",
-      description: "resume",
-      subagent_type: "general-purpose",
-      resume: "agent-1",
-    });
-    expect(result.content[0].text).toContain("no active session");
-  });
+	it("returns no-session when agent has no active session", async () => {
+		const deps = createToolDeps();
+		// No execution state set — session not yet created
+		deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord());
+		const result = await execute(deps, {
+			prompt: "continue",
+			description: "resume",
+			subagent_type: "general-purpose",
+			resume: "agent-1",
+		});
+		expect(result.content[0].text).toContain("no active session");
+	});
 
-  it("returns result text on successful resume", async () => {
-    const deps = createToolDeps();
-    const resumeRecord = createTestRecord();
-    resumeRecord.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
-    deps.manager.getRecord = vi.fn().mockReturnValue(resumeRecord);
-    deps.manager.resume = vi.fn().mockResolvedValue(createTestRecord({ result: "Resumed output." }));
-    const result = await execute(deps, {
-      prompt: "continue",
-      description: "resume",
-      subagent_type: "general-purpose",
-      resume: "agent-1",
-    });
-    expect(result.content[0].text).toContain("Resumed output.");
-  });
+	it("returns result text on successful resume", async () => {
+		const deps = createToolDeps();
+		const resumeRecord = createTestRecord();
+		resumeRecord.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
+		deps.manager.getRecord = vi.fn().mockReturnValue(resumeRecord);
+		deps.manager.resume = vi.fn().mockResolvedValue(createTestRecord({ result: "Resumed output." }));
+		const result = await execute(deps, {
+			prompt: "continue",
+			description: "resume",
+			subagent_type: "general-purpose",
+			resume: "agent-1",
+		});
+		expect(result.content[0].text).toContain("Resumed output.");
+	});
 });
 
-describe("Agent tool — model resolution error", () => {
-  it("returns error when model resolution fails", async () => {
-    const deps = createToolDeps();
-    const result = await execute(
-      deps,
-      {
-        prompt: "test",
-        description: "test",
-        subagent_type: "general-purpose",
-        model: "nonexistent-model-xyz",
-      },
-    );
-    // User-specified model that doesn't resolve → error message
-    expect(result.content[0].text).toContain("nonexistent-model-xyz");
-  });
+describe("AgentTool — model resolution error", () => {
+	it("returns error when model resolution fails", async () => {
+		const deps = createToolDeps();
+		const result = await execute(
+			deps,
+			{
+				prompt: "test",
+				description: "test",
+				subagent_type: "general-purpose",
+				model: "nonexistent-model-xyz",
+			},
+		);
+		// User-specified model that doesn't resolve → error message
+		expect(result.content[0].text).toContain("nonexistent-model-xyz");
+	});
 });
 
-describe("Agent tool — background execution", () => {
-  it("returns background launch message with agent ID", async () => {
-    const deps = createToolDeps();
-    const record = createTestRecord({ status: "running" });
-    deps.manager.getRecord = vi.fn().mockReturnValue(record);
-    const result = await execute(deps, {
-      prompt: "do something",
-      description: "bg task",
-      subagent_type: "general-purpose",
-      run_in_background: true,
-    });
-    const text = result.content[0].text;
-    expect(text).toContain("background");
-    expect(text).toContain("agent-1");
-    expect(text).toContain("bg task");
-  });
+describe("AgentTool — background execution", () => {
+	it("returns background launch message with agent ID", async () => {
+		const deps = createToolDeps();
+		const record = createTestRecord({ status: "running" });
+		deps.manager.getRecord = vi.fn().mockReturnValue(record);
+		const result = await execute(deps, {
+			prompt: "do something",
+			description: "bg task",
+			subagent_type: "general-purpose",
+			run_in_background: true,
+		});
+		const text = result.content[0].text;
+		expect(text).toContain("background");
+		expect(text).toContain("agent-1");
+		expect(text).toContain("bg task");
+	});
 
-  it("does not emit subagents:created directly — delegated to observer.onAgentCreated", async () => {
-    // The subagents:created event is now emitted by AgentManagerObserver.onAgentCreated,
-    // called from AgentManager.spawn(). Tested in agent-manager.test.ts.
-    // This test ensures the tool no longer holds an emitEvent dep for this purpose.
-    const deps = createToolDeps();
-    deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord({ status: "running" }));
-    const result = await execute(deps, {
-      prompt: "do something",
-      description: "bg task",
-      subagent_type: "general-purpose",
-      run_in_background: true,
-    });
-    // Background spawn succeeds — no emitEvent dep required
-    expect(result.content[0].text).toContain("background");
-  });
+	it("does not emit subagents:created directly — delegated to observer.onAgentCreated", async () => {
+		// The subagents:created event is now emitted by AgentManagerObserver.onAgentCreated,
+		// called from AgentManager.spawn(). Tested in agent-manager.test.ts.
+		// This test ensures the tool no longer holds an emitEvent dep for this purpose.
+		const deps = createToolDeps();
+		deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord({ status: "running" }));
+		const result = await execute(deps, {
+			prompt: "do something",
+			description: "bg task",
+			subagent_type: "general-purpose",
+			run_in_background: true,
+		});
+		// Background spawn succeeds — no emitEvent dep required
+		expect(result.content[0].text).toContain("background");
+	});
 
-  it("registers activity in agentActivity map", async () => {
-    const deps = createToolDeps();
-    deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord({ status: "running" }));
-    await execute(deps, {
-      prompt: "do something",
-      description: "bg task",
-      subagent_type: "general-purpose",
-      run_in_background: true,
-    });
-    expect(deps.agentActivity.get("agent-1")).toBeDefined();
-  });
+	it("registers activity in agentActivity map", async () => {
+		const deps = createToolDeps();
+		deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord({ status: "running" }));
+		await execute(deps, {
+			prompt: "do something",
+			description: "bg task",
+			subagent_type: "general-purpose",
+			run_in_background: true,
+		});
+		expect(deps.runtime.agentActivity.get("agent-1")).toBeDefined();
+	});
 
-  it("passes parentSession.toolCallId to manager.spawn so the manager wires NotificationState", async () => {
-    const deps = createToolDeps();
-    deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord({ status: "running" }));
-    await execute(deps, {
-      prompt: "do something",
-      description: "bg task",
-      subagent_type: "general-purpose",
-      run_in_background: true,
-    });
-    const spawnOpts = (deps.manager.spawn as ReturnType<typeof vi.fn>).mock.calls[0][3];
-    expect(spawnOpts.parentSession?.toolCallId).toBe("tc-1");
-  });
+	it("passes parentSession.toolCallId to manager.spawn so the manager wires NotificationState", async () => {
+		const deps = createToolDeps();
+		deps.manager.getRecord = vi.fn().mockReturnValue(createTestRecord({ status: "running" }));
+		await execute(deps, {
+			prompt: "do something",
+			description: "bg task",
+			subagent_type: "general-purpose",
+			run_in_background: true,
+		});
+		const spawnOpts = (deps.manager.spawn as ReturnType<typeof vi.fn>).mock.calls[0][3];
+		expect(spawnOpts.parentSession?.toolCallId).toBe("tc-1");
+	});
 });
 
-describe("Agent tool — foreground execution", () => {
-  it("returns completion message with stats", async () => {
-    const deps = createToolDeps();
-    deps.manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestRecord({ result: "Task complete.", toolUses: 5 }),
-    );
-    const result = await execute(deps, {
-      prompt: "do task",
-      description: "fg task",
-      subagent_type: "general-purpose",
-    });
-    const text = result.content[0].text;
-    expect(text).toContain("Agent completed");
-    expect(text).toContain("Task complete.");
-  });
+describe("AgentTool — foreground execution", () => {
+	it("returns completion message with stats", async () => {
+		const deps = createToolDeps();
+		deps.manager.spawnAndWait = vi.fn().mockResolvedValue(
+			createTestRecord({ result: "Task complete.", toolUses: 5 }),
+		);
+		const result = await execute(deps, {
+			prompt: "do task",
+			description: "fg task",
+			subagent_type: "general-purpose",
+		});
+		const text = result.content[0].text;
+		expect(text).toContain("Agent completed");
+		expect(text).toContain("Task complete.");
+	});
 
-  it("returns error message when agent fails", async () => {
-    const deps = createToolDeps();
-    deps.manager.spawnAndWait = vi.fn().mockResolvedValue(
-      createTestRecord({ status: "error", error: "Out of context" }),
-    );
-    const result = await execute(deps, {
-      prompt: "do task",
-      description: "fg task",
-      subagent_type: "general-purpose",
-    });
-    expect(result.content[0].text).toContain("Agent failed");
-    expect(result.content[0].text).toContain("Out of context");
-  });
+	it("returns error message when agent fails", async () => {
+		const deps = createToolDeps();
+		deps.manager.spawnAndWait = vi.fn().mockResolvedValue(
+			createTestRecord({ status: "error", error: "Out of context" }),
+		);
+		const result = await execute(deps, {
+			prompt: "do task",
+			description: "fg task",
+			subagent_type: "general-purpose",
+		});
+		expect(result.content[0].text).toContain("Agent failed");
+		expect(result.content[0].text).toContain("Out of context");
+	});
 
-  it("returns error when spawnAndWait throws", async () => {
-    const deps = createToolDeps();
-    deps.manager.spawnAndWait = vi.fn().mockRejectedValue(new Error("spawn failure"));
-    const result = await execute(deps, {
-      prompt: "do task",
-      description: "fg task",
-      subagent_type: "general-purpose",
-    });
-    expect(result.content[0].text).toContain("spawn failure");
-  });
+	it("returns error when spawnAndWait throws", async () => {
+		const deps = createToolDeps();
+		deps.manager.spawnAndWait = vi.fn().mockRejectedValue(new Error("spawn failure"));
+		const result = await execute(deps, {
+			prompt: "do task",
+			description: "fg task",
+			subagent_type: "general-purpose",
+		});
+		expect(result.content[0].text).toContain("spawn failure");
+	});
 });
