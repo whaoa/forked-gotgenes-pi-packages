@@ -11,6 +11,7 @@ import { BUILTIN_TOOL_NAMES } from "#src/config/agent-types";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { AgentRecord } from "#src/types";
 import type { AgentFileOps } from "#src/ui/agent-file-ops";
+import { writeAgentFile } from "#src/ui/agent-file-writer";
 import type { MenuUI } from "#src/ui/agent-menu";
 
 // ---- Deps interface ----
@@ -233,16 +234,6 @@ ${systemPrompt}
 
     const targetPath = join(targetDir, `${name}.md`);
 
-    if (this.fileOps.exists(targetPath)) {
-      const overwrite = await ui.confirm(
-        "Overwrite",
-        `${targetPath} already exists. Overwrite?`,
-      );
-      if (!overwrite) return;
-    }
-
-    this.fileOps.write(targetPath, content);
-    this.registry.reload();
-    ui.notify(`Created ${targetPath}`, "info");
+    await writeAgentFile(this.fileOps, ui, this.registry, targetPath, content, "Created");
   }
 }
