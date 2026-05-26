@@ -41,3 +41,40 @@ All 60 test files pass; `pnpm run check`, `pnpm run lint`, and `pnpm fallow dead
 - `flushPendingSteers` and `setupWorktree` extracted cleanly — each about 8 lines, no surprises.
 - The `WorktreeCleanupResult` import needed to be added to the test file alongside the existing `WorktreeManager` import for the type annotation fix — minor but worth noting for the next engineer.
 - Architecture doc updated: Step 3 entry now reflects `RunHandle` rather than the original `handleRunCompletion`/`handleRunError` proposal.
+
+## Stage: Final Retrospective (2026-05-26T15:10:00Z)
+
+### Session summary
+
+Issue #216 was planned, implemented via 4 TDD steps (5 commits), shipped, CI verified (after a GitHub Actions outage), and released as `pi-subagents-v7.6.0`.
+The final design replaced the original mechanical-extraction proposal with a `RunHandle` lifecycle object that eliminated mutable closure state from `startAgent`.
+
+### Observations
+
+#### What went well
+
+- The user's two design redirections during planning ("What collaborators are still missing?"
+  and "Make the change that makes the change easy") transformed a mechanical extraction plan into a structural improvement.
+  The resulting `RunHandle` eliminated the root cause (mutable closure state) rather than just shortening the method.
+- The prep-step pattern worked exactly as intended: `WorktreeState.performCleanup` (step 1) and `finalizeBackgroundRun` (step 3) made the `RunHandle` rewrite (step 4) straightforward.
+  Step 4's large edit landed cleanly with all 962 tests passing on the first run.
+- Two Explore subagents dispatched during planning (reading collaborator files and checking `WorktreeState` details) gathered the right context efficiently — `RunResult` being already exported and `record.description` being available at cleanup time were both discovered this way and shaped the `RunHandle` interface.
+
+#### What caused friction (agent side)
+
+- `premature-convergence` — accepted the issue's proposed mechanical extraction (3 methods) at face value and spent analysis time on LOC arithmetic before the user redirected toward structural thinking.
+  Impact: two user redirections needed; no rework since no code was committed yet.
+- `instruction-violation` (self-identified) — the testing skill says "run `pnpm run check` immediately after" changing a shared interface, but step 1 added `performCleanup` to `WorktreeState` without running `pnpm run check`.
+  The type error in the test helper (`makeWorktrees` default parameter needing `WorktreeCleanupResult` annotation) went undetected for 3 commits until step 4's `pnpm run check`.
+  Impact: added friction but no rework — fixed in the same commit.
+
+#### What caused friction (user side)
+
+- The user's design redirections were necessary and well-timed.
+  No friction from the user side — the two interventions were strategic and saved significant implementation effort.
+
+### Diagnostic details
+
+- **Model-performance correlation** — two Explore subagents ran on `claude-haiku-4-5`; appropriate for read-only codebase search (reading collaborator files, checking types and test patterns).
+- **Feedback-loop gap analysis** — `pnpm run check` ran only after step 4 (the `RunHandle` commit); should have run after step 1 (`WorktreeState.performCleanup` is a shared interface change per the testing skill).
+  The gap allowed a type annotation error to persist for 3 commits.
