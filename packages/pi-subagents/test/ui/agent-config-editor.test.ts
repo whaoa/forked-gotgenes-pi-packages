@@ -27,6 +27,25 @@ function makeEditor(overrides: {
   };
 }
 
+/**
+ * Setup helper for `showAgentDetail` tests.
+ *
+ * Creates an editor + file ops + menu UI in one call.
+ * Pass `filePath` to configure `findAgentFile`; pass `fileContent` to configure `read`.
+ */
+function setupDetail(
+  selectResults: (string | undefined)[],
+  options: { filePath?: string; fileContent?: string } = {},
+) {
+  const { fileOps, editor } = makeEditor();
+  const ui = makeMenuUI(selectResults);
+  fileOps.findAgentFile.mockReturnValue(options.filePath);
+  if (options.fileContent !== undefined) {
+    fileOps.read.mockReturnValue(options.fileContent);
+  }
+  return { fileOps, editor, ui };
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.spyOn(testRegistry, "resolveAgentConfig").mockReturnValue(testDefaultConfig);
@@ -39,8 +58,7 @@ describe("createAgentConfigEditor", () => {
   describe("showAgentDetail", () => {
     it("notifies warning when agent type is not found", async () => {
       vi.spyOn(testRegistry, "resolveType").mockReturnValue(undefined);
-      const { editor } = makeEditor();
-      const ui = makeMenuUI();
+      const { editor, ui } = setupDetail([]);
 
       await editor.showAgentDetail(ui, "missing-agent");
 
@@ -51,9 +69,7 @@ describe("createAgentConfigEditor", () => {
     });
 
     it("returns without action when user selects Back", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue(undefined);
-      const ui = makeMenuUI(["Back"]);
+      const { editor, ui } = setupDetail(["Back"]);
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -61,9 +77,7 @@ describe("createAgentConfigEditor", () => {
     });
 
     it("returns without action when user cancels", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue(undefined);
-      const ui = makeMenuUI([undefined]);
+      const { editor, ui } = setupDetail([undefined]);
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -73,9 +87,7 @@ describe("createAgentConfigEditor", () => {
     // ---- Menu option structure ----
 
     it("shows Eject and Disable for a default agent with no file", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue(undefined);
-      const ui = makeMenuUI([undefined]);
+      const { editor, ui } = setupDetail([undefined]);
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -84,9 +96,7 @@ describe("createAgentConfigEditor", () => {
     });
 
     it("shows Edit, Disable, Reset, Delete for a default agent with override file", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue("/project/.pi/agents/test-agent.md");
-      const ui = makeMenuUI([undefined]);
+      const { editor, ui } = setupDetail([undefined], { filePath: "/project/.pi/agents/test-agent.md" });
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -96,9 +106,7 @@ describe("createAgentConfigEditor", () => {
 
     it("shows Edit, Disable, Delete for a custom agent with file", async () => {
       vi.spyOn(testRegistry, "resolveAgentConfig").mockReturnValue(testCustomConfig);
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue("/project/.pi/agents/test-agent.md");
-      const ui = makeMenuUI([undefined]);
+      const { editor, ui } = setupDetail([undefined], { filePath: "/project/.pi/agents/test-agent.md" });
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -111,9 +119,7 @@ describe("createAgentConfigEditor", () => {
         ...testDefaultConfig,
         enabled: false,
       });
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue("/project/.pi/agents/test-agent.md");
-      const ui = makeMenuUI([undefined]);
+      const { editor, ui } = setupDetail([undefined], { filePath: "/project/.pi/agents/test-agent.md" });
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -126,9 +132,7 @@ describe("createAgentConfigEditor", () => {
         ...testCustomConfig,
         enabled: false,
       });
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue("/project/.pi/agents/test-agent.md");
-      const ui = makeMenuUI([undefined]);
+      const { editor, ui } = setupDetail([undefined], { filePath: "/project/.pi/agents/test-agent.md" });
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -139,11 +143,8 @@ describe("createAgentConfigEditor", () => {
     // ---- Edit ----
 
     it("writes updated content when user edits and saves", async () => {
-      const { fileOps, editor } = makeEditor();
       const filePath = "/project/.pi/agents/test-agent.md";
-      fileOps.findAgentFile.mockReturnValue(filePath);
-      fileOps.read.mockReturnValue("original content");
-      const ui = makeMenuUI(["Edit"]);
+      const { fileOps, editor, ui } = setupDetail(["Edit"], { filePath, fileContent: "original content" });
       ui.editor.mockResolvedValue("edited content");
 
       await editor.showAgentDetail(ui, "test-agent");
@@ -154,10 +155,8 @@ describe("createAgentConfigEditor", () => {
     });
 
     it("does not write when editor returns unchanged content", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue("/project/.pi/agents/test-agent.md");
-      fileOps.read.mockReturnValue("same content");
-      const ui = makeMenuUI(["Edit"]);
+      const filePath = "/project/.pi/agents/test-agent.md";
+      const { fileOps, editor, ui } = setupDetail(["Edit"], { filePath, fileContent: "same content" });
       ui.editor.mockResolvedValue("same content");
 
       await editor.showAgentDetail(ui, "test-agent");
@@ -166,10 +165,8 @@ describe("createAgentConfigEditor", () => {
     });
 
     it("does not write when user cancels editor", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue("/project/.pi/agents/test-agent.md");
-      fileOps.read.mockReturnValue("content");
-      const ui = makeMenuUI(["Edit"]);
+      const filePath = "/project/.pi/agents/test-agent.md";
+      const { fileOps, editor, ui } = setupDetail(["Edit"], { filePath, fileContent: "content" });
       ui.editor.mockResolvedValue(undefined);
 
       await editor.showAgentDetail(ui, "test-agent");
@@ -180,10 +177,8 @@ describe("createAgentConfigEditor", () => {
     // ---- Delete ----
 
     it("removes file when user confirms delete", async () => {
-      const { fileOps, editor } = makeEditor();
       const filePath = "/project/.pi/agents/test-agent.md";
-      fileOps.findAgentFile.mockReturnValue(filePath);
-      const ui = makeMenuUI(["Delete"]);
+      const { fileOps, editor, ui } = setupDetail(["Delete"], { filePath });
       ui.confirm.mockResolvedValue(true);
 
       await editor.showAgentDetail(ui, "test-agent");
@@ -194,9 +189,7 @@ describe("createAgentConfigEditor", () => {
     });
 
     it("does not remove file when user cancels delete", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue("/project/.pi/agents/test-agent.md");
-      const ui = makeMenuUI(["Delete"]);
+      const { fileOps, editor, ui } = setupDetail(["Delete"], { filePath: "/project/.pi/agents/test-agent.md" });
       ui.confirm.mockResolvedValue(false);
 
       await editor.showAgentDetail(ui, "test-agent");
@@ -207,10 +200,8 @@ describe("createAgentConfigEditor", () => {
     // ---- Reset to default ----
 
     it("removes override file when user confirms reset", async () => {
-      const { fileOps, editor } = makeEditor();
       const filePath = "/project/.pi/agents/test-agent.md";
-      fileOps.findAgentFile.mockReturnValue(filePath);
-      const ui = makeMenuUI(["Reset to default"]);
+      const { fileOps, editor, ui } = setupDetail(["Reset to default"], { filePath });
       ui.confirm.mockResolvedValue(true);
 
       await editor.showAgentDetail(ui, "test-agent");
@@ -227,9 +218,7 @@ describe("createAgentConfigEditor", () => {
         ...testDefaultConfig,
         builtinToolNames: ["read", "bash"],
       });
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue(undefined);
-      const ui = makeMenuUI(["Eject (export as .md)", "Project (.pi/agents/)"]);
+      const { fileOps, editor, ui } = setupDetail(["Eject (export as .md)", "Project (.pi/agents/)"]);
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -241,10 +230,8 @@ describe("createAgentConfigEditor", () => {
     });
 
     it("prompts for overwrite when ejected file already exists", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue(undefined);
+      const { fileOps, editor, ui } = setupDetail(["Eject (export as .md)", "Project (.pi/agents/)"]);
       fileOps.exists.mockReturnValue(true);
-      const ui = makeMenuUI(["Eject (export as .md)", "Project (.pi/agents/)"]);
       ui.confirm.mockResolvedValue(false);
 
       await editor.showAgentDetail(ui, "test-agent");
@@ -260,11 +247,11 @@ describe("createAgentConfigEditor", () => {
 
     it("disables agent by toggling enabled:false in existing file", async () => {
       vi.spyOn(testRegistry, "resolveAgentConfig").mockReturnValue(testCustomConfig);
-      const { fileOps, editor } = makeEditor();
       const filePath = "/project/.pi/agents/test-agent.md";
-      fileOps.findAgentFile.mockReturnValue(filePath);
-      fileOps.read.mockReturnValue("---\ndescription: test\n---\n\nprompt\n");
-      const ui = makeMenuUI(["Disable"]);
+      const { fileOps, editor, ui } = setupDetail(["Disable"], {
+        filePath,
+        fileContent: "---\ndescription: test\n---\n\nprompt\n",
+      });
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -277,10 +264,10 @@ describe("createAgentConfigEditor", () => {
 
     it("notifies when agent is already disabled", async () => {
       vi.spyOn(testRegistry, "resolveAgentConfig").mockReturnValue(testCustomConfig);
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue("/project/.pi/agents/test-agent.md");
-      fileOps.read.mockReturnValue("---\nenabled: false\ndescription: test\n---\n");
-      const ui = makeMenuUI(["Disable"]);
+      const { fileOps, editor, ui } = setupDetail(["Disable"], {
+        filePath: "/project/.pi/agents/test-agent.md",
+        fileContent: "---\nenabled: false\ndescription: test\n---\n",
+      });
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -289,10 +276,7 @@ describe("createAgentConfigEditor", () => {
     });
 
     it("creates a disable-only file when no agent file exists", async () => {
-      const { fileOps, editor } = makeEditor();
-      fileOps.findAgentFile.mockReturnValue(undefined);
-      vi.spyOn(testRegistry, "resolveAgentConfig").mockReturnValue(testDefaultConfig);
-      const ui = makeMenuUI(["Disable", "Project (.pi/agents/)"]);
+      const { fileOps, editor, ui } = setupDetail(["Disable", "Project (.pi/agents/)"]);
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -309,11 +293,11 @@ describe("createAgentConfigEditor", () => {
         ...testCustomConfig,
         enabled: false,
       });
-      const { fileOps, editor } = makeEditor();
       const filePath = "/project/.pi/agents/test-agent.md";
-      fileOps.findAgentFile.mockReturnValue(filePath);
-      fileOps.read.mockReturnValue("---\nenabled: false\ndescription: test\n---\n\nprompt\n");
-      const ui = makeMenuUI(["Enable"]);
+      const { fileOps, editor, ui } = setupDetail(["Enable"], {
+        filePath,
+        fileContent: "---\nenabled: false\ndescription: test\n---\n\nprompt\n",
+      });
 
       await editor.showAgentDetail(ui, "test-agent");
 
@@ -329,11 +313,11 @@ describe("createAgentConfigEditor", () => {
         ...testDefaultConfig,
         enabled: false,
       });
-      const { fileOps, editor } = makeEditor();
       const filePath = "/project/.pi/agents/test-agent.md";
-      fileOps.findAgentFile.mockReturnValue(filePath);
-      fileOps.read.mockReturnValue("---\nenabled: false\n---\n");
-      const ui = makeMenuUI(["Enable"]);
+      const { fileOps, editor, ui } = setupDetail(["Enable"], {
+        filePath,
+        fileContent: "---\nenabled: false\n---\n",
+      });
 
       await editor.showAgentDetail(ui, "test-agent");
 
