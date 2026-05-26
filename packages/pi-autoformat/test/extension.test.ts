@@ -1,8 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LoadConfigResult } from "#src/config-loader";

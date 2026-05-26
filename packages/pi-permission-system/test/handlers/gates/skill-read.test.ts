@@ -1,6 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-
-import type { GateDescriptor } from "#src/handlers/gates/descriptor";
 import { describeSkillReadGate } from "#src/handlers/gates/skill-read";
 import type { ToolCallContext } from "#src/handlers/gates/types";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";

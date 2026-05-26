@@ -25,12 +25,6 @@ const APPROVE_OPTION = "Yes";
 const APPROVE_FOR_SESSION_OPTION = "Yes, for this session";
 const DENY_OPTION = "No";
 const DENY_WITH_REASON_OPTION = "No, provide reason";
-const PERMISSION_DECISION_OPTIONS = [
-  APPROVE_OPTION,
-  APPROVE_FOR_SESSION_OPTION,
-  DENY_OPTION,
-  DENY_WITH_REASON_OPTION,
-] as const;
 
 export function normalizePermissionDenialReason(
   value: unknown,

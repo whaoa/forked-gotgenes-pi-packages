@@ -7,7 +7,6 @@ import {
 } from "#src/handlers/before-agent-start";
 import type { PermissionSession } from "#src/permission-session";
 import type { ToolRegistry } from "#src/tool-registry";
-import type { PermissionState } from "#src/types";
 
 // ── SDK stubs ──────────────────────────────────────────────────────────────
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {

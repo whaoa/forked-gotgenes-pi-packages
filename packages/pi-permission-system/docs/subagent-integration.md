@@ -57,7 +57,7 @@ These compose correctly with the permission system because the two operate at di
 
 Process-based subagent extensions (nicobailon, HazAT) spawn child processes but do not set the `PI_SUBAGENT_PARENT_SESSION` env var that the permission system needs for `ask`-state forwarding.
 Without that env var, `ask` permissions in child processes are auto-denied.
-See [docs/guides/permission-frontmatter-for-subagent-extensions.md](docs/guides/permission-frontmatter-for-subagent-extensions.md) for the convention that subagent extension authors should follow.
+See [guides/permission-frontmatter-for-subagent-extensions.md](guides/permission-frontmatter-for-subagent-extensions.md) for the convention that subagent extension authors should follow.
 
 The upstream `tintinweb/pi-subagents` (which `@gotgenes/pi-subagents` forks) does not call `registerSubagentSession()`, so it lacks deterministic child detection and `ask`-state forwarding.
 

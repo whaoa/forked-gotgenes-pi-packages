@@ -264,7 +264,7 @@ describe("piPermissionSystemExtension ready event wiring", () => {
     mkdirSync(join(baseDir, "agents"), { recursive: true });
     writeFileSync(
       globalConfigPath,
-      JSON.stringify({ permission: { "*": "ask" } }) + "\n",
+      `${JSON.stringify({ permission: { "*": "ask" } })}\n`,
       "utf8",
     );
     process.env.PI_CODING_AGENT_DIR = baseDir;

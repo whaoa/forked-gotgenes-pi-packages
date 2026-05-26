@@ -38,7 +38,6 @@ import {
 } from "#src/permission-session";
 import type { SessionLogger } from "#src/session-logger";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
-import type { PermissionCheckResult } from "#src/types";
 
 function makeSkillEntry(
   name: string,

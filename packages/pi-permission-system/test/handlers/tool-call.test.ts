@@ -7,7 +7,7 @@ import {
 } from "#src/handlers/permission-gate-handler";
 import type { PermissionSession } from "#src/permission-session";
 import type { ToolRegistry } from "#src/tool-registry";
-import type { PermissionCheckResult, PermissionState } from "#src/types";
+import type { PermissionCheckResult } from "#src/types";
 
 // ── SDK stubs ──────────────────────────────────────────────────────────────
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {

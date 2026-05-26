@@ -47,6 +47,7 @@ interface InputPayload {
  */
 export class PermissionGateHandler {
   constructor(
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via destructuring (const { session } = this)
     private readonly session: PermissionSession,
     private readonly events: PermissionEventBus,
     private readonly toolRegistry: ToolRegistry,

@@ -10,7 +10,6 @@ import {
   createFormatterConfig,
   DEFAULT_FORMATTER_CONFIG,
   type EventBusMutationChannelConfig,
-  type FormatterOutputOnFailure,
   type FormatterOutputReportingConfig,
   type UserFormatterConfig,
 } from "./formatter-config";
@@ -817,9 +816,15 @@ function validateCustomMutationToolEntry(
   }
 
   seenToolNames.add(toolName);
-  return pathField !== undefined
-    ? { toolName, pathField }
-    : { toolName, pathFields: pathFields! };
+  if (pathField !== undefined) {
+    return { toolName, pathField };
+  }
+  if (pathFields !== undefined) {
+    return { toolName, pathFields };
+  }
+  // Unreachable: the exclusivity check above returns undefined when both or
+  // neither of pathField/pathFields are set.
+  return undefined;
 }
 
 function validateCustomMutationTools(

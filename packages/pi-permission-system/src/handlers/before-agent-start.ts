@@ -41,6 +41,7 @@ export function shouldExposeTool(
  */
 export class AgentPrepHandler {
   constructor(
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via destructuring (const { session } = this)
     private readonly session: PermissionSession,
     private readonly toolRegistry: ToolRegistry,
   ) {}

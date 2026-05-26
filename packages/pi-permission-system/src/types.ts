@@ -14,17 +14,6 @@ export type FlatPermissionConfig = Record<
   PermissionState | Record<string, PermissionState>
 >;
 
-type BuiltInToolName =
-  | "bash"
-  | "read"
-  | "write"
-  | "edit"
-  | "grep"
-  | "find"
-  | "ls";
-
-type SpecialPermissionName = "external_directory";
-
 /**
  * Per-scope permission config shape after loading and validation.
  * Holds only the flat permission map — all policy is expressed there.

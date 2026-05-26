@@ -1,4 +1,4 @@
-import type { FlatPermissionConfig, PermissionState } from "./types";
+import type { FlatPermissionConfig } from "./types";
 
 /**
  * Deep-shallow merge two flat permission configs.

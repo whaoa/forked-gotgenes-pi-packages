@@ -22,6 +22,7 @@ interface ResourcesDiscoverPayload {
  */
 export class SessionLifecycleHandler {
   constructor(
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: accessed via destructuring (const { session } = this)
     private readonly session: PermissionSession,
     private readonly cleanupRpc: () => void,
   ) {}

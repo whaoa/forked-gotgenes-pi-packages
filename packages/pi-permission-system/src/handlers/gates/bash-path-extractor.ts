@@ -48,14 +48,6 @@ function getParser(): Promise<TSParser> {
   return parserPromise;
 }
 
-/**
- * Reset the cached parser promise.  Only used by tests to avoid
- * cross-test pollution or to inject a mock parser.
- */
-function resetParserForTesting(): void {
-  parserPromise = null;
-}
-
 // ── AST walker ─────────────────────────────────────────────────────────────
 
 /**

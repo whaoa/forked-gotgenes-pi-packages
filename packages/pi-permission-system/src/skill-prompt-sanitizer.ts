@@ -92,33 +92,6 @@ function parseSkillEntries(sectionBody: string): ParsedSkillPromptEntry[] {
   return entries;
 }
 
-function parseSkillPromptSection(prompt: string): SkillPromptSection | null {
-  const start = prompt.indexOf(AVAILABLE_SKILLS_OPEN_TAG);
-  if (start === -1) {
-    return null;
-  }
-
-  const closeStart = prompt.indexOf(
-    AVAILABLE_SKILLS_CLOSE_TAG,
-    start + AVAILABLE_SKILLS_OPEN_TAG.length,
-  );
-  if (closeStart === -1) {
-    return null;
-  }
-
-  const end = closeStart + AVAILABLE_SKILLS_CLOSE_TAG.length;
-  const sectionBody = prompt.slice(
-    start + AVAILABLE_SKILLS_OPEN_TAG.length,
-    closeStart,
-  );
-
-  return {
-    start,
-    end,
-    entries: parseSkillEntries(sectionBody),
-  };
-}
-
 export function parseAllSkillPromptSections(
   prompt: string,
 ): SkillPromptSection[] {

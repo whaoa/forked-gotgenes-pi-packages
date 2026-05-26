@@ -101,12 +101,15 @@ describe("describeBashExternalDirectoryGate", () => {
   it("uses config-level checkPermission for the policy state", async () => {
     const checkPermission = vi
       .fn()
-      .mockImplementation((surface: string, input: Record<string, unknown>) => {
-        // Path-specific check returns session for coverage filtering
-        if (input.path) return makeCheckResult("allow", { source: "special" });
-        // Config-level check (no path) returns deny
-        return makeCheckResult("deny");
-      });
+      .mockImplementation(
+        (_surface: string, input: Record<string, unknown>) => {
+          // Path-specific check returns session for coverage filtering
+          if (input.path)
+            return makeCheckResult("allow", { source: "special" });
+          // Config-level check (no path) returns deny
+          return makeCheckResult("deny");
+        },
+      );
     const result = await describeBashExternalDirectoryGate(
       makeTcc(),
       checkPermission,
@@ -172,12 +175,14 @@ describe("describeBashExternalDirectoryGate", () => {
   it("only includes uncovered paths when some are session-covered", async () => {
     const checkPermission = vi
       .fn()
-      .mockImplementation((surface: string, input: Record<string, unknown>) => {
-        if (input.path === "/outside/a.ts") {
-          return makeCheckResult("allow", { source: "session" });
-        }
-        return makeCheckResult("ask");
-      });
+      .mockImplementation(
+        (_surface: string, input: Record<string, unknown>) => {
+          if (input.path === "/outside/a.ts") {
+            return makeCheckResult("allow", { source: "session" });
+          }
+          return makeCheckResult("ask");
+        },
+      );
     const result = await describeBashExternalDirectoryGate(
       makeTcc({ input: { command: "diff /outside/a.ts /outside/b.ts" } }),
       checkPermission,

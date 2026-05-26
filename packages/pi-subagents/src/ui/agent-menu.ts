@@ -72,9 +72,9 @@ export class AgentsMenuHandler {
     private readonly registry: AgentTypeRegistry,
     private readonly agentActivity: AgentActivityReader,
     private readonly settings: AgentMenuSettings,
-    private readonly fileOps: AgentFileOps,
-    private readonly personalAgentsDir: string,
-    private readonly projectAgentsDir: string,
+    fileOps: AgentFileOps,
+    personalAgentsDir: string,
+    projectAgentsDir: string,
   ) {
     this.editor = new AgentConfigEditor(
       fileOps,

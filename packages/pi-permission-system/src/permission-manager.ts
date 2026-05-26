@@ -120,7 +120,7 @@ export class PermissionManager {
           // existing patterns from lower scopes keep their earlier origin.
           if (!origins.has(surface)) origins.set(surface, new Map());
           for (const pattern of Object.keys(value)) {
-            origins.get(surface)!.set(pattern, scopeName);
+            origins.get(surface)?.set(pattern, scopeName);
           }
         } else {
           // Full replacement: this scope takes over the entire surface entry.

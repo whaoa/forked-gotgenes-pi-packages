@@ -7,7 +7,6 @@ import {
 } from "#src/handlers/permission-gate-handler";
 import type { PermissionSession } from "#src/permission-session";
 import type { ToolRegistry } from "#src/tool-registry";
-import type { PermissionState } from "#src/types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 

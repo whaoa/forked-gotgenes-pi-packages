@@ -17,11 +17,6 @@ export type FallbackChainStep = {
 
 export type ChainStep = string | FallbackChainStep;
 
-function isFallbackChainStep(step: ChainStep): step is FallbackChainStep {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive null check despite ChainStep type not including null
-  return typeof step === "object" && step !== null && "fallback" in step;
-}
-
 export type FormatterConfig = {
   formatters: Record<string, FormatterDefinition>;
   chains?: Record<string, ChainStep[]>;

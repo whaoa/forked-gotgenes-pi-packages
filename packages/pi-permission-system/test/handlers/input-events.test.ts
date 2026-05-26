@@ -9,7 +9,6 @@ import type { PermissionDecisionEvent } from "#src/permission-events";
 import { PERMISSIONS_DECISION_CHANNEL } from "#src/permission-events";
 import type { PermissionSession } from "#src/permission-session";
 import type { ToolRegistry } from "#src/tool-registry";
-import type { PermissionState } from "#src/types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
