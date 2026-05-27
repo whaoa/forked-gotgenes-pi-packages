@@ -680,7 +680,7 @@ Removing it simplifies `runAgent`, shrinks `AgentConfig` and `SessionConfig`, an
 | `filterActiveTools` runs twice (pre-bind + post-bind) to catch extension-registered tools | B: Complexity | 3      | 1    | 6        |
 | `ToolFilterConfig` exists solely to carry filtering state through the runner              | C: Accidental | 2      | 1    | 4        |
 
-### Step 1: Remove `disallowed_tools` — [#237]
+### Step 1: Remove `disallowed_tools` — [#237] ✅ Complete
 
 Remove the `disallowedTools` field from `AgentConfig` and all code that processes it.
 
