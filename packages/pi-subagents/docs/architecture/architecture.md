@@ -453,7 +453,7 @@ The target state eliminates this overlap and flips the dependency direction.
 
 ### Responsibilities to remove
 
-- **Tool policy** (`disallowed_tools`, `ToolFilterConfig.disallowedSet`) — access control belongs in pi-permission-system's `permission:` frontmatter.
+- **Tool policy** (`disallowed_tools`) — access control belongs in pi-permission-system's `permission:` frontmatter.
 - **Extension filtering** (`extensions: string[]` allowlist) — tool visibility is pi-permission-system's job.
 - **Permission bridge** (`permission-bridge.ts`) — outbound coupling to pi-permission-system.
   Replaced by lifecycle events that pi-permission-system listens for.
@@ -496,7 +496,7 @@ Bags with 10+ fields are the highest priority for decomposition.
 | `ResolvedSpawnConfig`       | 3 nested                                               | foreground-runner, background-spawner, agent-tool | ✓ done    |
 | `AgentSpawnConfig`          | 13 → 13 (ParentSessionInfo nested)                     | agent-manager (internal)                          | ✓ done    |
 | `RunOptions`                | 9 (`RunContext` nested)                                | agent-runner                                      | ✓ done    |
-| `SessionConfig`             | 8 (ToolFilterConfig nested)                            | agent-runner (output of assembler)                | ✓ done    |
+| `SessionConfig`             | 8 (flat fields, ToolFilterConfig removed)              | agent-runner (output of assembler)                | ✓ done    |
 | `NotificationDetails`       | 10                                                     | notification                                      | Low (DTO) |
 | `ResourceLoaderOptions`     | 10                                                     | agent-runner (SDK bridge)                         | Low (SDK) |
 | `RunnerIO`                  | split → `EnvironmentIO` (3) + `SessionFactoryIO` (5+1) | agent-runner                                      | ✓ done    |
@@ -677,8 +677,8 @@ Removing it simplifies `runAgent`, shrinks `AgentConfig` and `SessionConfig`, an
 | ----------------------------------------------------------------------------------------- | ------------- | ------ | ---- | -------- |
 | `disallowed_tools` duplicates pi-permission-system's `permission:` frontmatter            | A: Overlap    | 4      | 2    | 12       |
 | `extensions: string[]` allowlist is tool filtering disguised as lifecycle control         | A: Overlap    | 3      | 2    | 9        |
-| `filterActiveTools` runs twice (pre-bind + post-bind) to catch extension-registered tools | B: Complexity | 3      | 1    | 6        |
-| `ToolFilterConfig` exists solely to carry filtering state through the runner              | C: Accidental | 2      | 1    | 4        |
+| `filterActiveTools` ran twice (pre-bind + post-bind) to catch extension-registered tools  | B: Complexity | 3      | 1    | ✓ done   |
+| `ToolFilterConfig` existed solely to carry filtering state through the runner             | C: Accidental | 2      | 1    | ✓ done   |
 | `Agent` tool name is PascalCase — misaligns with Pi's lowercase built-in convention       | D: Convention | 2      | 1    | 3        |
 
 ### Step 1: Remove `disallowed_tools` — [#237] ✅ Complete
@@ -713,17 +713,17 @@ The `extensions: false` case (used by `isolated`) is retained in this step and r
 - Smell: A (tool filtering disguised as extension lifecycle control)
 - Outcome: `filterActiveTools` reduces to two concerns: recursion guard and `extensions: false` passthrough
 
-### Step 3: Collapse `filterActiveTools` to recursion guard — [#239]
+### Step 3: Collapse `filterActiveTools` to recursion guard — [#239] ✅ Complete
 
-With Steps 1–2 complete, `filterActiveTools` has only two remaining branches: the `EXCLUDED_TOOL_NAMES` recursion guard and the `extensions === false` passthrough.
-Inline the `extensions === false` passthrough into the callsite and reduce the function to its essential purpose.
+With Steps 1–2 complete, `filterActiveTools` had only two remaining branches: the `EXCLUDED_TOOL_NAMES` recursion guard and the `extensions === false` passthrough.
+Inlined the `extensions === false` passthrough into the callsite and reduced the function to its essential purpose.
 
-1. Simplify `filterActiveTools` to filter only `EXCLUDED_TOOL_NAMES`.
-2. Remove `ToolFilterConfig` — the function no longer needs a config bag.
-3. Remove the pre-bind filter call — extension tools aren't in the active set yet, so filtering built-in tools pre-bind is only needed for denylist/allowlist logic that no longer exists.
-4. Keep a single post-bind filter call for the recursion guard.
-5. Simplify `SessionConfig` — remove the `toolFilter` field, keep `toolNames` as a flat field.
-6. Update tests.
+1. Simplified `filterActiveTools` to filter only `EXCLUDED_TOOL_NAMES`.
+2. Removed `ToolFilterConfig` — the function no longer needs a config bag.
+3. Removed the pre-bind filter call — extension tools aren't in the active set pre-bind, so the guard is a no-op there.
+4. Kept a single post-bind filter call for the recursion guard.
+5. Flattened `SessionConfig` — removed `toolFilter: ToolFilterConfig`; `toolNames` and `extensions` are top-level fields.
+6. Updated tests.
 
 - Target: `agent-runner.ts`, `session-config.ts`
 - Smell: B (accidental complexity), C (two-pass filter dance)
