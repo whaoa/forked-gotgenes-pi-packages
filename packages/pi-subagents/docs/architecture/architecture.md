@@ -55,7 +55,7 @@ flowchart TB
         direction TB
         AgentManager["AgentManager<br/>(spawn, queue, abort)"]
         AgentRunner["agent-runner<br/>(session, turns, results)"]
-        AgentRecord["Agent<br/>(status, behavior: abort/steer/worktree)"]
+        Agent["Agent<br/>(status, behavior: abort/steer/worktree/run lifecycle)"]
         ParentSnapshot["ParentSnapshot<br/>(frozen parent state)"]
         Worktree["worktree<br/>(git isolation)"]
     end
@@ -101,7 +101,7 @@ flowchart TB
 
 ```mermaid
 classDiagram
-    class AgentRecord {
+    class Agent {
         +id: string
         +type: SubagentType
         +description: string
@@ -124,6 +124,12 @@ classDiagram
         +queueSteer(message)
         +flushPendingSteers(session)
         +setupWorktree(worktrees, isolation)
+        +completeRun(result, worktrees)
+        +failRun(err, worktrees)
+        +wireSignal(signal, onAbort)
+        +attachObserver(unsub)
+        +releaseListeners()
+        +setOnRunFinished(fn)
     }
 
     class AgentManager {
@@ -160,7 +166,7 @@ classDiagram
         +hasRunning(): boolean
     }
 
-    AgentManager --> AgentRecord : creates/manages
+    AgentManager --> Agent : creates/manages
     AgentManager --> ParentSnapshot : receives at spawn
     SubagentsService --> AgentManager : wraps via adapter
     AgentManager --> AgentTypeRegistry : resolves types
@@ -266,7 +272,6 @@ src/
 │   ├── parent-snapshot.ts          immutable spawn-time parent state
 │   ├── execution-state.ts          session/output phase state
 │   ├── permission-bridge.ts        optional bridge to pi-permission-system registry
-│   ├── run-handle.ts               per-run cleanup lifecycle
 │   ├── worktree.ts                 git worktree isolation
 │   ├── worktree-state.ts           worktree phase state
 │   └── usage.ts                    token usage tracking
@@ -684,21 +689,22 @@ See [phase-14-strip-policy.md](history/phase-14-strip-policy.md) for details.
 Phase 15 addresses the anemic domain model in the lifecycle layer.
 `AgentRecord` is a data bag — identity, status transitions, and stats — but no behavior.
 `AgentManager` reaches into records 37 times, doing work that belongs on the agent.
-Per-agent state (pending steers, abort logic, run lifecycle) is scattered across the manager, `RunHandle`, and a manager-level Map.
+Per-agent state (pending steers, abort logic, run lifecycle) was scattered across the manager, `RunHandle`, and a manager-level Map.
+`RunHandle` has been dissolved into `Agent` methods — see Step 2.
 
 The scheduling concern (queue, concurrency counter, drain) is tangled into `AgentManager` alongside collection management and run orchestration.
 `notifyConcurrencyChanged()` is a scheduling method exposed as a public API so settings can poke the queue — a cross-concern leak.
 
 ### Findings summary
 
-| Finding                                                       | Category     | Impact | Risk | Priority |
-| ------------------------------------------------------------- | ------------ | ------ | ---- | -------- |
-| `AgentRecord` is anemic — no behavior, manager reaches in 37× | B: Oversized | 5      | 3    | 15       |
-| Scheduling tangled into `AgentManager` (3 fields, 3 methods)  | A: Coupling  | 4      | 2    | 12       |
-| `startAgent` uses `.then()`/`.catch()` instead of async/await | C: Callbacks | 3      | 2    | 10       |
-| `onSessionCreated` callback flows through 3 layers            | C: Callbacks | 3      | 2    | 10       |
-| `resume()` duplicates observer subscribe/unsubscribe pattern  | A: Redundant | 2      | 1    | 8        |
-| `exec`/`registry` relay-only deps on `AgentManager`           | C: Coupling  | 2      | 1    | 6        |
+| Finding                                                           | Category     | Impact | Risk | Priority |
+| ----------------------------------------------------------------- | ------------ | ------ | ---- | -------- |
+| `AgentRecord` is anemic — no behavior, manager reaches in 37×     | B: Oversized | 5      | 3    | 15       |
+| Scheduling tangled into `AgentManager` (3 fields, 3 methods)      | A: Coupling  | 4      | 2    | 12       |
+| ~~`startAgent` uses `.then()`/`.catch()` instead of async/await~~ | C: Callbacks | 3      | 2    | ✅       |
+| `onSessionCreated` callback flows through 3 layers                | C: Callbacks | 3      | 2    | 10       |
+| `resume()` duplicates observer subscribe/unsubscribe pattern      | A: Redundant | 2      | 1    | 8        |
+| `exec`/`registry` relay-only deps on `AgentManager`               | C: Coupling  | 2      | 1    | 6        |
 
 ### Step 1: Evolve AgentRecord into Agent with behavior — [#227] ✅ Complete
 
@@ -713,15 +719,17 @@ Move per-agent behavior from `AgentManager` into the agent:
 - Smell: B (anemic domain model) + C (manager reaching into records)
 - Outcome: `AgentManager` delegates via Tell-Don't-Ask; per-agent state lives on the agent
 
-### Step 2: Convert startAgent to async/await — [#228]
+### Step 2: Convert startAgent to async/await — [#228] ✅ Complete
 
-Convert `startAgent` from synchronous (returns void, assigns `record.promise` to a `.then()`/`.catch()` chain) to `async` (returns `Promise<void>`, uses try/catch).
+Converted `startAgent` to `async` with `try/catch` and dissolved `RunHandle` into `Agent` methods.
 `spawn()` assigns `record.promise = this.startAgent(...)` instead of calling `startAgent()` synchronously.
+`Agent` gained run lifecycle methods: `completeRun`, `failRun`, `wireSignal`, `attachObserver`, `releaseListeners`, `setOnRunFinished`.
+Worktree setup was hoisted to callers (`spawn`, `drainQueue`) to preserve the synchronous-throw contract.
 
 - Depends on: #227
-- Target: `src/lifecycle/agent-manager.ts`
+- Target: `src/lifecycle/agent-manager.ts`, `src/lifecycle/agent.ts`
 - Smell: C (raw promise callbacks)
-- Outcome: zero `.then()`/`.catch()` in `agent-manager.ts`
+- Outcome: zero `.then()`/`.catch()` in `agent-manager.ts`; `RunHandle` deleted; Agent owns run lifecycle
 
 ### Step 3: Replace onSessionCreated callback with observer method — [#229]
 
@@ -751,10 +759,10 @@ Move them to `ConcreteAgentRunner` construction.
 - Smell: C (relay-only dependencies)
 - Outcome: `AgentManager` loses 2 fields; `AgentManagerOptions` shrinks from 7 to 5 fields
 
-### Step 6: Unify resume() with RunHandle pattern — [#232]
+### Step 6: Unify resume() with Agent run lifecycle methods — [#232]
 
-After #227 moves `RunHandle` ownership to the `Agent`, `resume()` on `AgentManager` becomes a 4-line delegation to `agent.resume(runner, prompt, signal)`.
-The agent manages its own observer subscription lifecycle.
+After #228 dissolved `RunHandle` into Agent methods (`completeRun`, `failRun`, `releaseListeners`), `resume()` on `AgentManager` becomes a short delegation to `agent.resume(runner, prompt, signal)`.
+The agent manages its own observer subscription lifecycle using the same methods that `startAgent` uses.
 
 - Depends on: #227, #228
 - Target: `src/lifecycle/agent-manager.ts`
