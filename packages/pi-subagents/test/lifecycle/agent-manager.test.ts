@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AgentTypeRegistry } from "#src/config/agent-types";
 import { AgentManager, type AgentManagerObserver } from "#src/lifecycle/agent-manager";
 import type { AgentRunner } from "#src/lifecycle/agent-runner";
 import type { WorktreeManager } from "#src/lifecycle/worktree";
@@ -9,11 +8,6 @@ import type { Agent } from "#src/types";
 import { createBlockingRunner, createMockWorktrees, createRunResult, createSessionRunner } from "#test/helpers/manager-stubs";
 import { createMockSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
-
-/** Minimal registry with no user agents — sufficient since AgentManager only relays it to the runner. */
-const testRegistry = new AgentTypeRegistry(() => new Map());
-
-
 
 /** Test helper: construct an AgentManager with injected stubs. */
 function createManager(overrides?: {
@@ -48,8 +42,6 @@ function createManager(overrides?: {
   const manager = new AgentManager({
     runner,
     worktrees,
-    exec: vi.fn(),
-    registry: testRegistry,
     observer,
     getMaxConcurrent: overrides?.getMaxConcurrent,
     getRunConfig: overrides?.getRunConfig,
@@ -376,8 +368,6 @@ describe("AgentManager — getRunConfig threads defaultMaxTurns and graceTurns i
     const runOpts = vi.mocked(runner.run).mock.calls[0][3];
     expect(runOpts.defaultMaxTurns).toBe(10);
     expect(runOpts.graceTurns).toBe(3);
-    expect(runOpts.context.exec).toBeDefined();
-    expect(runOpts.context.registry).toBeDefined();
   });
 
   it("omits defaultMaxTurns and graceTurns from runAgent when no getRunConfig is provided", async () => {
@@ -391,8 +381,6 @@ describe("AgentManager — getRunConfig threads defaultMaxTurns and graceTurns i
     const runOpts = vi.mocked(runner.run).mock.calls[0][3];
     expect(runOpts.defaultMaxTurns).toBeUndefined();
     expect(runOpts.graceTurns).toBeUndefined();
-    expect(runOpts.context.exec).toBeDefined();
-    expect(runOpts.context.registry).toBeDefined();
   });
 });
 

@@ -129,16 +129,12 @@ export interface RunnerDeps {
 // ── Public interfaces ─────────────────────────────────────────────────────────
 
 /**
- * Parent execution context - where/who is running.
+ * Per-call execution context — fields that vary per spawn.
  *
- * Groups the four fields that describe the parent environment and identity,
- * separating them from the per-call execution parameters in RunOptions.
+ * Static dependencies (exec, registry) live on RunnerDeps; this interface
+ * carries only the two per-call fields that AgentManager supplies at spawn time.
  */
 export interface RunContext {
-  /** Shell-exec callback for detectEnv - injected from pi.exec(). */
-  exec: ShellExec;
-  /** Agent config lookup - provides resolveAgentConfig and getToolNamesForType. */
-  registry: AgentConfigLookup;
   /** Override working directory (e.g. for worktree isolation). */
   cwd?: string;
   /** Parent session identity (file path + session ID). */

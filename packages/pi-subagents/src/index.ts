@@ -24,7 +24,7 @@ import { AgentTypeRegistry } from "#src/config/agent-types";
 import { loadCustomAgents } from "#src/config/custom-agents";
 import { SessionLifecycleHandler, ToolStartHandler } from "#src/handlers/index";
 import { AgentManager, type AgentManagerObserver } from "#src/lifecycle/agent-manager";
-import { ConcreteAgentRunner, type RunnerIO } from "#src/lifecycle/agent-runner";
+import { ConcreteAgentRunner, type RunnerDeps } from "#src/lifecycle/agent-runner";
 import { buildParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { GitWorktreeManager } from "#src/lifecycle/worktree";
 import { buildEventData, type NotificationDetails, NotificationManager } from "#src/observation/notification";
@@ -132,25 +132,27 @@ export default function (pi: ExtensionAPI) {
     },
   };
 
-  const runnerIO: RunnerIO = {
-    detectEnv,
-    getAgentDir,
-    createResourceLoader: (opts) => new DefaultResourceLoader(opts),
-    deriveSessionDir: deriveSubagentSessionDir,
-    createSessionManager: (cwd, dir) => SessionManager.create(cwd, dir),
-    createSettingsManager: (cwd, dir) => SdkSettingsManager.create(cwd, dir),
-    createSession: (opts) => createAgentSession(opts as any),
-    assemblerIO: {
-      preloadSkills,
-      buildAgentPrompt,
+  const runnerDeps: RunnerDeps = {
+    io: {
+      detectEnv,
+      getAgentDir,
+      createResourceLoader: (opts) => new DefaultResourceLoader(opts),
+      deriveSessionDir: deriveSubagentSessionDir,
+      createSessionManager: (cwd, dir) => SessionManager.create(cwd, dir),
+      createSettingsManager: (cwd, dir) => SdkSettingsManager.create(cwd, dir),
+      createSession: (opts) => createAgentSession(opts as any),
+      assemblerIO: {
+        preloadSkills,
+        buildAgentPrompt,
+      },
     },
+    exec: (cmd, args, opts) => pi.exec(cmd, args, opts),
+    registry,
   };
 
   const manager = new AgentManager({
-    runner: new ConcreteAgentRunner(runnerIO),
+    runner: new ConcreteAgentRunner(runnerDeps),
     worktrees: new GitWorktreeManager(process.cwd()),
-    exec: (cmd, args, opts) => pi.exec(cmd, args, opts),
-    registry,
     observer,
     getMaxConcurrent: () => settings.maxConcurrent,
     getRunConfig: () => settings,

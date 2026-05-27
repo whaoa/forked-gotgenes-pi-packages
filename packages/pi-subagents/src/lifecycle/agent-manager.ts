@@ -9,7 +9,6 @@
 import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { AgentTypeRegistry } from "#src/config/agent-types";
 import { debugLog } from "#src/debug";
 import { Agent } from "#src/lifecycle/agent";
 import type { AgentRunner } from "#src/lifecycle/agent-runner";
@@ -19,7 +18,7 @@ import type { WorktreeManager } from "#src/lifecycle/worktree";
 import { NotificationState } from "#src/observation/notification-state";
 import { subscribeAgentObserver } from "#src/observation/record-observer";
 import type { RunConfig } from "#src/runtime";
-import type { AgentInvocation, IsolationMode, ShellExec, SubagentType, ThinkingLevel } from "#src/types";
+import type { AgentInvocation, IsolationMode, SubagentType, ThinkingLevel } from "#src/types";
 
 export type CompactionInfo = { reason: "manual" | "threshold" | "overflow"; tokensBefore: number };
 
@@ -38,8 +37,6 @@ const DEFAULT_MAX_CONCURRENT = 4;
 export interface AgentManagerOptions {
   runner: AgentRunner;
   worktrees: WorktreeManager;
-  exec: ShellExec;
-  registry: AgentTypeRegistry;
   /** Injected getter for the concurrency limit - owned by SettingsManager. */
   getMaxConcurrent?: () => number;
   getRunConfig?: () => RunConfig;
@@ -94,8 +91,6 @@ export class AgentManager {
   private readonly observer?: AgentManagerObserver;
   private readonly runner: AgentRunner;
   private readonly worktrees: WorktreeManager;
-  private readonly exec: ShellExec;
-  private readonly registry: AgentTypeRegistry;
   private readonly _getMaxConcurrent: () => number;
   private getRunConfig?: () => RunConfig;
 
@@ -106,8 +101,6 @@ export class AgentManager {
   constructor(options: AgentManagerOptions) {
     this.runner = options.runner;
     this.worktrees = options.worktrees;
-    this.exec = options.exec;
-    this.registry = options.registry;
     this.observer = options.observer;
     this.getRunConfig = options.getRunConfig;
     this._getMaxConcurrent = options.getMaxConcurrent ?? (() => DEFAULT_MAX_CONCURRENT);
@@ -190,8 +183,6 @@ export class AgentManager {
     try {
       const result = await this.runner.run(snapshot, type, prompt, {
         context: {
-          exec: this.exec,
-          registry: this.registry,
           cwd: record.worktreeState?.path,
           parentSession: options.parentSession,
         },
