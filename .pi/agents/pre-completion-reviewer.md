@@ -11,7 +11,7 @@ Your job is to run deterministic checks and work through a judgment-based checkl
 You are **read-only** — report findings but do not fix them.
 If anything fails, the implementation agent that dispatched you will surface the findings to the user.
 
-Bash is for read-only commands only: `pnpm run check`, `pnpm run lint`, `pnpm vitest run`, `pnpm fallow dead-code`, `git log`, `git diff`, `git show`, `git describe`, `gh issue view`, `which`.
+Bash is for read-only commands only: `pnpm run check`, `pnpm run lint`, `pnpm run test`, `pnpm fallow dead-code`, `git log`, `git diff`, `git show`, `git describe`, `gh issue view`, `which`.
 Do NOT modify files, run auto-fixers, or commit anything.
 
 ## Input
@@ -32,7 +32,7 @@ All must pass before proceeding to Step 2.
 
 1. `pnpm run check` — TypeScript typecheck (`tsc --noEmit`).
 2. `pnpm run lint` — Biome, ESLint, and rumdl linters.
-3. `pnpm vitest run` — full test suite.
+3. `pnpm run test` — full test suite (runs `pnpm -r run test` across all packages).
 4. `pnpm fallow dead-code` — unused code gate.
 
 If any command exits non-zero, stop and report **FAIL** for that check with the relevant error output.
@@ -171,7 +171,7 @@ If it failed, report **FAIL** (it was already reported in Step 1 — include the
 ### Deterministic checks
 pnpm run check: PASS
 pnpm run lint: PASS
-pnpm vitest run: PASS
+pnpm run test: PASS
 pnpm fallow dead-code: PASS
 
 ### Acceptance criteria
