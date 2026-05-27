@@ -11,13 +11,13 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { AgentTypeRegistry } from "#src/config/agent-types";
 import { debugLog } from "#src/debug";
-import { AgentRecord } from "#src/lifecycle/agent-record";
+import { Agent } from "#src/lifecycle/agent";
 import type { AgentRunner, RunResult } from "#src/lifecycle/agent-runner";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { WorktreeManager } from "#src/lifecycle/worktree";
 
 import { NotificationState } from "#src/observation/notification-state";
-import { subscribeRecordObserver } from "#src/observation/record-observer";
+import { subscribeAgentObserver } from "#src/observation/record-observer";
 import type { RunConfig } from "#src/runtime";
 import type { AgentInvocation, IsolationMode, ShellExec, SubagentType, ThinkingLevel } from "#src/types";
 
@@ -35,7 +35,7 @@ class RunHandle {
   private onFinished?: () => void;
 
   constructor(
-    private readonly record: AgentRecord,
+    private readonly record: Agent,
     private readonly worktrees: WorktreeManager,
     onFinished?: () => void,
   ) {
@@ -114,11 +114,11 @@ export type CompactionInfo = { reason: "manual" | "threshold" | "overflow"; toke
 
 /** Observer interface for agent lifecycle notifications. */
 export interface AgentManagerObserver {
-  onAgentStarted(record: AgentRecord): void;
-  onAgentCompleted(record: AgentRecord): void;
-  onAgentCompacted(record: AgentRecord, info: CompactionInfo): void;
+  onAgentStarted(record: Agent): void;
+  onAgentCompleted(record: Agent): void;
+  onAgentCompacted(record: Agent, info: CompactionInfo): void;
   /** Fires synchronously after a background agent record is created (before startAgent). */
-  onAgentCreated(record: AgentRecord): void;
+  onAgentCreated(record: Agent): void;
 }
 
 /** Default max concurrent background agents. */
@@ -172,13 +172,13 @@ export interface AgentSpawnConfig {
   /** Parent abort signal - when aborted, the subagent is also stopped. */
   signal?: AbortSignal;
   /** Called when the agent session is created - receives the session and the agent's record. */
-  onSessionCreated?: (session: AgentSession, record: AgentRecord) => void;
+  onSessionCreated?: (session: AgentSession, record: Agent) => void;
   /** Parent session identity - grouped fields that travel together from the tool boundary. */
   parentSession?: ParentSessionInfo;
 }
 
 export class AgentManager {
-  private agents = new Map<string, AgentRecord>();
+  private agents = new Map<string, Agent>();
   private cleanupInterval: ReturnType<typeof setInterval>;
   private readonly observer?: AgentManagerObserver;
   private readonly runner: AgentRunner;
@@ -225,7 +225,7 @@ export class AgentManager {
   ): string {
     const id = randomUUID().slice(0, 17);
     const abortController = new AbortController();
-    const record = new AgentRecord({
+    const record = new Agent({
       id,
       type,
       description: options.description,
@@ -264,7 +264,7 @@ export class AgentManager {
   }
 
   /** Actually start an agent (called immediately or from queue drain). */
-  private startAgent(id: string, record: AgentRecord, { snapshot, type, prompt, options }: SpawnArgs) {
+  private startAgent(id: string, record: Agent, { snapshot, type, prompt, options }: SpawnArgs) {
     const worktreeCwd = record.setupWorktree(this.worktrees, options.isolation);
 
     record.markRunning(Date.now());
@@ -299,7 +299,7 @@ export class AgentManager {
         const outputFile = session.sessionManager?.getSessionFile?.() ?? undefined;
         record.execution = { session, outputFile };
         record.flushPendingSteers(session);
-        handle.attachObserver(subscribeRecordObserver(session, record, {
+        handle.attachObserver(subscribeAgentObserver(session, record, {
           onCompact: (r, info) => this.observer?.onAgentCompacted(r, info),
         }));
         options.onSessionCreated?.(session, record);
@@ -310,7 +310,7 @@ export class AgentManager {
   }
 
   /** Decrement background counter, notify observer (crash-safe), and drain the queue. */
-  private finalizeBackgroundRun(record: AgentRecord): void {
+  private finalizeBackgroundRun(record: Agent): void {
     this.runningBackground--;
     try { this.observer?.onAgentCompleted(record); } catch (err) { debugLog("onAgentCompleted observer", err); }
     this.drainQueue();
@@ -342,7 +342,7 @@ export class AgentManager {
     type: SubagentType,
     prompt: string,
     options: Omit<AgentSpawnConfig, "isBackground">,
-  ): Promise<AgentRecord> {
+  ): Promise<Agent> {
     const id = this.spawn(snapshot, type, prompt, { ...options, isBackground: false });
     const record = this.agents.get(id)!;
     await record.promise;
@@ -356,14 +356,14 @@ export class AgentManager {
     id: string,
     prompt: string,
     signal?: AbortSignal,
-  ): Promise<AgentRecord | undefined> {
+  ): Promise<Agent | undefined> {
     const record = this.agents.get(id);
     const session = record?.session;
     if (!session) return undefined;
 
     record.resetForResume(Date.now());
 
-    const unsubResume = subscribeRecordObserver(session, record, {
+    const unsubResume = subscribeAgentObserver(session, record, {
       onCompact: (r, info) => this.observer?.onAgentCompacted(r, info),
     });
 
@@ -381,11 +381,11 @@ export class AgentManager {
     return record;
   }
 
-  getRecord(id: string): AgentRecord | undefined {
+  getRecord(id: string): Agent | undefined {
     return this.agents.get(id);
   }
 
-  listAgents(): AgentRecord[] {
+  listAgents(): Agent[] {
     return [...this.agents.values()].sort(
       (a, b) => b.startedAt - a.startedAt,
     );
@@ -406,7 +406,7 @@ export class AgentManager {
   }
 
   /** Dispose a record's session and remove it from the map. */
-  private removeRecord(id: string, record: AgentRecord): void {
+  private removeRecord(id: string, record: Agent): void {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- dispose may not exist on all session implementations
     record.session?.dispose?.();
     this.agents.delete(id);

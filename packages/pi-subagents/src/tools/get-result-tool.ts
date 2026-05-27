@@ -4,13 +4,13 @@ import type { AgentConfigLookup } from "#src/config/agent-types";
 import { getAgentConversation } from "#src/lifecycle/agent-runner";
 import { getSessionContextPercent } from "#src/lifecycle/usage";
 import { formatLifetimeTokens, textResult } from "#src/tools/helpers";
-import type { AgentRecord } from "#src/types";
+import type { Agent } from "#src/types";
 import { formatDuration, getDisplayName } from "#src/ui/display";
 
 // ---- Deps interfaces ----
 
 export interface GetResultToolManager {
-	getRecord(id: string): AgentRecord | undefined;
+	getRecord(id: string): Agent | undefined;
 }
 
 export interface GetResultToolNotifications {

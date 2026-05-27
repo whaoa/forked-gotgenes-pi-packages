@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { SteerTool, type SteerToolEvents, type SteerToolManager } from "#src/tools/steer-tool";
-import type { AgentRecord } from "#src/types";
-import { createTestRecord } from "#test/helpers/make-record";
+import type { Agent } from "#src/types";
+import { createTestAgent } from "#test/helpers/make-agent";
 import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
 import { STUB_CTX } from "#test/helpers/stub-ctx";
 
-function makeManager(records: Map<string, AgentRecord> = new Map()): SteerToolManager {
+function makeManager(records: Map<string, Agent> = new Map()): SteerToolManager {
 	return {
 		getRecord: (id: string) => records.get(id),
 	};
@@ -43,7 +43,7 @@ describe("SteerTool", () => {
 	});
 
 	it("rejects steering a non-running agent", async () => {
-		const records = new Map([["agent-1", createTestRecord({ status: "completed" })]]);
+		const records = new Map([["agent-1", createTestAgent({ status: "completed" })]]);
 		const result = await execute(makeManager(records), makeEvents(), { agent_id: "agent-1", message: "hi" });
 		expect(result.content[0].text).toContain("not running");
 		expect(result.content[0].text).toContain("completed");
@@ -51,7 +51,7 @@ describe("SteerTool", () => {
 
 	it("queues steer when session is not ready", async () => {
 		// No execution state set — session not yet created
-		const record = createTestRecord({ status: "running" });
+		const record = createTestAgent({ status: "running" });
 		const records = new Map([["agent-1", record]]);
 		const manager = makeManager(records);
 		const events = makeEvents();
@@ -65,7 +65,7 @@ describe("SteerTool", () => {
 	});
 
 	it("sends steer and emits event on success", async () => {
-		const record = createTestRecord({ status: "running" });
+		const record = createTestAgent({ status: "running" });
 		const mockSession = createMockSession();
 		record.execution = { session: toAgentSession(mockSession), outputFile: undefined };
 		const records = new Map([["agent-1", record]]);
@@ -82,7 +82,7 @@ describe("SteerTool", () => {
 	});
 
 	it("returns error message when steer fails", async () => {
-		const record = createTestRecord({ status: "running" });
+		const record = createTestAgent({ status: "running" });
 		const mockSession = createMockSession();
 		mockSession.steer.mockRejectedValue(new Error("session closed"));
 		record.execution = { session: toAgentSession(mockSession), outputFile: undefined };

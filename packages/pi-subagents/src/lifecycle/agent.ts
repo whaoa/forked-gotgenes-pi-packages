@@ -1,5 +1,5 @@
 /**
- * agent-record.ts — AgentRecord class with encapsulated status-transition logic.
+ * agent.ts — Agent class with encapsulated status-transition logic and per-agent behavior.
  *
  * Status transitions (status, result, error, startedAt, completedAt) are owned
  * by the class and exposed via transition methods. External code reads these
@@ -8,8 +8,8 @@
  * Stats (toolUses, lifetimeUsage, compactionCount) are owned by the class and
  * accumulated via mutation methods (incrementToolUses, addUsage, incrementCompactions).
  *
- * Behavior (abort, steer buffering, worktree setup) lives on the record rather
- * than on AgentManager — each agent manages its own lifecycle concerns.
+ * Behavior (abort, steer buffering, worktree setup) lives on the agent
+ * rather than on AgentManager — each agent manages its own lifecycle concerns.
  *
  * Phase-specific collaborators (execution, worktreeState, notification) are attached
  * after construction as lifecycle information becomes available.
@@ -24,7 +24,7 @@ import { WorktreeState } from "#src/lifecycle/worktree-state";
 import type { NotificationState } from "#src/observation/notification-state";
 import type { AgentInvocation, IsolationMode, SubagentType } from "#src/types";
 
-export type AgentRecordStatus =
+export type AgentStatus =
 	| "queued"
 	| "running"
 	| "completed"
@@ -33,11 +33,11 @@ export type AgentRecordStatus =
 	| "stopped"
 	| "error";
 
-export interface AgentRecordInit {
+export interface AgentInit {
 	id: string;
 	type: SubagentType;
 	description: string;
-	status?: AgentRecordStatus;
+	status?: AgentStatus;
 	startedAt?: number;
 	completedAt?: number;
 	result?: string;
@@ -47,7 +47,7 @@ export interface AgentRecordInit {
 	promise?: Promise<string>;
 }
 
-export class AgentRecord {
+export class Agent {
 	// Identity — set once at construction
 	readonly id: string;
 	readonly type: SubagentType;
@@ -55,8 +55,8 @@ export class AgentRecord {
 	readonly invocation?: AgentInvocation;
 
 	// Transition state — encapsulated behind getters, mutated only via transition methods
-	private _status: AgentRecordStatus;
-	get status(): AgentRecordStatus { return this._status; }
+	private _status: AgentStatus;
+	get status(): AgentStatus { return this._status; }
 
 	private _result?: string;
 	get result(): string | undefined { return this._result; }
@@ -123,7 +123,7 @@ export class AgentRecord {
 		return this.execution?.outputFile;
 	}
 
-	constructor(init: AgentRecordInit) {
+	constructor(init: AgentInit) {
 		this.id = init.id;
 		this.type = init.type;
 		this.description = init.description;

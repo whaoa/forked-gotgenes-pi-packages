@@ -3,14 +3,14 @@ import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { AgentActivityAccess } from "#src/tools/agent-tool";
 import { textResult } from "#src/tools/helpers";
 import type { ResolvedSpawnConfig } from "#src/tools/spawn-config";
-import type { AgentRecord } from "#src/types";
+import type { Agent } from "#src/types";
 import { AgentActivityTracker } from "#src/ui/agent-activity-tracker";
 import { subscribeUIObserver } from "#src/ui/ui-observer";
 
 /** Narrow manager interface for the background spawner. */
 export interface BackgroundManagerDeps {
   spawn(snapshot: ParentSnapshot, type: string, prompt: string, opts: AgentSpawnConfig): string;
-  getRecord(id: string): AgentRecord | undefined;
+  getRecord(id: string): Agent | undefined;
 }
 
 /** Narrow widget interface for the background spawner. */

@@ -4,7 +4,7 @@ import { AgentTypeRegistry } from "#src/config/agent-types";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { type ModelRegistry, resolveModel } from "#src/session/model-resolver";
 import { getModelLabelFromConfig } from "#src/tools/helpers";
-import type { AgentConfig, AgentRecord } from "#src/types";
+import type { Agent, AgentConfig } from "#src/types";
 import type { AgentActivityTracker } from "#src/ui/agent-activity-tracker";
 import { AgentConfigEditor } from "#src/ui/agent-config-editor";
 import { AgentCreationWizard } from "#src/ui/agent-creation-wizard";
@@ -15,15 +15,15 @@ import { formatDuration, getDisplayName } from "#src/ui/display";
 
 /** Narrow manager interface for menu operations. */
 export interface AgentMenuManager {
-  listAgents: () => AgentRecord[];
-  getRecord: (id: string) => AgentRecord | undefined;
+  listAgents: () => Agent[];
+  getRecord: (id: string) => Agent | undefined;
   /** Used by generate wizard to spawn an agent that writes the .md file. */
   spawnAndWait: (
     parentSnapshot: ParentSnapshot,
     type: string,
     prompt: string,
     opts: { description: string; maxTurns: number },
-  ) => Promise<AgentRecord>;
+  ) => Promise<Agent>;
 }
 
 /** Narrow settings interface required by the agent menu. */
@@ -251,7 +251,7 @@ export class AgentsMenuHandler {
     await this.showRunningAgents(ui);
   }
 
-  private async viewAgentConversation(ui: MenuUI, record: AgentRecord): Promise<void> {
+  private async viewAgentConversation(ui: MenuUI, record: Agent): Promise<void> {
     const session = record.session;
     if (!session) {
       ui.notify(

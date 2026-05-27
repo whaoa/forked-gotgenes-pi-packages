@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentTypeRegistry } from "#src/config/agent-types";
 import type { AgentActivityTracker } from "#src/ui/agent-activity-tracker";
 import { ConversationViewer } from "#src/ui/conversation-viewer";
-import { createTestRecord } from "./helpers/make-record";
+import { createTestAgent } from "./helpers/make-agent";
 
 const testRegistry = new AgentTypeRegistry(() => new Map());
 
@@ -55,7 +55,7 @@ function createTestViewer(options: TestViewerOptions = {}): ConversationViewer {
   return new ConversationViewer({
     tui: mockTui(30, width),
     session: mockSession(messages),
-    record: createTestRecord({ status: "running" }),
+    record: createTestAgent({ status: "running" }),
     activity,
     theme: ansiTheme(),
     done: vi.fn(),

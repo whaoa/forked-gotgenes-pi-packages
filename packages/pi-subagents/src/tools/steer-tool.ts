@@ -2,12 +2,12 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { getSessionContextPercent } from "#src/lifecycle/usage";
 import { formatLifetimeTokens, textResult } from "#src/tools/helpers";
-import type { AgentRecord } from "#src/types";
+import type { Agent } from "#src/types";
 
 // ---- Deps interfaces ----
 
 export interface SteerToolManager {
-	getRecord(id: string): AgentRecord | undefined;
+	getRecord(id: string): Agent | undefined;
 }
 
 export interface SteerToolEvents {

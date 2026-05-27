@@ -1,16 +1,16 @@
 /**
- * record-observer.ts — Subscribes to session events and updates AgentRecord stats.
+ * record-observer.ts — Subscribes to session events and updates Agent stats.
  *
  * Replaces the scattered callback-wrapping logic in AgentManager's startAgent()
  * and resume() with a single direct subscription.
  */
 
+import type { Agent } from "#src/lifecycle/agent";
 import type { CompactionInfo } from "#src/lifecycle/agent-manager";
-import type { AgentRecord } from "#src/lifecycle/agent-record";
 import type { SubscribableSession } from "#src/types";
 
-export interface RecordObserverOptions {
-  onCompact?: (record: AgentRecord, info: CompactionInfo) => void;
+export interface AgentObserverOptions {
+  onCompact?: (record: Agent, info: CompactionInfo) => void;
 }
 
 /**
@@ -23,10 +23,10 @@ export interface RecordObserverOptions {
  *
  * @returns An unsubscribe function.
  */
-export function subscribeRecordObserver(
+export function subscribeAgentObserver(
   session: SubscribableSession,
-  record: AgentRecord,
-  options?: RecordObserverOptions,
+  record: Agent,
+  options?: AgentObserverOptions,
 ): () => void {
   return session.subscribe((event) => {
     if (event.type === "tool_execution_end") {

@@ -5,14 +5,14 @@ import { NotificationState } from "#src/observation/notification-state";
 import type { SubagentsService } from "#src/service/service";
 import type { AgentManagerLike, ServiceRuntimeLike } from "#src/service/service-adapter";
 import { SubagentsServiceAdapter, toSubagentRecord } from "#src/service/service-adapter";
-import type { AgentRecord, SessionContext } from "#src/types";
-import { createTestRecord } from "#test/helpers/make-record";
+import type { Agent, SessionContext } from "#src/types";
+import { createTestAgent } from "#test/helpers/make-agent";
 import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
 describe("toSubagentRecord", () => {
   const baseRecord = (() => {
-    const r = createTestRecord({
+    const r = createTestAgent({
       id: "abc-123",
       type: "Explore",
       description: "Check stale TODOs",
@@ -44,26 +44,26 @@ describe("toSubagentRecord", () => {
   });
 
   it("strips execution from the record", () => {
-    const record = createTestRecord();
+    const record = createTestAgent();
     record.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("execution");
   });
 
   it("strips abortController from the record", () => {
-    const record = createTestRecord({ abortController: new AbortController() });
+    const record = createTestAgent({ abortController: new AbortController() });
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("abortController");
   });
 
   it("strips promise from the record", () => {
-    const record = createTestRecord({ promise: Promise.resolve("done") });
+    const record = createTestAgent({ promise: Promise.resolve("done") });
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("promise");
   });
 
   it("strips abortController, promise, and collaborator fields from the record", () => {
-    const record = createTestRecord({ abortController: new AbortController(), promise: Promise.resolve("x") });
+    const record = createTestAgent({ abortController: new AbortController(), promise: Promise.resolve("x") });
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("abortController");
     expect(result).not.toHaveProperty("promise");
@@ -73,7 +73,7 @@ describe("toSubagentRecord", () => {
   });
 
   it("strips invocation and collaborator fields from the serialized output", () => {
-    const record = createTestRecord({ invocation: { modelName: "haiku" } });
+    const record = createTestAgent({ invocation: { modelName: "haiku" } });
     record.notification = new NotificationState("tc-1");
     const result = toSubagentRecord(record);
     expect(result).not.toHaveProperty("notification");
@@ -83,7 +83,7 @@ describe("toSubagentRecord", () => {
   });
 
   it("omits optional fields when undefined on the source", () => {
-    const minimal = createTestRecord({
+    const minimal = createTestAgent({
       id: "min-1",
       description: "test",
       status: "running",
@@ -139,7 +139,7 @@ function makeRuntimeStub(override: Partial<ServiceRuntimeLike> = {}): ServiceRun
 }
 
 describe("SubagentsServiceAdapter — getRecord and listAgents", () => {
-  const recordA = createTestRecord({
+  const recordA = createTestAgent({
     id: "a-1",
     type: "Explore",
     description: "task A",
@@ -147,7 +147,7 @@ describe("SubagentsServiceAdapter — getRecord and listAgents", () => {
     abortController: new AbortController(),
   });
 
-  const recordB = createTestRecord({
+  const recordB = createTestAgent({
     id: "b-2",
     type: "Plan",
     description: "task B",
@@ -159,7 +159,7 @@ describe("SubagentsServiceAdapter — getRecord and listAgents", () => {
     lifetimeUsage: { input: 5, output: 10, cacheWrite: 0 },
   });
 
-  function createMockManager(records: AgentRecord[]) {
+  function createMockManager(records: Agent[]) {
     return {
       spawn: vi.fn(() => "id"),
       getRecord: vi.fn((id: string) => records.find((r) => r.id === id)),
@@ -170,7 +170,7 @@ describe("SubagentsServiceAdapter — getRecord and listAgents", () => {
     };
   }
 
-  function createService(records: AgentRecord[]): SubagentsService {
+  function createService(records: Agent[]): SubagentsService {
     const manager = createMockManager(records);
     return new SubagentsServiceAdapter(
       manager,
@@ -327,7 +327,7 @@ describe("SubagentsServiceAdapter — steer, abort, waitForAll, hasRunning", () 
     return {
       spawn: vi.fn(() => "id"),
       getRecord: vi.fn<AgentManagerLike["getRecord"]>(),
-      listAgents: vi.fn(() => [] as AgentRecord[]),
+      listAgents: vi.fn(() => [] as Agent[]),
       abort: vi.fn<AgentManagerLike["abort"]>(() => true),
       waitForAll: vi.fn(async () => {}),
       hasRunning: vi.fn(() => true),
@@ -379,7 +379,7 @@ describe("SubagentsServiceAdapter — steer, abort, waitForAll, hasRunning", () 
       mgr.getRecord.mockReturnValue({
         id: "a-1",
         status: "completed",
-      } as AgentRecord);
+      } as Agent);
       const svc = createSvc(mgr);
       expect(await svc.steer("a-1", "hurry")).toBe(false);
     });
@@ -392,7 +392,7 @@ describe("SubagentsServiceAdapter — steer, abort, waitForAll, hasRunning", () 
     });
 
     it("queues message and returns true when session not ready", async () => {
-      const record = createTestRecord({ id: "a-1", status: "running" });
+      const record = createTestAgent({ id: "a-1", status: "running" });
       const mgr = createTestManager();
       mgr.getRecord.mockReturnValue(record);
       const svc = createSvc(mgr);
@@ -402,7 +402,7 @@ describe("SubagentsServiceAdapter — steer, abort, waitForAll, hasRunning", () 
 
     it("delegates to session.steer and returns true when session is ready", async () => {
       const mockSteer = vi.fn(async () => {});
-      const record = createTestRecord({ id: "a-1", status: "running" });
+      const record = createTestAgent({ id: "a-1", status: "running" });
       record.execution = { session: toAgentSession(createMockSession({ steer: mockSteer })), outputFile: undefined };
       const mgr = createTestManager();
       mgr.getRecord.mockReturnValue(record);

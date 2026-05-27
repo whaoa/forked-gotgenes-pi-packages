@@ -9,7 +9,7 @@ import {
 } from "#src/observation/notification";
 import { NotificationState } from "#src/observation/notification-state";
 import { AgentActivityTracker } from "#src/ui/agent-activity-tracker";
-import { createTestRecord } from "#test/helpers/make-record";
+import { createTestAgent } from "#test/helpers/make-agent";
 
 // ---- Pure helper tests ----
 
@@ -46,7 +46,7 @@ describe("getStatusLabel", () => {
 });
 
 describe("formatTaskNotification", () => {
-  const baseRecord = createTestRecord();
+  const baseRecord = createTestAgent();
 
   it("produces valid XML structure", () => {
     const xml = formatTaskNotification(baseRecord, 500);
@@ -58,20 +58,20 @@ describe("formatTaskNotification", () => {
 
   it("truncates long results", () => {
     const longResult = "x".repeat(600);
-    const record = createTestRecord({ result: longResult });
+    const record = createTestAgent({ result: longResult });
     const xml = formatTaskNotification(record, 100);
     expect(xml).toContain("truncated");
     expect(xml).not.toContain(longResult);
   });
 
   it("shows No output when result is undefined", () => {
-    const record = createTestRecord({ result: undefined });
+    const record = createTestAgent({ result: undefined });
     const xml = formatTaskNotification(record, 500);
     expect(xml).toContain("No output.");
   });
 
   it("includes toolCallId from record.notification when present", () => {
-    const record = createTestRecord();
+    const record = createTestAgent();
     record.notification = new NotificationState("tc-123");
     const xml = formatTaskNotification(record, 500);
     expect(xml).toContain("<tool-use-id>tc-123</tool-use-id>");
@@ -86,7 +86,7 @@ describe("formatTaskNotification", () => {
 });
 
 describe("buildNotificationDetails", () => {
-  const baseRecord = createTestRecord({
+  const baseRecord = createTestAgent({
     description: "Test",
     result: "Done.",
     toolUses: 2,
@@ -114,7 +114,7 @@ describe("buildNotificationDetails", () => {
   });
 
   it("truncates long result previews with ellipsis", () => {
-    const record = createTestRecord({ description: "Test", result: "x".repeat(600), toolUses: 2, completedAt: 3000, lifetimeUsage: { input: 100, output: 200, cacheWrite: 0 } });
+    const record = createTestAgent({ description: "Test", result: "x".repeat(600), toolUses: 2, completedAt: 3000, lifetimeUsage: { input: 100, output: 200, cacheWrite: 0 } });
     const details = buildNotificationDetails(record, 100);
     expect(details.resultPreview).toHaveLength(101); // 100 chars + "…"
     expect(details.resultPreview.endsWith("…")).toBe(true);
@@ -122,7 +122,7 @@ describe("buildNotificationDetails", () => {
 });
 
 describe("buildEventData", () => {
-  const baseRecord = createTestRecord({
+  const baseRecord = createTestAgent({
     type: "Explore",
     description: "Search files",
     result: "Found 3 files",
@@ -146,7 +146,7 @@ describe("buildEventData", () => {
   });
 
   it("omits tokens when total is zero", () => {
-    const record = createTestRecord({ type: "Explore", description: "Search files", result: "Found 3 files", toolUses: 5, lifetimeUsage: { input: 0, output: 0, cacheWrite: 0 } });
+    const record = createTestAgent({ type: "Explore", description: "Search files", result: "Found 3 files", toolUses: 5, lifetimeUsage: { input: 0, output: 0, cacheWrite: 0 } });
     const data = buildEventData(record);
     expect(data.tokens).toBeUndefined();
   });
@@ -154,7 +154,7 @@ describe("buildEventData", () => {
   it("uses Date.now() fallback when completedAt is undefined", () => {
     vi.useFakeTimers();
     vi.setSystemTime(5000);
-    const record = createTestRecord({ type: "Explore", description: "Search files", result: "Found 3 files", toolUses: 5, lifetimeUsage: { input: 1000, output: 500, cacheWrite: 0 }, completedAt: undefined });
+    const record = createTestAgent({ type: "Explore", description: "Search files", result: "Found 3 files", toolUses: 5, lifetimeUsage: { input: 1000, output: 500, cacheWrite: 0 }, completedAt: undefined });
     const data = buildEventData(record);
     expect(data.durationMs).toBe(4000); // 5000 - 1000
     vi.useRealTimers();
@@ -185,7 +185,7 @@ describe("NotificationManager", () => {
     return new NotificationManager(args.sendMessage, args.agentActivity, args.markFinished, args.updateWidget);
   }
 
-  const baseRecord = createTestRecord({
+  const baseRecord = createTestAgent({
     description: "Test",
     result: "Done.",
     toolUses: 2,
@@ -217,7 +217,7 @@ describe("NotificationManager", () => {
   it("sendCompletion skips nudge when notification.resultConsumed is true", () => {
     const args = makeArgs();
     const system = makeManager(args);
-    const record = createTestRecord();
+    const record = createTestAgent();
     record.notification = new NotificationState("tc-1");
     record.notification.markConsumed();
     system.sendCompletion(record);

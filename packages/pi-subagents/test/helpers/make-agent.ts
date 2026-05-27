@@ -1,15 +1,15 @@
-import { AgentRecord, type AgentRecordInit } from "#src/lifecycle/agent-record";
+import { Agent, type AgentInit } from "#src/lifecycle/agent";
 
-export function createTestRecord(overrides: Partial<AgentRecordInit> & {
+export function createTestAgent(overrides: Partial<AgentInit> & {
 	/** Legacy shorthand: set toolUses via incrementToolUses(). */
 	toolUses?: number;
 	/** Legacy shorthand: set lifetimeUsage via addUsage(). */
 	lifetimeUsage?: { input: number; output: number; cacheWrite: number };
 	/** Legacy shorthand: set compactionCount via incrementCompactions(). */
 	compactionCount?: number;
-} = {}): AgentRecord {
+} = {}): Agent {
 	const { toolUses, lifetimeUsage, compactionCount, ...init } = overrides;
-	const record = new AgentRecord({
+	const record = new Agent({
 		id: "agent-1",
 		type: "general-purpose",
 		description: "Test task",

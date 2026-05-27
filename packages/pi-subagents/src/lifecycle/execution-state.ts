@@ -1,9 +1,9 @@
 /**
  * execution-state.ts — ExecutionState: execution-phase state for a running agent.
  *
- * Constructed and attached to AgentRecord when onSessionCreated fires inside startAgent().
+ * Constructed and attached to Agent when onSessionCreated fires inside startAgent().
  * Contains the session and output file — the two fields that become known once the
- * runner creates the session. promise stays as a separate AgentRecord field because
+ * runner creates the session. promise stays as a separate Agent field because
  * it is set at a different moment (after runner.run() returns).
  */
 

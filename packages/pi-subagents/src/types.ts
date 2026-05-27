@@ -7,7 +7,7 @@ import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { ModelRegistry } from "#src/session/model-resolver";
 
 
-export { AgentRecord } from "#src/lifecycle/agent-record";
+export { Agent, type AgentInit, type AgentStatus } from "#src/lifecycle/agent";
 export type { AgentSessionEvent, ThinkingLevel };
 
 /**

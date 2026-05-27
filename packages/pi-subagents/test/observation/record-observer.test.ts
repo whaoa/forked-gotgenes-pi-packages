@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgentRecord } from "#src/lifecycle/agent-record";
-import { subscribeRecordObserver } from "#src/observation/record-observer";
+import { Agent } from "#src/lifecycle/agent";
+import { subscribeAgentObserver } from "#src/observation/record-observer";
 import { createMockSession } from "#test/helpers/mock-session";
 
-function makeRecord(overrides?: Partial<ConstructorParameters<typeof AgentRecord>[0]>) {
-  return new AgentRecord({
+function makeRecord(overrides?: Partial<ConstructorParameters<typeof Agent>[0]>) {
+  return new Agent({
     id: "test-1",
     type: "general-purpose",
     description: "test",
@@ -13,11 +13,11 @@ function makeRecord(overrides?: Partial<ConstructorParameters<typeof AgentRecord
   });
 }
 
-describe("subscribeRecordObserver", () => {
+describe("subscribeAgentObserver", () => {
   it("increments record.toolUses on tool_execution_end", () => {
     const session = createMockSession();
     const record = makeRecord();
-    subscribeRecordObserver(session, record);
+    subscribeAgentObserver(session, record);
 
     expect(record.toolUses).toBe(0);
     session.emit({ type: "tool_execution_end", toolName: "Read" });
@@ -29,7 +29,7 @@ describe("subscribeRecordObserver", () => {
   it("accumulates lifetimeUsage on message_end with assistant usage", () => {
     const session = createMockSession();
     const record = makeRecord();
-    subscribeRecordObserver(session, record);
+    subscribeAgentObserver(session, record);
 
     session.emit({
       type: "message_end",
@@ -47,7 +47,7 @@ describe("subscribeRecordObserver", () => {
   it("ignores message_end from non-assistant roles", () => {
     const session = createMockSession();
     const record = makeRecord();
-    subscribeRecordObserver(session, record);
+    subscribeAgentObserver(session, record);
 
     session.emit({
       type: "message_end",
@@ -59,7 +59,7 @@ describe("subscribeRecordObserver", () => {
   it("increments compactionCount on compaction_end (not aborted)", () => {
     const session = createMockSession();
     const record = makeRecord();
-    subscribeRecordObserver(session, record);
+    subscribeAgentObserver(session, record);
 
     session.emit({
       type: "compaction_end",
@@ -82,7 +82,7 @@ describe("subscribeRecordObserver", () => {
     const session = createMockSession();
     const record = makeRecord();
     const onCompact = vi.fn();
-    subscribeRecordObserver(session, record, { onCompact });
+    subscribeAgentObserver(session, record, { onCompact });
 
     session.emit({
       type: "compaction_end",
@@ -101,7 +101,7 @@ describe("subscribeRecordObserver", () => {
     const session = createMockSession();
     const record = makeRecord();
     const onCompact = vi.fn();
-    subscribeRecordObserver(session, record, { onCompact });
+    subscribeAgentObserver(session, record, { onCompact });
 
     session.emit({
       type: "compaction_end",
@@ -116,7 +116,7 @@ describe("subscribeRecordObserver", () => {
   it("ignores compaction_end without result", () => {
     const session = createMockSession();
     const record = makeRecord();
-    subscribeRecordObserver(session, record);
+    subscribeAgentObserver(session, record);
 
     session.emit({
       type: "compaction_end",
@@ -129,7 +129,7 @@ describe("subscribeRecordObserver", () => {
   it("returned function unsubscribes from session", () => {
     const session = createMockSession();
     const record = makeRecord();
-    const unsubscribe = subscribeRecordObserver(session, record);
+    const unsubscribe = subscribeAgentObserver(session, record);
 
     session.emit({ type: "tool_execution_end", toolName: "Read" });
     expect(record.toolUses).toBe(1);

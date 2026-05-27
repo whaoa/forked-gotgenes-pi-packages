@@ -5,7 +5,7 @@ import type { AgentRunner } from "#src/lifecycle/agent-runner";
 import type { WorktreeManager } from "#src/lifecycle/worktree";
 import { NotificationState } from "#src/observation/notification-state";
 import type { RunConfig } from "#src/runtime";
-import type { AgentRecord } from "#src/types";
+import type { Agent } from "#src/types";
 import { createBlockingRunner, createMockWorktrees, createRunResult, createSessionRunner } from "#test/helpers/manager-stubs";
 import { createMockSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
@@ -115,7 +115,7 @@ describe("AgentManager — Bug 1 race condition (notification.resultConsumed vs 
   });
 
   it("normal case: onComplete fires with no notification when agent was not spawned via tool", async () => {
-    let completedRecord: AgentRecord | undefined;
+    let completedRecord: Agent | undefined;
     ({ manager } = createManager({ observer: { onAgentCompleted: (r) => {
       completedRecord = r;
     } } }));
@@ -754,7 +754,7 @@ describe("AgentManager — onSessionCreated callback receives record", () => {
 
   it("passes record as second argument to onSessionCreated callback", async () => {
     const session = createMockSession();
-    const received: { record: AgentRecord | undefined } = { record: undefined };
+    const received: { record: Agent | undefined } = { record: undefined };
     const runner = createSessionRunner(session);
     ({ manager } = createManager({ runner }));
 
@@ -773,7 +773,7 @@ describe("AgentManager — onSessionCreated callback receives record", () => {
 
   it("passes record to foreground onSessionCreated callback", async () => {
     const session = createMockSession();
-    const received: { record: AgentRecord | undefined } = { record: undefined };
+    const received: { record: Agent | undefined } = { record: undefined };
     const runner = createSessionRunner(session);
     ({ manager } = createManager({ runner }));
 

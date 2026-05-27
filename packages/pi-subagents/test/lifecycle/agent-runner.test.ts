@@ -150,7 +150,7 @@ describe("agent-runner final output capture", () => {
 // ─── Callback forwarding removed (issue #100) ───────────────────────────────────
 // Usage, compaction, tool-activity, and text-delta callbacks have been removed
 // from RunOptions and ResumeOptions. Record stats are now accumulated by
-// subscribeRecordObserver and UI state by subscribeUIObserver — both subscribe
+// subscribeAgentObserver and UI state by subscribeUIObserver — both subscribe
 // to the session directly. Tests for that wiring live in
 // test/record-observer.test.ts and test/ui/ui-observer.test.ts.
 

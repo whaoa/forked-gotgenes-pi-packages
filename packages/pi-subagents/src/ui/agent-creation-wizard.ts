@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { BUILTIN_TOOL_NAMES } from "#src/config/agent-types";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
-import type { AgentRecord } from "#src/types";
+import type { Agent } from "#src/types";
 import type { AgentFileOps } from "#src/ui/agent-file-ops";
 import { writeAgentFile } from "#src/ui/agent-file-writer";
 import type { MenuUI } from "#src/ui/agent-menu";
@@ -23,7 +23,7 @@ export interface WizardManager {
     type: string,
     prompt: string,
     opts: { description: string; maxTurns: number },
-  ) => Promise<AgentRecord>;
+  ) => Promise<Agent>;
 }
 
 /** Narrow registry interface for reloading after creation. */

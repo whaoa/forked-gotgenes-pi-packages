@@ -85,7 +85,7 @@ describe("usage", () => {
     });
 
     // The accumulator survives compaction because it lives on AgentActivity /
-    // AgentRecord, not on session.state.messages (which compaction replaces).
+    // Agent, not on session.state.messages (which compaction replaces).
     it("stays monotone across simulated compaction when fed via addUsage-style accumulation", () => {
       const usage = { input: 0, output: 0, cacheWrite: 0 };
       const onUsage = (u: { input: number; output: number; cacheWrite: number }) => {

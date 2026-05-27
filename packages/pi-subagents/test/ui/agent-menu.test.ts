@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentTypeRegistry } from "#src/config/agent-types";
 import { AgentsMenuHandler } from "#src/ui/agent-menu";
-import { createTestRecord } from "#test/helpers/make-record";
+import { createTestAgent } from "#test/helpers/make-agent";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 import { createTestAgentConfig, makeFileOps, makeMenuManager, makeMenuUI } from "#test/helpers/ui-stubs";
 
@@ -110,8 +110,8 @@ describe("AgentsMenuHandler", () => {
     const { handler } = makeHandler({
       manager: {
         listAgents: vi.fn().mockReturnValue([
-          createTestRecord({ status: "running" }),
-          createTestRecord({ status: "completed", id: "agent-2" }),
+          createTestAgent({ status: "running" }),
+          createTestAgent({ status: "completed", id: "agent-2" }),
         ]),
         getRecord: vi.fn(),
         spawnAndWait: vi.fn(),

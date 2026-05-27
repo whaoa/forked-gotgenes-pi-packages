@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type ForegroundParams, runForeground } from "#src/tools/foreground-runner";
 import type { ResolvedSpawnConfig } from "#src/tools/spawn-config";
+import { createTestAgent } from "#test/helpers/make-agent";
 import { createToolDeps } from "#test/helpers/make-deps";
-import { createTestRecord } from "#test/helpers/make-record";
 import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
@@ -80,7 +80,7 @@ describe("runForeground", () => {
 			manager: {
 				...createToolDeps().manager,
 				spawnAndWait: vi.fn().mockResolvedValue(
-					createTestRecord({ status: "error", error: "Context window exceeded" }),
+					createTestAgent({ status: "error", error: "Context window exceeded" }),
 				),
 			},
 		});
@@ -125,7 +125,7 @@ describe("runForeground", () => {
 				...createToolDeps().manager,
 				spawnAndWait: vi.fn().mockImplementation(
 					async (_snapshot: any, _type: any, _prompt: any, opts: any) => {
-						const record = createTestRecord({ result: "done" });
+						const record = createTestAgent({ result: "done" });
 						opts.onSessionCreated?.(mockSess, record);
 						return record;
 					},
@@ -145,7 +145,7 @@ describe("runForeground", () => {
 				...createToolDeps().manager,
 				spawnAndWait: vi.fn().mockImplementation(
 					async (_snapshot: any, _type: any, _prompt: any, opts: any) => {
-						const record = createTestRecord({ result: "done" });
+						const record = createTestAgent({ result: "done" });
 						record.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
 						opts.onSessionCreated?.(mockSess, record);
 						return record;
@@ -175,7 +175,7 @@ describe("runForeground", () => {
 		await vi.advanceTimersByTimeAsync(100);
 		expect(onUpdate).toHaveBeenCalled();
 
-		resolve(createTestRecord({ result: "done" }));
+		resolve(createTestAgent({ result: "done" }));
 		await runPromise;
 	});
 

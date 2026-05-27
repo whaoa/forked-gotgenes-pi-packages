@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { type BackgroundParams, spawnBackground } from "#src/tools/background-spawner";
 import type { ResolvedSpawnConfig } from "#src/tools/spawn-config";
 import { AgentActivityTracker } from "#src/ui/agent-activity-tracker";
+import { createTestAgent } from "#test/helpers/make-agent";
 import { createToolDeps } from "#test/helpers/make-deps";
-import { createTestRecord } from "#test/helpers/make-record";
 import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
@@ -113,7 +113,7 @@ describe("spawnBackground", () => {
       manager: {
         ...createToolDeps().manager,
         spawn: vi.fn().mockReturnValue("bg-2"),
-        getRecord: vi.fn().mockReturnValue(createTestRecord({ status: "queued" })),
+        getRecord: vi.fn().mockReturnValue(createTestAgent({ status: "queued" })),
       },
     });
     const result = spawnBackground(deps.manager, deps.runtime, deps.runtime.agentActivity, makeParams({ settings: { maxConcurrent: 4 } }));
@@ -128,7 +128,7 @@ describe("spawnBackground", () => {
   });
 
   it("includes output file path in result when present", () => {
-    const record = createTestRecord({ status: "running" });
+    const record = createTestAgent({ status: "running" });
     record.execution = { session: toAgentSession(createMockSession()), outputFile: "/sessions/bg.jsonl" };
     const deps = createToolDeps({
       manager: {
