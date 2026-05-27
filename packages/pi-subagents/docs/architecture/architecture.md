@@ -697,7 +697,7 @@ Remove the `disallowedTools` field from `AgentConfig` and all code that processe
 - Smell: A (responsibility overlap with pi-permission-system)
 - Outcome: users migrate to `permission:` frontmatter for tool restrictions; single source of truth for access control
 
-### Step 2: Remove `extensions` filtering — [#238]
+### Step 2: Remove `extensions` filtering — [#238] ✅ Complete
 
 Remove the `extensions: string[]` allowlist and simplify the field to a boolean.
 The `extensions: false` case (used by `isolated`) is retained in this step and removed in Phase 16.
