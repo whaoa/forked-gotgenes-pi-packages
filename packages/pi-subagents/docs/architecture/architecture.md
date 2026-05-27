@@ -22,6 +22,9 @@ This document describes the architecture of the pi-subagents fork: a focused, co
    No post-construction field writes from external code — if an object can't be instantiated ready-to-go, the prep work hasn't been done and the right dependencies haven't been identified.
 9. **State owns its mutations** — mutable state lives in a class whose methods enforce valid transitions and invariants.
    Free functions that mutate module-scoped variables, closure-captured bags-of-functions, and external writes to shared interfaces are replaced by classes that encapsulate the state they manage.
+10. **Open for extension, closed for modification** — pi-subagents is a minimal core that publishes events and a service API.
+    Other packages (pi-permission-system, a future UI extension, hypothetical OTel integration) hook into these events to add permissions, rendering, or telemetry.
+    Pi-subagents has zero knowledge of its consumers — dependency arrows point inward, never outward.
 
 ## Domain model
 
@@ -336,8 +339,9 @@ They declare this package as an optional peer dependency and use dynamic import 
 
 - The three tools: `Agent`, `get_subagent_result`, `steer_subagent`.
 - `AgentManager` — spawn, queue, abort, resume, concurrency control.
-- `agent-runner` — session creation, turn loop, tool filtering, extension binding (Patches 2 and 3), permission-system registration.
+- `agent-runner` — session creation, turn loop, extension binding.
 - `permission-bridge` — optional cross-extension bridge to `@gotgenes/pi-permission-system`; registers each child session with `SubagentSessionRegistry` before `bindExtensions()` so the permission system detects in-process children deterministically.
+  Scheduled for removal in Phase 16 — replaced by lifecycle events that consumers listen for.
 - `session-config` — pure configuration assembler (extracted from `agent-runner`).
 - `SubagentRuntime` — session-scoped state bag with methods.
 - `ParentSnapshot` — immutable snapshot of parent session state, captured once at spawn time.
@@ -430,6 +434,41 @@ The core emits events on `pi.events` that any extension can observe:
 | `subagents:activity`  | `{ id, toolName?, textDelta?, turnCount? }` | Streaming progress   |
 
 These are fire-and-forget broadcast events — no request IDs, no reply channels.
+
+## Target architecture
+
+The long-term architectural direction is to make pi-subagents a **minimal core** with inverted dependencies.
+Today, pi-subagents reaches outward to pi-permission-system via a bridge module and owns tool/extension filtering logic that duplicates permission-system responsibilities.
+The target state eliminates this overlap and flips the dependency direction.
+
+### Core responsibilities (keep)
+
+- **Agent definitions** — name, model, thinking, system prompt, tools list.
+- **Prompt composition** — system prompt assembly, skill preloading into prompt.
+- **Session lifecycle** — create child sessions, bind extensions, run conversation loop, track results.
+- **Concurrency management** — queue, abort, resume, max concurrency.
+- **Recursion guard** — remove pi-subagents' own three tools from child sessions (prevent infinite nesting).
+- **Lifecycle events** — emit events on `pi.events` when child sessions are created, completed, etc.
+- **Service API** — publish `SubagentsService` via `Symbol.for()` for cross-extension access.
+
+### Responsibilities to remove
+
+- **Tool policy** (`disallowed_tools`, `ToolFilterConfig.disallowedSet`) — access control belongs in pi-permission-system's `permission:` frontmatter.
+- **Extension filtering** (`extensions: string[]` allowlist) — tool visibility is pi-permission-system's job.
+- **Permission bridge** (`permission-bridge.ts`) — outbound coupling to pi-permission-system.
+  Replaced by lifecycle events that pi-permission-system listens for.
+- **Extension lifecycle control** (`extensions: false`, `isolated`) — extensions provide behavioral layers (permissions, formatting, context management) that benefit all agents.
+  Blanket-disabling them is a blunt instrument with no clear use case; tool restrictions belong in the permission system.
+
+### Composition model
+
+In the target state, pi-subagents publishes events and other packages hook in:
+
+- **pi-permission-system** listens for child session lifecycle events, applies per-agent policy (allow/ask/deny), gates tool calls at runtime.
+- **pi-subagents-ui** (future) subscribes to the service API, renders the widget, conversation viewer, and `/agents` menu.
+- **Any future extension** (OTel, auditing, cost tracking) hooks into the same events without pi-subagents knowing.
+
+This is achieved across three phases: Phase 14 (strip policy), Phase 16 (invert dependencies), and Phase 17 (extract UI).
 
 ## Current structural analysis
 
@@ -626,9 +665,87 @@ Phase 13 addressed remaining closure factories, the last fallow refactoring targ
 All six steps are closed: [#214], [#215], [#216], [#217], [#218], [#219].
 See [phase-13-remaining-smells.md](history/phase-13-remaining-smells.md) for details.
 
-## Improvement roadmap (Phase 14)
+## Improvement roadmap (Phase 14 — strip policy from core)
 
-Phase 14 addresses the anemic domain model in the lifecycle layer.
+Phase 14 removes tool and extension policy enforcement from pi-subagents.
+This code duplicates what pi-permission-system already provides with richer semantics (allow/ask/deny vs. binary hide).
+Removing it simplifies `runAgent`, shrinks `AgentConfig` and `SessionConfig`, and makes the Phase 15 domain-model work operate on a cleaner codebase.
+
+### Findings summary
+
+| Finding                                                                                   | Category      | Impact | Risk | Priority |
+| ----------------------------------------------------------------------------------------- | ------------- | ------ | ---- | -------- |
+| `disallowed_tools` duplicates pi-permission-system's `permission:` frontmatter            | A: Overlap    | 4      | 2    | 12       |
+| `extensions: string[]` allowlist is tool filtering disguised as lifecycle control         | A: Overlap    | 3      | 2    | 9        |
+| `filterActiveTools` runs twice (pre-bind + post-bind) to catch extension-registered tools | B: Complexity | 3      | 1    | 6        |
+| `ToolFilterConfig` exists solely to carry filtering state through the runner              | C: Accidental | 2      | 1    | 4        |
+
+### Step 1: Remove `disallowed_tools`
+
+Remove the `disallowedTools` field from `AgentConfig` and all code that processes it.
+
+1. Remove `disallowedTools` from the `AgentConfig` interface in `types.ts`.
+2. Remove `disallowed_tools` parsing from custom agent frontmatter in `custom-agents.ts`.
+3. Remove `disallowedSet` from `ToolFilterConfig` in `session-config.ts`.
+4. Remove the `disallowedSet` construction in `assembleSessionConfig`.
+5. Remove the `disallowedSet` branch from `filterActiveTools` in `agent-runner.ts`.
+6. Remove `disallowed_tools` from the agent config editor UI.
+7. Remove `disallowed_tools` from the agent creation wizard.
+8. Update tests.
+
+- Target: `types.ts`, `custom-agents.ts`, `session-config.ts`, `agent-runner.ts`, `ui/agent-config-editor.ts`, `ui/agent-creation-wizard.ts`
+- Smell: A (responsibility overlap with pi-permission-system)
+- Outcome: users migrate to `permission:` frontmatter for tool restrictions; single source of truth for access control
+
+### Step 2: Remove `extensions` filtering
+
+Remove the `extensions: string[]` allowlist and simplify the field to a boolean.
+The `extensions: false` case (used by `isolated`) is retained in this step and removed in Phase 16.
+
+1. Change `extensions` type from `true | string[] | false` to `boolean` in `AgentConfig`.
+2. Remove the `extensions` array branch from `filterActiveTools` in `agent-runner.ts`.
+3. Remove `extensions` from the agent config editor and creation wizard.
+4. Update custom agent frontmatter parsing to treat array values as `true` (with a warning).
+5. Update tests.
+
+- Target: `types.ts`, `agent-runner.ts`, `session-config.ts`, `ui/agent-config-editor.ts`, `ui/agent-creation-wizard.ts`
+- Smell: A (tool filtering disguised as extension lifecycle control)
+- Outcome: `filterActiveTools` reduces to two concerns: recursion guard and `extensions: false` passthrough
+
+### Step 3: Collapse `filterActiveTools` to recursion guard
+
+With Steps 1–2 complete, `filterActiveTools` has only two remaining branches: the `EXCLUDED_TOOL_NAMES` recursion guard and the `extensions === false` passthrough.
+Inline the `extensions === false` passthrough into the callsite and reduce the function to its essential purpose.
+
+1. Simplify `filterActiveTools` to filter only `EXCLUDED_TOOL_NAMES`.
+2. Remove `ToolFilterConfig` — the function no longer needs a config bag.
+3. Remove the pre-bind filter call — extension tools aren't in the active set yet, so filtering built-in tools pre-bind is only needed for denylist/allowlist logic that no longer exists.
+4. Keep a single post-bind filter call for the recursion guard.
+5. Simplify `SessionConfig` — remove the `toolFilter` field, keep `toolNames` as a flat field.
+6. Update tests.
+
+- Target: `agent-runner.ts`, `session-config.ts`
+- Smell: B (accidental complexity), C (two-pass filter dance)
+- Outcome: `filterActiveTools` is a one-liner; `SessionConfig` loses one nested type; the pre-bind/post-bind dance is gone
+
+### Step dependency diagram
+
+```mermaid
+flowchart LR
+    S1["Step 1\nRemove disallowed_tools"]
+    S2["Step 2\nRemove extensions filtering"]
+    S3["Step 3\nCollapse filterActiveTools"]
+
+    S1 --> S3
+    S2 --> S3
+```
+
+Steps 1 and 2 are independent and can proceed in parallel.
+Step 3 depends on both.
+
+## Improvement roadmap (Phase 15 — domain model evolution)
+
+Phase 15 addresses the anemic domain model in the lifecycle layer.
 `AgentRecord` is a data bag — identity, status transitions, and stats — but no behavior.
 `AgentManager` reaches into records 37 times, doing work that belongs on the agent.
 Per-agent state (pending steers, abort logic, run lifecycle) is scattered across the manager, `RunHandle`, and a manager-level Map.
@@ -732,27 +849,51 @@ flowchart LR
    Sequential — each depends on the previous.
 2. **Track B — Decoupling** (Steps 3, 4, 5): independent, can proceed in parallel with Track A.
 
+## Improvement roadmap (Phase 16 — invert dependencies)
+
+Phase 16 completes the architectural inversion by removing the outbound permission bridge and the `extensions: false` / `isolated` concepts.
+It depends on Phase 15's observer pattern (#229) as the replacement mechanism.
+
+Phase 16 is scoped but not yet broken into steps.
+Key changes:
+
+1. Remove `permission-bridge.ts` — the outbound coupling to pi-permission-system.
+2. Emit child session lifecycle events via the observer — pi-permission-system and other consumers listen for these events instead of being called.
+3. Remove `extensions: false` — all child sessions load all extensions.
+4. Dissolve or redefine `isolated` — without extension control and tool filtering, the concept either disappears or becomes purely about prompt composition (no skill preloading, no parent context inheritance).
+5. Update pi-permission-system to listen for child session events instead of being registered by the bridge.
+
+## Improvement roadmap (Phase 17 — extract UI)
+
+Phase 17 is the long-deferred UI extraction (originally Phase 6).
+The widget, conversation viewer, and `/agents` command menu move to a separate `pi-subagents-ui` extension that consumes the `SubagentsService` API.
+By this point the core is minimal and stable — the API boundary has been proven across Phases 14–16.
+
 ## Refactoring history
 
 Phases 1–5 and 7–12 are complete.
 Phase 6 (UI extraction to a separate package) is deferred.
 Detailed records are preserved in per-phase history files:
 
-| Phase | Title                                               | Status   | History                                                                              |
-| ----- | --------------------------------------------------- | -------- | ------------------------------------------------------------------------------------ |
-| 1     | Export SubagentsService API boundary                | Complete | [phase-1-api-boundary.md](history/phase-1-api-boundary.md)                           |
-| 2     | Remove scheduling subsystem                         | Complete | [phase-2-remove-scheduling.md](history/phase-2-remove-scheduling.md)                 |
-| 3     | Remove group-join, RPC; replace output-file         | Complete | [phase-3-remove-rpc-groupjoin.md](history/phase-3-remove-rpc-groupjoin.md)           |
-| 4     | Implement and publish SubagentsService              | Complete | [phase-4-implement-service.md](history/phase-4-implement-service.md)                 |
-| 5     | Decompose index.ts                                  | Complete | [phase-5-decompose-index.md](history/phase-5-decompose-index.md)                     |
-| 6     | Extract UI to separate package                      | Deferred | —                                                                                    |
-| 7     | Encapsulation and dependency narrowing              | Complete | [phase-7-encapsulation.md](history/phase-7-encapsulation.md)                         |
-| 8     | Testability, display extraction, menu decomposition | Complete | [phase-8-testability.md](history/phase-8-testability.md)                             |
-| 9     | Observation consolidation, ctx elimination          | Complete | [phase-9-observation-ctx.md](history/phase-9-observation-ctx.md)                     |
-| 10    | Domain organization, bag decomposition, complexity  | Complete | [phase-10-structural-decomposition.md](history/phase-10-structural-decomposition.md) |
-| 11    | Closure factories to classes                        | Complete | [phase-11-closure-to-class.md](history/phase-11-closure-to-class.md)                 |
-| 12    | Complexity reduction and test fixture extraction    | Complete | [phase-12-complexity-test-fixtures.md](history/phase-12-complexity-test-fixtures.md) |
-| 13    | Remaining structural smells                         | Complete | [phase-13-remaining-smells.md](history/phase-13-remaining-smells.md)                 |
+| Phase | Title                                               | Status              | History                                                                              |
+| ----- | --------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------ |
+| 1     | Export SubagentsService API boundary                | Complete            | [phase-1-api-boundary.md](history/phase-1-api-boundary.md)                           |
+| 2     | Remove scheduling subsystem                         | Complete            | [phase-2-remove-scheduling.md](history/phase-2-remove-scheduling.md)                 |
+| 3     | Remove group-join, RPC; replace output-file         | Complete            | [phase-3-remove-rpc-groupjoin.md](history/phase-3-remove-rpc-groupjoin.md)           |
+| 4     | Implement and publish SubagentsService              | Complete            | [phase-4-implement-service.md](history/phase-4-implement-service.md)                 |
+| 5     | Decompose index.ts                                  | Complete            | [phase-5-decompose-index.md](history/phase-5-decompose-index.md)                     |
+| 6     | Extract UI to separate package                      | Deferred → Phase 17 | —                                                                                    |
+| 7     | Encapsulation and dependency narrowing              | Complete            | [phase-7-encapsulation.md](history/phase-7-encapsulation.md)                         |
+| 8     | Testability, display extraction, menu decomposition | Complete            | [phase-8-testability.md](history/phase-8-testability.md)                             |
+| 9     | Observation consolidation, ctx elimination          | Complete            | [phase-9-observation-ctx.md](history/phase-9-observation-ctx.md)                     |
+| 10    | Domain organization, bag decomposition, complexity  | Complete            | [phase-10-structural-decomposition.md](history/phase-10-structural-decomposition.md) |
+| 11    | Closure factories to classes                        | Complete            | [phase-11-closure-to-class.md](history/phase-11-closure-to-class.md)                 |
+| 12    | Complexity reduction and test fixture extraction    | Complete            | [phase-12-complexity-test-fixtures.md](history/phase-12-complexity-test-fixtures.md) |
+| 13    | Remaining structural smells                         | Complete            | [phase-13-remaining-smells.md](history/phase-13-remaining-smells.md)                 |
+| 14    | Strip policy from core                              | Planned             | —                                                                                    |
+| 15    | Domain model evolution                              | Planned             | —                                                                                    |
+| 16    | Invert dependencies                                 | Planned             | —                                                                                    |
+| 17    | Extract UI to separate package                      | Planned             | —                                                                                    |
 
 ### Structural refactoring issues
 
@@ -770,7 +911,7 @@ Detailed records are preserved in per-phase history files:
 | Phase 11           | #192, #193, #194, #195, #196                               | SessionContext, runtime queries, interface alignment, tool classes, runner/menu classes, index.ts simplification                                         |
 | Phase 12           | #205, #206, #207, #208                                     | renderWidgetLines, showAgentDetail, widget update, shared test fixtures                                                                                  |
 | Phase 13           | #214, #215, #216, #217, #218, #219                         | Closure-to-class, buildParentContext, startAgent decomp, overwrite guard, settings SDK, test duplication                                                 |
-| Phase 14           | #227, #228, #229, #230, #231, #232                         | Agent domain model, async startAgent, onSessionCreated observer, ConcurrencyQueue, relay deps, resume unification                                        |
+| Phase 15           | #227, #228, #229, #230, #231, #232                         | Agent domain model, async startAgent, onSessionCreated observer, ConcurrencyQueue, relay deps, resume unification                                        |
 
 The remaining open issue is #22 (parent-session resolution), a cross-extension track that does not gate the structural work.
 
