@@ -1,7 +1,7 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 import { ConcreteAgentRunner } from "#src/lifecycle/agent-runner";
-import { createRunnerDeps, createRunnerIO } from "#test/helpers/runner-io";
+import { createRunnerDeps } from "#test/helpers/runner-io";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
 // ── Minimal session stub ──────────────────────────────────────────────────────

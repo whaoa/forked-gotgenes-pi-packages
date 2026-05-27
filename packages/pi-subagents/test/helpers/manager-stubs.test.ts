@@ -45,7 +45,7 @@ describe("createSessionRunner", () => {
 		const onSessionCreated = vi.fn();
 
 		await runner.run({} as never, "general-purpose", "test", {
-			context: {} as never,
+			context: {},
 			onSessionCreated,
 		});
 
@@ -58,7 +58,7 @@ describe("createSessionRunner", () => {
 		const runner = createSessionRunner(session);
 
 		const result = await runner.run({} as never, "general-purpose", "test", {
-			context: {} as never,
+			context: {},
 		});
 
 		expect(result.responseText).toBe("done");

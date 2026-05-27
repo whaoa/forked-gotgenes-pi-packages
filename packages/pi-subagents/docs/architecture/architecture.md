@@ -599,23 +599,21 @@ export interface ParentSessionInfo {
 
 `AgentSpawnConfig` now carries `parentSession?: ParentSessionInfo` instead of three flat optional fields.
 
-#### RunOptions (12 fields → extract RunContext) — done ([#169][169])
+#### RunOptions (12 fields → extract RunContext) — done ([#169][169]), updated by [#231]
 
-The `RunOptions` bag mixes execution parameters with context information.
-`RunContext` was extracted and nested as `RunOptions.context`:
+`RunContext` was extracted and nested as `RunOptions.context` in #169.
+Issue #231 moved the two static dependencies (`exec`, `registry`) to `RunnerDeps` on `ConcreteAgentRunner`, leaving `RunContext` with only per-call fields:
 
 ```typescript
-/** Parent execution context — where/who is running. */
+/** Per-call execution context — fields that vary per spawn. */
 export interface RunContext {
-  exec: ShellExec;
-  registry: AgentConfigLookup;
   cwd?: string;
   parentSession?: ParentSessionInfo;
 }
 ```
 
 The remaining `RunOptions` fields (`model`, `maxTurns`, `signal`, `isolated`, `thinkingLevel`, `defaultMaxTurns`, `graceTurns`, `onSessionCreated`) are genuine execution parameters.
-`RunOptions` now has 9 fields: 1 nested `context: RunContext` plus 8 flat execution fields.
+`RunOptions` now has 9 fields: 1 nested `context: RunContext` (2 per-call fields) plus 8 flat execution fields.
 
 #### SessionConfig (11 fields → extract ToolFilterConfig) — done ([#168][168])
 
@@ -772,11 +770,11 @@ Worktree setup was hoisted to callers (`spawn`, `drainQueue`) to preserve the sy
 - Smell: C (raw promise callbacks)
 - Outcome: zero `.then()`/`.catch()` in `agent-manager.ts`; `RunHandle` deleted; Agent owns run lifecycle
 
-### Step 3: Push exec/registry relay deps to runner construction — [#231]
+### Step 3: Push exec/registry relay deps to runner construction — [#231] ✅
 
-`AgentManager` receives `exec` and `registry` in its constructor but only relays them to `runner.run()` via `context`.
-Move them to `ConcreteAgentRunner` construction so the runner is self-contained.
-This is a prerequisite for Step 4 — Agent holds the runner, and the runner must carry its own static dependencies.
+`exec` and `registry` moved from `AgentManager` to `ConcreteAgentRunner` via a new `RunnerDeps` interface.
+`RunContext` shrunk from 4 to 2 per-call fields (`cwd`, `parentSession`).
+`AgentManagerOptions` shrunk from 7 to 5 fields.
 
 - Target: `src/lifecycle/agent-manager.ts`, `src/lifecycle/agent-runner.ts`, `src/index.ts`
 - Smell: C (relay-only dependencies)
