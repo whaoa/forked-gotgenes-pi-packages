@@ -67,6 +67,7 @@ Run `pnpm run check` (`tsc --noEmit`) for type-only changes.
   Either fold the test updates into the same step or place a dedicated test-update step immediately before it.
 - When a TDD plan lists separate steps that share a type definition, changing that type in step N breaks steps N+1…N+k.
   Either fold them into one step or introduce the new type alongside the old one and migrate callers incrementally.
+- When a TDD step narrows a union type (removes variants), grep all test files for fixtures or mocks that use the removed variant — those test fixes must land in the same step as the type change, not in later steps.
 - When a plan adds a parameter that flows through callback chains, the "Module-Level Changes" section must list every file in the chain.
 - When a TDD step changes a shared interface, run `pnpm run check` immediately after that step's commit.
 - When a TDD step changes an interface that has a single call site (e.g., a deps bag constructed in `index.ts`), the step must include updating that call site — the type checker will not allow the interface change and the call-site update to land in separate commits.
