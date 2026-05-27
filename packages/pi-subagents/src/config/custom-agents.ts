@@ -111,11 +111,18 @@ function csvList(val: unknown, defaults: string[]): string[] {
 
 /**
  * Resolve the `extensions` field to a boolean.
- * CSV/array values (legacy allowlist syntax) are coerced to `true`.
+ * CSV/array values (legacy allowlist syntax) are coerced to `true` with a warning.
  */
 function resolveBoolExtensions(val: unknown): boolean {
   const result = inheritField(val);
-  return Array.isArray(result) ? true : result;
+  if (Array.isArray(result)) {
+    console.warn(
+      "[pi-subagents] extensions allowlist syntax is deprecated — treating as \"true\" (inherit all).\n" +
+        "Use \"permission:\" frontmatter in pi-permission-system for per-tool access control.",
+    );
+    return true;
+  }
+  return result;
 }
 
 /**

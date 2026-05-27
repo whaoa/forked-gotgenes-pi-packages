@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_TOOL_NAMES } from "#src/config/agent-types";
 import { loadCustomAgents } from "#src/config/custom-agents";
 
@@ -138,6 +138,20 @@ Partial access.`);
     // extensions csv allowlist is no longer supported — coerced to true
     expect(agent.extensions).toBe(true);
     expect(agent.skills).toEqual(["planning", "review"]);
+  });
+
+  it("emits a deprecation warning when extensions csv allowlist is used", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    writeAgent("deprecated-ext", `---
+extensions: pi-github-tools
+---
+
+Deprecated.`);
+
+    loadCustomAgents(tmpDir);
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("deprecated"));
+    warnSpy.mockRestore();
   });
 
   it("passes through unknown tool names (not filtered)", () => {
