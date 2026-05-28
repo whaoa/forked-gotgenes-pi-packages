@@ -923,42 +923,170 @@ reset status → re-subscribe observer → prompt the existing session → trans
 4. **AgentInit must shrink dramatically.**
    ~20 optional fields → ~10, with clear grouping: identity + collaborators + wiring.
 
-### Open investigations
+### Resolved investigations
 
-Steps cannot be defined until these questions are resolved.
-Each investigation produces a concrete interface or design decision.
+All five investigations have been resolved by examining Pi's `AgentSession` SDK interface (source: `@earendil-works/pi-coding-agent` + Pi's `packages/agent/src/agent.ts`).
 
-1. **`AgentSession` SDK interface.**
-   What does Pi's `AgentSession` expose for prompt, steer, abort, subscribe, and resume?
-   This determines what Agent absorbs from the runner vs. what the session factory encapsulates.
-   Source: `@earendil-works/pi-coding-agent` types + Pi's `packages/agent/src/agent.ts`.
+#### 1. `AgentSession` SDK interface — resolved
 
-2. **Session factory boundary.**
-   What is the input spec (a value object?
-   the current `RunOptions` minus per-call fields?).
-   What is the output (a configured `AgentSession` + output file path?).
-   Where is the seam between "factory assembles the session" and "Agent uses the session"?
-   The factory must handle: env detection, config assembly, resource loading, session manager creation, `createAgentSession()`, `bindExtensions()`, tool filtering (recursion guard).
+AgentSession provides everything Agent needs for direct session interaction:
 
-3. **Turn-limit enforcement.**
-   Pi's Agent has its own turn loop but does not know about our `maxTurns` / `graceTurns` concept.
-   Currently the runner subscribes to session events and steers/aborts on limits.
-   This is novel orchestration that should stay on Agent.
-   How does Agent wire it — session subscription, or a hook on the session factory output?
+| What Agent needs          | AgentSession provides                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------ |
+| Prompt (initial + resume) | `session.prompt(text)` — works for both; calling it again on an existing session IS resume |
+| Steer                     | `session.steer(text)`                                                                      |
+| Abort                     | `session.abort()` — async, waits for idle                                                  |
+| Subscribe to events       | `session.subscribe(listener)` — turn_end, message_end, tool_execution_end, compaction_end  |
+| Read messages             | `session.messages`                                                                         |
+| Get session file          | `session.sessionManager.getSessionFile()`                                                  |
+| Dispose                   | `session.dispose()`                                                                        |
 
-4. **Response collection.**
-   Currently `collectResponseText()` subscribes to session events in the runner.
-   Is this Agent's job (subscribe and collect) or a session factory concern (return a collector handle)?
+Key finding: `session.prompt(text)` handles both initial run and resume — our current `resumeAgent()` already just calls this.
+The core Pi `Agent` (accessible via `session.agent`) owns the transcript, turn loop, tool execution, and steering/follow-up queues.
+Our Agent should call `session.prompt()` directly and subscribe to events for turn-limit enforcement.
 
-5. **Permission bridge integration.**
-   Currently `registerChildSession()` / `unregisterChildSession()` are called directly in `runAgent()` before/after `bindExtensions()`.
-   Options: session factory handles it internally, factory accepts lifecycle hooks, or the bridge is removed entirely (replaced by lifecycle events the permission system listens for).
-   This overlaps with the original Phase 16 dependency-inversion plan.
+#### 2. Session factory boundary — resolved
+
+The factory encapsulates everything *before* Agent starts using the session.
+The seam is clean: factory produces a ready-to-use `AgentSession`, Agent operates it.
+
+```text
+Factory creates (platform plumbing):
+  detect env → assemble config → create resource loader → reload
+  → create session manager → new session
+  → createAgentSession() → bindExtensions() → filter tools (recursion guard)
+  → register with permission bridge
+  → return { session, outputFile, cleanup }
+
+Agent takes over (novel orchestration):
+  → subscribe for turn tracking (maxTurns + graceTurns)
+  → session.prompt(text)
+  → collect response from session.messages
+  → session.steer() / session.abort() for turn limits
+  → call cleanup() when done
+```
+
+Factory input: per-agent config (snapshot, prompt, model, maxTurns, isolated, thinkingLevel, parentSession) bound at construction, plus per-call `cwd` from worktree.
+Factory output: `{ session: AgentSession, outputFile?: string, cleanup: () => void }`.
+
+#### 3. Turn-limit enforcement — Agent's job via session subscription
+
+Agent subscribes to session events and enforces turn limits — this is novel orchestration that Pi's Agent doesn't provide:
+
+```typescript
+session.subscribe((event) => {
+    if (event.type === "turn_end") {
+        turnCount++;
+        if (turnCount >= maxTurns) session.steer("wrap up");
+        if (turnCount >= maxTurns + graceTurns) session.abort();
+    }
+});
+```
+
+This uses `session.subscribe()`, `session.steer()`, and `session.abort()` directly.
+No runner involvement needed.
+
+#### 4. Response collection — Agent's job, simplified
+
+Agent collects the response directly from `session.messages` after `prompt()` completes.
+The existing `getLastAssistantText()` helper (which reads `session.messages`) already works as a fallback.
+The streaming `collectResponseText()` subscriber can move onto Agent for real-time text collection during the run.
+
+#### 5. Permission bridge — factory-internal
+
+The bridge calls (`registerChildSession` / `unregisterChildSession`) bracket `bindExtensions()` inside the factory.
+Since the factory owns `createAgentSession()` and `bindExtensions()`, both bridge calls become factory-internal.
+The factory returns a `cleanup()` function that Agent calls on completion; `cleanup()` handles `unregisterChildSession()` along with any other teardown.
+Agent never sees or imports the permission bridge.
+This naturally resolves the original Phase 16 dependency-inversion concern.
+
+### Steps
+
+#### Step 1: Extract `WorktreeIsolation` collaborator
+
+Create a collaborator that owns the worktree lifecycle: setup, path access, and cleanup.
+Agent receives `worktree?: WorktreeIsolation` instead of `_worktrees` + `_isolation` + managing `worktreeState` internally.
+The null check (`this.worktree?.setup()`) replaces the mode check (`this._isolation !== "worktree"`).
+AgentManager creates the collaborator only when `isolation === "worktree"` and passes it to Agent ready to go.
+
+- Target: new `src/lifecycle/worktree-isolation.ts`, `src/lifecycle/agent.ts`, `src/lifecycle/agent-manager.ts`
+- Smell: C (Ask-Don't-Tell — Agent checks `_isolation !== "worktree"` and orchestrates `_worktrees.create()` + `worktreeState.performCleanup()` instead of telling a collaborator)
+- Outcome: Agent loses `_worktrees`, `_isolation` fields + `setupWorktree()` method; `completeRun()`/`failRun()` simplify from 4-line null-check blocks to `this.worktree?.cleanup()`; AgentInit loses 2 fields
+
+#### Step 2: Extract `ChildSessionFactory` from runner
+
+Define the factory interface and extract session creation logic from `runAgent()` into a factory class.
+The factory is per-agent: constructed by AgentManager with config (snapshot, prompt, model, maxTurns, isolated, thinkingLevel, parentSession, getRunConfig) already bound.
+The shared `ConcreteAgentRunner` gains a `createFactory(config)` method that produces per-agent factories.
+`runAgent()` delegates to the factory internally during this step (lift-and-shift — Agent is not changed yet).
+Permission bridge calls (`registerChildSession` / `unregisterChildSession`) move inside the factory.
+
+```typescript
+interface ChildSessionFactory {
+    create(cwd?: string): Promise<ChildSessionResult>;
+}
+
+interface ChildSessionResult {
+    session: AgentSession;
+    outputFile?: string;
+    cleanup: () => void;
+}
+```
+
+- Target: new `src/lifecycle/child-session-factory.ts`, `src/lifecycle/agent-runner.ts`
+- Smell: B (conflated concerns — `runAgent()` mixes session creation with session interaction)
+- Outcome: session creation is independently testable; `permission-bridge.ts` imports move from runner to factory; factory interface is narrow (one method)
+
+#### Step 3: Agent owns session lifecycle — run + resume via factory
+
+The central step: Agent's `run()` calls `this.factory.create()` to get a session, then interacts with it directly.
+Agent absorbs turn-limit enforcement (subscribe to `turn_end`, steer/abort on limits), response collection (read `session.messages` after prompt), and abort forwarding (wire parent signal to `session.abort()`).
+Agent's `resume()` calls `session.prompt()` directly — the session already exists from the initial run.
+`AgentInit` shrinks: loses `_runner`, `_snapshot`, `_prompt`, `_model`, `_maxTurns`, `_isolated`, `_thinkingLevel`, `_parentSession`, `_getRunConfig` (9 fields); gains `factory` (1 field).
+Combined with Step 1, AgentInit goes from ~20 to ~10 fields.
+
+- Depends on: Step 1 (worktree is a collaborator), Step 2 (factory exists)
+- Target: `src/lifecycle/agent.ts`, `src/lifecycle/agent-manager.ts`, `src/tools/foreground-runner.ts`, `src/tools/background-spawner.ts`
+- Smell: C (Agent assembles 9 raw fields into a runner call instead of telling a collaborator) + B (runner conflates creation and interaction)
+- Outcome: Agent owns session interaction; `run()` is coordination not assembly; `resume()` is trivially `session.prompt()`; AgentInit has ~10 fields
+
+#### Step 4: Dissolve runner concept
+
+Delete `AgentRunner` interface, `ConcreteAgentRunner` class, `runAgent()` function, `resumeAgent()` function.
+The shared service that creates per-agent factories gets a clean interface (e.g., `SessionFactoryProvider`).
+Clean up dead types: `RunOptions`, `RunResult`, `ResumeOptions` — replaced by the factory interface and direct session interaction.
+Retain `getAgentConversation()` (used by conversation viewer) and `normalizeMaxTurns()` (used by spawn-config).
+
+- Depends on: Step 3
+- Target: `src/lifecycle/agent-runner.ts`, `src/lifecycle/agent.ts`, `src/index.ts`
+- Smell: A (dead code after runner dissolution)
+- Outcome: `agent-runner.ts` shrinks from 467 to ~50 lines (retained helpers only) or is deleted with helpers relocated; the "runner" concept is gone from the architecture
+
+### Step dependency diagram
+
+```mermaid
+flowchart LR
+    S1["Step 1<br/>WorktreeIsolation"]
+    S2["Step 2<br/>ChildSessionFactory"]
+    S3["Step 3<br/>Agent owns session"]
+    S4["Step 4<br/>Dissolve runner"]
+
+    S1 --> S3
+    S2 --> S3
+    S3 --> S4
+```
+
+### Tracks
+
+1. **Track A — Foundation** (Steps 1, 2): Extract collaborators.
+   Independent of each other — can proceed in parallel.
+2. **Track B — Integration** (Steps 3, 4): Agent uses collaborators, runner dissolves.
+   Sequential; depends on Track A completing.
 
 ### Relationship to the original Phase 16 plan
 
 The original Phase 16 ("invert dependencies") targeted permission-bridge removal, `extensions: false` removal, and `isolated` dissolution.
-The permission-bridge concern folds into investigation #5 above — the session factory is the natural place to resolve it.
+The permission-bridge concern is resolved by Step 2 — the factory handles registration internally, and Agent never imports the bridge.
 The `extensions`/`isolated` concerns are secondary and may move to a later phase once the collaborator architecture is in place.
 
 ### Fallow health snapshot (2026-05-28)
