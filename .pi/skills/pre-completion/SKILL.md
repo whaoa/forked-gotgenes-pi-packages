@@ -52,6 +52,9 @@ Wait for the reviewer to complete and return its report before continuing.
 
 ## Step 3: Handle the report
 
+If you cannot read an explicit `Overall: PASS|WARN|FAIL` line, treat it as "report not captured" and re-dispatch per Step 2.
+Do not proceed to "Summarize" on an uncaptured or banner-only result.
+
 ### Overall: PASS
 
 Proceed to the "Summarize" step in the template.
