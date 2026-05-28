@@ -490,13 +490,13 @@ This is achieved across three phases: Phase 14 (strip policy), Phase 16 (invert 
 | Metric                     | Value                             |
 | -------------------------- | --------------------------------- |
 | Health score               | 78/100 (B)                        |
-| Total LOC                  | 8,382 (56 files)                  |
+| Total LOC                  | 7,778 (57 files)                  |
 | Dead code                  | 0 files, 0 exports                |
 | Maintainability index      | 90.8 (good)                       |
 | Avg cyclomatic complexity  | 1.4                               |
 | P90 cyclomatic complexity  | 2                                 |
 | Production duplication     | 11 lines (1 internal clone group) |
-| Test duplication           | 38 clone groups, 634 lines        |
+| Test duplication           | 42 clone groups, 661 lines        |
 | Fallow refactoring targets | 0                                 |
 
 ### Dependency bag inventory
@@ -853,19 +853,124 @@ flowchart LR
 3. **Track C — Scheduling** (Step 5): ConcurrencyQueue extraction.
    Depends on Step 4 (queue drains via `agent.run()`).
 
-## Improvement roadmap (Phase 16 — invert dependencies)
+## Improvement roadmap (Phase 16 — agent collaborator architecture)
 
-Phase 16 completes the architectural inversion by removing the outbound permission bridge and the `extensions: false` / `isolated` concepts.
-It depends on Phase 15's lifecycle observer (#229) as the replacement mechanism.
+Phase 16 gives Agent proper collaborators so it can do its work without accumulating raw materials.
 
-Phase 16 is scoped but not yet broken into steps.
-Key changes:
+Phase 15 established the principle: Agent owns its lifecycle, not a manager.
+But in practice, Agent received 9 raw config fields and a shared generic runner, then assembled the runner call itself.
+The runner (`ConcreteAgentRunner`) is a stateless service — one instance shared across all agents — so every per-agent concern (snapshot, prompt, model, maxTurns, etc.) had to live on Agent as private fields.
+The result: `AgentInit` has ~20 optional fields, and Agent stores ~87 `this._` references.
 
-1. Remove `permission-bridge.ts` — the outbound coupling to pi-permission-system.
-2. Emit child session lifecycle events via the observer — pi-permission-system and other consumers listen for these events instead of being called.
-3. Remove `extensions: false` — all child sessions load all extensions.
-4. Dissolve or redefine `isolated` — without extension control and tool filtering, the concept either disappears or becomes purely about prompt composition (no skill preloading, no parent context inheritance).
-5. Update pi-permission-system to listen for child session events instead of being registered by the bridge.
+The deeper issue: the "runner" conflates two concerns.
+Session *creation* (platform plumbing — resource loaders, extension binding, tool filtering, env detection) is genuinely separate from session *interaction* (prompt, steer, abort, resume).
+Pi's own `Agent` class (in `packages/agent/`) already handles the interaction — it owns the transcript, runs the turn loop, executes tools, manages steering queues.
+Our extension's novel value is **child session orchestration within a parent session**: creating child sessions with config derived from the parent, managing concurrency, wiring lifecycle across sessions, and enabling resume.
+We should leverage the Pi session for interaction and focus on what's novel.
+
+### Target architecture
+
+Agent receives three collaborators at construction, each ready to go:
+
+| Collaborator           | Absorbs                                                                                                            | Agent tells it                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| Session factory        | runner + snapshot + prompt + model + maxTurns + isolated + thinkingLevel + parentSession + getRunConfig (9 fields) | "create me a configured child session"                          |
+| WorktreeIsolation      | worktrees + isolation + worktreeState (3 fields)                                                                   | `setup()`, `cleanup(description)`                               |
+| AgentLifecycleObserver | (already exists, 0 new fields)                                                                                     | `onStarted`, `onSessionCreated`, `onRunFinished`, `onCompacted` |
+
+After the session factory creates a session, Agent owns it directly — prompt, steer, abort, resume are Agent's verbs, not a collaborator's.
+The shared `ConcreteAgentRunner` becomes a factory that produces per-agent session factories.
+The "runner" concept dissolves.
+
+`AgentInit` shrinks from ~20 to ~10 fields:
+
+- 4 identity (`id`, `type`, `description`, `invocation`)
+- 2 status (`status`, `startedAt` — for tests/restore)
+- 3 collaborators (`sessionFactory`, `worktree`, `observer`)
+- 1 wiring (`signal`)
+
+Agent's `run()` becomes coordination, not assembly:
+
+```text
+mark running → notify observer → wire signal
+→ tell worktree to setup
+→ tell session factory to create session
+→ own the session: flush steers, subscribe observers, prompt, track turns
+→ on completion: tell worktree to cleanup, transition status, notify observer
+```
+
+Agent's `resume()` is trivially Agent's work — it already has the session:
+
+```text
+reset status → re-subscribe observer → prompt the existing session → transition status
+```
+
+### What we can commit to
+
+1. **The runner is not a collaborator — it's Agent's core behavior conflated with a session factory.**
+   The shared `ConcreteAgentRunner` becomes a factory.
+   Each agent receives a per-agent session factory with config already bound.
+   Once the session exists, Agent interacts with it directly.
+
+2. **WorktreeIsolation is a genuine collaborator.**
+   Created by the factory (AgentManager) only when `isolation === "worktree"`.
+   Agent tells it `setup()` and `cleanup()` instead of managing worktree internals.
+   The null check (`this.worktree?.setup()`) replaces the mode check (`this._isolation !== "worktree"`).
+
+3. **AgentLifecycleObserver is already a well-designed collaborator.**
+   No changes needed — Agent tells it about lifecycle events.
+
+4. **AgentInit must shrink dramatically.**
+   ~20 optional fields → ~10, with clear grouping: identity + collaborators + wiring.
+
+### Open investigations
+
+Steps cannot be defined until these questions are resolved.
+Each investigation produces a concrete interface or design decision.
+
+1. **`AgentSession` SDK interface.**
+   What does Pi's `AgentSession` expose for prompt, steer, abort, subscribe, and resume?
+   This determines what Agent absorbs from the runner vs. what the session factory encapsulates.
+   Source: `@earendil-works/pi-coding-agent` types + Pi's `packages/agent/src/agent.ts`.
+
+2. **Session factory boundary.**
+   What is the input spec (a value object?
+   the current `RunOptions` minus per-call fields?).
+   What is the output (a configured `AgentSession` + output file path?).
+   Where is the seam between "factory assembles the session" and "Agent uses the session"?
+   The factory must handle: env detection, config assembly, resource loading, session manager creation, `createAgentSession()`, `bindExtensions()`, tool filtering (recursion guard).
+
+3. **Turn-limit enforcement.**
+   Pi's Agent has its own turn loop but does not know about our `maxTurns` / `graceTurns` concept.
+   Currently the runner subscribes to session events and steers/aborts on limits.
+   This is novel orchestration that should stay on Agent.
+   How does Agent wire it — session subscription, or a hook on the session factory output?
+
+4. **Response collection.**
+   Currently `collectResponseText()` subscribes to session events in the runner.
+   Is this Agent's job (subscribe and collect) or a session factory concern (return a collector handle)?
+
+5. **Permission bridge integration.**
+   Currently `registerChildSession()` / `unregisterChildSession()` are called directly in `runAgent()` before/after `bindExtensions()`.
+   Options: session factory handles it internally, factory accepts lifecycle hooks, or the bridge is removed entirely (replaced by lifecycle events the permission system listens for).
+   This overlaps with the original Phase 16 dependency-inversion plan.
+
+### Relationship to the original Phase 16 plan
+
+The original Phase 16 ("invert dependencies") targeted permission-bridge removal, `extensions: false` removal, and `isolated` dissolution.
+The permission-bridge concern folds into investigation #5 above — the session factory is the natural place to resolve it.
+The `extensions`/`isolated` concerns are secondary and may move to a later phase once the collaborator architecture is in place.
+
+### Fallow health snapshot (2026-05-28)
+
+| Metric                 | Value                                                               |
+| ---------------------- | ------------------------------------------------------------------- |
+| Health score           | 78/100 (B) — deductions: hotspots -10, unit size -10, coupling -2.5 |
+| Dead code              | 0 files, 0 exports                                                  |
+| Production duplication | 11 lines (1 internal clone in `agent-config-editor.ts`)             |
+| Test duplication       | 42 clone groups, 661 lines (3.1%)                                   |
+| Hotspot #1             | `index.ts` — 70.0, accelerating (128 commits)                       |
+| Refactoring targets    | 0                                                                   |
 
 ## Improvement roadmap (Phase 17 — extract UI)
 
@@ -895,8 +1000,8 @@ Detailed records are preserved in per-phase history files:
 | 12       | Complexity reduction and test fixture extraction    | Complete                                                                         | [phase-12-complexity-test-fixtures.md](history/phase-12-complexity-test-fixtures.md) |
 | 13       | Remaining structural smells                         | Complete                                                                         | [phase-13-remaining-smells.md](history/phase-13-remaining-smells.md)                 |
 | 14       | Strip policy from core                              | Complete                                                                         | [phase-14-strip-policy.md](history/phase-14-strip-policy.md)                         |
-| 15       | Domain model evolution                              | Planned                                                                          | —                                                                                    |
-| 16       | Invert dependencies                                 | Planned                                                                          | —                                                                                    |
+| 15       | Domain model evolution                              | Complete                                                                         | —                                                                                    |
+| 16       | Agent collaborator architecture                     | Investigation                                                                    | —                                                                                    |
 | 17       | Extract UI to separate package                      | Planned                                                                          | —                                                                                    |
 
 ### Structural refactoring issues
