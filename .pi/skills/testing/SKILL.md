@@ -72,6 +72,8 @@ Run `pnpm run check` (`tsc --noEmit`) for type-only changes.
 - When a TDD step changes a shared interface, run `pnpm run check` immediately after that step's commit.
 - When a TDD step changes an interface that has a single call site (e.g., a deps bag constructed in `index.ts`), the step must include updating that call site — the type checker will not allow the interface change and the call-site update to land in separate commits.
 - When adding a field to a shared interface, grep for ALL test files that construct a compatible mock — not just factory helpers.
+- When a TDD step removes a field from a shared interface, grep all `src/` files that reference the removed field — every file that reads or passes the field must update in the same step.
+  This is the inverse of the excess-property rule: TypeScript rejects reading a property that no longer exists on the type.
 - When removing fields from a shared init type, grep for all test files and factory helpers that pass the removed field — esbuild won't reject unknown properties at runtime, so tests silently get wrong default values instead of failing.
 - When a TDD plan deletes a module across multiple steps (extract → remove consumers → delete), account for the doomed module's own imports at each intermediate step.
   If step N removes a type or function that the doomed module still imports, either delete the module in the same step or patch its imports to compile cleanly.
