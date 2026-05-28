@@ -11,6 +11,11 @@ export interface TranscriptEntry {
   [key: string]: unknown;
 }
 
+interface ToolResultInfo {
+  toolName: string;
+  isError: boolean;
+}
+
 /**
  * Extract plain text from user message content.
  * Handles both string content and TextContent[] arrays (skipping images).
@@ -32,6 +37,97 @@ function extractTextContent(content: unknown): string {
   return "";
 }
 
+/** Extract a brief one-line argument hint for well-known tool names. */
+function extractToolArgHint(
+  name: string,
+  args: Record<string, unknown>,
+): string {
+  switch (name) {
+    case "Read":
+    case "Edit":
+    case "Write":
+    case "find":
+      if (typeof args.path === "string") return `path: ${args.path}`;
+      break;
+    case "Bash":
+      if (typeof args.command === "string") {
+        return `command: ${args.command.slice(0, 80)}`;
+      }
+      break;
+    case "Grep":
+      if (typeof args.pattern === "string") return `pattern: ${args.pattern}`;
+      break;
+    default: {
+      // Fall back to first key-value pair
+      for (const [key, val] of Object.entries(args)) {
+        if (typeof val === "string") return `${key}: ${val}`;
+        break; // only inspect the first entry
+      }
+    }
+  }
+  return "";
+}
+
+function formatToolCallLine(
+  toolCall: Record<string, unknown>,
+  resultMap: Map<string, ToolResultInfo>,
+): string {
+  const name = typeof toolCall.name === "string" ? toolCall.name : "unknown";
+  const id = typeof toolCall.id === "string" ? toolCall.id : "";
+  const rawArgs = toolCall.arguments;
+  const args =
+    typeof rawArgs === "object" && rawArgs !== null
+      ? (rawArgs as Record<string, unknown>)
+      : {};
+
+  const hint = extractToolArgHint(name, args);
+  const sep = hint ? ` \u2014 ${hint}` : "";
+
+  const result = id ? resultMap.get(id) : undefined;
+  const status = result ? (result.isError ? "error" : "completed") : "pending";
+
+  return `  [tool] ${name}${sep} \u2192 ${status}`;
+}
+
+/** Build a map of toolCallId → result info from all toolResult message entries. */
+function buildToolResultMap(
+  entries: TranscriptEntry[],
+): Map<string, ToolResultInfo> {
+  const map = new Map<string, ToolResultInfo>();
+  for (const entry of entries) {
+    if (entry.type !== "message") continue;
+    const msg = entry.message as Record<string, unknown> | undefined;
+    if (msg?.role !== "toolResult") continue;
+    const toolCallId = typeof msg.toolCallId === "string" ? msg.toolCallId : "";
+    if (!toolCallId) continue;
+    map.set(toolCallId, {
+      toolName: typeof msg.toolName === "string" ? msg.toolName : "unknown",
+      isError: msg.isError === true,
+    });
+  }
+  return map;
+}
+
+/** Collect all toolCallIds that appear in assistant message content arrays. */
+function collectAssistantToolCallIds(entries: TranscriptEntry[]): Set<string> {
+  const ids = new Set<string>();
+  for (const entry of entries) {
+    if (entry.type !== "message") continue;
+    const msg = entry.message as Record<string, unknown> | undefined;
+    if (msg?.role !== "assistant") continue;
+    const content = msg.content;
+    if (!Array.isArray(content)) continue;
+    for (const part of content) {
+      if (typeof part !== "object" || part === null) continue;
+      const p = part as Record<string, unknown>;
+      if (p.type === "toolCall" && typeof p.id === "string") {
+        ids.add(p.id);
+      }
+    }
+  }
+  return ids;
+}
+
 function formatUserMessage(
   message: Record<string, unknown>,
   num: number,
@@ -43,6 +139,7 @@ function formatUserMessage(
 function formatAssistantMessage(
   message: Record<string, unknown>,
   num: number,
+  resultMap: Map<string, ToolResultInfo>,
 ): string {
   const provider =
     typeof message.provider === "string" ? message.provider : "unknown";
@@ -58,8 +155,10 @@ function formatAssistantMessage(
     const p = part as Record<string, unknown>;
     if (p.type === "text" && typeof p.text === "string") {
       lines.push(p.text);
+    } else if (p.type === "toolCall") {
+      lines.push(formatToolCallLine(p, resultMap));
     }
-    // ToolCall parts handled in formatAssistantWithToolResults (Step 2)
+    // thinking content is intentionally omitted
   }
   return lines.join("\n");
 }
@@ -68,17 +167,20 @@ function formatAssistantMessage(
  * Format a session entry array as a human-readable transcript.
  *
  * Sequential numbering counts only user and assistant conversation turns.
- * Metadata entries (compaction, model change, etc.) and omitted entry types
- * do not increment the turn counter.
- * Entries are separated by `---` dividers.
+ * Tool results are folded into their corresponding assistant tool call lines
+ * by matching toolCallId. Orphan tool results (no matching call) render
+ * as standalone lines. Entries are separated by `---` dividers.
  */
 export function formatTranscript(entries: TranscriptEntry[]): string {
+  const resultMap = buildToolResultMap(entries);
+  const assistantToolCallIds = collectAssistantToolCallIds(entries);
+
   const parts: string[] = [];
   let turnNum = 0;
 
   for (const entry of entries) {
     if (entry.type !== "message") {
-      // metadata entries (compaction, model_change, etc.) — handled in Step 3
+      // metadata entries (compaction, model_change, etc.) — Step 3
       continue;
     }
 
@@ -92,9 +194,19 @@ export function formatTranscript(entries: TranscriptEntry[]): string {
       parts.push(formatUserMessage(message, turnNum));
     } else if (role === "assistant") {
       turnNum++;
-      parts.push(formatAssistantMessage(message, turnNum));
+      parts.push(formatAssistantMessage(message, turnNum, resultMap));
+    } else if (role === "toolResult") {
+      const toolCallId =
+        typeof message.toolCallId === "string" ? message.toolCallId : "";
+      // Render only orphan results (not folded into an assistant message)
+      if (!assistantToolCallIds.has(toolCallId)) {
+        const toolName =
+          typeof message.toolName === "string" ? message.toolName : "unknown";
+        const status = message.isError === true ? "error" : "completed";
+        parts.push(`  [result] ${toolName} \u2192 ${status}`);
+      }
     }
-    // toolResult, bashExecution, custom, compactionSummary, branchSummary: Step 2/3
+    // bashExecution, custom, compactionSummary, branchSummary: Step 3
   }
 
   return parts.join("\n\n---\n\n");
