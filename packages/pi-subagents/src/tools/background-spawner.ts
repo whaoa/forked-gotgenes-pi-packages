@@ -54,9 +54,11 @@ export function spawnBackground(
       isBackground: true,
       isolation: execution.isolation,
       invocation: execution.agentInvocation,
-      onSessionCreated: (session) => {
-        bgState.setSession(session);
-        subscribeUIObserver(session, bgState);
+      observer: {
+        onSessionCreated: (_agent, session) => {
+          bgState.setSession(session);
+          subscribeUIObserver(session, bgState);
+        },
       },
     });
   } catch (err) {

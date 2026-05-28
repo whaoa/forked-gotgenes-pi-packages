@@ -424,20 +424,22 @@ describe("AgentManager — isolation: worktree fails loud, no silent fallback", 
     manager.dispose();
   });
 
-  it("spawn() throws when worktrees.create returns undefined; no orphan record left behind", async () => {
+  it("records error on agent when worktrees.create returns undefined (async error surface)", async () => {
     const worktrees = createMockWorktrees({ createResult: undefined });
     const runner: AgentRunner = {
       run: vi.fn(),
       resume: vi.fn(),
     };
     ({ manager } = createManager({ runner, worktrees }));
-    expect(() => manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+    const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
       description: "test",
       isolation: "worktree",
-    })).toThrow(/isolation: "worktree"/);
+    });
 
-    // Cleaned up — no orphan in listAgents()
-    expect(manager.listAgents()).toEqual([]);
+    // Error propagates through the promise
+    await manager.getRecord(id)!.promise;
+    expect(manager.getRecord(id)!.status).toBe("error");
+    expect(manager.getRecord(id)!.error).toContain('isolation: "worktree"');
     // runner.run never invoked — strict, no silent fallback
     expect(runner.run).not.toHaveBeenCalled();
   });
@@ -733,47 +735,51 @@ describe("AgentManager — onAgentCreated observer", () => {
   });
 });
 
-describe("AgentManager — onSessionCreated callback receives record", () => {
+describe("AgentManager — lifecycle observer forwarding", () => {
   let manager: AgentManager;
 
   afterEach(() => {
     manager.dispose();
   });
 
-  it("passes record as second argument to onSessionCreated callback", async () => {
+  it("forwards onSessionCreated from spawn options observer to Agent", async () => {
     const session = createMockSession();
-    const received: { record: Agent | undefined } = { record: undefined };
+    const received: { agent: Agent | undefined } = { agent: undefined };
     const runner = createSessionRunner(session);
     ({ manager } = createManager({ runner }));
 
     const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
       description: "test",
       isBackground: true,
-      onSessionCreated: (_session, record) => {
-        received.record = record;
+      observer: {
+        onSessionCreated: (agent) => {
+          received.agent = agent;
+        },
       },
     });
     await manager.getRecord(id)!.promise;
 
-    expect(received.record).toBe(manager.getRecord(id));
-    expect(received.record!.id).toBe(id);
+    expect(received.agent).toBe(manager.getRecord(id));
+    expect(received.agent!.id).toBe(id);
   });
 
-  it("passes record to foreground onSessionCreated callback", async () => {
+  it("forwards onSessionCreated for foreground agents", async () => {
     const session = createMockSession();
-    const received: { record: Agent | undefined } = { record: undefined };
+    const received: { agent: Agent | undefined } = { agent: undefined };
     const runner = createSessionRunner(session);
     ({ manager } = createManager({ runner }));
 
     await manager.spawnAndWait(STUB_SNAPSHOT, "general-purpose", "test", {
       description: "fg",
-      onSessionCreated: (_session, record) => {
-        received.record = record;
+      observer: {
+        onSessionCreated: (agent) => {
+          received.agent = agent;
+        },
       },
     });
 
-    expect(received.record).toBeDefined();
-    expect(received.record!.type).toBe("general-purpose");
+    expect(received.agent).toBeDefined();
+    expect(received.agent!.type).toBe("general-purpose");
   });
 });
 

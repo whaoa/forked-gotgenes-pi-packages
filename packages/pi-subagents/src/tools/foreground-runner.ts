@@ -109,13 +109,15 @@ export async function runForeground(
         invocation: execution.agentInvocation,
         signal,
         parentSession: params.parentSession,
-        onSessionCreated: (session, record) => {
-          fgState.setSession(session);
-          recordRef = record;
-          unsubUI = subscribeUIObserver(session, fgState, streamUpdate);
-          fgId = record.id;
-          agentActivity.set(record.id, fgState);
-          widget.ensureTimer();
+        observer: {
+          onSessionCreated: (agent, session) => {
+            fgState.setSession(session);
+            recordRef = agent;
+            unsubUI = subscribeUIObserver(session, fgState, streamUpdate);
+            fgId = agent.id;
+            agentActivity.set(agent.id, fgState);
+            widget.ensureTimer();
+          },
         },
       },
     );

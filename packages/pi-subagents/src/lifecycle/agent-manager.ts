@@ -8,9 +8,8 @@
 
 import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { debugLog } from "#src/debug";
-import { Agent } from "#src/lifecycle/agent";
+import { Agent, type AgentLifecycleObserver } from "#src/lifecycle/agent";
 import type { AgentRunner } from "#src/lifecycle/agent-runner";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { WorktreeManager } from "#src/lifecycle/worktree";
@@ -20,14 +19,15 @@ import type { RunConfig } from "#src/runtime";
 import type { AgentInvocation, CompactionInfo, IsolationMode, ParentSessionInfo, SubagentType, ThinkingLevel } from "#src/types";
 
 // Re-exported from types.ts for backward compatibility.
-export type { CompactionInfo } from "#src/types";
+// Re-exported from types.ts for backward compatibility.
+export type { CompactionInfo, ParentSessionInfo } from "#src/types";
 
 /** Observer interface for agent lifecycle notifications. */
 export interface AgentManagerObserver {
   onAgentStarted(record: Agent): void;
   onAgentCompleted(record: Agent): void;
   onAgentCompacted(record: Agent, info: CompactionInfo): void;
-  /** Fires synchronously after a background agent record is created (before startAgent). */
+  /** Fires synchronously after a background agent record is created (before run). */
   onAgentCreated(record: Agent): void;
 }
 
@@ -42,16 +42,6 @@ export interface AgentManagerOptions {
   getRunConfig?: () => RunConfig;
   observer?: AgentManagerObserver;
 }
-
-interface SpawnArgs {
-  snapshot: ParentSnapshot;
-  type: SubagentType;
-  prompt: string;
-  options: AgentSpawnConfig;
-}
-
-// Re-exported from types.ts for backward compatibility.
-export type { ParentSessionInfo } from "#src/types";
 
 export interface AgentSpawnConfig {
   description: string;
@@ -73,8 +63,8 @@ export interface AgentSpawnConfig {
   invocation?: AgentInvocation;
   /** Parent abort signal - when aborted, the subagent is also stopped. */
   signal?: AbortSignal;
-  /** Called when the agent session is created - receives the session and the agent's record. */
-  onSessionCreated?: (session: AgentSession, record: Agent) => void;
+  /** Per-agent lifecycle observer — replaces onSessionCreated callback. */
+  observer?: AgentLifecycleObserver;
   /** Parent session identity - grouped fields that travel together from the tool boundary. */
   parentSession?: ParentSessionInfo;
 }
@@ -88,8 +78,8 @@ export class AgentManager {
   private readonly _getMaxConcurrent: () => number;
   private getRunConfig?: () => RunConfig;
 
-  /** Queue of background agents waiting to start. */
-  private queue: { id: string; args: SpawnArgs }[] = [];
+  /** Queue of background agent IDs waiting to start. */
+  private queue: string[] = [];
   /** Number of currently running background agents. */
   private runningBackground = 0;
   constructor(options: AgentManagerOptions) {
@@ -111,6 +101,25 @@ export class AgentManager {
     this.drainQueue();
   }
 
+  /** Compose a per-agent lifecycle observer from manager and spawn-config concerns. */
+  private buildObserver(options: AgentSpawnConfig): AgentLifecycleObserver {
+    return {
+      onStarted: (agent) => {
+        if (options.isBackground) this.runningBackground++;
+        this.observer?.onAgentStarted(agent);
+      },
+      onSessionCreated: options.observer?.onSessionCreated
+        ? (agent, session) => options.observer!.onSessionCreated!(agent, session)
+        : undefined,
+      onRunFinished: (agent) => {
+        if (options.isBackground) this.finalizeBackgroundRun(agent);
+      },
+      onCompacted: (agent, info) => {
+        this.observer?.onAgentCompacted(agent, info);
+      },
+    };
+  }
+
   /**
    * Spawn an agent and return its ID immediately (for background use).
    * If the concurrency limit is reached, the agent is queued.
@@ -129,14 +138,21 @@ export class AgentManager {
       status: options.isBackground ? "queued" : "running",
       startedAt: Date.now(),
       invocation: options.invocation,
-      parentSession: options.parentSession,
+      // Run config
+      snapshot,
+      prompt,
+      model: options.model,
+      maxTurns: options.maxTurns,
+      isolated: options.isolated,
+      thinkingLevel: options.thinkingLevel,
       isolation: options.isolation,
+      parentSession: options.parentSession,
+      signal: options.signal,
+      // Shared deps
+      runner: this.runner,
       worktrees: this.worktrees,
-      observer: {
-        onRunFinished: options.isBackground
-          ? () => this.finalizeBackgroundRun(record)
-          : undefined,
-      },
+      observer: this.buildObserver(options),
+      getRunConfig: this.getRunConfig,
     });
     this.agents.set(id, record);
 
@@ -144,65 +160,14 @@ export class AgentManager {
       this.observer?.onAgentCreated(record);
     }
 
-    const args: SpawnArgs = { snapshot, type, prompt, options };
-
     if (options.isBackground && !options.bypassQueue && this.runningBackground >= this._getMaxConcurrent()) {
       // Queue it - will be started when a running agent completes
-      this.queue.push({ id, args });
+      this.queue.push(id);
       return id;
     }
 
-    // setupWorktree can throw (e.g. strict worktree-isolation failure) - clean
-    // up the record so callers don't see an orphan in `listAgents()`.
-    try {
-      record.setupWorktree();
-      record.promise = this.startAgent(id, record, args);
-    } catch (err) {
-      this.agents.delete(id);
-      throw err;
-    }
+    record.promise = record.run();
     return id;
-  }
-
-  /** Actually start an agent (called immediately or from queue drain). */
-  private async startAgent(id: string, record: Agent, { snapshot, type, prompt, options }: SpawnArgs): Promise<void> {
-    record.markRunning(Date.now());
-    if (options.isBackground) this.runningBackground++;
-    this.observer?.onAgentStarted(record);
-
-    record.wireSignal(options.signal, () => this.abort(id));
-
-    const runConfig = this.getRunConfig?.();
-    try {
-      const result = await this.runner.run(snapshot, type, prompt, {
-        context: {
-          cwd: record.worktreeState?.path,
-          parentSession: options.parentSession,
-        },
-        model: options.model,
-        maxTurns: options.maxTurns,
-        defaultMaxTurns: runConfig?.defaultMaxTurns,
-        graceTurns: runConfig?.graceTurns,
-        isolated: options.isolated,
-        thinkingLevel: options.thinkingLevel,
-        signal: record.abortController.signal,
-        onSessionCreated: (session) => {
-          // Capture the session file path early so it's available for display
-          // before the run completes (e.g. in background agent status messages).
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- sessionManager is typed as always present but Pi SDK may not provide it
-          const outputFile = session.sessionManager?.getSessionFile?.() ?? undefined;
-          record.execution = { session, outputFile };
-          record.flushPendingSteers(session);
-          record.attachObserver(subscribeAgentObserver(session, record, {
-            onCompact: (r, info) => this.observer?.onAgentCompacted(r, info),
-          }));
-          options.onSessionCreated?.(session, record);
-        },
-      });
-      record.completeRun(result);
-    } catch (err) {
-      record.failRun(err);
-    }
   }
 
   /** Decrement background counter, notify observer (crash-safe), and drain the queue. */
@@ -215,18 +180,10 @@ export class AgentManager {
   /** Start queued agents up to the concurrency limit. */
   private drainQueue() {
     while (this.queue.length > 0 && this.runningBackground < this._getMaxConcurrent()) {
-      const next = this.queue.shift()!;
-      const record = this.agents.get(next.id);
+      const id = this.queue.shift()!;
+      const record = this.agents.get(id);
       if (record?.status !== "queued") continue;
-      try {
-        record.setupWorktree();
-        record.promise = this.startAgent(next.id, record, next.args);
-      } catch (err) {
-        // Late failure (e.g. strict worktree-isolation) - surface on the record
-        // so the user/agent can see it via /agents, then keep draining.
-        record.markError(err);
-        this.observer?.onAgentCompleted(record);
-      }
+      record.promise = record.run();
     }
   }
 
@@ -294,7 +251,7 @@ export class AgentManager {
 
     // Remove from queue if queued
     if (record.status === "queued") {
-      this.queue = this.queue.filter(q => q.id !== id);
+      this.queue = this.queue.filter(qid => qid !== id);
       record.markStopped();
       return true;
     }
@@ -342,8 +299,8 @@ export class AgentManager {
   abortAll(): number {
     let count = 0;
     // Clear queued agents first
-    for (const queued of this.queue) {
-      const record = this.agents.get(queued.id);
+    for (const id of this.queue) {
+      const record = this.agents.get(id);
       if (record) {
         record.markStopped();
         count++;

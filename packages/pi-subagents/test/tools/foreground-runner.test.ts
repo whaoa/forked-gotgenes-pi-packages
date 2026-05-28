@@ -118,7 +118,7 @@ describe("runForeground", () => {
 	});
 
 	it("calls runtime.ensureTimer and runtime.markFinished after completion", async () => {
-		// spawnAndWait invokes onSessionCreated to register the agent in activity map
+		// spawnAndWait invokes observer.onSessionCreated to register the agent in activity map
 		const mockSess = { subscribe: vi.fn().mockReturnValue(() => {}) };
 		const deps = createToolDeps({
 			manager: {
@@ -126,7 +126,7 @@ describe("runForeground", () => {
 				spawnAndWait: vi.fn().mockImplementation(
 					async (_snapshot: any, _type: any, _prompt: any, opts: any) => {
 						const record = createTestAgent({ result: "done" });
-						opts.onSessionCreated?.(mockSess, record);
+						opts.observer?.onSessionCreated?.(record, mockSess);
 						return record;
 					},
 				),
@@ -147,14 +147,14 @@ describe("runForeground", () => {
 					async (_snapshot: any, _type: any, _prompt: any, opts: any) => {
 						const record = createTestAgent({ result: "done" });
 						record.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
-						opts.onSessionCreated?.(mockSess, record);
+						opts.observer?.onSessionCreated?.(record, mockSess);
 						return record;
 					},
 				),
 			},
 		});
 		await runForeground(deps.manager, deps.runtime, deps.runtime.agentActivity, makeParams(), undefined, undefined);
-		// Activity is registered during onSessionCreated and removed on cleanup —
+		// Activity is registered during observer.onSessionCreated and removed on cleanup —
 		// markFinished is the evidence that the id was tracked and cleaned up.
 		expect(deps.runtime.markFinished).toHaveBeenCalledOnce();
 	});
