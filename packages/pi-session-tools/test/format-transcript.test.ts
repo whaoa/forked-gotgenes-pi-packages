@@ -452,6 +452,231 @@ describe("formatTranscript — tool calls and result folding", () => {
   });
 });
 
+describe("formatTranscript — metadata entries", () => {
+  it("formats a compaction entry", () => {
+    expect(
+      formatTranscript([
+        {
+          type: "compaction",
+          id: "1",
+          parentId: null,
+          timestamp: "t",
+          summary: "summary text",
+          firstKeptEntryId: "abc",
+          tokensBefore: 48000,
+        },
+      ]),
+    ).toBe("[compaction] Context compacted (48000 tokens before)");
+  });
+
+  it("formats a model_change entry", () => {
+    expect(
+      formatTranscript([
+        {
+          type: "model_change",
+          id: "1",
+          parentId: null,
+          timestamp: "t",
+          provider: "anthropic",
+          modelId: "claude-opus-4-20250514",
+        },
+      ]),
+    ).toBe("[model change] → anthropic/claude-opus-4-20250514");
+  });
+
+  it("formats a thinking_level_change entry", () => {
+    expect(
+      formatTranscript([
+        {
+          type: "thinking_level_change",
+          id: "1",
+          parentId: null,
+          timestamp: "t",
+          thinkingLevel: "high",
+        },
+      ]),
+    ).toBe("[thinking] → high");
+  });
+
+  it("formats a branch_summary entry with truncated snippet", () => {
+    const longSummary = "This is a very long branch summary. ".repeat(10);
+    const result = formatTranscript([
+      {
+        type: "branch_summary",
+        id: "1",
+        parentId: null,
+        timestamp: "t",
+        fromId: "x",
+        summary: longSummary,
+      },
+    ]);
+    expect(result).toMatch(/^\[branch\] /);
+    expect(result.length).toBeLessThan(longSummary.length);
+  });
+
+  it("formats a short branch_summary without truncation", () => {
+    expect(
+      formatTranscript([
+        {
+          type: "branch_summary",
+          id: "1",
+          parentId: null,
+          timestamp: "t",
+          fromId: "x",
+          summary: "Short summary.",
+        },
+      ]),
+    ).toBe("[branch] Short summary.");
+  });
+
+  it("formats a bashExecution message", () => {
+    const result = formatTranscript([
+      {
+        type: "message",
+        id: "1",
+        parentId: null,
+        timestamp: "t",
+        message: {
+          role: "bashExecution",
+          command: "git status",
+          output: "On branch main\nnothing to commit",
+          exitCode: 0,
+          cancelled: false,
+          truncated: false,
+          timestamp: 1000,
+        },
+      },
+    ]);
+    expect(result).toBe("  [bash] git status (exit: 0)");
+  });
+
+  it("formats a bashExecution message with undefined exit code", () => {
+    const result = formatTranscript([
+      {
+        type: "message",
+        id: "1",
+        parentId: null,
+        timestamp: "t",
+        message: {
+          role: "bashExecution",
+          command: "sleep 5",
+          output: "",
+          exitCode: undefined,
+          cancelled: true,
+          truncated: false,
+          timestamp: 1000,
+        },
+      },
+    ]);
+    expect(result).toBe("  [bash] sleep 5 (cancelled)");
+  });
+
+  it("omits custom entries", () => {
+    expect(
+      formatTranscript([
+        {
+          type: "custom",
+          id: "1",
+          parentId: null,
+          timestamp: "t",
+          customType: "my-ext",
+          data: { key: "value" },
+        },
+      ]),
+    ).toBe("");
+  });
+
+  it("omits label entries", () => {
+    expect(
+      formatTranscript([
+        {
+          type: "label",
+          id: "1",
+          parentId: null,
+          timestamp: "t",
+          targetId: "x",
+          label: "my label",
+        },
+      ]),
+    ).toBe("");
+  });
+
+  it("omits session_info entries", () => {
+    expect(
+      formatTranscript([
+        {
+          type: "session_info",
+          id: "1",
+          parentId: null,
+          timestamp: "t",
+          name: "My session",
+        },
+      ]),
+    ).toBe("");
+  });
+
+  it("omits custom_message entries", () => {
+    expect(
+      formatTranscript([
+        {
+          type: "custom_message",
+          id: "1",
+          parentId: null,
+          timestamp: "t",
+          customType: "my-ext",
+          content: "some content",
+          display: true,
+        },
+      ]),
+    ).toBe("");
+  });
+
+  it("places metadata entries between conversation turns with separators", () => {
+    const entries = [
+      {
+        type: "message",
+        id: "1",
+        parentId: null,
+        timestamp: "t",
+        message: { role: "user", content: "Hello", timestamp: 1000 },
+      },
+      {
+        type: "compaction",
+        id: "2",
+        parentId: "1",
+        timestamp: "t",
+        summary: "compacted",
+        firstKeptEntryId: "1",
+        tokensBefore: 10000,
+      },
+      {
+        type: "model_change",
+        id: "3",
+        parentId: "2",
+        timestamp: "t",
+        provider: "anthropic",
+        modelId: "claude-opus-4-20250514",
+      },
+      {
+        type: "message",
+        id: "4",
+        parentId: "3",
+        timestamp: "t",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Hi" }],
+          provider: "anthropic",
+          model: "claude-opus-4-20250514",
+        },
+      },
+    ];
+    const result = formatTranscript(entries);
+    expect(result).toBe(
+      "1. user\nHello\n\n---\n\n[compaction] Context compacted (10000 tokens before)\n\n---\n\n[model change] → anthropic/claude-opus-4-20250514\n\n---\n\n2. assistant [anthropic/claude-opus-4-20250514]\nHi",
+    );
+  });
+});
+
 describe("formatTranscript — basic message formatting", () => {
   it("returns empty string for empty entries", () => {
     expect(formatTranscript([])).toBe("");

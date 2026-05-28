@@ -163,6 +163,54 @@ function formatAssistantMessage(
   return lines.join("\n");
 }
 
+const BRANCH_SUMMARY_SNIPPET_LENGTH = 100;
+
+/** Format a non-message session entry (compaction, model change, etc.). */
+function formatMetadataEntry(entry: TranscriptEntry): string | null {
+  switch (entry.type) {
+    case "compaction": {
+      const tokens =
+        typeof entry.tokensBefore === "number" ? entry.tokensBefore : 0;
+      return `[compaction] Context compacted (${tokens} tokens before)`;
+    }
+    case "model_change": {
+      const provider =
+        typeof entry.provider === "string" ? entry.provider : "unknown";
+      const modelId =
+        typeof entry.modelId === "string" ? entry.modelId : "unknown";
+      return `[model change] \u2192 ${provider}/${modelId}`;
+    }
+    case "thinking_level_change": {
+      const level =
+        typeof entry.thinkingLevel === "string"
+          ? entry.thinkingLevel
+          : "unknown";
+      return `[thinking] \u2192 ${level}`;
+    }
+    case "branch_summary": {
+      const summary = typeof entry.summary === "string" ? entry.summary : "";
+      const snippet = summary.slice(0, BRANCH_SUMMARY_SNIPPET_LENGTH);
+      const ellipsis =
+        summary.length > BRANCH_SUMMARY_SNIPPET_LENGTH ? "..." : "";
+      return `[branch] ${snippet}${ellipsis}`;
+    }
+    default:
+      // custom, label, session_info, custom_message: omitted
+      return null;
+  }
+}
+
+/** Format a bashExecution message entry (command + exit code, no output). */
+function formatBashMessage(message: Record<string, unknown>): string {
+  const command = typeof message.command === "string" ? message.command : "";
+  const exitCode =
+    typeof message.exitCode === "number" ? message.exitCode : undefined;
+  if (message.cancelled === true || exitCode === undefined) {
+    return `  [bash] ${command} (cancelled)`;
+  }
+  return `  [bash] ${command} (exit: ${exitCode})`;
+}
+
 /**
  * Format a session entry array as a human-readable transcript.
  *
@@ -180,7 +228,8 @@ export function formatTranscript(entries: TranscriptEntry[]): string {
 
   for (const entry of entries) {
     if (entry.type !== "message") {
-      // metadata entries (compaction, model_change, etc.) — Step 3
+      const formatted = formatMetadataEntry(entry);
+      if (formatted !== null) parts.push(formatted);
       continue;
     }
 
@@ -205,8 +254,10 @@ export function formatTranscript(entries: TranscriptEntry[]): string {
         const status = message.isError === true ? "error" : "completed";
         parts.push(`  [result] ${toolName} \u2192 ${status}`);
       }
+    } else if (role === "bashExecution") {
+      parts.push(formatBashMessage(message));
     }
-    // bashExecution, custom, compactionSummary, branchSummary: Step 3
+    // custom, compactionSummary, branchSummary message roles: omitted
   }
 
   return parts.join("\n\n---\n\n");
