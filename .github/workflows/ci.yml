@@ -25,6 +25,9 @@ jobs:
       - name: Typecheck
         run: pnpm -r run check
 
+      - name: Verify public types are consumable from the package
+        run: pnpm --filter @gotgenes/pi-subagents run verify:public-types
+
       - name: Lint
         run: pnpm run lint
 
