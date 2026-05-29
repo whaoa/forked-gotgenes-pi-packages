@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.0](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v7.3.3...pi-permission-system-v7.4.0) (2026-05-29)
+
+
+### Features
+
+* register subagent child sessions via lifecycle events ([cd324dc](https://github.com/gotgenes/pi-packages/commit/cd324dc5f8b18fe69ba8802eda0b17a6a36ccc58))
+
+
+### Documentation
+
+* document event-based subagent child lifecycle ([62621fa](https://github.com/gotgenes/pi-packages/commit/62621fa9abd093b5deadb3c15139179ae85ad519))
+
 ## [7.3.3](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v7.3.2...pi-permission-system-v7.3.3) (2026-05-28)
 
 
