@@ -29,3 +29,28 @@ The plan adds a `rollup-plugin-dts` build that bundles `src/service/service.ts` 
 - Primary feasibility risk flagged: whether `rollup-plugin-dts` resolves `#src/*` while rolling up the type graph.
   Build Step 1 is the explicit checkpoint (emit + assert the output is alias-free and exports the expected symbols).
 - `dist/` is gitignored and already excluded by eslint/biome; the new wrinkle is that a `files` allowlist is required so the gitignored `dist/public.d.ts` is included in the npm tarball — validate `pnpm pack --dry-run` parity so no currently-shipped file is dropped.
+
+## Stage: Implementation — Build (2026-05-29T00:00:00Z)
+
+### Session summary
+
+Executed all four build-order steps: added `rollup` + `rollup-plugin-dts` and a `build:types` script that bundles `src/service/service.ts` into a self-contained `dist/public.d.ts`; wired conditional `exports` (`types` + `default`, fixing the stale path) with a `prepack` hook and a `files` allowlist; added a `pnpm pack` → throwaway-consumer → `tsc` verification harness (`scripts/verify-public-types.sh`) plus a CI step; and recorded ADR 0003.
+A fifth commit documented the new build step in the `package-pi-subagents` skill (reviewer WARN).
+Root `pnpm run check`, root `pnpm run lint`, and `verify:public-types` all pass.
+
+### Observations
+
+- The primary feasibility risk (`rollup-plugin-dts` resolving `#src/*`) resolved cleanly out of the box: driving it with the package `tsconfig` (which carries the `#src/*` paths) produced a 178-line `dist/public.d.ts` with zero `#src/` residue and only `ThinkingLevel` kept external from `@earendil-works/pi-ai`.
+  No alias/path resolver plugin was needed.
+- Harness deviation (fixed in the same step): `pnpm add` in the isolated (`--ignore-workspace`) throwaway consumer exited non-zero with `ERR_PNPM_IGNORED_BUILDS` because it does not inherit the workspace `allowBuilds` approvals (`@google/genai`, `protobufjs`).
+  Fixed by adding `--ignore-scripts` — a type-check needs no dependency build scripts.
+  Worth remembering for any future packaged-consumer harness.
+- A subtle gotcha while debugging: `pnpm ... | tail; echo $?` reports `tail`'s exit, not pnpm's, which masked the real failure.
+  Use `set -o pipefail` or check the command directly.
+- `files` allowlist parity was validated with a before/after `pnpm pack --dry-run` diff: nothing dropped, only `dist/public.d.ts` added.
+  The allowlist reproduces the current contents (`src`, `docs`, `vitest.config.ts`, `AGENTS.md`, `CHANGELOG.md`, `.prettierignore`) plus `dist`.
+  Did not take the opportunity to slim the tarball (docs/test-config still ship) — that would be a separate deliberate change.
+- Runtime `default` → `./src/service/service.ts` is safe because that module's only internal imports are `import type`, which erase; no runtime `#src/*` resolution occurs.
+- No `src/`/`test/` `.ts` files were touched, so the vitest suite and `tsc` were unaffected (confirmed via root check).
+- Pre-completion reviewer: WARN — no findings attributable to this session.
+  Reviewer warnings: (1) the `package-pi-subagents` skill lacked a build-step note — addressed in commit `2ff5a375`; (2) `pnpm fallow dead-code` exits non-zero on a pre-existing finding in `packages/pi-subagents-worktrees/package.json` from the #263 scaffold (commit `9a7dcfc5`), out of scope for #270 and left for #263.
