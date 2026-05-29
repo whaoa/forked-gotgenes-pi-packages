@@ -52,3 +52,36 @@ Step 1 (re-export seam types from pi-subagents `service.ts`) and Step 4 (the `Wo
 - **Pre-completion review:** not dispatched — the implementation was paused before completing all steps, so the pre-completion protocol does not apply yet.
   It will run when #263 resumes and finishes.
 - **Remaining work on resume:** Step 1 (re-exports, contingent on #270), Step 4 (`WorkspaceProvider` impl), Step 5 (extension entry), Step 6 (settings + release-please registration), Steps 7–8 (core eviction, breaking), Step 9 (docs).
+
+## Stage: Implementation — TDD (resumed) (2026-05-29T21:09:56Z)
+
+### Session summary
+
+Resumed after #270 published `@gotgenes/pi-subagents@11.6.0` (the bundled `dist/public.d.ts`).
+Completed the remaining steps: the `WorkspaceProvider` impl, the extension entry, repo-config registration, and the two breaking core-eviction commits, plus docs.
+The worktrees package is 26 tests (4 files); the core dropped to 1016 tests (−41 worktree tests removed); all 7 packages, `pnpm run check`/`lint`, and `pnpm fallow dead-code` are green.
+Pre-completion reviewer: **PASS**.
+
+### Observations
+
+- **Step 1 dropped (chicken-and-egg confirmed).**
+  The published `11.6.0` `dist/public.d.ts` exports only `WorkspaceProvider` by name; `Workspace`/`WorkspacePrepareContext`/etc. are inlined-but-unexported.
+  Adding re-exports in #263 would be unconsumable until pi-subagents re-publishes, and `fallow` would flag them as dead.
+  The provider recovers the collaborator types via indexed-access aliases (`Parameters<WorkspaceProvider["prepare"]>[0]`, `NonNullable<Awaited<ReturnType<…>>>`).
+  Named re-exports tracked in new issue **#272**.
+- **Registry consumption, config in `pnpm-workspace.yaml` not `.npmrc`.**
+  Per #270's directive ("no workspace trickery"), the worktrees package depends on `@gotgenes/pi-subagents@^11.6.0` from the registry with `linkWorkspacePackages: false`.
+  The user corrected my initial `.npmrc` plan: pnpm 11 reads `linkWorkspacePackages` from `pnpm-workspace.yaml`, where this repo already centralizes `catalog`/`allowBuilds`.
+- **Provider shape.**
+  Class `WorktreeWorkspaceProvider implements WorkspaceProvider` with an inner `WorktreeWorkspace implements Workspace` (Workspace recovered via the derived alias).
+  `prepare` keeps `async` with an `eslint-disable require-await` (the seam is async; staying async makes creation failure *reject* rather than throw synchronously, which the `.rejects` test relies on).
+- **`settings.json` npm entry breaks unpublished packages.**
+  Adding `{ "source": "npm:@gotgenes/pi-subagents-worktrees" }` made the subagent harness (and Pi launch) try to `npm install` an unpublished package — the `pre-completion-reviewer` dispatch failed twice until I removed the `npm:` entry.
+  Only the local workspace-path entry is added now; the `npm:` entry must wait until first publish.
+- **Plan file-list gaps (handled).**
+  The tool-facing `isolation` axis also lived in `ui/agent-creation-wizard.ts`, `ui/agent-config-editor.ts`, and `config/custom-agents.ts` — not in the plan's Module-Level Changes.
+  The two-commit split held: Step 7 kept `IsolationMode` alive for `AgentSpawnConfig`, Step 8 removed it; `fallow` then flagged `IsolationMode` as orphaned and it was folded into the Step 8 commit.
+- **Reviewer WARN findings (non-blocking, deferred):** (1) `worktree.ts` `cleanupWorktree` mutates its `WorktreeInfo` arg (`worktree.branch = …`) redundantly with the returned result — a pre-existing pattern carried verbatim from the core lift-and-shift; (2) `debug.ts` reads `process.env` inside `isDebug()`, mirroring the core's intentional pattern.
+  Both left as-is to preserve the verbatim lift-and-shift; worth a future cleanup.
+- **Follow-ups filed:** #272 (named seam-type re-exports).
+  The `npm:` settings entry and the README's install instructions become accurate once the package first publishes.
