@@ -755,106 +755,15 @@ After Phase 15, Agent is born complete with all dependencies and configuration, 
 All six steps are closed: [#227], [#228], [#231], [#229], [#230], [#232].
 See [phase-15-domain-model-evolution.md](history/phase-15-domain-model-evolution.md) for details.
 
-## Improvement roadmap (Phase 16 — invert dependencies: extensions on a minimal core)
+## Phase 16 (complete)
 
-Phase 16 reclaims its original intent — invert the core's outbound dependencies — and extends it: worktree isolation joins permissions as an *extension* on a minimal core, leaving pi-subagents a pure child-session orchestrator.
+Phase 16 inverted the core's outbound dependencies: worktree isolation joined permissions as an *extension* on a minimal core, leaving pi-subagents a pure child-session orchestrator.
+The core now attaches extensions through exactly two surfaces — observational lifecycle events (unlimited) and rationed generative provider seams (today only the workspace provider) — and has zero knowledge of its consumers.
+The "runner" concept is gone: `createSubagentSession()` returns a born-complete `SubagentSession` that owns turn driving, steering, and disposal, and `Agent.run()` is coordination, not assembly.
 The decision and the full reasoning chain are recorded in [ADR 0002](../decisions/0002-extensions-on-a-minimal-core.md); the two-surface extension model is described under [Target architecture](#target-architecture).
-
-### Abandoned exploration: agent collaborator architecture
-
-An earlier Phase 16 plan ("agent collaborator architecture") proposed giving `Agent` three collaborators — a session factory, a `WorktreeIsolation`, and a lifecycle observer — and dissolving the runner.
-That framing was abandoned.
-Pulling on a single late-bound `create(cwd?)` parameter on the planned `ChildSessionFactory` exposed deeper problems:
-
-- `WorktreeIsolation.setup()` is a two-phase `construct-then-setup()` that violates "Construct complete" (principle 8) — the worktree is only *ready* at dequeue.
-- The worktree and the child session share one lifespan, so they are one run-scoped resource, not sibling collaborators that `Agent` must sequence; the `cwd` parameter only existed because the worktree was split out and `Agent` relayed its output back in.
-- Worktrees are not intrinsic to subagents — they are one *workspace strategy* and belong outside the core, exactly as Phase 14 evicted tool/extension policy.
-
-Issue #256 (`WorktreeIsolation` as a collaborator) shipped under the abandoned plan and is now superseded by #263; issue #257 (`ChildSessionFactory` extraction) was parked.
-The structural win the collaborator plan chased — a born-complete child execution and the dissolution of the runner — is recovered by a cleaner route once the workspace seam exists (Step 5).
-
-### Steps
-
-#### Step 1: Child-execution lifecycle events; retire permission-bridge — [#261] ✅ Delivered
-
-Emit ordered child-execution events (`spawning`, `session-created` before `bindExtensions()`, `completed`, `disposed`) carrying child identity (session directory, agent name, parent session id).
-Migrate `@gotgenes/pi-permission-system` to subscribe to `session-created`/`disposed` for registration instead of being looked up by the core; delete `permission-bridge.ts`.
-
-- Cross-package: pi-subagents (emit + remove bridge) and pi-permission-system (subscribe).
-- Investigation (resolved): `pi.events` is a Node `EventEmitter`, so `emit()` dispatches listeners synchronously on the same call stack — a synchronous subscriber completes before `emit()` returns.
-  Emitting `session-created` immediately before `bindExtensions()` therefore guarantees the registry entry lands pre-bind, with no new SDK hook.
-  The synchronous-handler constraint is encoded as a real-bus test in pi-permission-system.
-- Outcome: the core stops reaching out to a named consumer; permission detection rides events.
-- Deferred: removing the now-caller-less `registerSubagentSession`/`unregisterSubagentSession` from `PermissionsService` → #267; registry-detected resume ("executing now" → "exists" semantics) → #265.
-
-#### Step 2: Define the `WorkspaceProvider` seam — [#262] ✅ Delivered
-
-Added the `WorkspaceProvider` / `Workspace` interfaces (`src/lifecycle/workspace.ts`) and `SubagentsService.registerWorkspaceProvider` (single provider, throws on duplicate, returns an unregister disposer).
-All five workspace types are named-re-exported from `service.ts`: `WorkspaceProvider`, `Workspace`, `WorkspacePrepareContext`, `WorkspaceDisposeOutcome`, and `WorkspaceDisposeResult` (added in #272).
-At run-start `Agent.run()` consults the registered provider for the child's cwd and a disposal handle; with no provider the child runs in the parent's cwd (the legacy worktree-collaborator fallback was removed when worktrees left the core in #263).
-On completion the core calls `Workspace.dispose({ status, description })` and appends the returned `resultAddendum` verbatim — the provider owns the wording.
-
-- The seam is additive and non-breaking: the existing `isolation: "worktree"` path is untouched (its eviction is Step 3).
-- Land alongside its first consumer (Step 3) to avoid a vacant hook — the "no vacant hooks" rule.
-  Within #262 the seam is exercised only by test fakes; do not cut a release containing the seam without `@gotgenes/pi-subagents-worktrees`.
-- Outcome: a single generative seam; the core no longer knows what an "isolation strategy" is.
-
-#### Step 3: Extract worktrees to `@gotgenes/pi-subagents-worktrees` — [#263] ✅ Delivered
-
-New package implementing `WorkspaceProvider`: prepares a git worktree at run-start (born complete), tears it down after (saving the branch), and owns the "changes saved to branch" result.
-Worktree isolation is opt-in per agent type via the package's own `worktreeAgents` config; creation failure for an opted-in agent throws (strict, no silent fallback).
-Removed `worktree.ts`, `worktree-isolation.ts`, `GitWorktreeManager`, and the `isolation: "worktree"` mode from the core; dropped `isolation` from the spawn API and `SubagentsService`, and `worktreeResult` from `SubagentRecord`.
-
-- Supersedes #256.
-  New package registered in `release-please-config.json` and `.pi/settings.json` (after pi-subagents); consumes the published `@gotgenes/pi-subagents` from the registry (`linkWorkspacePackages: false`), since `exports.types` resolves to the shipped declaration bundle.
-  From the release carrying #272, all five workspace types are importable by name: `WorkspaceProvider`, `Workspace`, `WorkspacePrepareContext`, `WorkspaceDisposeOutcome`, and `WorkspaceDisposeResult`.
-- Outcome: git leaves the core; worktree users install one package, everyone else pays nothing.
-
-#### Step 4: Remove `isolated` / `extensions: false` / `noSkills` — [#264] ✅ Delivered
-
-Children always load the parent's extensions and skills; the recursion guard is now unconditional.
-Deny-at-use (the in-child permission layer) covers tool restriction; prevent-load is left as a latent provider seam (not shipped).
-The `skills` curation axis collapsed symmetrically with `extensions`: `AgentConfig.skills`, the skill-preload path (`skill-loader.ts`, `safe-fs.ts`, `preloadSkills`, `PromptExtras`), `SessionConfig.{extensions,noSkills,extras}`, and the `isolated:` / `extensions:` / `skills:` custom-agent frontmatter keys are all gone.
-
-- Depended on: Step 1 (deny-at-use over events).
-- Outcome: the `isolated`/`extensions`/`noSkills`/`skills` axis is gone; the guard is unconditional.
-
-#### Step 5: Born-complete child execution; dissolve the runner — [#265] ✅ Delivered
-
-`createSubagentSession()` is an assembly factory that returns a born-complete `SubagentSession` (session created, extensions bound, recursion guard applied).
-`SubagentSession` owns turn driving (`runTurnLoop`/`resumeTurnLoop`), steering, and disposal.
-`Agent.run()` is coordination, not assembly; `runAgent` / `resumeAgent` / `ConcreteAgentRunner` / `AgentRunner` / `RunOptions` / `RunResult` / `ExecutionState` dissolved.
-`getAgentConversation()` relocated to `session/conversation.ts`; `normalizeMaxTurns()` to `lifecycle/turn-limits.ts`.
-`disposed` now fires at true session disposal (cleanup), so resume executions are registry-detected (closing the gap deferred from #261).
-
-- Depends on: Steps 2–4.
-- Outcome: the "runner" concept is gone; `Agent.run()` is coordination, not assembly — the structural goal of the abandoned collaborator plan, reached cleanly.
-
-### Step dependency diagram
-
-```mermaid
-flowchart LR
-    S1["Step 1<br/>Lifecycle events<br/>(retire bridge)"]
-    S2["Step 2<br/>WorkspaceProvider seam"]
-    S3["Step 3<br/>Extract worktrees pkg"]
-    S4["Step 4<br/>Remove isolated"]
-    S5["Step 5<br/>Born-complete execution"]
-
-    S2 --> S3
-    S1 --> S4
-    S2 --> S5
-    S3 --> S5
-    S4 --> S5
-```
-
-### Tracks
-
-1. **Track A — Inversion seams** (Steps 1, 2): lifecycle events and the workspace seam.
-   Independent of each other — can proceed in parallel.
-2. **Track B — Eviction** (Steps 3, 4): worktrees and `isolated` leave the core.
-   Step 3 depends on Step 2.
-3. **Track C — Consolidation** (Step 5): dissolve the runner around the new seam.
-   Depends on Tracks A and B.
+All five steps are closed: [#261], [#262], [#263], [#264], [#265].
+The earlier "agent collaborator architecture" framing (#256 superseded, #257 parked, #258 and #259 closed not-planned) was abandoned; its structural win was reached cleanly via the workspace seam.
+See [phase-16-invert-dependencies.md](history/phase-16-invert-dependencies.md) for details.
 
 ## Improvement roadmap (Phase 17 — extract UI)
 
@@ -864,8 +773,8 @@ By this point the core is minimal and stable — the API boundary has been prove
 
 ## Refactoring history
 
-Phases 1–5, 7–14 are complete.
-Phase 6 (UI extraction to a separate package) is deferred.
+Phases 1–5, 7–16 are complete.
+Phase 6 (UI extraction to a separate package) is deferred → Phase 17.
 Detailed records are preserved in per-phase history files:
 
 | Phase | Title                                               | Status              | History                                                                              |
@@ -885,7 +794,7 @@ Detailed records are preserved in per-phase history files:
 | 13    | Remaining structural smells                         | Complete            | [phase-13-remaining-smells.md](history/phase-13-remaining-smells.md)                 |
 | 14    | Strip policy from core                              | Complete            | [phase-14-strip-policy.md](history/phase-14-strip-policy.md)                         |
 | 15    | Domain model evolution                              | Complete            | [phase-15-domain-model-evolution.md](history/phase-15-domain-model-evolution.md)     |
-| 16    | Invert dependencies (extensions on a minimal core)  | Planned             | [ADR 0002](../decisions/0002-extensions-on-a-minimal-core.md)                        |
+| 16    | Invert dependencies (extensions on a minimal core)  | Complete            | [phase-16-invert-dependencies.md](history/phase-16-invert-dependencies.md)           |
 | 17    | Extract UI to separate package                      | Planned             | —                                                                                    |
 
 ### Structural refactoring issues
@@ -907,7 +816,7 @@ Detailed records are preserved in per-phase history files:
 | Phase 14             | #237, #238, #239, #242                                     | Remove disallowed_tools, remove extensions filtering, collapse filterActiveTools, rename Agent to subagent                                                 |
 | Phase 15             | #227, #228, #231, #229, #230, #232                         | Agent domain model, async startAgent, runner self-contained, Agent.run(), ConcurrencyQueue, Agent.resume()                                                 |
 | Phase 16             | #261, #262, #263, #264, #265                               | Lifecycle events (retire permission-bridge), WorkspaceProvider seam, extract worktrees package, remove isolated, born-complete execution / dissolve runner |
-| Phase 16 (abandoned) | #256 (superseded), #257 (parked)                           | Agent collaborator architecture — replaced by the inversion approach above (ADR 0002)                                                                      |
+| Phase 16 (abandoned) | #256 (superseded), #257 (parked), #258, #259 (not planned) | Agent collaborator architecture — replaced by the inversion approach above (ADR 0002)                                                                      |
 
 The remaining open issue is #22 (parent-session resolution), a cross-extension track that does not gate the structural work.
 
