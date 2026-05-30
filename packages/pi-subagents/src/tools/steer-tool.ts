@@ -1,6 +1,5 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { getSessionContextPercent } from "#src/lifecycle/usage";
 import { formatLifetimeTokens, textResult } from "#src/tools/helpers";
 import type { Agent } from "#src/types";
 
@@ -40,21 +39,16 @@ export class SteerTool {
 				`Agent "${params.agent_id}" is not running (status: ${record.status}). Cannot steer a non-running agent.`,
 			);
 		}
-		const session = record.session;
-		if (!session) {
-			// Session not ready yet — buffer on the agent for delivery once initialized
-			record.queueSteer(params.message);
-			this.events.emit("subagents:steered", { id: record.id, message: params.message });
-			return textResult(
-				`Steering message queued for agent ${record.id}. It will be delivered once the session initializes.`,
-			);
-		}
-
 		try {
-			await session.steer(params.message);
+			const delivered = await record.steer(params.message);
 			this.events.emit("subagents:steered", { id: record.id, message: params.message });
+			if (!delivered) {
+				return textResult(
+					`Steering message queued for agent ${record.id}. It will be delivered once the session initializes.`,
+				);
+			}
 			const tokens = formatLifetimeTokens(record);
-			const contextPercent = getSessionContextPercent(session);
+			const contextPercent = record.getContextPercent();
 			const stateParts: string[] = [];
 			if (tokens) stateParts.push(tokens);
 			stateParts.push(`${record.toolUses} tool ${record.toolUses === 1 ? "use" : "uses"}`);

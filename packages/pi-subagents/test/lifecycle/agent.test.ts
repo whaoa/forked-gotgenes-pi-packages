@@ -556,14 +556,7 @@ describe("Agent — session-encapsulation methods", () => {
 	});
 });
 
-describe("Agent — queueSteer", () => {
-	it("buffers a steer message", () => {
-		const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
-		record.queueSteer("hello");
-		record.queueSteer("world");
-		expect(record.pendingSteerCount).toBe(2);
-	});
-
+describe("Agent — steer buffer", () => {
 	it("starts with an empty steer buffer", () => {
 		const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
 		expect(record.pendingSteerCount).toBe(0);
@@ -601,28 +594,7 @@ describe("Agent — abort", () => {
 	});
 });
 
-describe("Agent — flushPendingSteers", () => {
-	it("delegates each buffered message to subagentSession.steer and clears the buffer", () => {
-		const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
-		record.queueSteer("msg1");
-		record.queueSteer("msg2");
 
-		const stub = createSubagentSessionStub();
-		record.subagentSession = toSubagentSession(stub);
-		record.flushPendingSteers();
-
-		expect(stub.steer.mock.calls.map((c) => c[0])).toEqual(["msg1", "msg2"]);
-		expect(record.pendingSteerCount).toBe(0);
-	});
-
-	it("does nothing when the buffer is empty", () => {
-		const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
-		const stub = createSubagentSessionStub();
-		record.subagentSession = toSubagentSession(stub);
-		record.flushPendingSteers();
-		expect(stub.steer).not.toHaveBeenCalled();
-	});
-});
 
 /** Create an Agent for completeRun / failRun tests. */
 function createCompletionAgent(overrides?: { observer?: AgentLifecycleObserver }) {
@@ -843,7 +815,7 @@ describe("Agent.run() — happy path", () => {
 
 	it("flushes pending steers when session is created", async () => {
 		const agent = createRunnableAgent();
-		agent.queueSteer("hurry up");
+		void agent.steer("hurry up");
 		expect(agent.pendingSteerCount).toBe(1);
 		await agent.run();
 		expect(agent.pendingSteerCount).toBe(0);

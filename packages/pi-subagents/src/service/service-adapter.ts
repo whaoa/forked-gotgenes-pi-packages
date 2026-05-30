@@ -90,13 +90,7 @@ export class SubagentsServiceAdapter implements SubagentsService {
     if (record?.status !== "running") {
       return false;
     }
-    const session = record.session;
-    if (!session) {
-      // Session not ready yet — buffer on the agent for delivery once initialized
-      record.queueSteer(message);
-      return true;
-    }
-    await session.steer(message);
+    await record.steer(message);
     return true;
   }
 

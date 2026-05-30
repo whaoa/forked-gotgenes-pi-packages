@@ -445,17 +445,17 @@ export class Agent {
 
 	/**
 	 * Buffer a steer message for delivery once the session is ready.
-	 * Called when steer is requested before onSessionCreated fires.
+	 * Called internally from steer() before the session is ready.
 	 */
-	queueSteer(message: string): void {
+	private queueSteer(message: string): void {
 		this._pendingSteers.push(message);
 	}
 
 	/**
 	 * Flush all buffered steer messages to the session and clear the buffer.
-	 * Called once the session is available, delegating to SubagentSession.steer.
+	 * Called once the session is available (inside run()).
 	 */
-	flushPendingSteers(): void {
+	private flushPendingSteers(): void {
 		for (const msg of this._pendingSteers) {
 			this.subagentSession?.steer(msg).catch(() => {});
 		}
