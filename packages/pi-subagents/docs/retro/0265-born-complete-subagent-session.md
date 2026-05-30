@@ -42,7 +42,7 @@ Plan committed as `0265-born-complete-subagent-session.md`; a side-quest filed #
 Executed all 7 TDD steps from the plan via lift-and-shift, one commit per step, each leaving the suite green.
 Introduced `SubagentSession` (`runTurnLoop`/`resumeTurnLoop`/`steer`/`dispose`) and the `createSubagentSession()` assembly factory, swapped `Agent`/`AgentManager`/`index.ts` onto them, then deleted `agent-runner.ts` + `execution-state.ts` and the three runner test files.
 Package test count went 951 → 960 (net +9: new `subagent-session`/`create-subagent-session`/`turn-limits` suites added, the redundant runner suites deleted).
-Pre-completion reviewer: PASS.
+Pre-completion reviewer: initial FAIL (MD060 table alignment in SKILL.md, auto-fixed by `rumdl fmt`), PASS on re-check after fix + stale doc cleanup.
 
 ### Observations
 
