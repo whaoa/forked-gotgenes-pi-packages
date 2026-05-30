@@ -1,8 +1,9 @@
 import { createRequire } from "node:module";
-import { basename } from "node:path";
+import { basename, resolve } from "node:path";
 
 import {
-  isPathOutsideWorkingDirectory,
+  isPathWithinDirectory,
+  isSafeSystemPath,
   normalizePathForComparison,
 } from "#src/path-utils";
 
@@ -501,11 +502,90 @@ function classifyTokenAsPathCandidate(token: string): string | null {
   return null;
 }
 
+// ── Leading cd detection ───────────────────────────────────────────────────
+
+/**
+ * Walk down from the root to find the first `command` node in the program.
+ *
+ * Only descends into `program` and `list` nodes — subshells, pipelines, and
+ * other compound statements are ignored because a `cd` inside them does not
+ * affect the outer shell's working directory.
+ */
+function findFirstCommand(node: TSNode): TSNode | null {
+  if (node.type === "command") return node;
+  if (node.type === "program" || node.type === "list") {
+    const firstChild = node.child(0);
+    if (firstChild) return findFirstCommand(firstChild);
+  }
+  return null;
+}
+
+/**
+ * Extract the target directory of a leading `cd` command from the parsed AST.
+ *
+ * When a bash command begins with `cd <dir> && …`, the shell resolves
+ * subsequent relative paths against `<dir>`, not the original working
+ * directory.  The external-directory guard must do the same, otherwise a
+ * path that the shell keeps inside the working directory can appear to
+ * escape it and trigger a spurious permission prompt.
+ *
+ * Returns `undefined` when the first command is not `cd`, or when the
+ * target cannot be meaningfully resolved (`cd -`, bare `cd`, or `cd ~…`).
+ */
+function extractLeadingCdTarget(rootNode: TSNode): string | undefined {
+  const firstCmd = findFirstCommand(rootNode);
+  if (!firstCmd) return undefined;
+
+  const cmdName = extractCommandName(firstCmd);
+  if (cmdName !== "cd") return undefined;
+
+  for (let i = 0; i < firstCmd.childCount; i++) {
+    const child = firstCmd.child(i);
+    if (!child) continue;
+    if (child.type === "command_name" || child.type === "variable_assignment")
+      continue;
+    if (!ARG_NODE_TYPES.has(child.type)) continue;
+
+    const text = resolveNodeText(child);
+    // Skip `--` (end-of-flags marker)
+    if (text === "--") continue;
+    // `cd -` jumps to $OLDPWD; `cd ~…` is home-relative — neither can be
+    // resolved against the working directory.
+    if (text === "-" || text.startsWith("~")) return undefined;
+    return text;
+  }
+  return undefined;
+}
+
+/**
+ * Compute the effective base directory for resolving relative path candidates.
+ *
+ * When the leading `cd` target stays within the working directory, subsequent
+ * relative paths should be resolved against it.  An escaping target is itself
+ * an external access (reported via its own candidate token) and must never
+ * silence checks on subsequent paths, so the function falls back to `cwd`.
+ */
+function computeEffectiveResolveBase(
+  cdTarget: string | undefined,
+  cwd: string,
+): string {
+  if (cdTarget === undefined) return cwd;
+  const resolved = resolve(cwd, cdTarget);
+  const normalizedCwd = resolve(cwd);
+  return isPathWithinDirectory(resolved, normalizedCwd) ? resolved : cwd;
+}
+
+// ── Public extractors ──────────────────────────────────────────────────────
+
 /**
  * Extracts paths from a bash command string that resolve outside CWD.
  * Uses tree-sitter-bash to parse the command into a full AST, then walks
  * command argument and redirect-destination nodes.  Heredoc bodies, comments,
  * and other non-argument content are skipped, eliminating false positives.
+ *
+ * When the command begins with `cd <dir> && …`, relative candidate paths are
+ * resolved against `<dir>` (if it stays within CWD) rather than CWD itself,
+ * mirroring how the shell would resolve them.
  */
 export async function extractExternalPathsFromBashCommand(
   command: string,
@@ -515,12 +595,17 @@ export async function extractExternalPathsFromBashCommand(
   const tree = parser.parse(command);
   if (!tree) return [];
 
+  let cdTarget: string | undefined;
   const tokens: string[] = [];
   try {
+    cdTarget = extractLeadingCdTarget(tree.rootNode);
     collectPathCandidateTokens(tree.rootNode, tokens);
   } finally {
     tree.delete();
   }
+
+  const resolveBase = computeEffectiveResolveBase(cdTarget, cwd);
+  const normalizedCwd = normalizePathForComparison(cwd, cwd);
 
   const seen = new Set<string>();
   const externalPaths: string[] = [];
@@ -529,11 +614,13 @@ export async function extractExternalPathsFromBashCommand(
     const candidate = classifyTokenAsPathCandidate(token);
     if (!candidate) continue;
 
-    const normalized = normalizePathForComparison(candidate, cwd);
+    const normalized = normalizePathForComparison(candidate, resolveBase);
     if (!normalized) continue;
 
     if (
-      isPathOutsideWorkingDirectory(candidate, cwd) &&
+      normalizedCwd !== "" &&
+      !isSafeSystemPath(normalized) &&
+      !isPathWithinDirectory(normalized, normalizedCwd) &&
       !seen.has(normalized)
     ) {
       seen.add(normalized);

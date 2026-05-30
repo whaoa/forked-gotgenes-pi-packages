@@ -822,6 +822,82 @@ describe("extractExternalPathsFromBashCommand", () => {
       expect(result).toContain("/etc/hosts");
     });
   });
+
+  describe("leading cd prefix", () => {
+    test("regression: cd to subdir with relative path traversing back into cwd is not flagged", async () => {
+      // Real-world command that triggered a false-positive external-directory
+      // prompt. The relative path .pi/../../../.pi/skills/... resolves inside
+      // cwd when resolved from the cd target, but outside cwd when resolved
+      // from cwd itself.
+      const result = await extractExternalPathsFromBashCommand(
+        'cd /projects/my-app/packages/sub && grep -n "pattern" .pi/../../../.pi/skills/pkg/SKILL.md',
+        cwd,
+      );
+      expect(result).toHaveLength(0);
+    });
+
+    test("cd to subdir: still flags genuinely external paths after cd", async () => {
+      const result = await extractExternalPathsFromBashCommand(
+        "cd /projects/my-app/packages/sub && cat /etc/hosts",
+        cwd,
+      );
+      expect(result).toContain("/etc/hosts");
+    });
+
+    test("cd to subdir: relative path that stays inside cwd is not flagged", async () => {
+      const result = await extractExternalPathsFromBashCommand(
+        "cd /projects/my-app/src && cat ../README.md",
+        cwd,
+      );
+      expect(result).toHaveLength(0);
+    });
+
+    test("cd to external dir: paths after cd are still checked against cwd", async () => {
+      // When cd target is outside cwd, we fall back to cwd as the resolve base.
+      // The cd target itself should be flagged, and paths after cd are resolved
+      // against cwd.
+      const result = await extractExternalPathsFromBashCommand(
+        "cd /tmp && cat ../etc/hosts",
+        cwd,
+      );
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    test("cd with relative target: resolves inside cwd", async () => {
+      const result = await extractExternalPathsFromBashCommand(
+        'cd packages/sub && grep -n "x" .pi/../../../.pi/skills/pkg/SKILL.md',
+        cwd,
+      );
+      expect(result).toHaveLength(0);
+    });
+
+    test("no cd prefix: ../ path that escapes cwd is flagged", async () => {
+      // Without the cd prefix, the path resolves against cwd and escapes.
+      const result = await extractExternalPathsFromBashCommand(
+        'grep -n "pattern" .pi/../../../.pi/skills/pkg/SKILL.md',
+        cwd,
+      );
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    test("cd is not first command: cd is ignored", async () => {
+      // cd after another command should not affect path resolution.
+      const result = await extractExternalPathsFromBashCommand(
+        "echo hello && cd /projects/my-app/src && cat ../../outside.txt",
+        cwd,
+      );
+      // ../../outside.txt resolves against cwd, not the cd target
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    test("cd with semicolon separator", async () => {
+      const result = await extractExternalPathsFromBashCommand(
+        "cd /projects/my-app/src ; cat ../README.md",
+        cwd,
+      );
+      expect(result).toHaveLength(0);
+    });
+  });
 });
 
 describe("formatBashExternalDirectoryAskPrompt", () => {
