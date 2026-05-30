@@ -504,7 +504,7 @@ src/
 │       ├── external-directory-messages.ts External-directory ask-prompt formatting (denial messages moved to denial-messages.ts)
 │       ├── bash-external-directory.ts describeBashExternalDirectoryGate — pure descriptor/bypass factory
 │       ├── bash-path.ts      describeBashPathGate — async descriptor/bypass factory for bash path rules
-│       ├── bash-path-extractor.ts Tree-sitter-bash AST parser + external/rule path extraction
+│       ├── bash-path-extractor.ts Tree-sitter-bash AST parser + external/rule path extraction; cd-aware: when the command begins with `cd <dir> &&`, relative paths are resolved against `<dir>` (if it stays within cwd) rather than cwd, matching actual shell behavior
 │       ├── path.ts           describePathGate — pure descriptor factory for cross-cutting path rules
 │       ├── tool.ts           describeToolGate — pure descriptor factory
 │       └── index.ts          Barrel re-exports
