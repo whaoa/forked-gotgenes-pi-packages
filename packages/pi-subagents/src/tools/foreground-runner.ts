@@ -108,10 +108,11 @@ export async function runForeground(
         signal,
         parentSession: params.parentSession,
         observer: {
-          onSessionCreated: (agent, session) => {
-            fgState.setSession(session);
+          onSessionCreated: (agent) => {
+            const sub = agent.subagentSession!;
+            fgState.setSession(sub);
             recordRef = agent;
-            unsubUI = subscribeUIObserver(session, fgState, streamUpdate);
+            unsubUI = subscribeUIObserver(sub, fgState, streamUpdate);
             fgId = agent.id;
             agentActivity.set(agent.id, fgState);
             widget.ensureTimer();

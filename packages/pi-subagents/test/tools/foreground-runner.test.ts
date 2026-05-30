@@ -115,14 +115,14 @@ describe("runForeground", () => {
 
 	it("calls runtime.ensureTimer and runtime.markFinished after completion", async () => {
 		// spawnAndWait invokes observer.onSessionCreated to register the agent in activity map
-		const mockSess = { subscribe: vi.fn().mockReturnValue(() => {}) };
 		const deps = createToolDeps({
 			manager: {
 				...createToolDeps().manager,
 				spawnAndWait: vi.fn().mockImplementation(
 					async (_snapshot: any, _type: any, _prompt: any, opts: any) => {
 						const record = createTestAgent({ result: "done" });
-						opts.observer?.onSessionCreated?.(record, mockSess);
+						record.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession()));
+						opts.observer?.onSessionCreated?.(record);
 						return record;
 					},
 				),
@@ -135,7 +135,6 @@ describe("runForeground", () => {
 	});
 
 	it("registers activity tracker in agentActivity on session creation", async () => {
-		const mockSess = { subscribe: vi.fn().mockReturnValue(() => {}) };
 		const deps = createToolDeps({
 			manager: {
 				...createToolDeps().manager,
@@ -143,7 +142,7 @@ describe("runForeground", () => {
 					async (_snapshot: any, _type: any, _prompt: any, opts: any) => {
 						const record = createTestAgent({ result: "done" });
 						record.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession()));
-						opts.observer?.onSessionCreated?.(record, mockSess);
+						opts.observer?.onSessionCreated?.(record);
 						return record;
 					},
 				),

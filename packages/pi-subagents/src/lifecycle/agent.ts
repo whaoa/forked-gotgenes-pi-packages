@@ -36,8 +36,8 @@ import type { AgentInvocation, CompactionInfo, ParentSessionInfo, SubagentType, 
 export interface AgentLifecycleObserver {
 	/** Fires when the agent transitions to running (inside run(), after markRunning). */
 	onStarted?(agent: Agent): void;
-	/** Fires once the session is created — delivers the session to external consumers. */
-	onSessionCreated?(agent: Agent, session: AgentSession): void;
+	/** Fires once the session is created — the agent's subagentSession is now available. */
+	onSessionCreated?(agent: Agent): void;
 	/** Fires once when the run completes or fails (for concurrency drain). */
 	onRunFinished?(agent: Agent): void;
 	/** Fires on compaction events during the run. */
@@ -305,12 +305,11 @@ export class Agent {
 			return;
 		}
 
-		const session = this.subagentSession.session;
 		this.flushPendingSteers();
-		this.attachObserver(subscribeAgentObserver(session, this, {
+		this.attachObserver(subscribeAgentObserver(this.subagentSession, this, {
 			onCompact: (r, info) => this.observer?.onCompacted?.(r, info),
 		}));
-		this.observer?.onSessionCreated?.(this, session);
+		this.observer?.onSessionCreated?.(this);
 
 		const runConfig = this._getRunConfig?.();
 		try {
@@ -342,7 +341,7 @@ export class Agent {
 		}
 
 		this.resetForResume(Date.now());
-		this.attachObserver(subscribeAgentObserver(subagentSession.session, this, {
+		this.attachObserver(subscribeAgentObserver(subagentSession, this, {
 			onCompact: (r, info) => this.observer?.onCompacted?.(r, info),
 		}));
 

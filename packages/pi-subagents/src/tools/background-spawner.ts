@@ -53,9 +53,10 @@ export function spawnBackground(
       isBackground: true,
       invocation: execution.agentInvocation,
       observer: {
-        onSessionCreated: (_agent, session) => {
-          bgState.setSession(session);
-          subscribeUIObserver(session, bgState);
+        onSessionCreated: (agent) => {
+          const sub = agent.subagentSession!;
+          bgState.setSession(sub);
+          subscribeUIObserver(sub, bgState);
         },
       },
     });
