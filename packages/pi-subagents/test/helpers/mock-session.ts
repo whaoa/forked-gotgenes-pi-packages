@@ -5,6 +5,7 @@ import type { SubagentSession } from "#src/lifecycle/subagent-session";
 
 /** The core shape returned by `createMockSession`. */
 export interface MockSession {
+	messages: unknown[];
 	subscribe: Mock<(fn: (event: unknown) => void) => () => void>;
 	emit(event: unknown): void;
 	dispose: Mock<() => void>;
@@ -49,6 +50,14 @@ export function createSubagentSessionStub(
 		dispose: vi.fn((): void => {
 			session.dispose();
 		}),
+		getConversation: vi.fn((): string => ""),
+		getContextPercent: vi.fn((): number | null => null),
+		subscribe: vi.fn((fn: (event: unknown) => void): (() => void) => session.subscribe(fn)),
+		getSessionStats: vi.fn(() => ({
+			tokens: { input: 0, output: 0, cacheWrite: 0 },
+			contextUsage: { percent: null as number | null },
+		})),
+		get messages(): readonly unknown[] { return session.messages; },
 	};
 }
 
@@ -73,6 +82,7 @@ export function createMockSession(overrides: Record<string, unknown> = {}): Mock
 	});
 
 	const base: MockSession = {
+		messages: [],
 		subscribe,
 		emit(event: unknown) {
 			for (const fn of subscribers) fn(event);

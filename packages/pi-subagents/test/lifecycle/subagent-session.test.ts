@@ -26,6 +26,10 @@ function createSession(finalText: string) {
     abort: vi.fn(),
     steer: vi.fn().mockResolvedValue(undefined),
     dispose: vi.fn(),
+    getSessionStats: vi.fn(() => ({
+      tokens: { input: 100, output: 50, cacheWrite: 10 },
+      contextUsage: { percent: 42 },
+    })),
   };
   return { session, listeners };
 }
@@ -235,6 +239,59 @@ describe("SubagentSession — steer", () => {
     const { sub } = makeSubagentSession(session);
     await sub.steer("hurry up");
     expect(session.steer).toHaveBeenCalledWith("hurry up");
+  });
+});
+
+describe("SubagentSession — delegate methods", () => {
+  it("getConversation returns formatted text from session messages", () => {
+    const { session } = createSession("X");
+    session.messages.push({ role: "user", content: "Hello" });
+    session.messages.push({
+      role: "assistant",
+      content: [{ type: "text", text: "World" }],
+    });
+    const { sub } = makeSubagentSession(session);
+    const conv = sub.getConversation();
+    expect(conv).toContain("[User]: Hello");
+    expect(conv).toContain("[Assistant");
+    expect(conv).toContain("World");
+  });
+
+  it("getContextPercent returns the session context percent", () => {
+    const { session } = createSession("X");
+    const { sub } = makeSubagentSession(session);
+    expect(sub.getContextPercent()).toBe(42);
+  });
+
+  it("getContextPercent returns null when getSessionStats is unavailable", () => {
+    const { session } = createSession("X");
+    session.getSessionStats = vi.fn(() => { throw new Error("no stats"); });
+    const { sub } = makeSubagentSession(session);
+    expect(sub.getContextPercent()).toBeNull();
+  });
+
+  it("subscribe delegates to the underlying session", () => {
+    const { session } = createSession("X");
+    const { sub } = makeSubagentSession(session);
+    const fn = vi.fn();
+    const unsub = sub.subscribe(fn);
+    expect(session.subscribe).toHaveBeenCalledWith(fn);
+    expect(typeof unsub).toBe("function");
+  });
+
+  it("getSessionStats delegates to the underlying session", () => {
+    const { session } = createSession("X");
+    const { sub } = makeSubagentSession(session);
+    const stats = sub.getSessionStats();
+    expect(session.getSessionStats).toHaveBeenCalled();
+    expect(stats.tokens.input).toBe(100);
+  });
+
+  it("messages returns the underlying session messages", () => {
+    const { session } = createSession("X");
+    session.messages.push({ role: "user", content: "hi" });
+    const { sub } = makeSubagentSession(session);
+    expect(sub.messages).toBe(session.messages);
   });
 });
 

@@ -16,7 +16,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { ChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import { normalizeMaxTurns } from "#src/lifecycle/turn-limits";
+import { getSessionContextPercent, type SessionStatsLike } from "#src/lifecycle/usage";
 import { extractText } from "#src/session/context";
+import { getAgentConversation } from "#src/session/conversation";
 
 /** Outcome of one turn loop. */
 export interface TurnLoopResult {
@@ -61,7 +63,10 @@ export class SubagentSession {
     private readonly meta: SubagentSessionMeta,
   ) {}
 
-  /** Wrapped session — exposed for observer wiring + consumers; retired by #277. */
+  /**
+   * Wrapped session — for lifecycle-internal use only.
+   * @internal consumers outside lifecycle/ use the delegate methods below.
+   */
   get session(): AgentSession {
     return this._session;
   }
@@ -144,6 +149,31 @@ export class SubagentSession {
   /** Deliver a steer to the live session. */
   async steer(message: string): Promise<void> {
     await this._session.steer(message);
+  }
+
+  /** Return the session's conversation as formatted text. */
+  getConversation(): string {
+    return getAgentConversation(this._session);
+  }
+
+  /** Return the session context window utilization (0-100), or null when unavailable. */
+  getContextPercent(): number | null {
+    return getSessionContextPercent(this._session);
+  }
+
+  /** Subscribe to session events. Satisfies `SubscribableSession`. */
+  subscribe(fn: (event: AgentSessionEvent) => void): () => void {
+    return this._session.subscribe(fn);
+  }
+
+  /** Return session token statistics. Satisfies `SessionLike`. */
+  getSessionStats(): SessionStatsLike {
+    return this._session.getSessionStats();
+  }
+
+  /** The session's message history. */
+  get messages(): readonly unknown[] {
+    return this._session.messages as readonly unknown[];
   }
 
   /** Tear down: session.dispose() + emit `disposed` (registry unregister). */
