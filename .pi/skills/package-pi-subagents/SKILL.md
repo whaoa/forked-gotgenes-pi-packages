@@ -16,7 +16,7 @@ See `docs/architecture/architecture.md` for the full decomposition plan and `doc
 The fork carries two original patches from the thin-patch era, still present in the codebase:
 
 1. **Peer-dep rename** — peer dependencies point at `@earendil-works/pi-*` (the active scope) rather than the deprecated `@mariozechner/pi-*` scope.
-2. **Patch 3 (active_agent tag)** — `runAgent` prepends `<active_agent name="${agentConfig.name}"/>` to every assembled child system prompt so `@gotgenes/pi-permission-system` can resolve per-agent `permission:` frontmatter inside the child.
+2. **Patch 3 (active_agent tag)** — `assembleSessionConfig` prepends `<active_agent name="${agentConfig.name}"/>` to every assembled child system prompt so `@gotgenes/pi-permission-system` can resolve per-agent `permission:` frontmatter inside the child.
 
 Note: Patch 2 (post-bind active-tool re-filter) was simplified in Phase 14 (#239).
 The two-pass pre-bind/post-bind filter dance is gone.
@@ -68,7 +68,7 @@ See `@gotgenes/pi-subagents-worktrees` for the pattern.
 
 The fork preserves upstream's full `vitest` suite (362 tests) plus tests added for Patch 3.
 All tests must pass before publishing.
-Use `vi.hoisted(...)` for module-level mocks, matching the existing patterns in `test/agent-runner.test.ts`.
+Use `vi.hoisted(...)` for module-level mocks, matching the existing patterns in `test/lifecycle/subagent-session.test.ts`.
 
 ## Notes for Agents
 
@@ -76,7 +76,7 @@ When working in this package:
 
 1. New features and removals follow the phase plan in `docs/architecture/architecture.md`.
    Document architectural decisions in `docs/decisions/`.
-2. The upstream test suite is run periodically as a regression canary for the `agent-runner` core.
+2. The upstream test suite is run periodically as a regression canary for the session assembly core.
 3. Modules marked `← removing` or `← replacing` in the architecture doc's current-state listing are slated for deletion — do not add features to them.
 
 ## Architecture
@@ -86,26 +86,26 @@ Refactoring history is preserved in `docs/architecture/history/` (one file per c
 
 ### Domain organization
 
-The extension is organized into six domains (54 files):
+The extension is organized into six domains (56 files):
 
-| Domain      | Directory                                                                                                                                                               | Modules | Responsibility                                                                                                                         |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Config      | `agent-types.ts`, `default-agents.ts`, `custom-agents.ts`, `invocation-config.ts`                                                                                       | 4       | Agent type registry, built-in/custom configs, per-call merge                                                                           |
-| Session     | `session-config.ts`, `prompts.ts`, `context.ts`, `env.ts`, `model-resolver.ts`, `session-dir.ts`                                                                        | 6       | Pure session assembly: prompts, context, environment, model resolution                                                                 |
-| Lifecycle   | `agent-manager.ts`, `agent-runner.ts`, `agent.ts`, `concurrency-queue.ts`, `parent-snapshot.ts`, `execution-state.ts`, `child-lifecycle.ts`, `workspace.ts`, `usage.ts` | 9       | Spawn, abort, resume, scheduling, turn loop, status state machine, per-agent behavior, child-lifecycle events, workspace provider seam |
-| Observation | `record-observer.ts`, `notification.ts`, `notification-state.ts`, `renderer.ts`                                                                                         | 4       | Session-event stats, completion nudges, notification rendering                                                                         |
-| Tools       | `tools/`                                                                                                                                                                | 8       | LLM-facing tools: Agent, get_subagent_result, steer_subagent, spawn-config, result-renderer, helpers                                   |
-| UI          | `ui/`                                                                                                                                                                   | 10      | Widget, conversation viewer, /agents menu, creation wizard, config editor, display helpers                                             |
-| Service     | `service.ts`, `service-adapter.ts`                                                                                                                                      | 2       | Cross-extension API boundary via Symbol.for()                                                                                          |
+| Domain      | Directory                                                                                                                                                                                             | Modules | Responsibility                                                                                                                                                                 |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Config      | `agent-types.ts`, `default-agents.ts`, `custom-agents.ts`, `invocation-config.ts`                                                                                                                     | 4       | Agent type registry, built-in/custom configs, per-call merge                                                                                                                   |
+| Session     | `session-config.ts`, `prompts.ts`, `context.ts`, `conversation.ts`, `env.ts`, `model-resolver.ts`, `session-dir.ts`                                                                                   | 7       | Pure session assembly: prompts, context, conversation rendering, environment, model resolution                                                                                 |
+| Lifecycle   | `agent-manager.ts`, `create-subagent-session.ts`, `subagent-session.ts`, `turn-limits.ts`, `agent.ts`, `concurrency-queue.ts`, `parent-snapshot.ts`, `child-lifecycle.ts`, `workspace.ts`, `usage.ts` | 10      | Spawn, abort, resume, scheduling, session assembly factory, born-complete turn loop, status state machine, per-agent behavior, child-lifecycle events, workspace provider seam |
+| Observation | `record-observer.ts`, `notification.ts`, `notification-state.ts`, `renderer.ts`                                                                                                                       | 4       | Session-event stats, completion nudges, notification rendering                                                                                                                 |
+| Tools       | `tools/`                                                                                                                                                                                              | 8       | LLM-facing tools: Agent, get_subagent_result, steer_subagent, spawn-config, result-renderer, helpers                                                                           |
+| UI          | `ui/`                                                                                                                                                                                                 | 10      | Widget, conversation viewer, /agents menu, creation wizard, config editor, display helpers                                                                                     |
+| Service     | `service.ts`, `service-adapter.ts`                                                                                                                                                                    | 2       | Cross-extension API boundary via Symbol.for()                                                                                                                                  |
 
 Entry point (`index.ts`), runtime (`runtime.ts`), shared types (`types.ts`), settings (`settings.ts`), debug (`debug.ts`), and event handlers (`handlers/`) sit at the root.
 
 ### Module dependency flow
 
 ```text
-tools/ → AgentManager → agent-runner → session-config → [prompts, memory, skills, env]
-                                                          ↑
-                                               AgentTypeRegistry → [default-agents, custom-agents]
+tools/ → AgentManager → Agent → createSubagentSession → session-config → [prompts, memory, skills, env]
+                                       ↓                                    ↑
+                                 SubagentSession            AgentTypeRegistry → [default-agents, custom-agents]
 
 record-observer ─subscribes─→ AgentSession ←─subscribes─ ui-observer
 widget ─polls─→ AgentActivityTracker map

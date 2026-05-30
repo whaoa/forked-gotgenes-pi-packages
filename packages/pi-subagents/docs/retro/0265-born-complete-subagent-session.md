@@ -34,3 +34,25 @@ Plan committed as `0265-born-complete-subagent-session.md`; a side-quest filed #
 - Two follow-ups deliberately deferred and noted in the plan's Non-Goals / Open Questions: the `Agent` → `Subagent` class rename (mechanical, ~19 files — separate issue) and resume-aware workspaces (a worktree's lifetime is one turn loop; worktree + resume is degenerate today).
 - The change is non-breaking (no `feat!:`): the dissolved types (`RunOptions`, `RunResult`, `AgentRunner`) are internal, so `public.d.ts` is unaffected.
   TDD order uses lift-and-shift across 7 steps to keep each commit compiling; transient duplication of the turn-loop helpers/assembly exists between steps 3–5 and is deleted in step 6.
+
+## Stage: Implementation — TDD (2026-05-29T22:18:00Z)
+
+### Session summary
+
+Executed all 7 TDD steps from the plan via lift-and-shift, one commit per step, each leaving the suite green.
+Introduced `SubagentSession` (`runTurnLoop`/`resumeTurnLoop`/`steer`/`dispose`) and the `createSubagentSession()` assembly factory, swapped `Agent`/`AgentManager`/`index.ts` onto them, then deleted `agent-runner.ts` + `execution-state.ts` and the three runner test files.
+Package test count went 951 → 960 (net +9: new `subagent-session`/`create-subagent-session`/`turn-limits` suites added, the redundant runner suites deleted).
+Pre-completion reviewer: PASS.
+
+### Observations
+
+- The plan sketch's `TurnLoopOptions` listed only `maxTurns`/`graceTurns`/`signal`, but preserving the old `runAgent` precedence `per-call ?? agentMaxTurns ?? defaultMaxTurns` required threading `defaultMaxTurns` through `TurnLoopOptions` and storing `agentMaxTurns` + `parentContext` in `SubagentSession` meta (both are session-level facts known at creation).
+  This is a correctness-preserving deviation, well covered by three precedence tests plus a parent-context-prepend test in `subagent-session.test.ts`.
+- The atomic call-site swap (step 5) touched more test files than the plan's step-5 list anticipated: every tool/service test that set `record.execution = { session, outputFile }` (`steer-tool`, `agent-tool`, `background-spawner`, `foreground-runner`, `get-result-tool`, `service-adapter`) had to migrate to `record.subagentSession = toSubagentSession(createSubagentSessionStub(...))`.
+  Added `createSubagentSessionStub`/`toSubagentSession` to `mock-session.ts` so the migration was a one-line change per call site; the stub's `steer`/`dispose` delegate to the underlying `MockSession` so existing session-spy assertions kept working unchanged.
+- `disposed` moved from `runAgent`'s `finally` (run-completion) to `SubagentSession.dispose()`, invoked by `AgentManager` via the new `Agent.disposeSession()` (routing both `record.session?.dispose?.()` call sites at `agent-manager.ts:235,309`).
+  The full cross-package suite confirms the permission system (1504 tests) is unaffected — its subscription code did not change, only *when* `disposed` fires.
+- Test-helper gotcha: `makeSubagentSession`'s `outputFile` default initially swallowed an explicit `undefined` via `?? default`; fixed with an `"outputFile" in metaOverrides` presence check (the testing-skill "Partial spread erases explicit undefined" family).
+- `print-mode.test.ts` now mocks `#src/lifecycle/create-subagent-session` (was `#src/lifecycle/agent-runner`); `index.ts` wraps the factory as `(params) => createSubagentSession(params, deps)`, so the module mock still intercepts it.
+- fallow stayed clean throughout — the transient duplication of IO interfaces + turn-loop helpers between `agent-runner.ts` and the new modules (steps 3–5) was removed in step 6 before the pre-completion gate ran.
+- Reviewer's two minor non-blocking notes: SKILL.md Session-domain count now lists `conversation.ts` but still omits the pre-existing `content-items.ts` (drift predates this issue); `create-subagent-session.ts` keeps an accurate "old runner's runAgent()" provenance comment.

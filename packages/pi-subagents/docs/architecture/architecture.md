@@ -53,7 +53,8 @@ flowchart TB
         direction TB
         AgentManager["AgentManager<br/>(spawn, abort, collection)"]
         ConcurrencyQueue["ConcurrencyQueue<br/>(scheduling, drain)"]
-        AgentRunner["agent-runner<br/>(session, turns, results)"]
+        CreateSubagentSession["createSubagentSession<br/>(assembly factory)"]
+        SubagentSession["SubagentSession<br/>(turn loop, steer, dispose)"]
         Agent["Agent<br/>(status, behavior: abort/steer/run lifecycle)"]
         ParentSnapshot["ParentSnapshot<br/>(frozen parent state)"]
         Workspace["workspace<br/>(provider seam: child cwd + teardown)"]
@@ -85,13 +86,15 @@ flowchart TB
     end
 
     AgentTool --> AgentManager
-    AgentManager --> AgentRunner
-    AgentRunner --> SessionConfig
+    AgentManager --> Agent
+    Agent --> CreateSubagentSession & SubagentSession
+    CreateSubagentSession --> SubagentSession
+    CreateSubagentSession --> SessionConfig
     SessionConfig --> AgentTypeRegistry
     SessionConfig --> Prompts & Env
     AgentTypeRegistry --> DefaultAgents & CustomAgents
-    RecordObserver -.->|subscribes| AgentRunner
-    UIObserver -.->|subscribes| AgentRunner
+    RecordObserver -.->|subscribes| SubagentSession
+    UIObserver -.->|subscribes| SubagentSession
     Widget -.->|polls| AgentManager
 ```
 
@@ -108,7 +111,7 @@ classDiagram
         +error?: string
         +toolUses: number
         +lifetimeUsage: LifetimeUsage
-        +execution?: ExecutionState
+        +subagentSession?: SubagentSession
         +notification?: NotificationState
         +markRunning()
         +markCompleted()
@@ -121,13 +124,13 @@ classDiagram
         +resume(prompt, signal)
         +abort(): boolean
         +queueSteer(message)
-        +flushPendingSteers(session)
+        +flushPendingSteers()
         +completeRun(result)
         +failRun(err)
+        +disposeSession()
         +wireSignal(signal, onAbort)
         +attachObserver(unsub)
         +releaseListeners()
-        +setOnRunFinished(fn)
     }
 
     class AgentManager {
@@ -210,24 +213,31 @@ sequenceDiagram
     participant Tool as subagent tool
     participant Spawn as spawn-config
     participant Mgr as AgentManager
-    participant Runner as agent-runner
+    participant Ag as Agent
+    participant Factory as createSubagentSession
     participant Asm as assembleSessionConfig
+    participant Sub as SubagentSession
     participant Child as Child session
 
     LLM->>Tool: subagent(type, prompt, ...)
     Tool->>Spawn: resolveSpawnConfig(params)
     Spawn-->>Tool: ResolvedSpawnConfig
     Tool->>Mgr: spawn(snapshot, type, prompt, config)
-    Mgr->>Runner: runAgent(record, snapshot, options, io)
-    Runner->>Asm: assembleSessionConfig(type, ctx, opts, env, registry, io)
-    Asm-->>Runner: SessionConfig
-    Runner->>Child: create session + run turn loop
-    Child-->>Runner: result text
-    Runner-->>Mgr: update Agent
-    Note over Mgr: agent-observer subscribes to session events for stats
-    Note over Mgr: ui-observer subscribes for streaming state
+    Mgr->>Ag: run()
+    Ag->>Factory: createSubagentSession(params, deps)
+    Factory->>Asm: assembleSessionConfig(type, ctx, opts, env, registry, io)
+    Asm-->>Factory: SessionConfig
+    Factory->>Child: create session + bind extensions
+    Factory-->>Ag: SubagentSession (born complete)
+    Note over Ag: agent-observer + ui-observer subscribe to session events
+    Ag->>Sub: runTurnLoop(prompt, opts)
+    Sub->>Child: prompt + drive turn loop
+    Child-->>Sub: result text
+    Sub-->>Ag: TurnLoopResult
+    Ag-->>Mgr: update Agent
     Mgr-->>Tool: Agent
     Tool-->>LLM: formatted result
+    Note over Mgr: disposeSession() fires `disposed` at cleanup (resume-detectable)
 ```
 
 ## Module organization
@@ -257,17 +267,19 @@ src/
 │   ├── prompts.ts                  system prompt building
 │   ├── content-items.ts            shared message content parsing (tool-call names, assistant content)
 │   ├── context.ts                  parent conversation extraction
+│   ├── conversation.ts             render a session's messages as formatted text
 │   ├── env.ts                      git/platform detection
 │   ├── model-resolver.ts           fuzzy model name resolution
 │   └── session-dir.ts              session directory derivation
 │
 ├── lifecycle/                      agent execution and state tracking
 │   ├── agent-manager.ts            collection manager + observer wiring
-│   ├── agent-runner.ts             session creation, turn loop, tool filtering
+│   ├── create-subagent-session.ts  assembly factory: session creation, binding, tool filtering
+│   ├── subagent-session.ts         born-complete child session: turn loop, steer, dispose
+│   ├── turn-limits.ts              normalizeMaxTurns (turn-count policy)
 │   ├── agent.ts                    owns full execution lifecycle (run, abort, steer, workspace)
 │   ├── concurrency-queue.ts        background agent scheduling with configurable concurrency limit
 │   ├── parent-snapshot.ts          immutable spawn-time parent state
-│   ├── execution-state.ts          session/output phase state
 │   ├── child-lifecycle.ts          child-execution lifecycle event publisher
 │   ├── workspace.ts                workspace provider seam (generative extension surface)
 │   └── usage.ts                    token usage tracking
@@ -327,7 +339,7 @@ flowchart TD
     subgraph core["@gotgenes/pi-subagents"]
         direction TB
         exports["SubagentsService API<br/>publish / getSubagentsService<br/>SubagentRecord, SubagentStatus"]
-        engine["Tools: subagent, get_subagent_result,<br/>steer_subagent<br/>AgentManager, agent-runner"]
+        engine["Tools: subagent, get_subagent_result,<br/>steer_subagent<br/>AgentManager, createSubagentSession, SubagentSession"]
         ui_int["Internal UI: widget, viewer,<br/>/agents menu"]
     end
 
@@ -344,13 +356,14 @@ They declare this package as an optional peer dependency and use dynamic import 
 - The three tools: `subagent` (née `Agent`), `get_subagent_result`, `steer_subagent`.
 - `AgentManager` — spawn, abort, resume, collection management, observer wiring.
 - `ConcurrencyQueue` — background agent scheduling with configurable concurrency limit.
-- `agent-runner` — session creation, turn loop, extension binding.
+- `createSubagentSession` — assembly factory: session creation and extension binding; returns a born-complete `SubagentSession`.
+- `SubagentSession` — the born-complete child session: drives the turn loop (`runTurnLoop`/`resumeTurnLoop`), steers, and disposes (firing `disposed` at true session disposal, so resume executions are registry-detected).
 - `child-lifecycle` — publishes the child-execution lifecycle (`spawning`, `session-created` before `bindExtensions()`, `completed`, `disposed`) on `pi.events`.
   Reactive consumers subscribe: `@gotgenes/pi-permission-system` registers each child session on `session-created` and unregisters it on `disposed`.
   This replaced the former outbound `permission-bridge` (#261, ADR 0002) — the core no longer looks up a named consumer.
 - `workspace` — the single generative seam (#262, ADR 0002): a registered `WorkspaceProvider` supplies a child's cwd plus bracketed `dispose()` at run-start.
   With no provider, children run in the parent cwd (default unchanged); the git worktree strategy lives behind this seam in `@gotgenes/pi-subagents-worktrees` (#263, the seam's first consumer).
-- `session-config` — pure configuration assembler (extracted from `agent-runner`).
+- `session-config` — pure configuration assembler (called by `createSubagentSession`).
 - `SubagentRuntime` — session-scoped state bag with methods.
 - `ParentSnapshot` — immutable snapshot of parent session state, captured once at spawn time.
 - `record-observer` — session-event observer that updates record statistics without callback threading.
@@ -532,20 +545,21 @@ This is achieved across phases: Phase 14 (strip policy), Phase 16 (invert depend
 These interfaces carry hidden dependencies that obscure true coupling.
 Bags with 10+ fields are the highest priority for decomposition.
 
-| Interface                   | Fields                                                      | Consumers                                         | Severity  |
-| --------------------------- | ----------------------------------------------------------- | ------------------------------------------------- | --------- |
-| `ResolvedSpawnConfig`       | 3 nested                                                    | foreground-runner, background-spawner, agent-tool | ✓ done    |
-| `AgentSpawnConfig`          | 13 → 13 (ParentSessionInfo nested)                          | agent-manager (internal)                          | ✓ done    |
-| `RunOptions`                | 9 (`RunContext` nested)                                     | agent-runner                                      | ✓ done    |
-| `SessionConfig`             | 6 (flat fields; extensions/noSkills/extras removed in #264) | agent-runner (output of assembler)                | ✓ done    |
-| `NotificationDetails`       | 10                                                          | notification                                      | Low (DTO) |
-| `ResourceLoaderOptions`     | 10                                                          | agent-runner (SDK bridge)                         | Low (SDK) |
-| `RunnerIO`                  | split → `EnvironmentIO` (3) + `SessionFactoryIO` (5+1)      | agent-runner                                      | ✓ done    |
-| `CreateSessionOptions`      | 9                                                           | agent-runner (SDK bridge)                         | Low (SDK) |
-| `AgentToolDeps`             | 8                                                           | agent-tool                                        | ✓ done    |
-| `AgentMenuDeps`             | 8                                                           | agent-menu                                        | ✓ done    |
-| `ConversationViewerOptions` | 8                                                           | conversation-viewer                               | Low       |
-| `AgentInit`                 | 8                                                           | agent                                             | Low       |
+| Interface                     | Fields                                                       | Consumers                                         | Severity  |
+| ----------------------------- | ------------------------------------------------------------ | ------------------------------------------------- | --------- |
+| `ResolvedSpawnConfig`         | 3 nested                                                     | foreground-runner, background-spawner, agent-tool | ✓ done    |
+| `AgentSpawnConfig`            | 13 → 13 (ParentSessionInfo nested)                           | agent-manager (internal)                          | ✓ done    |
+| `CreateSubagentSessionParams` | 6 (snapshot, type, cwd, parentSession, model, thinkingLevel) | create-subagent-session                           | ✓ done    |
+| `TurnLoopOptions`             | 4 (maxTurns, defaultMaxTurns, graceTurns, signal)            | subagent-session                                  | ✓ done    |
+| `SessionConfig`               | 6 (flat fields; extensions/noSkills/extras removed in #264)  | session-config (output of assembler)              | ✓ done    |
+| `NotificationDetails`         | 10                                                           | notification                                      | Low (DTO) |
+| `ResourceLoaderOptions`       | 10                                                           | create-subagent-session (SDK bridge)              | Low (SDK) |
+| `SubagentSessionIO`           | split → `EnvironmentIO` (3) + `SessionFactoryIO` (5+1)       | create-subagent-session                           | ✓ done    |
+| `CreateSessionOptions`        | 9                                                            | create-subagent-session (SDK bridge)              | Low (SDK) |
+| `AgentToolDeps`               | 8                                                            | agent-tool                                        | ✓ done    |
+| `AgentMenuDeps`               | 8                                                            | agent-menu                                        | ✓ done    |
+| `ConversationViewerOptions`   | 8                                                            | conversation-viewer                               | Low       |
+| `AgentInit`                   | 8                                                            | agent                                             | Low       |
 
 ### Complexity hotspots
 
@@ -578,7 +592,7 @@ One 11-line internal clone group remains within `agent-config-editor.ts` (lines 
 ### Session encapsulation debt (Law of Demeter) — [#277]
 
 Discovered while planning [#265].
-Consumers reach the raw SDK `AgentSession` through the `Agent.session` getter (`this.execution?.session`) and operate on it directly, instead of telling the owning agent what they want.
+Consumers reach the raw SDK `AgentSession` through the `Agent.session` getter (`this.subagentSession?.session`) and operate on it directly, instead of telling the owning agent what they want.
 These are Law of Demeter / Tell-Don't-Ask reach-throughs; the fix is intent-revealing methods on the owning object (`Subagent` / `SubagentSession`, introduced by [#265]).
 
 | Reach-through                         | Sites                                               | Missing method                                   |
@@ -801,11 +815,13 @@ The `skills` curation axis collapsed symmetrically with `extensions`: `AgentConf
 - Depended on: Step 1 (deny-at-use over events).
 - Outcome: the `isolated`/`extensions`/`noSkills`/`skills` axis is gone; the guard is unconditional.
 
-#### Step 5: Born-complete child execution; dissolve the runner — [#265]
+#### Step 5: Born-complete child execution; dissolve the runner — [#265] ✅ Delivered
 
-With the cwd resolved through the provider seam (not relayed by `Agent`), child-session creation produces a born-complete execution (`{ session, outputFile?, dispose() }`).
-`Agent` owns session interaction directly (prompt, steer, abort, resume, turn limits, response collection); `runAgent` / `resumeAgent` / `ConcreteAgentRunner` / `RunOptions` / `RunResult` dissolve.
-Retain `getAgentConversation()` and `normalizeMaxTurns()`.
+`createSubagentSession()` is an assembly factory that returns a born-complete `SubagentSession` (session created, extensions bound, recursion guard applied).
+`SubagentSession` owns turn driving (`runTurnLoop`/`resumeTurnLoop`), steering, and disposal.
+`Agent.run()` is coordination, not assembly; `runAgent` / `resumeAgent` / `ConcreteAgentRunner` / `AgentRunner` / `RunOptions` / `RunResult` / `ExecutionState` dissolved.
+`getAgentConversation()` relocated to `session/conversation.ts`; `normalizeMaxTurns()` to `lifecycle/turn-limits.ts`.
+`disposed` now fires at true session disposal (cleanup), so resume executions are registry-detected (closing the gap deferred from #261).
 
 - Depends on: Steps 2–4.
 - Outcome: the "runner" concept is gone; `Agent.run()` is coordination, not assembly — the structural goal of the abandoned collaborator plan, reached cleanly.
@@ -901,7 +917,7 @@ If they land, upstream gains the peer-dep fix and the two RepOne patches.
 This fork continues independently regardless.
 
 Upstream fixes and ideas are cherry-picked when they align with this fork's scope.
-The upstream test suite is run periodically as a regression canary for the agent-runner core.
+The upstream test suite is run periodically as a regression canary for the session assembly core.
 
 [earendil-works/pi#4207]: https://github.com/earendil-works/pi/issues/4207
 [gotgenes/pi-packages]: https://github.com/gotgenes/pi-packages
