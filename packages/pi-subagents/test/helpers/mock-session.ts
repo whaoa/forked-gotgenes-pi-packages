@@ -1,6 +1,7 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { Mock } from "vitest";
 import { vi } from "vitest";
+import type { SubagentSession } from "#src/lifecycle/subagent-session";
 
 /** The core shape returned by `createMockSession`. */
 export interface MockSession {
@@ -26,6 +27,39 @@ export interface MockSession {
  */
 export function toAgentSession(session: MockSession): AgentSession {
 	return session as unknown as AgentSession;
+}
+
+/**
+ * Build a SubagentSession-shaped stub wrapping a MockSession.
+ *
+ * For tests that only need an Agent to own a `.session` / `.outputFile`: the
+ * turn-driving methods are inert vi.fn() spies, and `steer`/`dispose` delegate
+ * to the underlying MockSession so existing session-spy assertions keep working.
+ */
+export function createSubagentSessionStub(
+	session: MockSession = createMockSession(),
+	outputFile?: string,
+) {
+	return {
+		session,
+		outputFile,
+		runTurnLoop: vi.fn().mockResolvedValue({ responseText: "done", aborted: false, steered: false }),
+		resumeTurnLoop: vi.fn().mockResolvedValue("resumed"),
+		steer: vi.fn((message: string): Promise<void> => session.steer(message) as Promise<void>),
+		dispose: vi.fn((): void => {
+			session.dispose();
+		}),
+	};
+}
+
+/**
+ * Cast a SubagentSession stub to SubagentSession for assignment to Agent.
+ *
+ * SubagentSession is a class with private fields — no plain object satisfies it
+ * without a type bridge. Centralising the cast keeps test files explicit.
+ */
+export function toSubagentSession(stub: ReturnType<typeof createSubagentSessionStub>): SubagentSession {
+	return stub as unknown as SubagentSession;
 }
 
 export function createMockSession(overrides: Record<string, unknown> = {}): MockSession & Record<string, unknown> {

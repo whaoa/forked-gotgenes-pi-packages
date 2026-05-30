@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBlockingRunner, createRunResult, createSessionRunner } from "./manager-stubs";
+import { createBlockingFactory, createSessionFactory } from "./manager-stubs";
 import { createMockSession } from "./mock-session";
 
-describe("createBlockingRunner", () => {
-	it("run returns a pending promise (never resolves)", () => {
-		const runner = createBlockingRunner();
-		const p = runner.run({} as never, "general-purpose", "test", {} as never);
-		// The promise must still be pending — we check it doesn't settle synchronously
+describe("createBlockingFactory", () => {
+	it("returns a pending promise (never resolves)", () => {
+		const factory = createBlockingFactory();
+		const p = factory({} as never);
 		let settled = false;
 		void p.then(() => {
 			settled = true;
@@ -14,60 +13,37 @@ describe("createBlockingRunner", () => {
 		expect(settled).toBe(false);
 	});
 
-	it("exposes run and resume as vi.fn stubs", () => {
-		const runner = createBlockingRunner();
-		expect(vi.isMockFunction(runner.run)).toBe(true);
-		expect(vi.isMockFunction(runner.resume)).toBe(true);
+	it("is a vi.fn stub", () => {
+		const factory = createBlockingFactory();
+		expect(vi.isMockFunction(factory)).toBe(true);
 	});
 });
 
-describe("createRunResult", () => {
-	it("returns the expected default shape", () => {
-		const result = createRunResult();
-		expect(result.responseText).toBe("done");
-		expect(result.aborted).toBe(false);
-		expect(result.steered).toBe(false);
-		expect(result.session).toBeDefined();
+describe("createSessionFactory", () => {
+	it("resolves to a SubagentSession stub wrapping the given session", async () => {
+		const session = createMockSession();
+		const { factory, stub } = createSessionFactory(session);
+		const sub = await factory({} as never);
+		expect(sub).toBe(stub);
+		expect(stub.session).toBe(session);
 	});
 
-	it("uses the provided session", () => {
-		const session = createMockSession();
-		const result = createRunResult(session);
-		// The session is cast to AgentSession — verify it is the same object via identity.
-		expect(result.session).toBe(session);
+	it("exposes the outputFile on the stub", async () => {
+		const { stub } = createSessionFactory(createMockSession(), "/tmp/out.jsonl");
+		expect(stub.outputFile).toBe("/tmp/out.jsonl");
 	});
-});
 
-describe("createSessionRunner", () => {
-	it("calls onSessionCreated with the given session", async () => {
-		const session = createMockSession();
-		const runner = createSessionRunner(session);
-		const onSessionCreated = vi.fn();
-
-		await runner.run({} as never, "general-purpose", "test", {
-			context: {},
-			onSessionCreated,
+	it("runTurnLoop resolves to a done TurnLoopResult by default", async () => {
+		const { stub } = createSessionFactory();
+		await expect(stub.runTurnLoop("go", {})).resolves.toEqual({
+			responseText: "done",
+			aborted: false,
+			steered: false,
 		});
-
-		expect(onSessionCreated).toHaveBeenCalledOnce();
-		expect(onSessionCreated).toHaveBeenCalledWith(session);
 	});
 
-	it("resolves with a RunResult containing the given session", async () => {
-		const session = createMockSession();
-		const runner = createSessionRunner(session);
-
-		const result = await runner.run({} as never, "general-purpose", "test", {
-			context: {},
-		});
-
-		expect(result.responseText).toBe("done");
-		expect(result.session).toBe(session);
-	});
-
-	it("exposes run and resume as vi.fn stubs", () => {
-		const runner = createSessionRunner(createMockSession());
-		expect(vi.isMockFunction(runner.run)).toBe(true);
-		expect(vi.isMockFunction(runner.resume)).toBe(true);
+	it("the factory is a vi.fn stub", () => {
+		const { factory } = createSessionFactory();
+		expect(vi.isMockFunction(factory)).toBe(true);
 	});
 });

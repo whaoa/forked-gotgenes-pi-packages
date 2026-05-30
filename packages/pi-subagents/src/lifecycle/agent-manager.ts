@@ -10,9 +10,10 @@ import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
 import { debugLog } from "#src/debug";
 import { Agent, type AgentLifecycleObserver } from "#src/lifecycle/agent";
-import type { AgentRunner } from "#src/lifecycle/agent-runner";
 import type { ConcurrencyQueue } from "#src/lifecycle/concurrency-queue";
+import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
+import type { SubagentSession } from "#src/lifecycle/subagent-session";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 
 import type { RunConfig } from "#src/runtime";
@@ -28,7 +29,8 @@ export interface AgentManagerObserver {
 }
 
 export interface AgentManagerOptions {
-  runner: AgentRunner;
+  /** Assembly factory that produces a born-complete SubagentSession per spawn. */
+  createSubagentSession: (params: CreateSubagentSessionParams) => Promise<SubagentSession>;
   /** Concurrency queue — owns scheduling, limit checks, and drain logic. */
   queue: ConcurrencyQueue;
   /** Base working directory handed to a workspace provider (the parent cwd). */
@@ -64,7 +66,7 @@ export class AgentManager {
   private agents = new Map<string, Agent>();
   private cleanupInterval: ReturnType<typeof setInterval>;
   private readonly observer?: AgentManagerObserver;
-  private readonly runner: AgentRunner;
+  private readonly createSubagentSession: (params: CreateSubagentSessionParams) => Promise<SubagentSession>;
   private readonly queue: ConcurrencyQueue;
   private readonly baseCwd: string;
   private getRunConfig?: () => RunConfig;
@@ -76,7 +78,7 @@ export class AgentManager {
   }
 
   constructor(options: AgentManagerOptions) {
-    this.runner = options.runner;
+    this.createSubagentSession = options.createSubagentSession;
     this.queue = options.queue;
     this.baseCwd = options.baseCwd;
     this.observer = options.observer;
@@ -152,7 +154,7 @@ export class AgentManager {
       parentSession: options.parentSession,
       signal: options.signal,
       // Shared deps
-      runner: this.runner,
+      createSubagentSession: this.createSubagentSession,
       observer: this.buildObserver(options),
       getRunConfig: this.getRunConfig,
       baseCwd: this.baseCwd,
@@ -231,8 +233,7 @@ export class AgentManager {
 
   /** Dispose a record's session and remove it from the map. */
   private removeRecord(id: string, record: Agent): void {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- dispose may not exist on all session implementations
-    record.session?.dispose?.();
+    record.disposeSession();
     this.agents.delete(id);
   }
 
@@ -306,7 +307,7 @@ export class AgentManager {
     // Clear queue
     this.queue.clear();
     for (const record of this.agents.values()) {
-      record.session?.dispose();
+      record.disposeSession();
     }
     this.agents.clear();
   }

@@ -14,16 +14,16 @@
  * The child's working directory is supplied by a registered WorkspaceProvider
  * (the workspace seam); with no provider the child runs in the parent cwd.
  *
- * Phase-specific collaborators (execution, notification) are attached
+ * Phase-specific collaborators (subagentSession, notification) are attached
  * after construction as lifecycle information becomes available.
  */
 
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { debugLog } from "#src/debug";
-import type { AgentRunner, RunResult } from "#src/lifecycle/agent-runner";
-import type { ExecutionState } from "#src/lifecycle/execution-state";
+import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
+import type { SubagentSession, TurnLoopResult } from "#src/lifecycle/subagent-session";
 import type { LifetimeUsage } from "#src/lifecycle/usage";
 import { addUsage } from "#src/lifecycle/usage";
 import type { Workspace, WorkspaceProvider } from "#src/lifecycle/workspace";
@@ -36,7 +36,7 @@ import type { AgentInvocation, CompactionInfo, ParentSessionInfo, SubagentType, 
 export interface AgentLifecycleObserver {
 	/** Fires when the agent transitions to running (inside run(), after markRunning). */
 	onStarted?(agent: Agent): void;
-	/** Fires when the runner creates the session — delivers the session to external consumers. */
+	/** Fires once the session is created — delivers the session to external consumers. */
 	onSessionCreated?(agent: Agent, session: AgentSession): void;
 	/** Fires once when the run completes or fails (for concurrency drain). */
 	onRunFinished?(agent: Agent): void;
@@ -68,7 +68,8 @@ export interface AgentInit {
 	error?: string;
 
 	// Shared deps (required for run(), optional for tests)
-	runner?: AgentRunner;
+	/** Assembly factory that produces a born-complete SubagentSession. */
+	createSubagentSession?: (params: CreateSubagentSessionParams) => Promise<SubagentSession>;
 	observer?: AgentLifecycleObserver;
 	getRunConfig?: () => RunConfig;
 	/** Resolves the registered workspace provider (if any) at run-start. */
@@ -126,7 +127,7 @@ export class Agent {
 	promise?: Promise<void>;
 
 	// Shared deps — optional (required for run())
-	private readonly _runner?: AgentRunner;
+	private readonly _createSubagentSession?: (params: CreateSubagentSessionParams) => Promise<SubagentSession>;
 	readonly observer?: AgentLifecycleObserver;
 	private readonly _getRunConfig?: () => RunConfig;
 	private readonly _getWorkspaceProvider?: () => WorkspaceProvider | undefined;
@@ -144,7 +145,8 @@ export class Agent {
 	private readonly _signal?: AbortSignal;
 
 	// Phase-specific collaborators — each born complete when their info becomes available
-	execution?: ExecutionState;
+	/** The born-complete child session — set when the factory returns inside run(). */
+	subagentSession?: SubagentSession;
 	notification?: NotificationState;
 
 	// Steer buffer — messages queued before the session is ready
@@ -154,12 +156,12 @@ export class Agent {
 
 	/** The active agent session, or undefined before the session is created. */
 	get session(): AgentSession | undefined {
-		return this.execution?.session;
+		return this.subagentSession?.session;
 	}
 
 	/** Path to the agent's session JSONL file, or undefined if not yet available. */
 	get outputFile(): string | undefined {
-		return this.execution?.outputFile;
+		return this.subagentSession?.outputFile;
 	}
 
 	constructor(init: AgentInit) {
@@ -185,7 +187,7 @@ export class Agent {
 		this.abortController = new AbortController();
 
 		// Shared deps
-		this._runner = init.runner;
+		this._createSubagentSession = init.createSubagentSession;
 		this.observer = init.observer;
 		this._getRunConfig = init.getRunConfig;
 		this._getWorkspaceProvider = init.getWorkspaceProvider;
@@ -207,16 +209,16 @@ export class Agent {
 	}
 
 	/**
-	 * Execute the full agent lifecycle: workspace preparation, runner invocation,
-	 * session-creation handling, observer wiring, workspace disposal, and
+	 * Execute the full agent lifecycle: workspace preparation, session creation
+	 * via the factory, observer wiring, the turn loop, workspace disposal, and
 	 * status transitions.
 	 *
-	 * Requires runner and snapshot to be set at construction.
+	 * Requires the session factory and snapshot to be set at construction.
 	 * The returned promise always resolves (errors are captured internally).
 	 */
 	async run(): Promise<void> {
-		if (!this._runner) {
-			throw new Error("Agent not configured for execution — missing runner");
+		if (!this._createSubagentSession) {
+			throw new Error("Agent not configured for execution — missing session factory");
 		}
 		if (!this._snapshot || !this._prompt) {
 			throw new Error("Agent not configured for execution — missing snapshot or prompt");
@@ -247,29 +249,35 @@ export class Agent {
 			return;
 		}
 
+		try {
+			this.subagentSession = await this._createSubagentSession({
+				snapshot: this._snapshot,
+				type: this.type,
+				cwd,
+				parentSession: this._parentSession,
+				model: this._model,
+				thinkingLevel: this._thinkingLevel,
+			});
+		} catch (err) {
+			// The factory disposed its own session on a post-creation failure.
+			this.failRun(err);
+			return;
+		}
+
+		const session = this.subagentSession.session;
+		this.flushPendingSteers();
+		this.attachObserver(subscribeAgentObserver(session, this, {
+			onCompact: (r, info) => this.observer?.onCompacted?.(r, info),
+		}));
+		this.observer?.onSessionCreated?.(this, session);
+
 		const runConfig = this._getRunConfig?.();
 		try {
-			const result = await this._runner.run(this._snapshot, this.type, this._prompt, {
-				context: {
-					cwd,
-					parentSession: this._parentSession,
-				},
-				model: this._model,
+			const result = await this.subagentSession.runTurnLoop(this._prompt, {
 				maxTurns: this._maxTurns,
 				defaultMaxTurns: runConfig?.defaultMaxTurns,
 				graceTurns: runConfig?.graceTurns,
-				thinkingLevel: this._thinkingLevel,
 				signal: this.abortController.signal,
-				onSessionCreated: (session) => {
-					// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- sessionManager is typed as always present but Pi SDK may not provide it
-					const outputFile = session.sessionManager?.getSessionFile?.() ?? undefined;
-					this.execution = { session, outputFile };
-					this.flushPendingSteers(session);
-					this.attachObserver(subscribeAgentObserver(session, this, {
-						onCompact: (r, info) => this.observer?.onCompacted?.(r, info),
-					}));
-					this.observer?.onSessionCreated?.(this, session);
-				},
 			});
 			this.completeRun(result);
 		} catch (err) {
@@ -281,27 +289,24 @@ export class Agent {
 	 * Resume an existing session with a new prompt, managing the observer
 	 * subscription lifecycle internally (same wiring as run()).
 	 *
-	 * Requires runner and an existing session (set when the original run created it).
+	 * Requires an existing SubagentSession (set when the original run created it).
 	 * The returned promise always resolves (errors are captured internally).
-	 * The parent signal flows straight through to runner.resume — resume does not
+	 * The parent signal flows straight through to resumeTurnLoop — resume does not
 	 * route through this.abortController.
 	 */
 	async resume(prompt: string, signal?: AbortSignal): Promise<void> {
-		if (!this._runner) {
-			throw new Error("Agent not configured for execution — missing runner");
-		}
-		const session = this.session;
-		if (!session) {
+		const subagentSession = this.subagentSession;
+		if (!subagentSession) {
 			throw new Error("Agent not configured for resume — missing session");
 		}
 
 		this.resetForResume(Date.now());
-		this.attachObserver(subscribeAgentObserver(session, this, {
+		this.attachObserver(subscribeAgentObserver(subagentSession.session, this, {
 			onCompact: (r, info) => this.observer?.onCompacted?.(r, info),
 		}));
 
 		try {
-			const responseText = await this._runner.resume(session, prompt, { signal });
+			const responseText = await subagentSession.resumeTurnLoop(prompt, signal);
 			this.markCompleted(responseText);
 		} catch (err) {
 			this.markError(err);
@@ -407,11 +412,11 @@ export class Agent {
 
 	/**
 	 * Flush all buffered steer messages to the session and clear the buffer.
-	 * Called from onSessionCreated once the session is available.
+	 * Called once the session is available, delegating to SubagentSession.steer.
 	 */
-	flushPendingSteers(session: AgentSession): void {
+	flushPendingSteers(): void {
 		for (const msg of this._pendingSteers) {
-			session.steer(msg).catch(() => {});
+			this.subagentSession?.steer(msg).catch(() => {});
 		}
 		this._pendingSteers = [];
 	}
@@ -451,8 +456,8 @@ export class Agent {
 		this._detachFn = undefined;
 	}
 
-	/** Complete a run: release listeners, dispose the workspace, status transition, execution update, notify observer. */
-	completeRun(result: RunResult): void {
+	/** Complete a run: release listeners, dispose the workspace, status transition, notify observer. */
+	completeRun(result: TurnLoopResult): void {
 		this.releaseListeners();
 
 		let finalResult = result.responseText;
@@ -470,12 +475,12 @@ export class Agent {
 		else if (result.steered) this.markSteered(finalResult);
 		else this.markCompleted(finalResult);
 
-		this.execution = {
-			session: result.session,
-			outputFile: result.sessionFile ?? this.execution?.outputFile,
-		};
-
 		this.observer?.onRunFinished?.(this);
+	}
+
+	/** Dispose the wrapped session, firing the `disposed` lifecycle event. */
+	disposeSession(): void {
+		this.subagentSession?.dispose();
 	}
 
 	/** Fail a run: mark error, release listeners, best-effort workspace dispose, notify observer. */

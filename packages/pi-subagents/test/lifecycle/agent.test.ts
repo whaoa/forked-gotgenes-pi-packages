@@ -1,9 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 import { Agent, type AgentLifecycleObserver } from "#src/lifecycle/agent";
-import type { AgentRunner, RunResult } from "#src/lifecycle/agent-runner";
+import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
+import type { SubagentSession, TurnLoopResult } from "#src/lifecycle/subagent-session";
 import type { Workspace, WorkspaceProvider } from "#src/lifecycle/workspace";
-import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
+import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
+
+type SessionFactory = (params: CreateSubagentSessionParams) => Promise<SubagentSession>;
+
+/** Build a factory plus the SubagentSession stub it resolves to. */
+function createFactory(): { factory: SessionFactory; stub: ReturnType<typeof createSubagentSessionStub> } {
+	const stub = createSubagentSessionStub();
+	const factory = vi.fn(async (_params: CreateSubagentSessionParams) => toSubagentSession(stub));
+	return { factory, stub };
+}
+
+/** A factory resolving to a default (done) SubagentSession stub. */
+function defaultFactory(): SessionFactory {
+	return createFactory().factory;
+}
 
 describe("Agent — constructor", () => {
 	it("sets required fields from init", () => {
@@ -80,7 +95,7 @@ describe("Agent — constructor", () => {
 		expect(record.error).toBeUndefined();
 		expect(record.completedAt).toBeUndefined();
 		expect(record.promise).toBeUndefined();
-		expect(record.execution).toBeUndefined();
+		expect(record.subagentSession).toBeUndefined();
 		expect(record.notification).toBeUndefined();
 	});
 
@@ -411,34 +426,34 @@ describe("Agent — resetForResume", () => {
 
 describe("convenience getters", () => {
 	describe("session", () => {
-		it("returns undefined when execution is not set", () => {
+		it("returns undefined when subagentSession is not set", () => {
 			const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
 			expect(record.session).toBeUndefined();
 		});
 
-		it("returns session from execution when set", () => {
+		it("returns session from subagentSession when set", () => {
 			const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
-			const fakeSession = {} as any;
-			record.execution = { session: fakeSession, outputFile: undefined };
-			expect(record.session).toBe(fakeSession);
+			const session = createMockSession();
+			record.subagentSession = toSubagentSession(createSubagentSessionStub(session));
+			expect(record.session).toBe(session);
 		});
 	});
 
 	describe("outputFile", () => {
-		it("returns undefined when execution is not set", () => {
+		it("returns undefined when subagentSession is not set", () => {
 			const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
 			expect(record.outputFile).toBeUndefined();
 		});
 
-		it("returns outputFile from execution when set", () => {
+		it("returns outputFile from subagentSession when set", () => {
 			const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
-			record.execution = { session: {} as any, outputFile: "/path/to/session.jsonl" };
+			record.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession(), "/path/to/session.jsonl"));
 			expect(record.outputFile).toBe("/path/to/session.jsonl");
 		});
 
-		it("returns undefined when execution is set but outputFile is undefined", () => {
+		it("returns undefined when subagentSession is set but outputFile is undefined", () => {
 			const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
-			record.execution = { session: {} as any, outputFile: undefined };
+			record.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession()));
 			expect(record.outputFile).toBeUndefined();
 		});
 	});
@@ -490,24 +505,25 @@ describe("Agent — abort", () => {
 });
 
 describe("Agent — flushPendingSteers", () => {
-	it("calls session.steer for each buffered message and clears the buffer", async () => {
+	it("delegates each buffered message to subagentSession.steer and clears the buffer", () => {
 		const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
 		record.queueSteer("msg1");
 		record.queueSteer("msg2");
 
-		const steered: string[] = [];
-		const session = { steer: (m: string) => { steered.push(m); return Promise.resolve(); } };
-		record.flushPendingSteers(session as any);
+		const stub = createSubagentSessionStub();
+		record.subagentSession = toSubagentSession(stub);
+		record.flushPendingSteers();
 
-		expect(steered).toEqual(["msg1", "msg2"]);
+		expect(stub.steer.mock.calls.map((c) => c[0])).toEqual(["msg1", "msg2"]);
 		expect(record.pendingSteerCount).toBe(0);
 	});
 
 	it("does nothing when the buffer is empty", () => {
 		const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
-		const session = { steer: vi.fn(() => Promise.resolve()) };
-		record.flushPendingSteers(session as any);
-		expect(session.steer).not.toHaveBeenCalled();
+		const stub = createSubagentSessionStub();
+		record.subagentSession = toSubagentSession(stub);
+		record.flushPendingSteers();
+		expect(stub.steer).not.toHaveBeenCalled();
 	});
 });
 
@@ -518,10 +534,9 @@ function createCompletionAgent(overrides?: { observer?: AgentLifecycleObserver }
 	};
 }
 
-function createRunResult(overrides?: Partial<RunResult>): RunResult {
+function createTurnLoopResult(overrides?: Partial<TurnLoopResult>): TurnLoopResult {
 	return {
 		responseText: "done",
-		session: {} as any,
 		aborted: false,
 		steered: false,
 		...overrides,
@@ -531,42 +546,27 @@ function createRunResult(overrides?: Partial<RunResult>): RunResult {
 describe("Agent — completeRun", () => {
 	it("transitions to completed for a normal result", () => {
 		const { record } = createCompletionAgent();
-		record.completeRun(createRunResult());
+		record.completeRun(createTurnLoopResult());
 		expect(record.status).toBe("completed");
 		expect(record.result).toBe("done");
 	});
 
 	it("transitions to aborted when result.aborted is true", () => {
 		const { record } = createCompletionAgent();
-		record.completeRun(createRunResult({ aborted: true }));
+		record.completeRun(createTurnLoopResult({ aborted: true }));
 		expect(record.status).toBe("aborted");
 	});
 
 	it("transitions to steered when result.steered is true", () => {
 		const { record } = createCompletionAgent();
-		record.completeRun(createRunResult({ steered: true }));
+		record.completeRun(createTurnLoopResult({ steered: true }));
 		expect(record.status).toBe("steered");
-	});
-
-	it("updates execution state with session and outputFile", () => {
-		const session = { fake: true } as any;
-		const { record } = createCompletionAgent();
-		record.completeRun(createRunResult({ session, sessionFile: "/tmp/out.jsonl" }));
-		expect(record.execution?.session).toBe(session);
-		expect(record.execution?.outputFile).toBe("/tmp/out.jsonl");
-	});
-
-	it("preserves existing outputFile when sessionFile is undefined", () => {
-		const { record } = createCompletionAgent();
-		record.execution = { session: {} as any, outputFile: "/existing.jsonl" };
-		record.completeRun(createRunResult({ sessionFile: undefined }));
-		expect(record.execution.outputFile).toBe("/existing.jsonl");
 	});
 
 	it("fires observer.onRunFinished on completion", () => {
 		const onRunFinished = vi.fn();
 		const { record } = createCompletionAgent({ observer: { onRunFinished } });
-		record.completeRun(createRunResult());
+		record.completeRun(createTurnLoopResult());
 		expect(onRunFinished).toHaveBeenCalledOnce();
 		expect(onRunFinished).toHaveBeenCalledWith(record);
 	});
@@ -575,7 +575,7 @@ describe("Agent — completeRun", () => {
 		const { record } = createCompletionAgent();
 		const unsub = vi.fn();
 		record.attachObserver(unsub);
-		record.completeRun(createRunResult());
+		record.completeRun(createTurnLoopResult());
 		expect(unsub).toHaveBeenCalledOnce();
 	});
 });
@@ -602,6 +602,21 @@ describe("Agent — failRun", () => {
 		record.attachObserver(unsub);
 		record.failRun(new Error("boom"));
 		expect(unsub).toHaveBeenCalledOnce();
+	});
+});
+
+describe("Agent — disposeSession", () => {
+	it("disposes the wrapped SubagentSession", () => {
+		const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
+		const stub = createSubagentSessionStub();
+		record.subagentSession = toSubagentSession(stub);
+		record.disposeSession();
+		expect(stub.dispose).toHaveBeenCalledOnce();
+	});
+
+	it("is a no-op when no session was created", () => {
+		const record = new Agent({ id: "1", type: "general-purpose", description: "test" });
+		expect(() => record.disposeSession()).not.toThrow();
 	});
 });
 
@@ -663,27 +678,9 @@ describe("Agent — resetForResume releases listeners", () => {
 
 // ── Agent.run() ──────────────────────────────────────────────────────────────
 
-/** Create a mock runner for Agent.run() tests. */
-function createMockRunner(overrides?: Partial<AgentRunner>): AgentRunner {
-	const session = createMockSession();
-	return {
-		run: vi.fn((_snapshot, _type, _prompt, opts: { onSessionCreated?: (s: any) => void }) => {
-			opts.onSessionCreated?.(toAgentSession(session));
-			return Promise.resolve({
-				responseText: "done",
-				session: toAgentSession(session),
-				aborted: false,
-				steered: false,
-			});
-		}) as AgentRunner["run"],
-		resume: vi.fn().mockResolvedValue("resumed"),
-		...overrides,
-	};
-}
-
 /** Create a complete Agent ready for run(). */
 function createRunnableAgent(overrides?: {
-	runner?: AgentRunner;
+	createSubagentSession?: SessionFactory;
 	observer?: AgentLifecycleObserver;
 	getRunConfig?: () => { defaultMaxTurns: number | undefined; graceTurns: number };
 	parentSession?: { toolCallId?: string; parentSessionFile?: string; parentSessionId?: string };
@@ -691,14 +688,14 @@ function createRunnableAgent(overrides?: {
 	baseCwd?: string;
 	workspaceProvider?: WorkspaceProvider;
 }) {
-	const runner = overrides?.runner ?? createMockRunner();
+	const createSubagentSession = overrides?.createSubagentSession ?? defaultFactory();
 	const observer = overrides?.observer ?? {};
 	const provider = overrides?.workspaceProvider;
 	return new Agent({
 		id: "run-1",
 		type: "general-purpose",
 		description: "run test",
-		runner,
+		createSubagentSession,
 		observer,
 		snapshot: STUB_SNAPSHOT,
 		prompt: "do something",
@@ -740,11 +737,11 @@ describe("Agent.run() — happy path", () => {
 		expect(callOrder).toEqual(["started", "sessionCreated", "runFinished"]);
 	});
 
-	it("sets execution state with session and outputFile", async () => {
+	it("sets the subagentSession with a session", async () => {
 		const agent = createRunnableAgent();
 		await agent.run();
-		expect(agent.execution).toBeDefined();
-		expect(agent.execution!.session).toBeDefined();
+		expect(agent.subagentSession).toBeDefined();
+		expect(agent.subagentSession!.session).toBeDefined();
 	});
 
 	it("flushes pending steers when session is created", async () => {
@@ -757,13 +754,13 @@ describe("Agent.run() — happy path", () => {
 });
 
 describe("Agent.run() — workspace provider", () => {
-	it("prepares the workspace and threads its cwd into runner.run", async () => {
-		const runner = createMockRunner();
+	it("prepares the workspace and threads its cwd into the factory params", async () => {
+		const { factory } = createFactory();
 		const provider = makeWorkspaceProvider(makeWorkspace("/ws/dir"));
-		const agent = createRunnableAgent({ runner, workspaceProvider: provider });
+		const agent = createRunnableAgent({ createSubagentSession: factory, workspaceProvider: provider });
 		await agent.run();
-		const runOpts = (runner.run as ReturnType<typeof vi.fn>).mock.calls[0][3];
-		expect(runOpts.context.cwd).toBe("/ws/dir");
+		const params = (factory as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(params.cwd).toBe("/ws/dir");
 	});
 
 	it("calls prepare with the run-start context", async () => {
@@ -787,12 +784,12 @@ describe("Agent.run() — workspace provider", () => {
 	});
 
 	it("falls back to baseCwd (cwd undefined) when prepare returns undefined", async () => {
-		const runner = createMockRunner();
+		const { factory } = createFactory();
 		const provider = makeWorkspaceProvider(undefined);
-		const agent = createRunnableAgent({ runner, workspaceProvider: provider });
+		const agent = createRunnableAgent({ createSubagentSession: factory, workspaceProvider: provider });
 		await agent.run();
-		const runOpts = (runner.run as ReturnType<typeof vi.fn>).mock.calls[0][3];
-		expect(runOpts.context.cwd).toBeUndefined();
+		const params = (factory as ReturnType<typeof vi.fn>).mock.calls[0][0];
+		expect(params.cwd).toBeUndefined();
 		expect(agent.status).toBe("completed");
 	});
 
@@ -806,11 +803,11 @@ describe("Agent.run() — workspace provider", () => {
 		expect(onRunFinished).toHaveBeenCalledOnce();
 	});
 
-	it("disposes with status error when the runner throws", async () => {
-		const runner = createMockRunner();
-		(runner.run as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("runner exploded"));
+	it("disposes with status error when the turn loop throws", async () => {
+		const { factory, stub } = createFactory();
+		stub.runTurnLoop.mockRejectedValue(new Error("turn loop exploded"));
 		const workspace = makeWorkspace("/ws/dir", { resultAddendum: "\nshould be discarded" });
-		const agent = createRunnableAgent({ runner, workspaceProvider: makeWorkspaceProvider(workspace) });
+		const agent = createRunnableAgent({ createSubagentSession: factory, workspaceProvider: makeWorkspaceProvider(workspace) });
 		await agent.run();
 		expect(agent.status).toBe("error");
 		expect(workspace.dispose).toHaveBeenCalledWith({ status: "error", description: "run test" });
@@ -819,87 +816,91 @@ describe("Agent.run() — workspace provider", () => {
 });
 
 describe("Agent.run() — error handling", () => {
-	it("transitions to error when runner throws", async () => {
-		const runner = createMockRunner();
-		(runner.run as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("runner exploded"));
-		const agent = createRunnableAgent({ runner });
+	it("transitions to error when the turn loop throws", async () => {
+		const { factory, stub } = createFactory();
+		stub.runTurnLoop.mockRejectedValue(new Error("turn loop exploded"));
+		const agent = createRunnableAgent({ createSubagentSession: factory });
 		await agent.run();
 		expect(agent.status).toBe("error");
-		expect(agent.error).toBe("runner exploded");
+		expect(agent.error).toBe("turn loop exploded");
 	});
 
-	it("throws when runner is missing", async () => {
+	it("transitions to error when the factory throws", async () => {
+		const factory: SessionFactory = vi.fn().mockRejectedValue(new Error("creation failed"));
+		const agent = createRunnableAgent({ createSubagentSession: factory });
+		await agent.run();
+		expect(agent.status).toBe("error");
+		expect(agent.error).toBe("creation failed");
+	});
+
+	it("throws when the session factory is missing", async () => {
 		const agent = new Agent({ id: "1", type: "general-purpose", description: "test", snapshot: STUB_SNAPSHOT, prompt: "go" });
-		await expect(agent.run()).rejects.toThrow(/missing runner/);
+		await expect(agent.run()).rejects.toThrow(/missing session factory/);
 	});
 });
 
 describe("Agent.run() — abort signal forwarding", () => {
 	it("wires parent signal so aborting it stops the agent", async () => {
 		const parentController = new AbortController();
-		const runner = createMockRunner({
-			run: vi.fn(() => {
-				parentController.abort();
-				return Promise.reject(new Error("aborted"));
-			}),
+		const { factory, stub } = createFactory();
+		stub.runTurnLoop.mockImplementation(() => {
+			parentController.abort();
+			return Promise.reject(new Error("aborted"));
 		});
-		const agent = createRunnableAgent({ runner, signal: parentController.signal });
+		const agent = createRunnableAgent({ createSubagentSession: factory, signal: parentController.signal });
 		await agent.run();
 		expect(agent.abortController.signal.aborted).toBe(true);
 	});
 });
 
 describe("Agent.run() — RunConfig threading", () => {
-	it("passes defaultMaxTurns and graceTurns to runner.run", async () => {
-		const runner = createMockRunner();
-		const agent = createRunnableAgent({ runner, getRunConfig: () => ({ defaultMaxTurns: 10, graceTurns: 3 }) });
+	it("passes defaultMaxTurns and graceTurns to runTurnLoop", async () => {
+		const { factory, stub } = createFactory();
+		const agent = createRunnableAgent({ createSubagentSession: factory, getRunConfig: () => ({ defaultMaxTurns: 10, graceTurns: 3 }) });
 		await agent.run();
-		const runOpts = (runner.run as ReturnType<typeof vi.fn>).mock.calls[0][3];
-		expect(runOpts.defaultMaxTurns).toBe(10);
-		expect(runOpts.graceTurns).toBe(3);
+		const turnOpts = stub.runTurnLoop.mock.calls[0][1];
+		expect(turnOpts.defaultMaxTurns).toBe(10);
+		expect(turnOpts.graceTurns).toBe(3);
 	});
 });
 
 // ── Agent.resume() ─────────────────────────────────────────────────────────────
 
-/** Create an Agent with a session already attached, ready for resume(). */
+/** Create an Agent with a SubagentSession already attached, ready for resume(). */
 function createResumableAgent(overrides?: {
-	runner?: AgentRunner;
 	observer?: AgentLifecycleObserver;
 	session?: ReturnType<typeof createMockSession>;
+	stub?: ReturnType<typeof createSubagentSessionStub>;
 }) {
 	const session = overrides?.session ?? createMockSession();
-	const runner = overrides?.runner ?? createMockRunner();
+	const stub = overrides?.stub ?? createSubagentSessionStub(session);
 	const agent = new Agent({
 		id: "resume-1",
 		type: "general-purpose",
 		description: "resume test",
 		status: "completed",
 		result: "first",
-		runner,
 		observer: overrides?.observer ?? {},
 	});
-	agent.execution = { session: toAgentSession(session), outputFile: undefined };
-	return { agent, session, runner };
+	agent.subagentSession = toSubagentSession(stub);
+	return { agent, session, stub };
 }
 
 describe("Agent.resume() — happy path", () => {
-	it("transitions to completed and sets result from the runner response", async () => {
+	it("transitions to completed and sets result from the resume response", async () => {
 		const { agent } = createResumableAgent();
 		await agent.resume("continue");
 		expect(agent.status).toBe("completed");
 		expect(agent.result).toBe("resumed");
 	});
 
-	it("passes the prompt and signal straight through to runner.resume", async () => {
-		const { agent, runner, session } = createResumableAgent();
+	it("passes the prompt and signal straight through to resumeTurnLoop", async () => {
+		const { agent, stub } = createResumableAgent();
 		const signal = new AbortController().signal;
 		await agent.resume("continue", signal);
-		const resumeMock = runner.resume as ReturnType<typeof vi.fn>;
-		expect(resumeMock).toHaveBeenCalledOnce();
-		expect(resumeMock.mock.calls[0][0]).toBe(toAgentSession(session));
-		expect(resumeMock.mock.calls[0][1]).toBe("continue");
-		expect(resumeMock.mock.calls[0][2]).toEqual({ signal });
+		expect(stub.resumeTurnLoop).toHaveBeenCalledOnce();
+		expect(stub.resumeTurnLoop.mock.calls[0][0]).toBe("continue");
+		expect(stub.resumeTurnLoop.mock.calls[0][1]).toBe(signal);
 	});
 
 	it("resets transition state before resuming", async () => {
@@ -912,14 +913,13 @@ describe("Agent.resume() — happy path", () => {
 describe("Agent.resume() — observer lifecycle", () => {
 	it("accumulates usage and compactions from session events during resume", async () => {
 		const session = createMockSession();
-		const runner = createMockRunner({
-			resume: vi.fn().mockImplementation(async () => {
-				session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 70, output: 30, cacheWrite: 5 } } });
-				session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 999 }, reason: "overflow" });
-				return "second";
-			}),
+		const stub = createSubagentSessionStub(session);
+		stub.resumeTurnLoop.mockImplementation(async () => {
+			session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 70, output: 30, cacheWrite: 5 } } });
+			session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 999 }, reason: "overflow" });
+			return "second";
 		});
-		const { agent } = createResumableAgent({ runner, session });
+		const { agent } = createResumableAgent({ session, stub });
 		await agent.resume("more");
 		expect(agent.lifetimeUsage).toEqual({ input: 70, output: 30, cacheWrite: 5 });
 		expect(agent.compactionCount).toBe(1);
@@ -931,13 +931,12 @@ describe("Agent.resume() — observer lifecycle", () => {
 		const observer: AgentLifecycleObserver = {
 			onCompacted: (_agent, info) => seen.push({ reason: info.reason, tokensBefore: info.tokensBefore }),
 		};
-		const runner = createMockRunner({
-			resume: vi.fn().mockImplementation(async () => {
-				session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 123 }, reason: "threshold" });
-				return "second";
-			}),
+		const stub = createSubagentSessionStub(session);
+		stub.resumeTurnLoop.mockImplementation(async () => {
+			session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 123 }, reason: "threshold" });
+			return "second";
 		});
-		const { agent } = createResumableAgent({ runner, observer, session });
+		const { agent } = createResumableAgent({ observer, session, stub });
 		await agent.resume("more");
 		expect(seen).toEqual([{ reason: "threshold", tokensBefore: 123 }]);
 	});
@@ -953,11 +952,10 @@ describe("Agent.resume() — observer lifecycle", () => {
 });
 
 describe("Agent.resume() — error handling", () => {
-	it("transitions to error without throwing when runner.resume rejects", async () => {
-		const runner = createMockRunner({
-			resume: vi.fn().mockRejectedValue(new Error("resume exploded")),
-		});
-		const { agent } = createResumableAgent({ runner });
+	it("transitions to error without throwing when resumeTurnLoop rejects", async () => {
+		const stub = createSubagentSessionStub();
+		stub.resumeTurnLoop.mockRejectedValue(new Error("resume exploded"));
+		const { agent } = createResumableAgent({ stub });
 		await agent.resume("more");
 		expect(agent.status).toBe("error");
 		expect(agent.error).toBe("resume exploded");
@@ -965,23 +963,16 @@ describe("Agent.resume() — error handling", () => {
 
 	it("releases the observer subscription after resume errors", async () => {
 		const session = createMockSession();
-		const runner = createMockRunner({
-			resume: vi.fn().mockRejectedValue(new Error("boom")),
-		});
-		const { agent } = createResumableAgent({ runner, session });
+		const stub = createSubagentSessionStub(session);
+		stub.resumeTurnLoop.mockRejectedValue(new Error("boom"));
+		const { agent } = createResumableAgent({ session, stub });
 		await agent.resume("more");
 		session.emit({ type: "tool_execution_end" });
 		expect(agent.toolUses).toBe(0);
 	});
 
-	it("throws when runner is missing", async () => {
+	it("throws when no session exists", async () => {
 		const agent = new Agent({ id: "1", type: "general-purpose", description: "test" });
-		agent.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
-		await expect(agent.resume("more")).rejects.toThrow(/missing runner/);
-	});
-
-	it("throws when session is missing", async () => {
-		const agent = new Agent({ id: "1", type: "general-purpose", description: "test", runner: createMockRunner() });
 		await expect(agent.resume("more")).rejects.toThrow(/missing session/);
 	});
 });

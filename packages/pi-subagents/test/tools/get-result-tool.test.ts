@@ -8,7 +8,7 @@ import {
 } from "#src/tools/get-result-tool";
 import type { Agent } from "#src/types";
 import { createTestAgent } from "#test/helpers/make-agent";
-import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
+import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 import { STUB_CTX } from "#test/helpers/stub-ctx";
 
 const testRegistry = new AgentTypeRegistry(() => new Map());
@@ -120,7 +120,7 @@ describe("GetResultTool", () => {
 	it("includes conversation when verbose=true", async () => {
 		const record = createTestAgent();
 		const session = createMockSession({ messages: [{ role: "user", content: "hello" }] });
-		record.execution = { session: toAgentSession(session), outputFile: undefined };
+		record.subagentSession = toSubagentSession(createSubagentSessionStub(session));
 		const records = new Map([["agent-1", record]]);
 		const result = await execute(makeManager(records), makeNotifications(), { agent_id: "agent-1", verbose: true });
 		expect(result.content[0].text).toContain("--- Agent Conversation ---");

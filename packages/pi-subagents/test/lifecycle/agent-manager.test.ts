@@ -1,35 +1,35 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentManager, type AgentManagerObserver } from "#src/lifecycle/agent-manager";
-import type { AgentRunner } from "#src/lifecycle/agent-runner";
 import { ConcurrencyQueue } from "#src/lifecycle/concurrency-queue";
+import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
+import type { SubagentSession } from "#src/lifecycle/subagent-session";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { NotificationState } from "#src/observation/notification-state";
 import type { RunConfig } from "#src/runtime";
 import type { Agent } from "#src/types";
-import { createBlockingRunner, createRunResult, createSessionRunner } from "#test/helpers/manager-stubs";
-import { createMockSession } from "#test/helpers/mock-session";
+import { createBlockingFactory, createSessionFactory } from "#test/helpers/manager-stubs";
+import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
 /** Default max concurrent background agents (matches production default). */
 const DEFAULT_MAX_CONCURRENT = 4;
 
+type SessionFactory = (params: CreateSubagentSessionParams) => Promise<SubagentSession>;
+
+/** Default factory: resolves to a fresh SubagentSession stub on every spawn. */
+function defaultFactory(): SessionFactory {
+  return vi.fn(async (_params: CreateSubagentSessionParams) => toSubagentSession(createSubagentSessionStub()));
+}
+
 /** Test helper: construct an AgentManager with injected stubs. */
 function createManager(overrides?: {
-  runner?: AgentRunner;
+  createSubagentSession?: SessionFactory;
   observer?: Partial<AgentManagerObserver>;
   getMaxConcurrent?: () => number;
   getRunConfig?: () => RunConfig;
   baseCwd?: string;
 }) {
-  const runner: AgentRunner = overrides?.runner ?? {
-    run: vi.fn().mockResolvedValue({
-      responseText: "done",
-      session: createMockSession(),
-      aborted: false,
-      steered: false,
-    }),
-    resume: vi.fn().mockResolvedValue("resumed"),
-  };
+  const createSubagentSession: SessionFactory = overrides?.createSubagentSession ?? defaultFactory();
   const observer: AgentManagerObserver | undefined = overrides?.observer
     ? {
         onAgentStarted: overrides.observer.onAgentStarted ?? (() => {}),
@@ -50,13 +50,13 @@ function createManager(overrides?: {
     },
   );
   mgr = new AgentManager({
-    runner,
+    createSubagentSession,
     observer,
     queue,
     baseCwd: overrides?.baseCwd ?? "/repo",
     getRunConfig: overrides?.getRunConfig,
   });
-  return { manager: mgr, runner, queue };
+  return { manager: mgr, createSubagentSession, queue };
 }
 
 /** Spawn a background agent using STUB_SNAPSHOT. */
@@ -193,9 +193,8 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
   });
 
   it("clearCompleted does not remove running or queued agents", async () => {
-    // Use maxConcurrent=1 to keep second agent queued; runner never resolves
-    const runner = createBlockingRunner();
-    ({ manager } = createManager({ getMaxConcurrent: () => 1, runner }));
+    // Use maxConcurrent=1 to keep second agent queued; factory never resolves
+    ({ manager } = createManager({ getMaxConcurrent: () => 1, createSubagentSession: createBlockingFactory() }));
 
     const id1 = spawnBg(manager, "test1", "running agent");
     // Second agent should be queued (limit=1)
@@ -218,11 +217,8 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
   it("clearCompleted calls dispose on sessions of removed records", async () => {
     const disposeSpy = vi.fn();
     const sess = createMockSession({ dispose: disposeSpy });
-    const runner: AgentRunner = {
-      run: vi.fn().mockResolvedValue(createRunResult(sess)),
-      resume: vi.fn(),
-    };
-    ({ manager } = createManager({ runner }));
+    const { factory } = createSessionFactory(sess);
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     const id = spawnBg(manager);
     await manager.getRecord(id)!.promise;
@@ -233,11 +229,9 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
   });
 
   it("clearCompleted removes error and stopped records", async () => {
-    const runner: AgentRunner = {
-      run: vi.fn().mockRejectedValue(new Error("boom")),
-      resume: vi.fn(),
-    };
-    ({ manager } = createManager({ runner }));
+    const { factory, stub } = createSessionFactory();
+    stub.runTurnLoop.mockRejectedValue(new Error("boom"));
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     const id = spawnBg(manager);
     await manager.getRecord(id)!.promise;
@@ -258,9 +252,8 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
   });
 
   it("spawn initializes lifetimeUsage to zeros and compactionCount to 0", () => {
-    // Runner never resolves — we just want to inspect the record at spawn time.
-    const runner = createBlockingRunner();
-    ({ manager } = createManager({ runner }));
+    // Factory never resolves — we just want to inspect the record at spawn time.
+    ({ manager } = createManager({ createSubagentSession: createBlockingFactory() }));
 
     const id = spawnBg(manager);
     const record = manager.getRecord(id)!;
@@ -272,19 +265,16 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
   });
 
   it("record observer accumulates assistant usage into record.lifetimeUsage", async () => {
-    // The record observer subscribes to session events via onSessionCreated.
-    // Emitting message_end events through the mock session drives stats.
-    const runner: AgentRunner = {
-      run: vi.fn().mockImplementation(async (_ctx: any, _type: any, _prompt: any, opts: any) => {
-        const session = createMockSession();
-        opts.onSessionCreated?.(session);
-        session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 100, output: 50, cacheWrite: 10 } } });
-        session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 200, output: 80, cacheWrite: 20 } } });
-        return { responseText: "done", session, aborted: false, steered: false };
-      }),
-      resume: vi.fn(),
-    };
-    ({ manager } = createManager({ runner }));
+    // The record observer subscribes to session events via the wired subagentSession.
+    // Emitting message_end events from runTurnLoop drives stats.
+    const session = createMockSession();
+    const { factory, stub } = createSessionFactory(session);
+    stub.runTurnLoop.mockImplementation(async () => {
+      session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 100, output: 50, cacheWrite: 10 } } });
+      session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 200, output: 80, cacheWrite: 20 } } });
+      return { responseText: "done", aborted: false, steered: false };
+    });
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     const id = spawnBg(manager);
     await manager.getRecord(id)!.promise;
@@ -297,20 +287,17 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
   it("record observer increments compactionCount on compaction_end events", async () => {
     const compactSeen: any[] = [];
 
-    const runner: AgentRunner = {
-      run: vi.fn().mockImplementation(async (_ctx: any, _type: any, _prompt: any, opts: any) => {
-        const session = createMockSession();
-        opts.onSessionCreated?.(session);
-        // Compaction fires while the agent is still running — the record passed to
-        // onCompact should reflect the just-incremented count.
-        session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 12345 }, reason: "threshold" });
-        session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 22222 }, reason: "manual" });
-        return { responseText: "done", session, aborted: false, steered: false };
-      }),
-      resume: vi.fn(),
-    };
+    const session = createMockSession();
+    const { factory, stub } = createSessionFactory(session);
+    stub.runTurnLoop.mockImplementation(async () => {
+      // Compaction fires while the agent is still running — the record passed to
+      // onCompact should reflect the just-incremented count.
+      session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 12345 }, reason: "threshold" });
+      session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 22222 }, reason: "manual" });
+      return { responseText: "done", aborted: false, steered: false };
+    });
 
-    ({ manager } = createManager({ runner, observer: { onAgentCompacted: (record, info) => {
+    ({ manager } = createManager({ createSubagentSession: factory, observer: { onAgentCompacted: (record, info) => {
       compactSeen.push({ count: record.compactionCount, reason: info.reason });
     } } }));
 
@@ -325,27 +312,22 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
   });
 
   it("resume() also accumulates usage and increments compactions on the same record", async () => {
-    // First, spawn with a subscribable session that resume can latch onto
+    // Spawn with a subscribable session that resume can latch onto.
     const session = createMockSession();
-    const runner: AgentRunner = {
-      run: vi.fn().mockImplementation(async (_ctx: any, _type: any, _prompt: any, opts: any) => {
-        opts.onSessionCreated?.(session);
-        return { responseText: "first", session, aborted: false, steered: false };
-      }),
-      resume: vi.fn().mockImplementation(async (_session: any, _prompt: any) => {
-        // Emit events through the session — the record observer subscribed by
-        // AgentManager.resume() will pick them up.
-        session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 70, output: 30, cacheWrite: 5 } } });
-        session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 999 }, reason: "overflow" });
-        return "second";
-      }),
-    };
-    ({ manager } = createManager({ runner }));
+    const { factory, stub } = createSessionFactory(session);
+    stub.resumeTurnLoop.mockImplementation(async () => {
+      // Emit events through the session — the record observer subscribed by
+      // AgentManager.resume() will pick them up.
+      session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 70, output: 30, cacheWrite: 5 } } });
+      session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 999 }, reason: "overflow" });
+      return "second";
+    });
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     const id = spawnBg(manager);
     await manager.getRecord(id)!.promise;
 
-    // Pre-resume: lifetimeUsage from spawn was zero (mock didn't emit usage events)
+    // Pre-resume: lifetimeUsage from spawn was zero (run did not emit usage events)
     expect(manager.getRecord(id)!.lifetimeUsage).toEqual({ input: 0, output: 0, cacheWrite: 0 });
     expect(manager.getRecord(id)!.compactionCount).toBe(0);
 
@@ -356,38 +338,36 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
   });
 });
 
-describe("AgentManager — getRunConfig threads defaultMaxTurns and graceTurns into RunOptions", () => {
+describe("AgentManager — getRunConfig threads defaultMaxTurns and graceTurns into the turn loop", () => {
   let manager: AgentManager;
 
   afterEach(() => {
     manager.dispose();
   });
 
-  it("passes defaultMaxTurns and graceTurns from getRunConfig to runAgent", async () => {
+  it("passes defaultMaxTurns and graceTurns from getRunConfig to runTurnLoop", async () => {
     const getRunConfig = vi.fn(() => ({ defaultMaxTurns: 10, graceTurns: 3 }));
-    let runner: AgentRunner;
-    ({ manager, runner } = createManager({ getRunConfig }));
+    const { factory, stub } = createSessionFactory();
+    ({ manager } = createManager({ getRunConfig, createSubagentSession: factory }));
 
-    spawnBg(manager);
+    const id = spawnBg(manager);
+    await manager.getRecord(id)!.promise;
 
-    await vi.waitFor(() => expect(runner.run).toHaveBeenCalled());
-
-    const runOpts = vi.mocked(runner.run).mock.calls[0][3];
-    expect(runOpts.defaultMaxTurns).toBe(10);
-    expect(runOpts.graceTurns).toBe(3);
+    const turnOpts = stub.runTurnLoop.mock.calls[0][1];
+    expect(turnOpts.defaultMaxTurns).toBe(10);
+    expect(turnOpts.graceTurns).toBe(3);
   });
 
-  it("omits defaultMaxTurns and graceTurns from runAgent when no getRunConfig is provided", async () => {
-    let runner: AgentRunner;
-    ({ manager, runner } = createManager());
+  it("omits defaultMaxTurns and graceTurns from runTurnLoop when no getRunConfig is provided", async () => {
+    const { factory, stub } = createSessionFactory();
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
-    spawnBg(manager);
+    const id = spawnBg(manager);
+    await manager.getRecord(id)!.promise;
 
-    await vi.waitFor(() => expect(runner.run).toHaveBeenCalled());
-
-    const runOpts = vi.mocked(runner.run).mock.calls[0][3];
-    expect(runOpts.defaultMaxTurns).toBeUndefined();
-    expect(runOpts.graceTurns).toBeUndefined();
+    const turnOpts = stub.runTurnLoop.mock.calls[0][1];
+    expect(turnOpts.defaultMaxTurns).toBeUndefined();
+    expect(turnOpts.graceTurns).toBeUndefined();
   });
 });
 
@@ -398,9 +378,9 @@ describe("AgentManager — parent session threading", () => {
     manager.dispose();
   });
 
-  it("threads parentSession from AgentSpawnConfig to RunOptions", async () => {
-    let runner: AgentRunner;
-    ({ manager, runner } = createManager());
+  it("threads parentSession from AgentSpawnConfig to the factory params", async () => {
+    const { factory } = createSessionFactory();
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
       description: "test",
@@ -408,11 +388,11 @@ describe("AgentManager — parent session threading", () => {
       parentSession: { parentSessionFile: "/sessions/parent.jsonl", parentSessionId: "parent-session-123" },
     });
 
-    await vi.waitFor(() => expect(runner.run).toHaveBeenCalled());
+    await vi.waitFor(() => expect(factory).toHaveBeenCalled());
 
-    const runOpts = vi.mocked(runner.run).mock.calls[0][3];
-    expect(runOpts.context.parentSession?.parentSessionFile).toBe("/sessions/parent.jsonl");
-    expect(runOpts.context.parentSession?.parentSessionId).toBe("parent-session-123");
+    const params = vi.mocked(factory).mock.calls[0][0];
+    expect(params.parentSession?.parentSessionFile).toBe("/sessions/parent.jsonl");
+    expect(params.parentSession?.parentSessionId).toBe("parent-session-123");
   });
 });
 
@@ -423,36 +403,28 @@ describe("AgentManager — dependency injection via options bag", () => {
     manager.dispose();
   });
 
-  it("calls injected runner.run when spawning an agent", async () => {
-    let runner: AgentRunner;
-    ({ manager, runner } = createManager());
+  it("calls the injected factory when spawning an agent", async () => {
+    const { factory } = createSessionFactory();
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     const id = spawnBg(manager);
     await manager.getRecord(id)!.promise;
 
-    expect(runner.run).toHaveBeenCalledOnce();
+    expect(factory).toHaveBeenCalledOnce();
     expect(manager.getRecord(id)!.result).toBe("done");
   });
 
-  it("calls injected runner.resume when resuming an agent", async () => {
-    const session = createMockSession();
-    const runner: AgentRunner = {
-      run: vi.fn().mockResolvedValue({
-        responseText: "first",
-        session,
-        aborted: false,
-        steered: false,
-      }),
-      resume: vi.fn().mockResolvedValue("second"),
-    };
-    ({ manager } = createManager({ runner }));
+  it("calls resumeTurnLoop on the SubagentSession when resuming an agent", async () => {
+    const { factory, stub } = createSessionFactory();
+    stub.resumeTurnLoop.mockResolvedValue("second");
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     const id = spawnBg(manager);
     await manager.getRecord(id)!.promise;
 
     await manager.resume(id, "continue");
 
-    expect(runner.resume).toHaveBeenCalledOnce();
+    expect(stub.resumeTurnLoop).toHaveBeenCalledOnce();
     expect(manager.getRecord(id)!.result).toBe("second");
   });
 
@@ -471,18 +443,19 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
     const { promise: gate2, resolve: resolve2 } = Promise.withResolvers<void>(); // eslint-disable-line @typescript-eslint/no-invalid-void-type -- Promise.withResolvers<void> is valid; rule does not allow void in generic fn call type args
 
     let callCount = 0;
-    const runner: AgentRunner = {
-      run: vi.fn().mockImplementation(async () => {
-        callCount++;
-        const n = callCount;
-        startOrder.push(`start-${n}`);
+    const factory: SessionFactory = vi.fn(async () => {
+      callCount++;
+      const n = callCount;
+      startOrder.push(`start-${n}`);
+      const stub = createSubagentSessionStub();
+      stub.runTurnLoop.mockImplementation(async () => {
         if (n === 1) await gate1;
         if (n === 2) await gate2;
-        return { responseText: `result-${n}`, session: createMockSession(), aborted: false, steered: false };
-      }),
-      resume: vi.fn(),
-    };
-    ({ manager } = createManager({ runner, getMaxConcurrent: () => 1 }));
+        return { responseText: `result-${n}`, aborted: false, steered: false };
+      });
+      return toSubagentSession(stub);
+    });
+    ({ manager } = createManager({ createSubagentSession: factory, getMaxConcurrent: () => 1 }));
 
     // Spawn two background agents — first runs, second queues
     const id1 = spawnBg(manager, "test1", "first");
@@ -507,8 +480,8 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
   });
 
   it("abort removes a queued agent without ever running it", () => {
-    const runner = createBlockingRunner();
-    ({ manager } = createManager({ runner, getMaxConcurrent: () => 1 }));
+    const factory = createBlockingFactory();
+    ({ manager } = createManager({ createSubagentSession: factory, getMaxConcurrent: () => 1 }));
 
     // First runs, second queues
     const id1 = spawnBg(manager, "a");
@@ -520,8 +493,8 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
     expect(manager.abort(id2)).toBe(true);
     expect(manager.getRecord(id2)!.status).toBe("stopped");
 
-    // runner.run was called once (for the first agent), never for the aborted one
-    expect(runner.run).toHaveBeenCalledOnce();
+    // factory was called once (for the first agent), never for the aborted one
+    expect(factory).toHaveBeenCalledOnce();
 
     manager.abort(id1);
   });
@@ -531,16 +504,18 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
     const { promise: gate, resolve } = Promise.withResolvers<void>(); // eslint-disable-line @typescript-eslint/no-invalid-void-type -- Promise.withResolvers<void> is valid; rule does not allow void in generic fn call type args
 
     let callCount = 0;
-    const runner: AgentRunner = {
-      run: vi.fn().mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) await gate;
-        return { responseText: "ok", session: createMockSession(), aborted: false, steered: false };
-      }),
-      resume: vi.fn(),
-    };
+    const factory: SessionFactory = vi.fn(async () => {
+      callCount++;
+      const n = callCount;
+      const stub = createSubagentSessionStub();
+      stub.runTurnLoop.mockImplementation(async () => {
+        if (n === 1) await gate;
+        return { responseText: "ok", aborted: false, steered: false };
+      });
+      return toSubagentSession(stub);
+    });
     ({ manager } = createManager({
-      runner,
+      createSubagentSession: factory,
       getMaxConcurrent: () => 1,
       observer: { onAgentStarted: (record) => { startedIds.push(record.id); } },
     }));
@@ -562,35 +537,33 @@ describe("AgentManager — queueing and concurrency with injected stubs", () => 
   });
 });
 
-describe("AgentManager — execution state", () => {
+describe("AgentManager — subagent session state", () => {
   let manager: AgentManager;
 
   afterEach(() => {
     manager.dispose();
   });
 
-  it("sets record.execution with session and outputFile after session creation", async () => {
+  it("sets record.subagentSession with session and outputFile after session creation", async () => {
     const session = createMockSession();
-    session.sessionManager.getSessionFile.mockReturnValue("/tmp/session.jsonl");
-    const runner = createSessionRunner(session);
-    ({ manager } = createManager({ runner }));
+    const { factory } = createSessionFactory(session, "/tmp/session.jsonl");
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     const id = spawnBg(manager);
     await manager.getRecord(id)!.promise;
 
     const record = manager.getRecord(id)!;
-    expect(record.execution).toBeDefined();
-    expect(record.execution!.session).toBe(session);
-    expect(record.execution!.outputFile).toBe("/tmp/session.jsonl");
+    expect(record.subagentSession).toBeDefined();
+    expect(record.subagentSession!.session).toBe(session);
+    expect(record.subagentSession!.outputFile).toBe("/tmp/session.jsonl");
   });
 
-  it("record.execution is undefined before the session is created", () => {
-    const runner = createBlockingRunner();
-    ({ manager } = createManager({ runner }));
+  it("record.subagentSession is undefined before the session is created", () => {
+    ({ manager } = createManager({ createSubagentSession: createBlockingFactory() }));
 
     const id = spawnBg(manager);
     const record = manager.getRecord(id)!;
-    expect(record.execution).toBeUndefined();
+    expect(record.subagentSession).toBeUndefined();
     manager.abort(id);
   });
 });
@@ -658,8 +631,8 @@ describe("AgentManager — lifecycle observer forwarding", () => {
   it("forwards onSessionCreated from spawn options observer to Agent", async () => {
     const session = createMockSession();
     const received: { agent: Agent | undefined } = { agent: undefined };
-    const runner = createSessionRunner(session);
-    ({ manager } = createManager({ runner }));
+    const { factory } = createSessionFactory(session);
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
       description: "test",
@@ -679,8 +652,8 @@ describe("AgentManager — lifecycle observer forwarding", () => {
   it("forwards onSessionCreated for foreground agents", async () => {
     const session = createMockSession();
     const received: { agent: Agent | undefined } = { agent: undefined };
-    const runner = createSessionRunner(session);
-    ({ manager } = createManager({ runner }));
+    const { factory } = createSessionFactory(session);
+    ({ manager } = createManager({ createSubagentSession: factory }));
 
     await manager.spawnAndWait(STUB_SNAPSHOT, "general-purpose", "test", {
       description: "fg",

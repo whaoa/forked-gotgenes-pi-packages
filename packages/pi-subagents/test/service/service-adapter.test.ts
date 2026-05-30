@@ -7,7 +7,7 @@ import type { AgentManagerLike, ServiceRuntimeLike } from "#src/service/service-
 import { SubagentsServiceAdapter, toSubagentRecord } from "#src/service/service-adapter";
 import type { Agent, SessionContext } from "#src/types";
 import { createTestAgent } from "#test/helpers/make-agent";
-import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
+import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
 describe("toSubagentRecord", () => {
@@ -40,11 +40,11 @@ describe("toSubagentRecord", () => {
     });
   });
 
-  it("strips execution from the record", () => {
+  it("strips the session from the serialized record", () => {
     const record = createTestAgent();
-    record.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
+    record.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession()));
     const result = toSubagentRecord(record);
-    expect(result).not.toHaveProperty("execution");
+    expect(result).not.toHaveProperty("subagentSession");
   });
 
   it("strips abortController from the record", () => {
@@ -401,7 +401,7 @@ describe("SubagentsServiceAdapter — steer, abort, waitForAll, hasRunning", () 
     it("delegates to session.steer and returns true when session is ready", async () => {
       const mockSteer = vi.fn(async () => {});
       const record = createTestAgent({ id: "a-1", status: "running" });
-      record.execution = { session: toAgentSession(createMockSession({ steer: mockSteer })), outputFile: undefined };
+      record.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession({ steer: mockSteer })));
       const mgr = createTestManager();
       mgr.getRecord.mockReturnValue(record);
       const svc = createSvc(mgr);

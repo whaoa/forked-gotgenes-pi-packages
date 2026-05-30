@@ -1,16 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("#src/lifecycle/agent-runner", async () => {
-  const actual = await vi.importActual<typeof import("#src/lifecycle/agent-runner")>("#src/lifecycle/agent-runner");
+vi.mock("#src/lifecycle/create-subagent-session", async () => {
+  const actual = await vi.importActual<typeof import("#src/lifecycle/create-subagent-session")>(
+    "#src/lifecycle/create-subagent-session",
+  );
   return {
     ...actual,
-    runAgent: vi.fn(),
+    createSubagentSession: vi.fn(),
   };
 });
 
 import subagentsExtension from "#src/index";
-import { runAgent } from "#src/lifecycle/agent-runner";
-import { createMockSession, toAgentSession } from "./helpers/mock-session";
+import { createSubagentSession } from "#src/lifecycle/create-subagent-session";
+import { createMockSession, createSubagentSessionStub, toSubagentSession } from "./helpers/mock-session";
 
 function makePi() {
   const tools = new Map<string, any>();
@@ -73,13 +75,9 @@ describe("print mode background notifications", () => {
   });
 
   it("ignores stale-context errors from delayed completion nudges", async () => {
-    vi.mocked(runAgent).mockResolvedValue({
-      responseText: "done",
-      session: toAgentSession(createMockSession()),
-      aborted: false,
-      steered: false,
-      sessionFile: "/sessions/child.jsonl",
-    });
+    vi.mocked(createSubagentSession).mockResolvedValue(
+      toSubagentSession(createSubagentSessionStub(createMockSession(), "/sessions/child.jsonl")),
+    );
 
     const { pi, tools, handlers } = makePi();
     subagentsExtension(pi);

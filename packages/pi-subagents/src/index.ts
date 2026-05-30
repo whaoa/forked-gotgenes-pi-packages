@@ -24,9 +24,9 @@ import { AgentTypeRegistry } from "#src/config/agent-types";
 import { loadCustomAgents } from "#src/config/custom-agents";
 import { SessionLifecycleHandler, ToolStartHandler } from "#src/handlers/index";
 import { AgentManager, type AgentManagerObserver } from "#src/lifecycle/agent-manager";
-import { ConcreteAgentRunner, type RunnerDeps } from "#src/lifecycle/agent-runner";
 import { createChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import { ConcurrencyQueue } from "#src/lifecycle/concurrency-queue";
+import { createSubagentSession, type SubagentSessionDeps } from "#src/lifecycle/create-subagent-session";
 import { buildParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { buildEventData, type NotificationDetails, NotificationManager } from "#src/observation/notification";
 import { createNotificationRenderer } from "#src/observation/renderer";
@@ -132,7 +132,7 @@ export default function (pi: ExtensionAPI) {
     },
   };
 
-  const runnerDeps: RunnerDeps = {
+  const subagentSessionDeps: SubagentSessionDeps = {
     io: {
       detectEnv,
       getAgentDir,
@@ -162,7 +162,7 @@ export default function (pi: ExtensionAPI) {
   );
 
   const manager = new AgentManager({
-    runner: new ConcreteAgentRunner(runnerDeps),
+    createSubagentSession: (params) => createSubagentSession(params, subagentSessionDeps),
     baseCwd: process.cwd(),
     observer,
     queue,

@@ -1,68 +1,42 @@
 /**
- * manager-stubs.ts — Shared AgentRunner stubs for agent-manager tests.
+ * manager-stubs.ts — Shared createSubagentSession factory stubs for agent-manager tests.
  *
- * Extracts the four most-repeated inline clone families from agent-manager.test.ts.
- * Tests with unique runner behavior (event-emitting, gated, error-throwing) keep
- * their inline stubs — those encode test-specific sequences a factory would obscure.
+ * The factory produces a born-complete SubagentSession (issue #265). These
+ * helpers wrap the SubagentSession stub from mock-session into the factory shape
+ * AgentManager injects into each Agent. Tests with unique turn-loop behavior
+ * (event-emitting, gated, error-throwing) configure the returned stub directly.
  */
 import { vi } from "vitest";
-import type { AgentRunner, RunResult } from "#src/lifecycle/agent-runner";
-import { createMockSession, type MockSession, toAgentSession } from "#test/helpers/mock-session";
+import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
+import type { SubagentSession } from "#src/lifecycle/subagent-session";
+import {
+  createMockSession,
+  createSubagentSessionStub,
+  type MockSession,
+  toSubagentSession,
+} from "#test/helpers/mock-session";
 
-// ── createBlockingRunner ─────────────────────────────────────────────────────
+// ── createBlockingFactory ────────────────────────────────────────────────────
 
 /**
- * AgentRunner whose `run()` returns a promise that never resolves.
+ * A factory whose creation never resolves.
  *
- * Use when a test needs an agent to stay in the "running" state indefinitely
+ * Use when a test needs an agent to stay "running" with no session yet created
  * (e.g., to inspect queued records or test abort behavior).
  */
-export function createBlockingRunner(): AgentRunner {
-	return {
-		run: vi.fn().mockImplementation(() => new Promise<RunResult>(() => {})),
-		resume: vi.fn(),
-	};
+export function createBlockingFactory() {
+  return vi.fn((_params: CreateSubagentSessionParams) => new Promise<SubagentSession>(() => {}));
 }
 
-// ── createRunResult ──────────────────────────────────────────────────────────
+// ── createSessionFactory ─────────────────────────────────────────────────────
 
 /**
- * Standard RunResult shape with sensible defaults.
- *
- * Pass an existing MockSession when the test needs to reference the same session
- * object after the run (e.g., to assert dispose was called on it).
+ * A factory returning a SubagentSession stub wrapping the given (or a fresh)
+ * session. Returns the factory plus the stub and session so tests can configure
+ * `runTurnLoop`/`resumeTurnLoop` and emit session events.
  */
-export function createRunResult(session?: MockSession): RunResult {
-	const sess = session ?? createMockSession();
-	return {
-		responseText: "done",
-		session: toAgentSession(sess),
-		aborted: false,
-		steered: false,
-	};
-}
-
-// ── createSessionRunner ──────────────────────────────────────────────────────
-
-/**
- * AgentRunner that fires `onSessionCreated` with the given session and resolves.
- *
- * Use when the test needs `onSessionCreated` to fire so that the record observer
- * subscribes or execution state is captured.
- */
-export function createSessionRunner(session: MockSession): AgentRunner {
-	return {
-		run: vi.fn().mockImplementation(
-			async (
-				_snapshot: unknown,
-				_type: unknown,
-				_prompt: unknown,
-				opts: { onSessionCreated?: (s: unknown) => void },
-			) => {
-				opts.onSessionCreated?.(session);
-				return createRunResult(session);
-			},
-		),
-		resume: vi.fn(),
-	};
+export function createSessionFactory(session: MockSession = createMockSession(), outputFile?: string) {
+  const stub = createSubagentSessionStub(session, outputFile);
+  const factory = vi.fn(async (_params: CreateSubagentSessionParams) => toSubagentSession(stub));
+  return { factory, stub, session };
 }

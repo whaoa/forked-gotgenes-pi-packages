@@ -3,7 +3,7 @@ import { type ForegroundParams, runForeground } from "#src/tools/foreground-runn
 import type { ResolvedSpawnConfig } from "#src/tools/spawn-config";
 import { createTestAgent } from "#test/helpers/make-agent";
 import { createToolDeps } from "#test/helpers/make-deps";
-import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
+import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
 function makeConfig(overrides: Partial<ResolvedSpawnConfig> = {}): ResolvedSpawnConfig {
@@ -142,7 +142,7 @@ describe("runForeground", () => {
 				spawnAndWait: vi.fn().mockImplementation(
 					async (_snapshot: any, _type: any, _prompt: any, opts: any) => {
 						const record = createTestAgent({ result: "done" });
-						record.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
+						record.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession()));
 						opts.observer?.onSessionCreated?.(record, mockSess);
 						return record;
 					},

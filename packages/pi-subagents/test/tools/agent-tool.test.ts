@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentTool } from "#src/tools/agent-tool";
 import { createTestAgent } from "#test/helpers/make-agent";
 import { createToolDeps } from "#test/helpers/make-deps";
-import { createMockSession, toAgentSession } from "#test/helpers/mock-session";
+import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 
 function makeCtx(overrides: Record<string, unknown> = {}) {
 	return {
@@ -103,7 +103,7 @@ describe("AgentTool — resume path", () => {
 	it("returns result text on successful resume", async () => {
 		const deps = createToolDeps();
 		const resumeRecord = createTestAgent();
-		resumeRecord.execution = { session: toAgentSession(createMockSession()), outputFile: undefined };
+		resumeRecord.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession()));
 		deps.manager.getRecord = vi.fn().mockReturnValue(resumeRecord);
 		deps.manager.resume = vi.fn().mockResolvedValue(createTestAgent({ result: "Resumed output." }));
 		const result = await execute(deps, {
