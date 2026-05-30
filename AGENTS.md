@@ -6,6 +6,7 @@ This is a pnpm workspace monorepo.
 Each package under `packages/` is a Pi extension published to npm under `@gotgenes/`.
 Always launch Pi from the repo root — the root `.pi/settings.json` and `.pi/prompts/` are only discovered from CWD.
 Before working on a specific package, load its `package-<name>` skill for architecture, priorities, and testing context.
+Load skills inline — never dispatch a subagent to load skills.
 When adding a new package or a new internal docs subdirectory (retro, plans, architecture, decisions, assets), add the path to `exclude-paths` in `release-please-config.json`.
 Commits that only touch excluded paths do not trigger releases.
 
