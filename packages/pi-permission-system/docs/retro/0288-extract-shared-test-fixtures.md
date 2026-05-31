@@ -24,3 +24,26 @@ Plan is a pure test refactor (no `src/` changes); next step is `/build-plan` sin
 - Step 5 (lifecycle setup) and the ext-dir block's final home are flagged as open questions to settle during implementation.
 - Initial `Write` hit an external-directory denial from a wrong absolute path (`/Users/chris/development/pi/pi-permission-system/...`); the repo root is `pi-packages`.
   Use repo-relative paths.
+
+## Stage: Implementation — TDD (2026-05-31T14:45:00Z)
+
+### Session summary
+
+Completed all 6 migration steps from the plan: handler fixtures (Step 1), external-directory family (Step 2), gate fixtures (Step 3), manager harness (Step 4), lifecycle setup (Step 5), and docs refresh (Step 6).
+Test count held steady at 71 files / 1628 tests throughout — pure refactor, no assertions changed.
+Pre-completion reviewer returned WARN (resolved before shipping).
+
+### Observations
+
+- **Step 1** `makeCheckResult` signature change required converting positional-`state` calls in `tool-call-events.test.ts` to override-bag form with explicit `matchedPattern: "*"` where the original factory had it as a default.
+  All other files used the neutral default safely.
+- **Step 2** `makeToolCallEvent` in `external-directory-integration.test.ts` used `input` as a direct second argument (not wrapped); migrated all call sites to `{ input: {...} }` wrapper convention to align with the shared factory.
+  No test failures.
+- **Step 3** `makeCheckResult` defaults diverged across runner vs bash-path/path files; gate-fixtures introduces `makeGateCheckResult` (path defaults) alongside the neutral `makeCheckResult` from handler-fixtures to avoid verbose per-call overrides in the 20+ bash-path call sites.
+- **Step 4** `CreateManagerOptions` was still used in `createManagerWithProject` in `permission-system.test.ts` after removing the local definition — needed an explicit import from the harness.
+  The `TS2345` error at line 1170 (pre-existing latent type issue) was resolved as a side effect once `CreateManagerOptions` was properly imported.
+- **Step 5** `makeSession` in `before-agent-start.test.ts` and `lifecycle.test.ts` have different method sets (different lifecycle phases), so only `makeCtx` was extracted.
+  The 39-line fallow clone was primarily the `makeCtx` body.
+- **WARN 1 resolved**: stale `PermissionGateHandler` import in `tool-call.test.ts` removed (biome lint warning, exit 0).
+- **WARN 2 resolved**: `package-pi-permission-system` SKILL.md Testing section updated with `test/helpers/` layout and the divergent-default `makeCheckResult` override pattern.
+- Pre-completion reviewer verdict: **WARN** (2 findings, both resolved before shipping).
