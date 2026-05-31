@@ -635,5 +635,119 @@ flowchart TD
 | Config schema        | 3     | Add numeric fields to config (independent of extraction)   |
 | Integration          | 4     | Wire config to formatter (depends on both tracks)          |
 
+## Improvement roadmap — Phase 2
+
+Goal: pay down the complexity and duplication debt that `fallow` flags but no issue tracks.
+
+Phase 1 is scoped to enabling [#266] (the preview formatter).
+Phase 2 is a distinct theme: it eliminates the five `fallow` refactoring targets and drives down the test-tree duplication.
+Four of the five targets sit on the security-critical `tool_call` decision path, where high untested complexity is a correctness risk, not only a maintainability one.
+
+### Current health metrics
+
+| Metric               | Value                                                        |
+| -------------------- | ------------------------------------------------------------ |
+| Health score         | 74 B                                                         |
+| LOC                  | 30,811                                                       |
+| Dead files / exports | 0%                                                           |
+| Avg cyclomatic       | 1.4                                                          |
+| Maintainability      | 91.2 (good)                                                  |
+| Duplication          | 9.1% (122 clone groups)                                      |
+| Refactoring targets  | 5 (4 medium, 1 high)                                         |
+| Worst CRAP risk      | `permission-gate-handler.ts` 172, `permission-manager.ts` 97 |
+
+### Findings
+
+All findings are `fallow`-confirmed and untracked before this phase.
+
+| #   | Finding                                                                                                                                                                      | Category                         | Files                                   | Impact | Risk | Priority |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------------- | ------ | ---- | -------- |
+| 1   | `handleToolCall` runs six gates with a repeated bypass/runner/short-circuit shape — cognitive 52, CRAP 172, the package's worst                                              | B: god function                  | `handlers/permission-gate-handler.ts`   | 5      | 2    | 20       |
+| 2   | `resolvePermissions` interleaves scope merge with parallel origin-map bookkeeping — cognitive 33, CRAP 97                                                                    | B: god function                  | `permission-manager.ts`                 | 4      | 2    | 16       |
+| 3   | `runGateCheck` carries the full check→log→emit→approve cycle as six inline phases — cognitive 32                                                                             | B: god function                  | `handlers/gates/runner.ts`              | 4      | 2    | 16       |
+| 4   | Two token classifiers share a 31-line rejection prelude (production clone); `collectPathCandidateTokens` (37) and `collectPatternCommandTokens` (33) are complexity hotspots | A: duplication / B: god function | `handlers/gates/bash-path-extractor.ts` | 4      | 3    | 12       |
+| 5   | `stripJsonComments` is a five-variable character scanner — cognitive 31                                                                                                      | B: god function                  | `config-loader.ts`                      | 2      | 2    | 8        |
+| 6   | 9.1% duplication concentrated in the test tree — the single largest health deduction (-4.1)                                                                                  | D: test duplication              | `test/` (clone families)                | 3      | 1    | 15       |
+
+### Steps
+
+1. **Decompose `handleToolCall`** ([#285])
+   - Extract a `runGate(descriptor)` helper closing over `tcc` and `runnerDeps` that handles the bypass log/emit branch, calls `runGateCheck`, and returns a block result or `undefined`.
+   - Extract the tool-name validation prelude into a helper returning a discriminated result.
+   - The body collapses to validate → build context → ordered gate pipeline that short-circuits on the first block.
+   - Category: B (god function on the security path)
+   - Outcome: cognitive 52 → target < 15; CRAP 172 falls as the repeated block dissolves.
+   - Commit: `refactor: decompose handleToolCall into a gate pipeline`
+
+2. **Decompose `resolvePermissions`** ([#286])
+   - Extract `mergeScopesWithOrigins(scopes)` returning `{ mergedPermission, origins }`, isolating origin-map bookkeeping from the resolve pipeline.
+   - The remaining body reads as load scopes → merge with origins → extract universal fallback → build config rules → compose.
+   - Category: B (god function)
+   - Outcome: cognitive 33 → target < 15; CRAP 97 falls.
+   - Commit: `refactor: extract mergeScopesWithOrigins from resolvePermissions`
+
+3. **Decompose `runGateCheck`** ([#287])
+   - Extract `resolveGateCheck`, `emitSessionHit`, and `recordSessionApprovals` as named helpers for phases 1, 2, and 6.
+   - The `runGateCheck` signature and return contract stay identical.
+   - Category: B (god function)
+   - Outcome: cognitive 32 → target < 15.
+   - Commit: `refactor: extract phase helpers from runGateCheck`
+
+4. **Decompose `bash-path-extractor.ts`** ([#289])
+   - Extract `rejectNonPathToken(token)` for the shared rejection prelude; each classifier keeps only its acceptance gate, removing the 31-line clone.
+   - Extract the flag-handling step from `collectPatternCommandTokens` to cut its cognitive load.
+   - Category: A + B (production clone + god functions)
+   - Outcome: clone removed; `collectPathCandidateTokens` (37) and `collectPatternCommandTokens` (33) drop below target.
+   - Commit: `refactor: extract shared token rejection in bash-path-extractor`
+
+5. **Reduce `stripJsonComments` complexity** ([#290])
+   - Model the scanner as an explicit small state machine or extract per-mode consume helpers.
+   - Lowest priority; defer if the higher-priority targets consume the phase.
+   - Category: B (god function)
+   - Outcome: cognitive 31 → target < 15.
+   - Commit: `refactor: model stripJsonComments as a state machine`
+
+6. **Extract shared test fixtures** ([#288])
+   - Extract handler/session setup, ruleset, and event-payload factories into `test/helpers/`, then migrate the top clone families (`permission-system.test.ts`, the external-directory tests, the handler-event tests, `bash-path.test.ts`, `runner.test.ts`).
+   - Lift-and-shift: introduce fixtures alongside existing tests, migrate incrementally, remove duplicated blocks last; one clone family per commit.
+   - Category: D (test duplication)
+   - Outcome: duplication 9.1% → single digits low; the -4.1 health deduction shrinks.
+   - Commit: `test: extract shared permission fixtures (per clone family)`
+
+### Step dependency diagram
+
+Steps 1-5 are independent.
+Step 6 is best sequenced after the production refactors whose tested call sites it touches (dashed edges) — those refactors are behavior-preserving, so the soft ordering only avoids re-migrating fixtures, it does not block.
+
+```mermaid
+flowchart TD
+    S1["Step 1: Decompose handleToolCall (#285)"]
+    S2["Step 2: Decompose resolvePermissions (#286)"]
+    S3["Step 3: Decompose runGateCheck (#287)"]
+    S4["Step 4: Decompose bash-path-extractor (#289)"]
+    S5["Step 5: Reduce stripJsonComments (#290)"]
+    S6["Step 6: Extract shared test fixtures (#288)"]
+
+    S1 -.-> S6
+    S2 -.-> S6
+    S3 -.-> S6
+    S4 -.-> S6
+```
+
+### Tracks
+
+| Track                       | Steps   | Description                                                              |
+| --------------------------- | ------- | ------------------------------------------------------------------------ |
+| A: Decision-path complexity | 1, 2, 3 | Decompose the three `tool_call` hotspots (independent, parallel)         |
+| B: bash-path-extractor      | 4       | Remove the production clone and reduce the two collect-function hotspots |
+| C: config-loader            | 5       | Reduce `stripJsonComments` complexity (lowest priority)                  |
+| D: Duplication              | 6       | Extract shared test fixtures; best sequenced after Tracks A and B        |
+
 [#266]: https://github.com/gotgenes/pi-packages/issues/266
 [#282]: https://github.com/gotgenes/pi-packages/issues/282
+[#285]: https://github.com/gotgenes/pi-packages/issues/285
+[#286]: https://github.com/gotgenes/pi-packages/issues/286
+[#287]: https://github.com/gotgenes/pi-packages/issues/287
+[#288]: https://github.com/gotgenes/pi-packages/issues/288
+[#289]: https://github.com/gotgenes/pi-packages/issues/289
+[#290]: https://github.com/gotgenes/pi-packages/issues/290
