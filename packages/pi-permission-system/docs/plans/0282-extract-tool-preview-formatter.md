@@ -344,6 +344,5 @@ This keeps each commit individually reviewable and the type checker satisfied at
   extension seam (`register()` for custom tool formatters) — deferred to [#283].
 
 [#266]: https://github.com/gotgenes/pi-packages/issues/266
-[#282]: https://github.com/gotgenes/pi-packages/issues/282
 [#283]: https://github.com/gotgenes/pi-packages/issues/283
 [#285]: https://github.com/gotgenes/pi-packages/issues/285
