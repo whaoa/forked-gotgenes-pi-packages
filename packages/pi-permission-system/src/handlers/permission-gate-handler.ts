@@ -23,7 +23,7 @@ import {
 } from "#src/tool-registry";
 import { describeBashExternalDirectoryGate } from "./gates/bash-external-directory";
 import { describeBashPathGate } from "./gates/bash-path";
-import type { GateRunnerDeps } from "./gates/descriptor";
+import type { GateResult, GateRunnerDeps } from "./gates/descriptor";
 import { isGateBypass } from "./gates/descriptor";
 import { describeExternalDirectoryGate } from "./gates/external-directory";
 import { describePathGate } from "./gates/path";
@@ -109,134 +109,72 @@ export class PermissionGateHandler {
       promptPermission,
     };
 
-    // ── Skill-read gate (descriptor + runner) ───────────────────────────────
-    const skillDescriptor = describeSkillReadGate(tcc, () =>
-      this.session.getActiveSkillEntries(),
-    );
-    if (skillDescriptor) {
-      const skillResult = await runGateCheck(
-        skillDescriptor,
+    // ── Unified gate executor ─────────────────────────────────────────────
+    // Handles the bypass log/emit branch, calls runGateCheck for descriptors,
+    // and returns a block result or undefined (allow / no-op).
+    const runGate = async (
+      gate: GateResult,
+    ): Promise<{ block: true; reason: string } | undefined> => {
+      if (!gate) {
+        return undefined;
+      }
+      if (isGateBypass(gate)) {
+        if (gate.log) {
+          writeReviewLog(gate.log.event, gate.log.details);
+        }
+        if (gate.decision) {
+          emitDecision(gate.decision);
+        }
+        return undefined;
+      }
+      const result = await runGateCheck(
+        gate,
         tcc.agentName,
         tcc.toolCallId,
         runnerDeps,
       );
-      if (skillResult.action === "block") {
-        return { block: true, reason: skillResult.reason };
-      }
-    }
+      return result.action === "block"
+        ? { block: true, reason: result.reason }
+        : undefined;
+    };
 
-    // ── Path gate for tools (descriptor + runner) ────────────────────────────
-    const pathDesc = describePathGate(tcc, checkPermission, getSessionRuleset);
-    if (pathDesc) {
-      if (isGateBypass(pathDesc)) {
-        if (pathDesc.log) {
-          writeReviewLog(pathDesc.log.event, pathDesc.log.details);
-        }
-      } else {
-        const pathResult = await runGateCheck(
-          pathDesc,
-          tcc.agentName,
-          tcc.toolCallId,
-          runnerDeps,
-        );
-        if (pathResult.action === "block") {
-          return { block: true, reason: pathResult.reason };
-        }
-      }
-    }
-
-    // ── External-directory gate (descriptor + runner) ────────────────────────
+    // ── Ordered gate pipeline ─────────────────────────────────────────────
+    // infraDirs is computed once, outside the pipeline, exactly as before.
     const infraDirs = [
       ...this.session.getInfrastructureDirs(),
       ...this.session.getInfrastructureReadPaths(),
     ];
-    const extDirDesc = describeExternalDirectoryGate(tcc, infraDirs);
-    if (extDirDesc) {
-      if (isGateBypass(extDirDesc)) {
-        if (extDirDesc.log) {
-          writeReviewLog(extDirDesc.log.event, extDirDesc.log.details);
-        }
-        if (extDirDesc.decision) {
-          emitDecision(extDirDesc.decision);
-        }
-      } else {
-        const extDirResult = await runGateCheck(
-          extDirDesc,
-          tcc.agentName,
-          tcc.toolCallId,
-          runnerDeps,
-        );
-        if (extDirResult.action === "block") {
-          return { block: true, reason: extDirResult.reason };
-        }
-      }
-    }
 
-    // ── Bash external-directory gate (descriptor + runner) ───────────────────
-    const bashExtDesc = await describeBashExternalDirectoryGate(
-      tcc,
-      checkPermission,
-      getSessionRuleset,
-    );
-    if (bashExtDesc) {
-      if (isGateBypass(bashExtDesc)) {
-        if (bashExtDesc.log) {
-          writeReviewLog(bashExtDesc.log.event, bashExtDesc.log.details);
-        }
-      } else {
-        const bashExtResult = await runGateCheck(
-          bashExtDesc,
-          tcc.agentName,
-          tcc.toolCallId,
-          runnerDeps,
+    const gateProducers: Array<() => GateResult | Promise<GateResult>> = [
+      () =>
+        describeSkillReadGate(tcc, () => this.session.getActiveSkillEntries()),
+      () => describePathGate(tcc, checkPermission, getSessionRuleset),
+      () => describeExternalDirectoryGate(tcc, infraDirs),
+      () =>
+        describeBashExternalDirectoryGate(
+          tcc,
+          checkPermission,
+          getSessionRuleset,
+        ),
+      () => describeBashPathGate(tcc, checkPermission, getSessionRuleset),
+      () => {
+        const toolCheck = checkPermission(
+          tcc.toolName,
+          tcc.input,
+          tcc.agentName ?? undefined,
+          getSessionRuleset(),
         );
-        if (bashExtResult.action === "block") {
-          return { block: true, reason: bashExtResult.reason };
-        }
-      }
-    }
+        const toolDescriptor = describeToolGate(tcc, toolCheck);
+        toolDescriptor.preCheck = toolCheck;
+        return toolDescriptor;
+      },
+    ];
 
-    // ── Bash path gate (descriptor + runner) ────────────────────────────────
-    const bashPathDesc = await describeBashPathGate(
-      tcc,
-      checkPermission,
-      getSessionRuleset,
-    );
-    if (bashPathDesc) {
-      if (isGateBypass(bashPathDesc)) {
-        if (bashPathDesc.log) {
-          writeReviewLog(bashPathDesc.log.event, bashPathDesc.log.details);
-        }
-      } else {
-        const bashPathResult = await runGateCheck(
-          bashPathDesc,
-          tcc.agentName,
-          tcc.toolCallId,
-          runnerDeps,
-        );
-        if (bashPathResult.action === "block") {
-          return { block: true, reason: bashPathResult.reason };
-        }
+    for (const produce of gateProducers) {
+      const blocked = await runGate(await produce());
+      if (blocked) {
+        return blocked;
       }
-    }
-
-    // ── Normal tool permission gate (descriptor + runner) ────────────────────
-    const toolCheck = checkPermission(
-      tcc.toolName,
-      tcc.input,
-      tcc.agentName ?? undefined,
-      getSessionRuleset(),
-    );
-    const toolDescriptor = describeToolGate(tcc, toolCheck);
-    toolDescriptor.preCheck = toolCheck;
-    const toolResult = await runGateCheck(
-      toolDescriptor,
-      tcc.agentName,
-      tcc.toolCallId,
-      runnerDeps,
-    );
-    if (toolResult.action === "block") {
-      return { block: true, reason: toolResult.reason };
     }
 
     return {};
