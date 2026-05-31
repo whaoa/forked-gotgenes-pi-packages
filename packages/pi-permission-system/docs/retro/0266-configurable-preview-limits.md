@@ -55,3 +55,22 @@ Created two new issues (#282: extract `ToolPreviewFormatter`, #283: formatter ex
 1. Added reference-style link convention rule to `.pi/skills/markdown-conventions/SKILL.md`.
 2. Added `git push` to `.pi/prompts/plan-improvements.md` commit step.
 3. Fixed hardcoded `docs(pi-subagents)` to `docs($1)` in `.pi/prompts/plan-improvements.md` commit message template.
+
+## Stage: Planning (2026-05-30T16:00:00Z)
+
+### Session summary
+
+Wrote the implementation plan (`packages/pi-permission-system/docs/plans/0266-configurable-preview-limits.md`) for the now-narrowed scope of #266: make `toolInputPreviewMaxLength` and `toolTextSummaryMaxLength` configurable.
+The prior session already extracted `ToolPreviewFormatter` (#282, closed) and deferred the smart formatters / extension seam to #283 (open), so this plan covers only Phase 1 roadmap steps 3–4.
+
+### Observations
+
+- Scope was already disambiguated by the prior session: the `ctx_batch_execute` smart formatter and the `registerToolInputFormatter()` seam live in #283, not here.
+  The plan treats both as explicit Non-Goals and links them.
+- The `ToolPreviewFormatter` is constructed fresh inside `handleToolCall`, and `session.config` returns refreshed config at call time — so no "reconstruct on config refresh" wiring is needed; reading config at construction time suffices.
+- Chose to introduce a pure `resolveToolPreviewLimits(config)` helper in `tool-preview-formatter.ts` (narrow `Pick` parameter for ISP) rather than inlining the `?? DEFAULT` fallbacks in the handler — gives a unit-testable seam without standing up the handler.
+- Validation decision: `normalizeOptionalPositiveInt` requires a positive integer; invalid/absent values fall back to the existing constants.
+  No upper cap — a large value is the intended "never truncate" escape hatch.
+- `toolInputLogPreviewMaxLength` (1000) is left hardcoded — the issue only asks for the two prompt-facing limits.
+- Schema (`additionalProperties: false`) forces the schema + example update into the same commit as the type change; folded into TDD step 1.
+- One open question left for implementation: whether `config.example.json` shows the issue's illustrative `400`/`120` or echoes the `200`/`80` code defaults.
