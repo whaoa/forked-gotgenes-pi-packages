@@ -27,3 +27,26 @@ Plan filed at `packages/pi-permission-system/docs/plans/0285-decompose-handle-to
 
 [#282]: https://github.com/gotgenes/pi-packages/issues/282
 [#288]: https://github.com/gotgenes/pi-packages/issues/288
+
+## Stage: Implementation — TDD (2026-05-30T22:00:00Z)
+
+### Session summary
+
+All four TDD cycles completed in sequence: unit tests for `validateRequestedTool` (red), extraction and wiring of `validateRequestedTool` + `RequestedToolValidation` (green), introduction of the `runGate` closure and ordered `gateProducers` pipeline replacing six hand-written gate blocks (green, verified by all existing suites), and `architecture.md` update marking Phase 2 step 1 complete.
+Test count delta: +1 file, +10 tests (67 files / 1520 tests total, up from 66 / 1510).
+Pre-completion reviewer: **PASS**.
+
+### Observations
+
+- **ESLint/Biome friction on the loop comment:** added a `// eslint-disable-next-line no-await-in-loop` comment above the pipeline `for` loop; ESLint stripped it (the rule is not enabled in this package) and left a trailing space; Biome rejected the trailing space in the follow-up lint run.
+  Fixed with `biome check --write` before re-committing.
+  Lesson: don't pre-emptively add `eslint-disable` for rules that may not be configured — run lint first and see what it actually complains about.
+- **Complexity outcome:** `handleToolCall` no longer appears as a refactoring target in `fallow health --targets`.
+  CRAP risk for `permission-gate-handler.ts` dropped from 172 → 79.4 (now `handleInput`, which predates this issue and was always high).
+  Refactoring targets for the package: 5 → 4.
+- **`validateRequestedTool` returns raw name, not normalised:** confirmed by the `ok`-path unit test.
+  The plan note was accurate and critical — the normalised form from `ToolRegistrationCheckResult.normalizedToolName` would have silently changed `tcc.toolName` for tools registered under aliases.
+- **All pre-existing suites stayed green without modification**, as required by the plan's behavior-preservation goal.
+
+[#282]: https://github.com/gotgenes/pi-packages/issues/282
+[#288]: https://github.com/gotgenes/pi-packages/issues/288
