@@ -44,7 +44,7 @@ export interface AgentLifecycleObserver {
 	onCompacted?(agent: Agent, info: CompactionInfo): void;
 }
 
-export type AgentStatus =
+export type SubagentStatus =
 	| "queued"
 	| "running"
 	| "completed"
@@ -61,7 +61,7 @@ export interface AgentInit {
 	invocation?: AgentInvocation;
 
 	// Status (for tests and restore scenarios)
-	status?: AgentStatus;
+	status?: SubagentStatus;
 	startedAt?: number;
 	completedAt?: number;
 	result?: string;
@@ -96,8 +96,8 @@ export class Agent {
 	readonly invocation?: AgentInvocation;
 
 	// Transition state — encapsulated behind getters, mutated only via transition methods
-	private _status: AgentStatus;
-	get status(): AgentStatus { return this._status; }
+	private _status: SubagentStatus;
+	get status(): SubagentStatus { return this._status; }
 
 	private _result?: string;
 	get result(): string | undefined { return this._result; }
@@ -497,7 +497,7 @@ export class Agent {
 
 		let finalResult = result.responseText;
 		if (this._workspace) {
-			const finalStatus: AgentStatus = result.aborted
+			const finalStatus: SubagentStatus = result.aborted
 				? "aborted"
 				: result.steered
 					? "steered"
