@@ -53,8 +53,8 @@ Run `pnpm run check` (`tsc --noEmit`) for type-only changes.
 
 ## Running tests
 
-- Run a single file: `pnpm vitest run <test-path>`
-- Run the full suite: `pnpm vitest run`
+- Run a single file: `pnpm --filter @gotgenes/<pkg> exec vitest run <test-path>` — plain `pnpm vitest run` fails at the repo root (`Command "vitest" not found`).
+- Run the full suite: `pnpm --filter @gotgenes/<pkg> exec vitest run`
 - When a fix changes shared helper functions, run the full suite before committing — not just the directly affected test file.
 
 ## Operator semantics

@@ -90,3 +90,49 @@ Test count grew from 1527 to 1544 (+17 tests across `extension-config.test.ts` a
 - Pre-completion reviewer: WARN (resolved before retro commit).
   Finding: `package-pi-permission-system/SKILL.md` alignment guideline omitted `docs/configuration.md`.
   Fix: skill updated in a follow-up commit (`3bd6ffda`).
+
+## Stage: Final Retrospective (2026-05-31T03:44:40Z)
+
+### Session summary
+
+Shipped #266 end-to-end across three workflow stages in one session: planning (claude-opus-4-8), TDD implementation (claude-sonnet-4-6), and shipping (deepseek-v4-flash).
+Added `toolInputPreviewMaxLength` and `toolTextSummaryMaxLength` config fields, wired them through `resolveToolPreviewLimits()` into `ToolPreviewFormatter`, released `pi-permission-system-v8.1.0`, and closed the issue.
+Test count grew from 1527 to 1544.
+
+### Observations
+
+#### What went well
+
+1. Clean cross-stage handoff via the retro file — the TDD session opened by reading the planning-stage notes and inherited the `resolveToolPreviewLimits` design and the `400`/`120`-vs-`200`/`80` open question without re-deriving them.
+2. Model assignment matched task difficulty at every stage: opus for scope/design judgment, sonnet for implementation, deepseek-flash for mechanical ship orchestration (`ci_find`/`ci_watch`/`release_pr_merge`).
+   No mismatches.
+3. Incremental verification caught the mock breakage immediately — `pnpm run check` then `pnpm run test` ran right after the step-2 wiring change, surfacing the 60 failures at the exact commit that introduced them rather than at the end.
+
+#### What caused friction (agent side)
+
+1. `missing-context` — the plan wired `handleToolCall` to read `this.session.config`, but the four handler test mock factories (`makeSession` / `makeStatefulSession` in `external-directory-integration`, `external-directory-session-dedup`, `tool-call`, `tool-call-events`) build the session via `{ ... } as unknown as PermissionSession` and never stubbed `config`.
+   The cast erased the missing member, so `tsc` passed but 60 tests threw at runtime (`Cannot read properties of undefined (reading 'toolInputPreviewMaxLength')`).
+   Impact: ~20 tool calls (entries 67–89) to diagnose, locate, read, and patch the four factories; resolved cleanly inside the step-2 commit.
+   The plan's Module-Level Changes listed only production files.
+2. `missing-context` — first attempt to run a single test file used `pnpm vitest run <path>` from the repo root (as the `tdd-plan` prompt and `testing` skill both instruct), which fails in this pnpm workspace (`Command "vitest" not found`).
+   Self-corrected to `pnpm --filter @gotgenes/pi-permission-system exec vitest run test/...`.
+   Impact: 1 wasted tool call.
+3. `instruction-violation` (self-caught) — the plan file initially included a `[#266]:` link-reference definition for the doc's own issue number, which `markdown-conventions` explicitly forbids; markdownlint MD053 caught it.
+   Impact: one extra edit during planning.
+
+#### What caused friction (user side)
+
+1. The agent stalled after editing the fourth mock factory (entry 87 produced no tool call); the user had to send "Continue."
+   Mechanical nudge, not strategic — no rework.
+
+### Diagnostic details
+
+- **Model-performance correlation** — planning (claude-opus-4-8), TDD (claude-sonnet-4-6), ship (deepseek-v4-flash), retro (claude-opus-4-8); all appropriate.
+  The pre-completion-reviewer subagent (entry 102) returned a substantive WARN, indicating its model handled the judgment-heavy review correctly.
+- **Feedback-loop gap analysis** — no gap; per-file `vitest` runs after each red/green plus a full-suite + `check` immediately after the step-2 wiring change surfaced the mock breakage at its origin commit.
+- **Unused-tool detection** — the mock breakage (friction #1) was a planning-time grep gap, not a missing subagent; a grep for the consumer's mock factories during planning would have pre-empted it.
+
+### Changes made
+
+1. Fixed the single-file test command in `.pi/prompts/tdd-plan.md` to `pnpm --filter @gotgenes/<pkg> exec vitest run <test-path>` (plain `pnpm vitest run` fails at the repo root).
+2. Fixed the "Running tests" commands in `.pi/skills/testing/SKILL.md` to the same `--filter ... exec` form for both single-file and full-suite runs.

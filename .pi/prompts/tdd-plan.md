@@ -68,7 +68,7 @@ For **each** step in the plan's "TDD Order", in order:
 
 1. **Red.**
    Write the failing tests the step describes.
-   Run only the affected test file: `pnpm vitest run <test-path>` and confirm failures.
+   Run only the affected test file: `pnpm --filter @gotgenes/<pkg> exec vitest run <test-path>` and confirm failures (plain `pnpm vitest run` fails at the repo root in this workspace).
 2. **Green.**
    Implement the minimum code to make those tests pass.
    Re-run the same file and confirm green.
