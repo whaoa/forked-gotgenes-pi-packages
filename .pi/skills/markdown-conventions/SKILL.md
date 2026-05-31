@@ -25,6 +25,8 @@ Load this skill when writing or editing markdown files.
 - Separate adjacent blockquotes with an HTML comment (`<!-- -->`) to satisfy markdownlint's MD028.
 - In long-lived docs (`docs/architecture/`, `docs/plans/`), reference GitHub issues with reference-style links — `[#42]` in the body, `[#42]: https://github.com/gotgenes/pi-packages/issues/42` at the end of the file.
   Bare `#42` auto-links on GitHub but not in other renderers.
+  Every `[#N]:` definition must have a matching `[#N]` reference in the body (markdownlint MD053 rejects unused definitions).
+  Do not add a definition for the doc's own issue number — it lives in frontmatter, not as a body link.
 
 ## Documentation frontmatter
 
