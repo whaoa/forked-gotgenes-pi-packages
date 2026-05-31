@@ -478,7 +478,8 @@ src/
 ├── pattern-suggest.ts        Per-surface approval pattern suggestions
 ├── bash-arity.ts             Command arity table for bash pattern suggestions
 ├── expand-home.ts            ~/$HOME expansion for patterns
-├── session-rules.ts          Session approval store (Ruleset wrapper)
+├── session-approval.ts        SessionApproval value object — owns the single/multi-pattern union; exposes representativePattern and toGateApproval()
+├── session-rules.ts          Session approval store (Ruleset wrapper); record(approval) fan-out delegates to per-pattern approve()
 ├── policy-loader.ts          PolicyLoader interface + FilePolicyLoader (file I/O, mtime caching)
 ├── scope-merge.ts            Cross-scope permission merge + origin-map bookkeeping
 ├── permission-manager.ts     Scope loading + rule composition + checkPermission(); delegates I/O to PolicyLoader
@@ -495,8 +496,8 @@ src/
 │   └── gates/               Pure descriptor factories + runner
 │       ├── types.ts          GateOutcome, ToolCallContext
 │       ├── descriptor.ts     GateDescriptor (with DenialContext), GateBypass, GateResult, GateRunnerDeps types
-│       ├── runner.ts         runGateCheck() — single site for check→log→emit→approve; constructs messages from DenialContext via denial-messages.ts
-│       ├── helpers.ts        deriveDecisionValue, deriveResolution
+│       ├── runner.ts         runGateCheck() — thin orchestration: phase 1 inline, phases 2+5 via buildDecisionEvent, phase 6 via deps.recordSessionApproval tell
+│       ├── helpers.ts        deriveDecisionValue, deriveResolution, buildDecisionEvent
 │       ├── skill-read.ts     describeSkillReadGate — pure descriptor factory
 │       ├── external-directory.ts describeExternalDirectoryGate — pure descriptor/bypass factory
 │       ├── external-directory-messages.ts External-directory ask-prompt formatting (denial messages moved to denial-messages.ts)
@@ -660,7 +661,7 @@ All findings are `fallow`-confirmed and untracked before this phase.
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------------- | ------ | ---- | -------- |
 | 1   | `handleToolCall` runs six gates with a repeated bypass/runner/short-circuit shape — cognitive 52, CRAP 172, the package's worst                                              | B: god function                  | `handlers/permission-gate-handler.ts`   | 5      | 2    | 20       |
 | 2   | ✅ `resolvePermissions` interleaves scope merge with parallel origin-map bookkeeping — cognitive 33, CRAP 97 — resolved by [#286]                                            | B: god function                  | `permission-manager.ts`                 | 4      | 2    | 16       |
-| 3   | `runGateCheck` carries the full check→log→emit→approve cycle as six inline phases — cognitive 32                                                                             | B: god function                  | `handlers/gates/runner.ts`              | 4      | 2    | 16       |
+| 3   | ✅ `runGateCheck` carried the full check→log→emit→approve cycle as six inline phases — cognitive 32 — resolved by [#287]                                                     | B: god function                  | `handlers/gates/runner.ts`              | 4      | 2    | 16       |
 | 4   | Two token classifiers share a 31-line rejection prelude (production clone); `collectPathCandidateTokens` (37) and `collectPatternCommandTokens` (33) are complexity hotspots | A: duplication / B: god function | `handlers/gates/bash-path-extractor.ts` | 4      | 3    | 12       |
 | 5   | `stripJsonComments` is a five-variable character scanner — cognitive 31                                                                                                      | B: god function                  | `config-loader.ts`                      | 2      | 2    | 8        |
 | 6   | 9.1% duplication concentrated in the test tree — the single largest health deduction (-4.1)                                                                                  | D: test duplication              | `test/` (clone families)                | 3      | 1    | 15       |
@@ -678,12 +679,11 @@ All findings are `fallow`-confirmed and untracked before this phase.
    - The remaining body reads as load scopes → merge with origins → extract universal fallback → build config rules → compose.
    - Outcome: `resolvePermissions` no longer appears as a refactoring target; `permission-manager.ts` dropped from the CRAP-risk list.
 
-3. **Decompose `runGateCheck`** ([#287])
-   - Extract `resolveGateCheck`, `emitSessionHit`, and `recordSessionApprovals` as named helpers for phases 1, 2, and 6.
-   - The `runGateCheck` signature and return contract stay identical.
-   - Category: B (god function)
-   - Outcome: cognitive 32 → target < 15.
-   - Commit: `refactor: extract phase helpers from runGateCheck`
+3. ✅ **Thin `runGateCheck`** ([#287]) — **completed**
+   - Introduced `SessionApproval` value object (`src/session-approval.ts`) owning the `{pattern}|{patterns}` union; exposed `representativePattern` and `toGateApproval()`.
+   - `SessionRules.record(approval)` absorbs the per-pattern loop; `GateRunnerDeps` seam renamed to `recordSessionApproval(approval)` — runner tells the store, never interrogates the union.
+   - Extracted `buildDecisionEvent` into `helpers.ts` to deduplicate the `origin/agentName/matchedPattern ?? null` normalization across both emit sites.
+   - Outcome: `runner.ts` no longer appears as a refactoring target; refactoring targets 4 → 3.
 
 4. **Decompose `bash-path-extractor.ts`** ([#289])
    - Extract `rejectNonPathToken(token)` for the shared rejection prelude; each classifier keeps only its acceptance gate, removing the 31-line clone.
