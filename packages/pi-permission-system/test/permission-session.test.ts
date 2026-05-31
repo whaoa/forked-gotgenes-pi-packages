@@ -39,6 +39,7 @@ import {
 import { SessionApproval } from "#src/session-approval";
 import type { SessionLogger } from "#src/session-logger";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
+import { makeCtx } from "#test/helpers/handler-fixtures";
 
 function makeSkillEntry(
   name: string,
@@ -92,25 +93,6 @@ function makeForwarding(): ForwardingController {
     start: vi.fn(),
     stop: vi.fn(),
   };
-}
-
-function makeCtx(overrides: Partial<ExtensionContext> = {}): ExtensionContext {
-  return {
-    cwd: "/test/project",
-    hasUI: true,
-    ui: {
-      setStatus: vi.fn(),
-      notify: vi.fn(),
-      select: vi.fn(),
-      input: vi.fn(),
-    },
-    sessionManager: {
-      getEntries: vi.fn().mockReturnValue([]),
-      getSessionDir: vi.fn().mockReturnValue("/sessions/test"),
-      addEntry: vi.fn(),
-    },
-    ...overrides,
-  } as unknown as ExtensionContext;
 }
 
 function makePermissionManager(

@@ -1,13 +1,16 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
+
 import {
   getEventInput,
   PermissionGateHandler,
 } from "#src/handlers/permission-gate-handler";
-import type { PermissionSession } from "#src/permission-session";
-import type { ToolRegistry } from "#src/tool-registry";
-import type { PermissionCheckResult } from "#src/types";
+
+import {
+  makeCheckResult,
+  makeCtx,
+  makeHandler,
+  makeToolCallEvent,
+} from "#test/helpers/handler-fixtures";
 
 // ── SDK stubs ──────────────────────────────────────────────────────────────
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
@@ -15,101 +18,6 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
     await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
   return { ...original };
 });
-
-// ── helpers ────────────────────────────────────────────────────────────────
-
-function makeCtx(
-  overrides: Partial<ExtensionContext> & { cwd?: string } = {},
-): ExtensionContext {
-  return {
-    cwd: "/test/project",
-    hasUI: true,
-    ui: {
-      setStatus: vi.fn(),
-      notify: vi.fn(),
-      select: vi.fn(),
-      input: vi.fn(),
-    },
-    sessionManager: {
-      getEntries: vi.fn().mockReturnValue([]),
-      getSessionDir: vi.fn().mockReturnValue("/sessions/test"),
-      addEntry: vi.fn(),
-    },
-    ...overrides,
-  } as unknown as ExtensionContext;
-}
-
-function makeToolCallEvent(
-  toolName: string,
-  extraFields: Record<string, unknown> = {},
-) {
-  return {
-    type: "tool_call",
-    toolCallId: "tc-1",
-    name: toolName,
-    input: {},
-    ...extraFields,
-  };
-}
-
-function makePermissionResult(
-  state: "allow" | "deny" | "ask",
-): PermissionCheckResult {
-  return { state, toolName: "read", source: "tool", origin: "builtin" };
-}
-
-function makeSession(
-  overrides: Partial<Record<keyof PermissionSession, unknown>> = {},
-): PermissionSession {
-  return {
-    logger: { debug: vi.fn(), review: vi.fn(), warn: vi.fn() },
-    activate: vi.fn(),
-    resolveAgentName: vi.fn().mockReturnValue(null),
-    checkPermission: vi.fn().mockReturnValue(makePermissionResult("allow")),
-    getToolPermission: vi.fn().mockReturnValue("allow"),
-    getSessionRuleset: vi.fn().mockReturnValue([]),
-    recordSessionApproval: vi.fn(),
-    getActiveSkillEntries: vi.fn().mockReturnValue([]),
-    getInfrastructureDirs: vi
-      .fn()
-      .mockReturnValue(["/test/agent", "/test/agent/git"]),
-    getInfrastructureReadPaths: vi.fn().mockReturnValue([]),
-    config: DEFAULT_EXTENSION_CONFIG,
-    canPrompt: vi.fn().mockReturnValue(true),
-    prompt: vi.fn().mockResolvedValue({ approved: true, state: "approved" }),
-    ...overrides,
-  } as unknown as PermissionSession;
-}
-
-function makeEvents() {
-  return {
-    emit: vi.fn(),
-    on: vi.fn().mockReturnValue(() => undefined),
-  };
-}
-
-function makeToolRegistry(overrides: Partial<ToolRegistry> = {}): ToolRegistry {
-  return {
-    getAll: vi.fn().mockReturnValue([{ name: "read" }, { name: "bash" }]),
-    setActive: vi.fn(),
-    ...overrides,
-  };
-}
-
-function makeHandler(overrides?: {
-  session?: Partial<Record<keyof PermissionSession, unknown>>;
-  toolRegistry?: Partial<ToolRegistry>;
-}): {
-  handler: PermissionGateHandler;
-  session: PermissionSession;
-  toolRegistry: ToolRegistry;
-} {
-  const session = makeSession(overrides?.session);
-  const events = makeEvents();
-  const toolRegistry = makeToolRegistry(overrides?.toolRegistry);
-  const handler = new PermissionGateHandler(session, events, toolRegistry);
-  return { handler, session, toolRegistry };
-}
 
 // ── getEventInput ──────────────────────────────────────────────────────────
 
@@ -184,7 +92,9 @@ describe("handleToolCall", () => {
   it("blocks when tool is denied by policy", async () => {
     const { handler } = makeHandler({
       session: {
-        checkPermission: vi.fn().mockReturnValue(makePermissionResult("deny")),
+        checkPermission: vi
+          .fn()
+          .mockReturnValue(makeCheckResult({ state: "deny" })),
       },
     });
     const result = await handler.handleToolCall(
@@ -259,7 +169,9 @@ describe("handleToolCall — external-directory gate", () => {
   it("blocks a read of a path outside cwd when policy is deny", async () => {
     const { handler } = makeHandler({
       session: {
-        checkPermission: vi.fn().mockReturnValue(makePermissionResult("deny")),
+        checkPermission: vi
+          .fn()
+          .mockReturnValue(makeCheckResult({ state: "deny" })),
       },
       toolRegistry: {
         getAll: vi.fn().mockReturnValue([{ name: "read" }]),
@@ -282,7 +194,9 @@ describe("handleToolCall — bash external-directory gate", () => {
   it("blocks a bash command referencing an external path when policy is deny", async () => {
     const { handler } = makeHandler({
       session: {
-        checkPermission: vi.fn().mockReturnValue(makePermissionResult("deny")),
+        checkPermission: vi
+          .fn()
+          .mockReturnValue(makeCheckResult({ state: "deny" })),
       },
       toolRegistry: {
         getAll: vi.fn().mockReturnValue([{ name: "bash" }]),
@@ -308,9 +222,9 @@ describe("handleToolCall — path gate (tools)", () => {
       .mockImplementation(
         (surface: string, _input: unknown, _agentName?: string) => {
           if (surface === "path") {
-            return { ...makePermissionResult("deny"), matchedPattern: "*.env" };
+            return makeCheckResult({ state: "deny", matchedPattern: "*.env" });
           }
-          return makePermissionResult("allow");
+          return makeCheckResult();
         },
       );
     const { handler } = makeHandler({
@@ -355,9 +269,9 @@ describe("handleToolCall — bash path gate", () => {
       .mockImplementation(
         (surface: string, _input: unknown, _agentName?: string) => {
           if (surface === "path") {
-            return { ...makePermissionResult("deny"), matchedPattern: "*.env" };
+            return makeCheckResult({ state: "deny", matchedPattern: "*.env" });
           }
-          return makePermissionResult("allow");
+          return makeCheckResult();
         },
       );
     const { handler } = makeHandler({

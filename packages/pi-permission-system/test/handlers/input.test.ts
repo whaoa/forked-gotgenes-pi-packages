@@ -1,81 +1,13 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  extractSkillNameFromInput,
-  PermissionGateHandler,
-} from "#src/handlers/permission-gate-handler";
-import type { PermissionSession } from "#src/permission-session";
-import type { ToolRegistry } from "#src/tool-registry";
+import { extractSkillNameFromInput } from "#src/handlers/permission-gate-handler";
+
+import { makeCtx, makeHandler } from "#test/helpers/handler-fixtures";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function makeCtx(overrides: Partial<ExtensionContext> = {}): ExtensionContext {
-  return {
-    cwd: "/test/project",
-    hasUI: true,
-    ui: {
-      setStatus: vi.fn(),
-      notify: vi.fn(),
-      select: vi.fn(),
-      input: vi.fn(),
-    },
-    sessionManager: {
-      getEntries: vi.fn().mockReturnValue([]),
-      getSessionDir: vi.fn().mockReturnValue("/sessions/test"),
-      addEntry: vi.fn(),
-    },
-    ...overrides,
-  } as unknown as ExtensionContext;
-}
-
 function makeInputEvent(text: string) {
   return { text };
-}
-
-function makeSession(
-  overrides: Partial<Record<keyof PermissionSession, unknown>> = {},
-): PermissionSession {
-  return {
-    logger: { debug: vi.fn(), review: vi.fn(), warn: vi.fn() },
-    activate: vi.fn(),
-    resolveAgentName: vi.fn().mockReturnValue(null),
-    checkPermission: vi.fn().mockReturnValue({ state: "allow" }),
-    getToolPermission: vi.fn().mockReturnValue("allow"),
-    getSessionRuleset: vi.fn().mockReturnValue([]),
-    recordSessionApproval: vi.fn(),
-    canPrompt: vi.fn().mockReturnValue(true),
-    prompt: vi.fn().mockResolvedValue({ approved: true, state: "approved" }),
-    createPermissionRequestId: vi.fn().mockReturnValue("req-id"),
-    ...overrides,
-  } as unknown as PermissionSession;
-}
-
-function makeEvents() {
-  return {
-    emit: vi.fn(),
-    on: vi.fn().mockReturnValue(() => undefined),
-  };
-}
-
-function makeToolRegistry(): ToolRegistry {
-  return {
-    getAll: vi.fn().mockReturnValue([]),
-    setActive: vi.fn(),
-  };
-}
-
-function makeHandler(overrides?: {
-  session?: Partial<Record<keyof PermissionSession, unknown>>;
-}): {
-  handler: PermissionGateHandler;
-  session: PermissionSession;
-} {
-  const session = makeSession(overrides?.session);
-  const events = makeEvents();
-  const toolRegistry = makeToolRegistry();
-  const handler = new PermissionGateHandler(session, events, toolRegistry);
-  return { handler, session };
 }
 
 // ── extractSkillNameFromInput ──────────────────────────────────────────────
