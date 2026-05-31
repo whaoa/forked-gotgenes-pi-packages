@@ -39,3 +39,45 @@ Pre-completion reviewer returned PASS.
 - The `fallow health --targets` output confirms `resolvePermissions` is no longer in the refactoring-targets list; `permission-manager.ts` is gone from the CRAP-risk note; the four remaining targets are `tool-input-preview.ts`, `config-loader.ts` (stripJsonComments / Phase 2 step 5), `runner.ts` (runGateCheck / step 3), and `bash-path-extractor.ts` (step 4).
 - `MergedScopes` is imported by the test file (typed as the result of `mergeScopesWithOrigins([])` in the first test case), satisfying fallow's dead-export check.
 - Pre-completion reviewer: PASS — no warnings.
+
+## Stage: Final Retrospective (2026-05-31T05:02:52Z)
+
+### Session summary
+
+Shipped the behavior-preserving decomposition of `PermissionManager.resolvePermissions` across three stages (plan → TDD → ship): the scope-merge + origin-tracking loop now lives in a pure `mergeScopesWithOrigins` in the new `src/scope-merge.ts`, with 9 new unit tests and `permission-manager-unified.test.ts` unchanged.
+CI passed on `47e0bf43`, the issue was closed, and no release-please PR was produced (no `feat:`/`fix:` commits).
+The session was unusually clean — one minor mechanical edit slip, caught instantly by the autoformat hook, with no rework to committed code.
+
+### Observations
+
+#### What went well
+
+- The deterministic feedback loop was exemplary: the green baseline (`check`, `lint`, `test`) was verified before any code change, per-step test runs followed each cycle, and the full suite plus `fallow dead-code` ran after the last step.
+  Verification never bunched at the end.
+- The `pi-autoformat` save hook surfaced the corrupted import block (duplicate `import` declarations → biome parse error) within a single tool call, before any manual `lint`/`check` run — the hook functioned as an instant guardrail against a mechanical slip.
+- The planning-stage `ask_user` handshake (module placement) paid off downstream: the chosen `src/scope-merge.ts` location drove a frictionless TDD stage because the file/test layout was already settled.
+- The cross-session retro bridge worked as intended: the TDD stage read the Planning observations (the `mergeFlatPermissions` import-removal warning, the `MergedScopes` dead-export note) and acted on them without rediscovery.
+
+#### What caused friction (agent side)
+
+- `other` (edit-tool misuse) — the first `Edit` on `src/permission-manager.ts` used an `oldText` that matched only the opening lines of the import section while its `newText` carried the full restructured import blocks, prepending duplicates of imports that still existed below.
+  Impact: ~2 extra tool calls (read the corrupted file, one corrective `Edit` spanning the full duplicated range); no rework to committed code because the autoformat hook caught it immediately.
+  Self-identified via the hook's biome output.
+
+#### What caused friction (user side)
+
+- None.
+  User involvement was limited to the one planning-stage decision (`ask_user`) and stage advancement — strategic, not mechanical oversight.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatch was the `pre-completion-reviewer` (judgment-heavy: deterministic checks, design review, Mermaid validation via `mmdc`).
+  It produced a thorough, well-structured PASS report — no reasoning-weak-model mismatch evident.
+- **Escalation-delay tracking** — no `rabbit-hole` points; the import-block corruption resolved in one corrective tool call, far below the 5-call escalation threshold.
+- **Unused-tool detection** — no `missing-context` gaps; planning exploration and grep coverage were sufficient, and no situation called for an unused Explore/`colgrep`/`web_search`.
+- **Feedback-loop gap analysis** — no gap; verification ran incrementally (baseline-first, per-step, full-suite-last) and the save hook added continuous coverage.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0286-decompose-resolve-permissions.md`.
+   No `AGENTS.md` or prompt changes — the single friction point was a one-off mechanical edit slip, self-caught instantly by the autoformat hook, which does not justify a standing rule.
