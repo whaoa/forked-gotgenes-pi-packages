@@ -84,6 +84,15 @@ Do not propose module-scoped singletons or Node.js module-cache sharing as a cro
 
 ## Testing
 
+Shared test fixtures live in `test/helpers/`:
+
+- `handler-fixtures.ts` — `makeCtx`, `makeEvents`, `makeSession`, `makeToolRegistry`, `makeToolCallEvent`, `makeCheckResult` (neutral default, override-driven), `makeHandler`, `getDecisionEvents`.
+- `gate-fixtures.ts` — `makeDescriptor`, `makeRunnerDeps`, `makeTcc` (bash defaults), `makeGateCheckResult` (path-surface defaults: `toolName: "path"`, `source: "special"`, `origin: "global"`).
+- `manager-harness.ts` — `createManager` (filesystem-backed `PermissionManager`).
+
+Import from these instead of redefining factories inline.
+When a call site needs different defaults from `makeCheckResult`, pass explicit overrides (e.g. `makeCheckResult({ state: "deny", matchedPattern: "*" })`).
+
 - Test permission resolution (allow/deny/ask decisions across tools, bash, MCP, skills, special).
 - Test wildcard matching (bash patterns, skill globs) including over-match and under-match cases.
 - Test policy merge precedence: global → project → per-agent frontmatter.
