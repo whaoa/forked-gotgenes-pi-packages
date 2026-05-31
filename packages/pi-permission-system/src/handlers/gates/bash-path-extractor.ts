@@ -2,6 +2,10 @@ import { createRequire } from "node:module";
 import { basename, resolve } from "node:path";
 
 import {
+  classifyTokenAsPathCandidate,
+  classifyTokenAsRuleCandidate,
+} from "#src/handlers/gates/bash-token-classification";
+import {
   isPathWithinDirectory,
   isSafeSystemPath,
   normalizePathForComparison,
@@ -412,95 +416,9 @@ function collectPathCandidateTokens(node: TSNode, tokens: string[]): void {
   }
 }
 
-/**
- * URL pattern to skip tokens that look like URLs rather than paths.
- */
-const URL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
-
-/**
- * Regex metacharacter sequences that are never found in real filesystem paths.
- * If a token contains any of these, it is almost certainly a regex pattern
- * (e.g. a grep argument) rather than a path.
- */
-const REGEX_METACHAR_PATTERN = /\.\*|\.\+|\\\||\\\(|\\\)|\[.*?\]|\^\//;
-
-/**
- * Broader token classification for cross-cutting `path` rules.
- *
- * Accepts the same rejections as `classifyTokenAsPathCandidate` (empty, flags,
- * env assignments, URLs, @scope/package, bare-slash, regex metacharacters),
- * but also accepts:
- * - Tokens starting with `.` (dot-files: `.env`, `./src`)
- * - Tokens containing `/` (relative paths: `src/foo.ts`)
- *
- * Does NOT require the strict "must start with `/` or `~/` or contain `..`"
- * gate that the external-directory classifier uses.
- */
-function classifyTokenAsRuleCandidate(token: string): string | null {
-  if (!token) return null;
-  if (token.startsWith("-")) return null;
-
-  const eqIndex = token.indexOf("=");
-  const slashIndex = token.indexOf("/");
-  if (eqIndex !== -1 && (slashIndex === -1 || eqIndex < slashIndex)) {
-    return null;
-  }
-
-  if (URL_PATTERN.test(token)) return null;
-  if (token.startsWith("@") && !token.startsWith("@/")) return null;
-  if (/^\/+$/.test(token)) return null;
-  if (REGEX_METACHAR_PATTERN.test(token)) return null;
-
-  // Accept: starts with . (dot-files, ./ relative), contains / (paths),
-  // starts with / or ~/ (absolute/home), or contains .. (parent traversal).
-  if (token.startsWith(".")) return token;
-  if (token.includes("/")) return token;
-  if (token.startsWith("~/")) return token;
-  if (token.includes("..")) return token;
-
-  return null;
-}
-
-/**
- * Determines whether a token looks like a path candidate worth resolving.
- * Returns the raw token string if it's a candidate, or null to skip.
- */
-function classifyTokenAsPathCandidate(token: string): string | null {
-  // Skip empty tokens
-  if (!token) return null;
-
-  // Skip flags
-  if (token.startsWith("-")) return null;
-
-  // Skip env assignments (FOO=/bar)
-  const eqIndex = token.indexOf("=");
-  const slashIndex = token.indexOf("/");
-  if (eqIndex !== -1 && (slashIndex === -1 || eqIndex < slashIndex)) {
-    return null;
-  }
-
-  // Skip URLs
-  if (URL_PATTERN.test(token)) return null;
-
-  // Skip @scope/package patterns
-  if (token.startsWith("@") && !token.startsWith("@/")) return null;
-
-  // Skip bare-slash tokens (// JS comments, lone /, etc.) — they resolve to root
-  // and are never meaningful path arguments in practice.
-  if (/^\/+$/.test(token)) return null;
-
-  // Skip tokens that contain regex metacharacter sequences — these are almost
-  // certainly grep/sed/awk patterns, not filesystem paths.
-  // Matches: .*, .+, \|, \(, \), [...], or ^/ (anchored regex starting with /)
-  if (REGEX_METACHAR_PATTERN.test(token)) return null;
-
-  // Must look like a path: starts with /, ~/, or contains ..
-  if (token.startsWith("/")) return token;
-  if (token.startsWith("~/")) return token;
-  if (token.includes("..")) return token;
-
-  return null;
-}
+// Token classification is delegated to bash-token-classification.ts,
+// which exports classifyTokenAsPathCandidate and classifyTokenAsRuleCandidate
+// with a shared rejectNonPathToken predicate eliminating the prior clone.
 
 // ── Leading cd detection ───────────────────────────────────────────────────
 
