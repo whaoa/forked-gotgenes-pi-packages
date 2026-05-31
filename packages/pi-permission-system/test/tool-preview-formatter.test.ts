@@ -270,7 +270,7 @@ describe("ToolPreviewFormatter.getToolInputPreviewForLog", () => {
 
   test("truncates path preview at toolInputLogPreviewMaxLength", () => {
     const f = makeFormatter({ toolInputLogPreviewMaxLength: 15 });
-    const longPath = "/src/" + "a".repeat(50) + ".ts";
+    const longPath = `/src/${"a".repeat(50)}.ts`;
     const preview = f.getToolInputPreviewForLog(
       makeResult("read"),
       { path: longPath },
@@ -326,7 +326,7 @@ describe("ToolPreviewFormatter.getPermissionLogContext", () => {
 
   test("toolInputPreview respects toolInputLogPreviewMaxLength", () => {
     const f = makeFormatter({ toolInputLogPreviewMaxLength: 15 });
-    const longPath = "/src/" + "a".repeat(50) + ".ts";
+    const longPath = `/src/${"a".repeat(50)}.ts`;
     const ctx = f.getPermissionLogContext(
       makeResult("read"),
       { path: longPath },
