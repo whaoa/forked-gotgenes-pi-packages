@@ -129,6 +129,8 @@ Use `scripts/issue-context.sh <N>` to gather all available context for an issue 
 When a rename or extraction adds exports to a barrel file (`types.ts`, `index.ts`), verify at least one consumer imports the symbol from that barrel — not from the source module directly.
 Do not add speculative re-exports; fallow will flag them as dead code.
 
+When adding a public or cross-extension API (a service method, exported seam, or registration hook), document it for third-party authors — input/return contract, error/throw semantics, a minimal wiring example, and known limitations — not just the type signature.
+
 Use `colgrep` for intent-based codebase exploration and convention discovery; use `grep` for exact symbol matching.
 
 ### Biome / ESLint linter conflicts

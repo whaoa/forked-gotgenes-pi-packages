@@ -39,6 +39,8 @@ Before investigating the plan, load skills relevant to the change:
    Extract the `pkg:*` label(s) from the issue (e.g., `pkg:pi-permission-system` → package is `pi-permission-system`).
    If no `pkg:*` label exists or it seems incongruent with the issue content, ask the user which package this issue belongs to.
    If the issue has **multiple** `pkg:*` labels, the plan is cross-package — use `docs/plans/` at the repo root instead of a single package's directory.
+   Labels are a hint, not the determinant: the plan is cross-package only if code in more than one package actually changes.
+   If the confirmed scope is a single package despite multiple `pkg:*` labels, file in that package's directory.
    Set `PKG` to the package name for single-package issues; for cross-package issues, load skills for each affected package.
 3. List the target plans directory (`packages/<PKG>/docs/plans/` for single-package, `docs/plans/` for cross-package) to see numbering and style conventions (create the directory if it does not exist yet).
    Pick the next free `NNNN` (prefer matching the issue number when reasonable).

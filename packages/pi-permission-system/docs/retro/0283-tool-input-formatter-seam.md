@@ -56,3 +56,58 @@ Full suite, type check, lint, and `fallow dead-code` all pass.
   It covers the per-tool `input` shapes, the must-not-throw contract, `undefined`-vs-`""` semantics, the grammatical-fragment guidance, an end-to-end register/dispose lifecycle example, and recommended practices.
   It also documents — and corrects an earlier misleading example about — the **MCP keying limitation**: the gate keys on the registered Pi tool name (`getToolNameFromValue`), so MCP calls all arrive under the `"mcp"` umbrella and cannot be keyed per `server:tool`; `"mcp"` is already held by the built-in.
   A potential follow-up surfaced: a chained/per-`server:tool` MCP formatter model would need a richer seam than the current one-formatter-per-name registry.
+
+## Stage: Final Retrospective (2026-06-01T00:30:00Z)
+
+### Session summary
+
+Shipped `#283` end to end in one continuous session: planning, TDD (9 commits), `/ship-issue` (CI green, issue closed, release-please merged to `pi-permission-system@8.3.0`), a post-ship docs-thoroughness pass, and a courtesy follow-up to the original `#266` requester.
+The feature — a `registerToolInputFormatter` seam plus a built-in MCP argument summarizer — works as designed, but three of the session's friction points share one shape: the agent delivered the mechanical minimum and the user had to push for the thorough version.
+
+### Observations
+
+#### What went well
+
+- Incremental verification was disciplined: `pnpm run check` plus the targeted `vitest` file ran after each TDD step, not just at the end, so type and test regressions surfaced one step at a time.
+- The plan flagged "confirm the real MCP input shape before writing `formatMcpInputForPrompt`," and the agent followed through with a `grep` of `mcp-targets.ts` / `input-normalizer.ts` instead of guessing the `{ tool, server, arguments }` shape.
+- `ask_user` resolved genuine design ambiguity (precedence, reference-built-in target) cleanly in two focused calls without over-asking.
+- The `#266` follow-up disclosed the MCP keying limitation honestly rather than overstating the feature.
+
+#### What caused friction (agent side)
+
+1. `scope-drift` (user-caught) — the first-pass docs for the public seam (`docs: document tool input formatter seam`, `2fc9ff1d`) were just the interface signature plus one example.
+   The user had to ask "Did we thoroughly document how to create these formatters…?"
+   which triggered a substantial authoring guide (`6d154a14`, +115/−19) covering per-tool `input` shapes, the must-not-throw contract, `undefined`-vs-`""` semantics, lifecycle wiring, and limitations.
+   Impact: one extra user prompt and one follow-up commit; every gap was knowable when the thin docs were written.
+2. `premature-convergence` (partly user-surfaced) — the agent committed to "MCP summarizer keyed to `mcp`" in planning without tracing the umbrella-keying constraint to its conclusion: because every MCP call arrives under the single `mcp` tool, the seam can *never* do bespoke per-MCP-tool rendering, which is literally what `#266`'s title ("smart formatters for known MCP tools") and the `ctx_batch_execute` example asked for.
+   The limitation only became explicit while writing the authoring guide and was disclosed post-ship.
+   Impact: no rework — the generic summarizer is still valuable — but the shipped feature only partially fulfills the original `#266` ask, surfaced after release.
+3. `missing-context` (user-caught) — the `/ship-issue` close comment mentioned `#266`, but the agent did not proactively notify the human requester (`@kuba-4chain`) on their issue; the user prompted "We should also get back to the submitter of `#266`, right?"
+   Impact: one extra user prompt and one follow-up comment to close the loop.
+4. `instruction-violation` (self-identified) — the `/plan-issue` prompt says "multiple `pkg:*` labels → cross-package → root `docs/plans/`," but after the user confirmed the work was `pi-permission-system`-only, the agent filed the plan in the package directory instead.
+   The override was correct (the determinant is which packages' code changes, not the labels), but the prompt's rule was mechanically wrong for this case.
+   Impact: added deliberation, no rework.
+5. `other` (self-caught) — the first "truncates the full summary" test used a single 200-char value that could not exceed the 160-char summary cap, because `renderArgValue` caps each value at 60 chars; fixed in the same red step with three long-valued arguments.
+   Impact: negligible, caught before commit.
+
+#### What caused friction (user side)
+
+- Two of the friction points (docs thoroughness, notifying the `#266` submitter) were corrections the user could instead have pre-empted by stating up front "this is a public API — write authoring docs and notify the original requester on ship."
+  Framed as opportunity: a one-line "treat this as a third-party-facing API" cue at planning time would likely have produced the thorough docs and the courtesy follow-up without the two mid-stream nudges.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatch was the `pre-completion-reviewer` on `anthropic/claude-sonnet-4-6`, judgment-heavy review work; appropriate task-model fit, and it caught a real staleness (`architecture.md` said "exposes two methods" after a third was added).
+- **Feedback-loop gap analysis** — positive: verification ran incrementally (per-step `check` + targeted `vitest`), with `lint` and `fallow dead-code` reserved for the end where their cross-cutting scope belongs.
+  No end-only-verification gap.
+- Escalation-delay and unused-tool lenses found nothing notable (no rabbit-holes, no >5-call error loops, no obviously-skipped tool).
+
+### Changes made
+
+1. `AGENTS.md` (Code Style) — added a rule: public or cross-extension APIs must be documented for third-party authors (input/return contract, error/throw semantics, a minimal wiring example, known limitations), not just the type signature.
+   Addresses friction #1.
+2. `.pi/prompts/plan-issue.md` — clarified that `pkg:*` labels are a hint, not the determinant: a plan is cross-package only if code in more than one package actually changes; a confirmed single-package scope files in that package's directory despite multiple labels.
+   Addresses friction #4.
+
+Not implemented (user declined): proposal B (a `/ship-issue` step to notify an external requester when shipping work deferred from their issue, friction #3).
+The behavior was still performed manually this session via the `#266` follow-up comment.
