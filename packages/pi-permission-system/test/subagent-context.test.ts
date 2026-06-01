@@ -2,6 +2,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { SUBAGENT_ENV_HINT_KEYS } from "#src/permission-forwarding";
 import {
+  isRegisteredSubagentChild,
   isSubagentExecutionContext,
   normalizeFilesystemPath,
 } from "#src/subagent-context";
@@ -23,6 +24,45 @@ function makeCtx(
     },
   } as unknown as ExtensionContext;
 }
+
+describe("isRegisteredSubagentChild", () => {
+  const childSessionId = "child-session-abc";
+
+  test("returns true when the session id is registered", () => {
+    const registry = new SubagentSessionRegistry();
+    registry.register(childSessionId, {});
+    expect(
+      isRegisteredSubagentChild(makeCtx(null, childSessionId), registry),
+    ).toBe(true);
+  });
+
+  test("returns false when the session id is not registered", () => {
+    const registry = new SubagentSessionRegistry();
+    expect(
+      isRegisteredSubagentChild(makeCtx(null, childSessionId), registry),
+    ).toBe(false);
+  });
+
+  test("returns false when the session id is empty", () => {
+    const registry = new SubagentSessionRegistry();
+    registry.register("", {});
+    expect(isRegisteredSubagentChild(makeCtx(null, ""), registry)).toBe(false);
+  });
+
+  test("returns false when getSessionId throws", () => {
+    const registry = new SubagentSessionRegistry();
+    registry.register(childSessionId, {});
+    const ctx = {
+      sessionManager: {
+        getSessionDir: vi.fn(() => null),
+        getSessionId: vi.fn(() => {
+          throw new Error("session id unavailable");
+        }),
+      },
+    } as unknown as ExtensionContext;
+    expect(isRegisteredSubagentChild(ctx, registry)).toBe(false);
+  });
+});
 
 describe("normalizeFilesystemPath", () => {
   test("normalizes a simple absolute path", () => {

@@ -28,6 +28,32 @@ function isPathWithinDirectoryForSubagent(
   return pathValue.startsWith(prefix);
 }
 
+/**
+ * Return `true` when `ctx` belongs to an in-process subagent child registered
+ * in `registry` by its session id.
+ *
+ * This is the only signal that identifies an **in-process** child (one sharing
+ * the parent's `globalThis`); env-hint and filesystem heuristics identify
+ * **process-based** subagents instead. The composition root uses this to decide
+ * whether the instance owns the process-global service slot — a registered
+ * child must not publish over its parent.
+ */
+export function isRegisteredSubagentChild(
+  ctx: ExtensionContext,
+  registry: SubagentSessionRegistry,
+): boolean {
+  try {
+    const sessionId = ctx.sessionManager.getSessionId();
+    if (!sessionId) {
+      return false;
+    }
+    return registry.has(sessionId);
+  } catch {
+    // getSessionId() unavailable — treat as not-a-registered-child.
+    return false;
+  }
+}
+
 export function isSubagentExecutionContext(
   ctx: ExtensionContext,
   subagentSessionsDir: string,
@@ -37,15 +63,8 @@ export function isSubagentExecutionContext(
   //    session id before bindExtensions(); checked first so it takes priority
   //    over heuristics. Each concurrent sibling has a unique session id, so
   //    one sibling's disposed event cannot affect another's registration.
-  if (registry) {
-    try {
-      const sessionId = ctx.sessionManager.getSessionId();
-      if (sessionId && registry.has(sessionId)) {
-        return true;
-      }
-    } catch {
-      // getSessionId() unavailable — fall through to env/filesystem detection.
-    }
+  if (registry && isRegisteredSubagentChild(ctx, registry)) {
+    return true;
   }
 
   const sessionDir = ctx.sessionManager.getSessionDir();
