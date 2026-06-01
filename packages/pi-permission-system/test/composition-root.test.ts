@@ -105,6 +105,33 @@ function makeChildCtx(cwd: string, sessionId: string): unknown {
   };
 }
 
+/**
+ * Build a UI-present `ctx` that records the titles passed to `ui.select`, and
+ * approves every prompt. The ask-prompt message (which embeds the tool-input
+ * preview) is the first line of the select title.
+ */
+function makeUiCtx(cwd: string, capturedTitles: string[]): { ctx: unknown } {
+  const ctx = {
+    cwd,
+    hasUI: true,
+    sessionManager: {
+      getEntries: (): unknown[] => [],
+      getSessionId: (): string => "ui-session",
+      getSessionDir: (): string => cwd,
+    },
+    ui: {
+      notify: (): void => {},
+      setStatus: (): void => {},
+      select: async (title: string): Promise<string | undefined> => {
+        capturedTitles.push(title);
+        return "Yes";
+      },
+      input: async (): Promise<string | undefined> => undefined,
+    },
+  };
+  return { ctx };
+}
+
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -247,5 +274,41 @@ describe("shutdown teardown chain", () => {
       parentSessionId: "p-late",
     });
     expect(getSubagentSessionRegistry().has("late-child")).toBe(false);
+  });
+});
+
+describe("service and gate share one formatter registry", () => {
+  // A formatter registered through the published service must be consulted by
+  // the live gate handler — proving both reference the same
+  // ToolInputFormatterRegistry instance the factory created once.
+  it("surfaces a service-registered formatter in the gate's ask prompt", async () => {
+    writeGlobalConfig({
+      permission: { "*": "allow", demo: "ask" },
+    });
+
+    const cwd = mkdtempSync(join(tmpdir(), "pi-perm-ui-cwd-"));
+    const pi = makeFakePi({ toolNames: ["demo"] });
+    piPermissionSystemExtension(pi as unknown as ExtensionAPI);
+
+    const previewMarker = "PREVIEW::shared-registry-proof";
+    getPermissionsService()!.registerToolInputFormatter(
+      "demo",
+      () => previewMarker,
+    );
+
+    const capturedTitles: string[] = [];
+    const { ctx } = makeUiCtx(cwd, capturedTitles);
+    const result = (await pi.fire(
+      "tool_call",
+      { toolName: "demo", toolCallId: "demo-ask", input: { foo: "bar" } },
+      ctx,
+    )) as { block?: true };
+
+    // The gate prompted (not blocked) and the prompt embedded the formatter's
+    // preview — so the gate consulted the same registry the service wrote to.
+    expect(result.block).toBeUndefined();
+    expect(capturedTitles.some((t) => t.includes(previewMarker))).toBe(true);
+
+    rmSync(cwd, { recursive: true, force: true });
   });
 });
