@@ -52,3 +52,7 @@ Full suite, type check, lint, and `fallow dead-code` all pass.
   Fixed in a follow-up `docs:` commit before closing.
 - Deferred (Open Questions from the plan): try/catch guard on misbehaving formatters and the exact wording of the MCP summary prefix — settled on `with key: value, ...` format which reads naturally in the prompt.
   No follow-up issue needed for these; they are implementation details documented in the code.
+- Post-review docs pass: a thorough authoring guide for `registerToolInputFormatter` was added to `docs/cross-extension-api.md` (commit `6d154a14`).
+  It covers the per-tool `input` shapes, the must-not-throw contract, `undefined`-vs-`""` semantics, the grammatical-fragment guidance, an end-to-end register/dispose lifecycle example, and recommended practices.
+  It also documents — and corrects an earlier misleading example about — the **MCP keying limitation**: the gate keys on the registered Pi tool name (`getToolNameFromValue`), so MCP calls all arrive under the `"mcp"` umbrella and cannot be keyed per `server:tool`; `"mcp"` is already held by the built-in.
+  A potential follow-up surfaced: a chained/per-`server:tool` MCP formatter model would need a richer seam than the current one-formatter-per-name registry.
