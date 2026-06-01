@@ -23,18 +23,17 @@ function bashResult(
 }
 
 describe("resolveBashCommandCheck", () => {
-  it("passes a single command straight through", async () => {
-    const decompose = vi.fn(async () => ["npm install pkg"]);
+  it("passes a single command straight through", () => {
     const checkPermission = vi
       .fn<CheckPermissionFn>()
       .mockReturnValue(bashResult("allow", "npm install pkg", "npm *"));
 
-    const result = await resolveBashCommandCheck(
+    const result = resolveBashCommandCheck(
       "npm install pkg",
+      ["npm install pkg"],
       undefined,
       [],
       checkPermission,
-      decompose,
     );
 
     expect(result.state).toBe("allow");
@@ -47,8 +46,7 @@ describe("resolveBashCommandCheck", () => {
     );
   });
 
-  it("denies the chain when any sub-command is denied, reporting that command's pattern", async () => {
-    const decompose = vi.fn(async () => ["cd /p", "npm install pkg"]);
+  it("denies the chain when any sub-command is denied, reporting that command's pattern", () => {
     const checkPermission = vi
       .fn<CheckPermissionFn>()
       .mockImplementation((_surface, input) => {
@@ -58,12 +56,12 @@ describe("resolveBashCommandCheck", () => {
           : bashResult("allow", command, "cd *");
       });
 
-    const result = await resolveBashCommandCheck(
+    const result = resolveBashCommandCheck(
       "cd /p && npm install pkg",
+      ["cd /p", "npm install pkg"],
       undefined,
       [],
       checkPermission,
-      decompose,
     );
 
     expect(result.state).toBe("deny");
@@ -71,8 +69,7 @@ describe("resolveBashCommandCheck", () => {
     expect(result.command).toBe("npm install pkg");
   });
 
-  it("asks when a sub-command asks and none denies", async () => {
-    const decompose = vi.fn(async () => ["cd /p", "git push"]);
+  it("asks when a sub-command asks and none denies", () => {
     const checkPermission = vi
       .fn<CheckPermissionFn>()
       .mockImplementation((_surface, input) => {
@@ -82,12 +79,12 @@ describe("resolveBashCommandCheck", () => {
           : bashResult("allow", command, "cd *");
       });
 
-    const result = await resolveBashCommandCheck(
+    const result = resolveBashCommandCheck(
       "cd /p && git push",
+      ["cd /p", "git push"],
       undefined,
       [],
       checkPermission,
-      decompose,
     );
 
     expect(result.state).toBe("ask");
@@ -95,8 +92,7 @@ describe("resolveBashCommandCheck", () => {
     expect(result.command).toBe("git push");
   });
 
-  it("returns the first allow result when every sub-command is allowed", async () => {
-    const decompose = vi.fn(async () => ["a", "b"]);
+  it("returns the first allow result when every sub-command is allowed", () => {
     const checkPermission = vi
       .fn<CheckPermissionFn>()
       .mockImplementation((_surface, input) => {
@@ -104,30 +100,29 @@ describe("resolveBashCommandCheck", () => {
         return bashResult("allow", command, `${command} *`);
       });
 
-    const result = await resolveBashCommandCheck(
+    const result = resolveBashCommandCheck(
       "a && b",
+      ["a", "b"],
       undefined,
       [],
       checkPermission,
-      decompose,
     );
 
     expect(result.state).toBe("allow");
     expect(result.matchedPattern).toBe("a *");
   });
 
-  it("falls back to the whole command when no top-level commands are found", async () => {
-    const decompose = vi.fn(async () => []);
+  it("falls back to the whole command when no top-level commands are found", () => {
     const checkPermission = vi
       .fn<CheckPermissionFn>()
       .mockReturnValue(bashResult("ask", "( rm x )", "*"));
 
-    const result = await resolveBashCommandCheck(
+    const result = resolveBashCommandCheck(
       "( rm x )",
+      [],
       undefined,
       [],
       checkPermission,
-      decompose,
     );
 
     expect(result.state).toBe("ask");
@@ -140,21 +135,20 @@ describe("resolveBashCommandCheck", () => {
     );
   });
 
-  it("forwards the agent name and session rules to each sub-command check", async () => {
+  it("forwards the agent name and session rules to each sub-command check", () => {
     const sessionRules: Rule[] = [
       { surface: "bash", pattern: "npm *", action: "allow", origin: "session" },
     ];
-    const decompose = vi.fn(async () => ["npm i"]);
     const checkPermission = vi
       .fn<CheckPermissionFn>()
       .mockReturnValue(bashResult("allow", "npm i"));
 
-    await resolveBashCommandCheck(
+    resolveBashCommandCheck(
       "npm i",
+      ["npm i"],
       "agent-x",
       sessionRules,
       checkPermission,
-      decompose,
     );
 
     expect(checkPermission).toHaveBeenCalledWith(

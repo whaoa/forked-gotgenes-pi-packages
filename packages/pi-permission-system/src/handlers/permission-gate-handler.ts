@@ -186,15 +186,16 @@ export class PermissionGateHandler {
           checkPermission,
           getSessionRuleset,
         ),
-      async () => {
+      () => {
         // Bash commands may chain several sub-commands (`a && b`, `a | b`, …);
-        // evaluate each on the bash surface and select the most restrictive,
-        // rather than matching the whole program string (#301). Other tools
-        // evaluate their single input directly.
+        // evaluate each unit from the shared parse on the bash surface and
+        // select the most restrictive, rather than matching the whole program
+        // string (#301). Other tools evaluate their single input directly.
         const toolCheck =
-          tcc.toolName === "bash"
-            ? await resolveBashCommandCheck(
-                getNonEmptyString(toRecord(tcc.input).command) ?? "",
+          tcc.toolName === "bash" && bashProgram
+            ? resolveBashCommandCheck(
+                command ?? "",
+                bashProgram.commands().map((c) => c.text),
                 tcc.agentName ?? undefined,
                 getSessionRuleset(),
                 checkPermission,
