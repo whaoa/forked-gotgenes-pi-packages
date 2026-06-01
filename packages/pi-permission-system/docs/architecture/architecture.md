@@ -454,7 +454,7 @@ The primary cross-extension API is a `Symbol.for()`-backed service object on `gl
 Pi's extension loader creates a fresh jiti instance per extension with `moduleCache: false`, isolating module-scoped state.
 `Symbol.for()` and `globalThis` are process-global by spec, so they survive this isolation.
 
-The extension factory publishes a `PermissionsService` object via `publishPermissionsService()` during startup.
+The extension publishes a `PermissionsService` object via `publishPermissionsService()` at `session_start`, gated so an in-process subagent child does not clobber the parent's service (#302).
 Other extensions retrieve it with `getPermissionsService()` from `import("@gotgenes/pi-permission-system")`.
 The `package.json` `exports` field points to `src/service.ts`, which contains the interface, the accessor functions, and the `Symbol.for()` key — no extension machinery.
 

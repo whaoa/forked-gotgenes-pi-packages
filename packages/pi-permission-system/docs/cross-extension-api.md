@@ -34,8 +34,10 @@ try {
 Pi's extension loader creates a fresh [jiti](https://github.com/nicolo-ribaudo/jiti) instance per extension with `moduleCache: false`, which isolates module-level state.
 `Symbol.for()` and `globalThis` are process-global by spec, so they survive this isolation.
 
-The permission-system extension publishes a service object on `globalThis` via `Symbol.for("@gotgenes/pi-permission-system:service")` during startup.
+The permission-system extension publishes a service object on `globalThis` via `Symbol.for("@gotgenes/pi-permission-system:service")` at `session_start`.
 Consumers call `getPermissionsService()` to retrieve it — even though their `import()` loads a fresh module copy, the accessor reads from the shared `globalThis` slot.
+An in-process subagent child does not publish its own service; inside a child, `getPermissionsService()` resolves the parent's service.
+A consumer reacting to the `permissions:ready` broadcast (also emitted at `session_start`, after the publish) can resolve the service immediately.
 
 ### API
 
@@ -220,7 +222,7 @@ See [Subagent Integration](subagent-integration.md) for details.
 ### Reload Safety
 
 During `/reload`, all extensions re-initialize.
-The permission-system clears the slot on shutdown and publishes a fresh service on re-initialization.
+The permission-system re-publishes a fresh service at `session_start`; teardown is identity-scoped, so a superseded generation's shutdown only clears the slot when it still owns it and cannot wipe the new service.
 Consumers that re-initialize during reload naturally get the new instance.
 
 Best practice: call `getPermissionsService()` per use rather than caching the reference.
@@ -244,14 +246,14 @@ The protocol version constant is exported from `src/permission-events.ts` and em
 
 ## Channel Reference
 
-| Channel                                    | Direction | When                         | Payload type                                      |
-| ------------------------------------------ | --------- | ---------------------------- | ------------------------------------------------- |
-| `permissions:ready`                        | Broadcast | Once, immediately after load | `PermissionsReadyEvent`                           |
-| `permissions:decision`                     | Broadcast | After every gate resolution  | `PermissionDecisionEvent`                         |
-| `permissions:rpc:check`                    | Request   | On-demand                    | `PermissionsCheckRequest`                         |
-| `permissions:rpc:check:reply:<requestId>`  | Reply     | After each check request     | `PermissionsRpcReply<PermissionsCheckReplyData>`  |
-| `permissions:rpc:prompt`                   | Request   | On-demand                    | `PermissionsPromptRequest`                        |
-| `permissions:rpc:prompt:reply:<requestId>` | Reply     | After prompt is resolved     | `PermissionsRpcReply<PermissionsPromptReplyData>` |
+| Channel                                    | Direction | When                              | Payload type                                      |
+| ------------------------------------------ | --------- | --------------------------------- | ------------------------------------------------- |
+| `permissions:ready`                        | Broadcast | At `session_start`, after publish | `PermissionsReadyEvent`                           |
+| `permissions:decision`                     | Broadcast | After every gate resolution       | `PermissionDecisionEvent`                         |
+| `permissions:rpc:check`                    | Request   | On-demand                         | `PermissionsCheckRequest`                         |
+| `permissions:rpc:check:reply:<requestId>`  | Reply     | After each check request          | `PermissionsRpcReply<PermissionsCheckReplyData>`  |
+| `permissions:rpc:prompt`                   | Request   | On-demand                         | `PermissionsPromptRequest`                        |
+| `permissions:rpc:prompt:reply:<requestId>` | Reply     | After prompt is resolved          | `PermissionsRpcReply<PermissionsPromptReplyData>` |
 
 ---
 
@@ -399,7 +401,8 @@ The handler replies with `{ success: false, error: "no_ui" }` when no interactiv
 
 ## Ready Event
 
-The extension emits `permissions:ready` once immediately after it loads.
+The extension emits `permissions:ready` at `session_start`, right after the service is published — so a consumer reacting to it can immediately resolve `getPermissionsService()`.
+It fires once per `session_start` (including `/reload`).
 Consumers that start after the extension can check via a ping-style RPC check — the `permissions:rpc:check` handler is active as long as the extension is loaded.
 
 ```typescript

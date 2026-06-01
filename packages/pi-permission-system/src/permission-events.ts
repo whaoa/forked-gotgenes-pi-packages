@@ -24,7 +24,7 @@ export const PERMISSIONS_PROTOCOL_VERSION = 1;
 
 // ── Channel name constants ─────────────────────────────────────────────────
 
-/** Emitted once on extension load. */
+/** Emitted at `session_start`, after the service is published. */
 export const PERMISSIONS_READY_CHANNEL = "permissions:ready";
 
 /** Emitted after every permission gate resolution. */
@@ -160,7 +160,8 @@ export interface PermissionsPromptReplyData {
 
 /**
  * Emit the `permissions:ready` broadcast.
- * Call once after the extension has finished setup.
+ * Call at `session_start`, after the service is published, so a consumer
+ * reacting to ready can immediately resolve `getPermissionsService()`.
  */
 export function emitReadyEvent(events: PermissionEventBus): void {
   const payload: PermissionsReadyEvent = {

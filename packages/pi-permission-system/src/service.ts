@@ -81,7 +81,10 @@ export interface PermissionsService {
  * Store a `PermissionsService` on `globalThis` so other extensions can
  * retrieve it via `getPermissionsService()`.
  *
- * Overwrites any previously published service — safe for `/reload`.
+ * Called at `session_start` by the top-level (parent) instance only — an
+ * in-process subagent child skips publishing so it cannot clobber the parent's
+ * service. Overwrites any previously published service, which keeps `/reload`
+ * working: a reloaded parent re-publishes its fresh service.
  */
 export function publishPermissionsService(service: PermissionsService): void {
   (globalThis as Record<symbol, unknown>)[SERVICE_KEY] = service;
