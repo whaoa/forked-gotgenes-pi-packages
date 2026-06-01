@@ -23,6 +23,7 @@ Load this skill when writing or editing markdown files.
 - Use compact table style with no cell padding — markdownlint's MD060 enforces consistent column style and is not auto-fixable.
   Example: `| Header | Header |` / `| --- | --- |` / `| cell | cell |` — spaces inside pipes, no padding variation.
 - Separate adjacent blockquotes with an HTML comment (`<!-- -->`) to satisfy markdownlint's MD028.
+- Author and append markdown with the `Write`/`Edit` tools, not shell heredocs (`cat <<EOF`) — heredocs don't interpolate `\uXXXX` escapes and make one-sentence-per-line slips easy, both of which trip markdownlint.
 - In long-lived docs (`docs/architecture/`, `docs/plans/`), reference GitHub issues with reference-style links — `[#42]` in the body, `[#42]: https://github.com/gotgenes/pi-packages/issues/42` at the end of the file.
   Bare `#42` auto-links on GitHub but not in other renderers.
   Every `[#N]:` definition must have a matching `[#N]` reference in the body (markdownlint MD053 rejects unused definitions).

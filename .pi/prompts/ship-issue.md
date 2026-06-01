@@ -57,6 +57,9 @@ The comment should include:
 
 Then use `issue_close` with issue number `$1` and the summary as the comment.
 
+Then check whether this push shipped work for **other** issues (a stacked refactor/enabler, other `(#M)` commit refs, or sibling `docs/plans/`/`docs/retro/` files in the `<previous-tag-or-base>..HEAD` range).
+Close each with its own short summary — release-please omits `refactor:` commits from the changelog, so a stacked refactor issue leaves no reminder.
+
 ## 6. Merge release-please PR (if present)
 
 1. Use `release_pr_find` to locate an open release-please PR.
