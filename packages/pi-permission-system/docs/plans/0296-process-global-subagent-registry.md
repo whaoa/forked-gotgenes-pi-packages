@@ -201,10 +201,12 @@ No changes to `service.ts`, `subagent-context.ts`, `permission-forwarding.ts`, `
 - Concurrent sibling children of the same parent share the `<parent-session-dir>/<basename>/tasks` `getSessionDir()` key, so they collide on one registry entry; when one sibling is disposed, `unregister` removes the shared entry and detection breaks for still-running siblings.
   This pre-dates the regression (the old bridge keyed on the same path) and is independent of the event-bus split, so it is out of scope here.
   Fixing it would require `@gotgenes/pi-subagents` to derive a unique per-child session directory — a separate, likely cross-package follow-up issue.
-- An end-to-end parent+child integration test (two real sessions on two real buses) would have caught this regression but needs harness support that does not exist yet; the accessor unit test plus the existing injected-registry tests are the practical coverage for this fix.
+- This regression is an instance of a broader gap: the composition root (`index.ts`) has no test coverage, so wiring faults (a collaborator instantiated instead of shared, a dropped handler, a leaked teardown) slip past the unit suite.
+  The practical coverage for *this* fix is the accessor unit test (TDD step 1) plus the existing injected-registry tests; a `makeFakePi()` composition-root harness and the backfill tests that would have caught this class of fault are tracked separately in [#297] and intentionally out of scope here.
 
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
 [#22]: https://github.com/gotgenes/pi-packages/issues/22
 [#101]: https://github.com/gotgenes/pi-packages/issues/101
 [#261]: https://github.com/gotgenes/pi-packages/issues/261
 [#267]: https://github.com/gotgenes/pi-packages/issues/267
+[#297]: https://github.com/gotgenes/pi-packages/issues/297

@@ -32,3 +32,7 @@ The plan adds one accessor (`getSubagentSessionRegistry`) and changes one line i
   The regression is using a per-session bus as a cross-session transport, not the bus being per-session.
   Rejected sharing the parent's bus into the child (crosses every extension's intra-session channels) and inventing a process-global event bus (broader scope; `globalThis` + `Symbol.for()` already covers it).
   The chosen fix keeps per-session buses and shares only the cross-session state; the child reads the registry rather than receiving the event.
+- Decided **not** to add an in-package cross-bus integration test to #296 (keeps the fix tight).
+  Instead filed [#297] to track a `makeFakePi()` composition-root harness plus backfill tests for the broader wiring-fault class this regression exemplifies (registry sharing, handler-registration completeness, shutdown teardown, service/registry shared-instance wiring, `ready` ordering). #297 also records a suspected latent bug to verify: each instance runs `publishPermissionsService` at init and `unpublishPermissionsService` on shutdown, so a child instance may overwrite the parent's published service and then delete the global slot on child shutdown.
+
+[#297]: https://github.com/gotgenes/pi-packages/issues/297
