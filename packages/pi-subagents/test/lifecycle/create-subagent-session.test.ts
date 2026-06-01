@@ -166,7 +166,7 @@ describe("createSubagentSession — lifecycle ordering", () => {
     expect(createdOrder).toBeLessThan(bindOrder);
   });
 
-  it("carries the agent name, session dir, and parent session id in session-created", async () => {
+  it("carries the session id and parent session id in session-created", async () => {
     const { session } = createSession();
     io.createSession.mockResolvedValue({ session });
     io.deriveSessionDir.mockReturnValue("/custom/session/dir");
@@ -185,8 +185,7 @@ describe("createSubagentSession — lifecycle ordering", () => {
     );
 
     expect(lifecycle.sessionCreated).toHaveBeenCalledWith({
-      sessionDir: "/custom/session/dir",
-      agentName: "Explore",
+      sessionId: "child-session-id",
       parentSessionId: "parent-session-42",
     });
   });
@@ -224,7 +223,7 @@ describe("createSubagentSession — dispose on creation failure", () => {
     // session-created fired, so disposed must fire to avoid a registry leak.
     expect(lifecycle.sessionCreated).toHaveBeenCalledOnce();
     expect(lifecycle.disposed).toHaveBeenCalledOnce();
-    expect(lifecycle.disposed).toHaveBeenCalledWith({ sessionDir: "/custom/session/dir" });
+    expect(lifecycle.disposed).toHaveBeenCalledWith({ sessionId: "child-session-id" });
     expect(session.dispose).toHaveBeenCalledOnce();
   });
 });

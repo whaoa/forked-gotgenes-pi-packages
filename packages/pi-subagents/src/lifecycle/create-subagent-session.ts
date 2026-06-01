@@ -51,6 +51,7 @@ export interface ResourceLoaderLike {
 export interface SessionManagerLike {
   newSession(opts: { parentSession?: string }): void;
   getSessionFile(): string | undefined;
+  getSessionId(): string;
 }
 
 /** Options passed to EnvironmentIO/SessionFactoryIO methods. */
@@ -196,6 +197,7 @@ export async function createSubagentSession(
   const sessionDir = deps.io.deriveSessionDir(params.parentSession?.parentSessionFile, cfg.effectiveCwd);
   const sessionManager = deps.io.createSessionManager(cfg.effectiveCwd, sessionDir);
   sessionManager.newSession({ parentSession: params.parentSession?.parentSessionId });
+  const sessionId = sessionManager.getSessionId();
 
   const { session } = await deps.io.createSession({
     cwd: cfg.effectiveCwd,
@@ -211,6 +213,7 @@ export async function createSubagentSession(
 
   const subagentSession = new SubagentSession(session, {
     outputFile: sessionManager.getSessionFile(),
+    sessionId,
     sessionDir,
     agentName: type,
     agentMaxTurns: cfg.agentMaxTurns,
@@ -223,7 +226,7 @@ export async function createSubagentSession(
   // entry in place for the first permission check during child extension
   // initialization. The event bus dispatches synchronously, so a synchronous
   // subscriber completes before this returns.
-  deps.lifecycle.sessionCreated({ sessionDir, agentName: type, parentSessionId });
+  deps.lifecycle.sessionCreated({ sessionId, parentSessionId });
 
   try {
     // Bind extensions so that session_start fires and extensions can initialize.

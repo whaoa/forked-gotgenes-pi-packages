@@ -44,7 +44,9 @@ export interface TurnLoopOptions {
 export interface SubagentSessionMeta {
   /** Path to the persisted session JSONL file, if the session was persisted. */
   outputFile: string | undefined;
-  /** Child session directory — the registry key carried on lifecycle events. */
+  /** Child session id — the registry key carried on session-created/disposed events. */
+  sessionId: string;
+  /** Child session directory — carried on the completed event as transcript location. */
   sessionDir: string;
   agentName: string;
   /** Per-agent max-turns from the resolved agent config — middle precedence. */
@@ -180,7 +182,7 @@ export class SubagentSession {
   dispose(): void {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- dispose may not exist on all session implementations
     this._session.dispose?.();
-    this.meta.lifecycle.disposed({ sessionDir: this.meta.sessionDir });
+    this.meta.lifecycle.disposed({ sessionId: this.meta.sessionId });
   }
 }
 

@@ -15,10 +15,10 @@ export const SUBAGENT_CHILD_SPAWNING = "subagents:child:spawning";
 
 /**
  * Emitted after the child session is created, immediately before
- * `bindExtensions()`. Carries the child identity consumers need to register
- * the session. Subscribers must register synchronously so the entry lands
- * before binding proceeds (see ADR 0002 / the event-bus synchronous-dispatch
- * guarantee).
+ * `bindExtensions()`. Carries the child session id consumers need to register
+ * the session in `SubagentSessionRegistry`. Subscribers must register
+ * synchronously so the entry lands before binding proceeds (see ADR 0002 /
+ * the event-bus synchronous-dispatch guarantee).
  */
 export const SUBAGENT_CHILD_SESSION_CREATED = "subagents:child:session-created";
 
@@ -36,9 +36,9 @@ export interface ChildSpawningEvent {
 
 /** Payload for `subagents:child:session-created`. */
 export interface ChildSessionCreatedEvent {
-  /** Child session directory — the registry key. */
-  sessionDir: string;
-  agentName: string;
+  /** Child session id — the registry key. Unique per child; concurrent
+   * siblings of the same parent occupy distinct keys. */
+  sessionId: string;
   parentSessionId?: string;
 }
 
@@ -54,7 +54,8 @@ export interface ChildCompletedEvent {
 
 /** Payload for `subagents:child:disposed`. */
 export interface ChildDisposedEvent {
-  sessionDir: string;
+  /** Child session id — the registry key. Must match `session-created`. */
+  sessionId: string;
 }
 
 /** Narrow emit seam — injected, never imports the Pi SDK. */

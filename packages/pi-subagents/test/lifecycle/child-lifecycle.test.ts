@@ -30,19 +30,17 @@ describe("createChildLifecyclePublisher", () => {
     });
   });
 
-  it("emits subagents:child:session-created with the child identity", () => {
+  it("emits subagents:child:session-created with the child session id", () => {
     const { emit, publisher } = setup();
 
     publisher.sessionCreated({
-      sessionDir: "/sessions/child-abc",
-      agentName: "Explore",
+      sessionId: "child-session-abc",
       parentSessionId: "parent-42",
     });
 
     expect(emit).toHaveBeenCalledOnce();
     expect(emit).toHaveBeenCalledWith(SUBAGENT_CHILD_SESSION_CREATED, {
-      sessionDir: "/sessions/child-abc",
-      agentName: "Explore",
+      sessionId: "child-session-abc",
       parentSessionId: "parent-42",
     });
   });
@@ -66,14 +64,14 @@ describe("createChildLifecyclePublisher", () => {
     });
   });
 
-  it("emits subagents:child:disposed with the session directory", () => {
+  it("emits subagents:child:disposed with the child session id", () => {
     const { emit, publisher } = setup();
 
-    publisher.disposed({ sessionDir: "/sessions/child-abc" });
+    publisher.disposed({ sessionId: "child-session-abc" });
 
     expect(emit).toHaveBeenCalledOnce();
     expect(emit).toHaveBeenCalledWith(SUBAGENT_CHILD_DISPOSED, {
-      sessionDir: "/sessions/child-abc",
+      sessionId: "child-session-abc",
     });
   });
 

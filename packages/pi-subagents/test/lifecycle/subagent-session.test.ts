@@ -43,6 +43,7 @@ function makeSubagentSession(
   session: ReturnType<typeof createSession>["session"],
   metaOverrides?: Partial<{
     outputFile: string | undefined;
+    sessionId: string;
     sessionDir: string;
     agentName: string;
     agentMaxTurns: number | undefined;
@@ -54,6 +55,7 @@ function makeSubagentSession(
   const hasOutputFile = metaOverrides != null && "outputFile" in metaOverrides;
   const sub = new SubagentSession(session as unknown as AgentSession, {
     outputFile: hasOutputFile ? metaOverrides.outputFile : "/sessions/child.jsonl",
+    sessionId: metaOverrides?.sessionId ?? "child-session-default",
     sessionDir: metaOverrides?.sessionDir ?? "/sessions/dir",
     agentName: metaOverrides?.agentName ?? "Explore",
     agentMaxTurns: metaOverrides?.agentMaxTurns,
@@ -296,12 +298,12 @@ describe("SubagentSession — delegate methods", () => {
 });
 
 describe("SubagentSession — dispose", () => {
-  it("disposes the session and emits disposed with the session directory", () => {
+  it("disposes the session and emits disposed with the child session id", () => {
     const { session } = createSession("X");
-    const { sub } = makeSubagentSession(session, { sessionDir: "/sessions/abc", lifecycle });
+    const { sub } = makeSubagentSession(session, { sessionId: "child-session-abc", lifecycle });
     sub.dispose();
     expect(session.dispose).toHaveBeenCalledOnce();
     expect(lifecycle.disposed).toHaveBeenCalledOnce();
-    expect(lifecycle.disposed).toHaveBeenCalledWith({ sessionDir: "/sessions/abc" });
+    expect(lifecycle.disposed).toHaveBeenCalledWith({ sessionId: "child-session-abc" });
   });
 });
