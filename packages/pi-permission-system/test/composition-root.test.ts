@@ -35,7 +35,9 @@ import {
   createPermissionForwardingLocation,
   type ForwardedPermissionRequest,
 } from "#src/permission-forwarding";
+import { getPermissionsService } from "#src/service";
 import { SUBAGENT_CHILD_SESSION_CREATED } from "#src/subagent-lifecycle-events";
+import { getSubagentSessionRegistry } from "#src/subagent-registry";
 import { makeFakePi } from "#test/helpers/make-fake-pi";
 
 const SERVICE_KEY = Symbol.for("@gotgenes/pi-permission-system:service");
@@ -224,5 +226,26 @@ describe("subagent registry sharing across factory instances", () => {
 
     rmSync(childCwd, { recursive: true, force: true });
     rmSync(externalDir, { recursive: true, force: true });
+  });
+});
+
+describe("shutdown teardown chain", () => {
+  it("unpublishes the service and unsubscribes the lifecycle on shutdown", async () => {
+    const pi = makeFakePi();
+    piPermissionSystemExtension(pi as unknown as ExtensionAPI);
+
+    expect(getPermissionsService()).toBeDefined();
+
+    await pi.fire("session_shutdown");
+
+    // Service slot cleared.
+    expect(getPermissionsService()).toBeUndefined();
+
+    // Lifecycle unsubscribed: a post-shutdown session-created must not register.
+    pi.events.emit(SUBAGENT_CHILD_SESSION_CREATED, {
+      sessionId: "late-child",
+      parentSessionId: "p-late",
+    });
+    expect(getSubagentSessionRegistry().has("late-child")).toBe(false);
   });
 });
