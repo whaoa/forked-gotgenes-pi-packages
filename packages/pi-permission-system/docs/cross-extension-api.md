@@ -89,31 +89,127 @@ const denied = tools.filter(
 #### `registerToolInputFormatter`
 
 Register a custom preview formatter for a specific tool name.
-The formatter is called inside `ToolPreviewFormatter.formatToolInputForPrompt` before the built-in switch — return a string to use it as the ask-prompt preview, or `undefined` to fall through to the default.
-
-Only one formatter may be registered per tool name.
-A second call for the same name throws.
-The returned disposer unregisters the formatter; it is identity-guarded so a stale call cannot evict a later registration.
+Permission ask-prompts call your formatter while building the prompt text, so you can show a human-readable summary of a tool call instead of the default truncated JSON.
 
 ```typescript
-const svc = getPermissionsService();
-const dispose = svc?.registerToolInputFormatter(
-  "my-server:batch",
-  (input) => {
-    const cmds = input.commands;
-    return Array.isArray(cmds)
-      ? `runs ${cmds.length} command${cmds.length === 1 ? "" : "s"}`
-      : undefined;
-  },
-);
-
-// On extension shutdown:
-dispose?.();
+registerToolInputFormatter(
+  toolName: string,
+  formatter: (input: Record<string, unknown>) => string | undefined,
+): () => void; // returns a disposer
 ```
 
-A built-in formatter for the `"mcp"` surface ships by default and renders a compact key/value summary of the call's `arguments`.
-Register before startup is complete to install your formatter before the built-in.
-To override the built-in `"mcp"` formatter, dispose it first (the disposer is returned by your own registration — the built-in is registered internally and cannot be disposed externally; raise an issue if you need this).
+Registration rules:
+
+- One formatter per tool name.
+  A second `register` for the same name throws — there is no silent override.
+- The returned disposer unregisters the formatter.
+  It is identity-guarded, so a stale disposer cannot evict a later registration of the same name.
+
+##### Which tool name to key on
+
+The `toolName` you register is matched against the **registered Pi tool name** the agent invoked — not against MCP server/tool pairs.
+
+- For a tool your extension registers directly with Pi, use that tool's exact name (the same string Pi shows in `pi.getAllTools()`).
+- For **MCP** calls, every server tool arrives as the single umbrella `"mcp"` tool, with the real target in `input.tool` (e.g. `"exa:search"`).
+  You therefore cannot register a formatter per `server:tool`.
+  The `"mcp"` name is already claimed by the built-in summarizer (below), and because duplicate registration throws, you cannot replace it.
+  If you need richer per-server MCP previews, open an issue — that requires a chained-formatter model this seam does not yet provide.
+- `"bash"` never reaches your formatter: bash prompts take a dedicated branch that shows the command directly.
+
+##### What your formatter receives
+
+The `input` argument is the raw tool-call input object exactly as the agent supplied it (the tool's arguments).
+It is always a plain record; shapes by tool:
+
+| Tool                   | `input` shape                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| `mcp` (umbrella)       | `{ tool: "server:tool", server?, arguments?: object, … }` — summarize `input.arguments` |
+| `read`                 | `{ path, offset?, limit? }`                                                             |
+| `write`                | `{ path, content }`                                                                     |
+| `edit`                 | `{ path, edits?: […] }` or `{ path, oldText, newText }`                                 |
+| `grep` / `find` / `ls` | `{ pattern?, glob?, path? }`                                                            |
+| your own tool          | whatever input schema your tool registered                                              |
+
+Treat every field as untrusted: the agent can emit malformed or partial input, so read defensively (type-check before use) rather than assuming a shape.
+
+##### What your return value does
+
+The returned string is spliced into the middle of the prompt sentence:
+
+```text
+Agent 'Explore' requested tool 'deploy' <your fragment>. Allow this call?
+```
+
+Return a short grammatical fragment that reads naturally in that slot — e.g. `"with target staging (3 services)"` or `"runs 2 commands"`, not a full sentence and not raw JSON.
+
+Return semantics:
+
+- Return a **string** to use it verbatim as the preview (this also overrides the built-in preview for built-in tools like `read`/`edit`).
+- Return **`undefined`** to decline — the prompt falls through to the built-in formatter for that tool, and finally to the truncated-JSON default.
+  Prefer `undefined` over `""` when you have nothing useful to add: an empty string short-circuits the fallthrough and suppresses the default preview entirely.
+
+##### Your formatter must not throw
+
+The core does **not** wrap your formatter in a `try/catch`.
+A thrown error propagates into prompt construction and can break the permission prompt — a denial-of-service on the gate.
+Guard your own parsing and return `undefined` on anything unexpected.
+
+##### End-to-end wiring
+
+Register during your extension's initialization and store the disposer for teardown:
+
+```typescript
+export default function myExtension(pi: ExtensionAPI): void {
+  let disposeFormatter: (() => void) | undefined;
+
+  void (async () => {
+    try {
+      const { getPermissionsService } = await import(
+        "@gotgenes/pi-permission-system"
+      );
+      const permissions = getPermissionsService();
+      disposeFormatter = permissions?.registerToolInputFormatter(
+        "deploy", // a tool THIS extension registers with Pi
+        (input) => {
+          const target =
+            typeof input.target === "string" ? input.target : undefined;
+          const services = Array.isArray(input.services)
+            ? input.services.length
+            : undefined;
+          if (!target) return undefined; // decline → default preview
+          return services !== undefined
+            ? `with target ${target} (${services} services)`
+            : `with target ${target}`;
+        },
+      );
+    } catch {
+      // permission-system not installed — nothing to register
+    }
+  })();
+
+  pi.on("session_shutdown", () => {
+    disposeFormatter?.();
+    disposeFormatter = undefined;
+  });
+}
+```
+
+Reload note: on `/reload`, the permission-system publishes a fresh service backed by a new registry, so previous registrations are dropped.
+Re-register on every initialization (as above) rather than once globally; the disposer is for explicit teardown within a single load.
+
+##### Recommended practices
+
+- Keep previews short — they appear inline in a yes/no prompt, and the result is truncated by the configured preview length anyway.
+- Never surface secrets (tokens, keys, full request bodies) in a preview; summarize counts and identifiers instead.
+- Parse defensively and return `undefined` on malformed input — never throw.
+- Return a grammatical fragment, not raw JSON or a full sentence.
+- Register idempotently on each extension load; dispose on `session_shutdown`.
+
+##### Built-in MCP summarizer
+
+A built-in formatter is registered for the `"mcp"` tool at startup (through this same public API).
+It renders a compact `with key: value, …` summary of the call's `arguments` and returns `undefined` when there are no arguments, leaving the MCP target prompt unchanged.
+This is the reference implementation for the seam — see `src/builtin-tool-input-formatters.ts`.
 
 #### Subagent session registration
 
