@@ -45,5 +45,48 @@ Test count went from 1662 to 1669 (`+6` passing `+1` expected-fail); the full su
 - Pre-completion reviewer: WARN — one non-blocking finding (the `package-pi-permission-system` skill's Testing section did not list `make-fake-pi.ts`).
   Addressed in a follow-up `docs:` commit that documents the harness and the required global-slot/env cleanup.
 
+## Stage: Final Retrospective (2026-06-01T17:25:56Z)
+
+### Session summary
+
+A single session carried issue #297 cleanly through all four stages: plan → TDD (7 cycles) → ship → retro.
+The work delivered the `makeFakePi()` composition-root harness, six wiring tests, and a consolidation of the inline `createToolCallHarness`, confirmed a latent multi-instance global-service bug (filed as #302), and shipped green CI with the issue closed and no release-please bump (test-only commits).
+
+### Observations
+
+#### What went well
+
+- Read-before-write discipline prevented rework on the two trickiest tests.
+  Reading `forwarded-permissions/polling.ts` first surfaced the 10-minute `PERMISSION_FORWARDING_TIMEOUT_MS`, which forced a real fire-without-await → poll `requests/` → write response round-trip for target 1 instead of a naive "not blocked" assertion that would have hung.
+  Reading `permission-prompts.ts` revealed the `mcp` branch of `formatAskPrompt` needs a resolved `result.target`, so target 4 used a plain extension tool name (`demo`) instead.
+- Incremental verification: `pnpm run check` and the affected test file ran after every one of the 7 TDD steps, not just at the end.
+  No feedback-loop gap.
+- The forwarding round-trip pattern (fire the child `tool_call` without awaiting, poll the parent `requests/` dir, write an approval response, then await) is a novel, reusable technique for exercising the file-based permission-forwarding IPC without hitting its long timeout.
+- Target 6's confirm-and-defer flow was clean: a passing characterization `it` documents current behavior, an `it.fails` documents the desired behavior and flips when fixed, and #302 carries the fix out of scope.
+
+#### What caused friction (agent side)
+
+- `missing-context` — during the step-7 consolidation, the enumeration grep for `.handlers` usages was piped through `head -40`, which truncated output and hid a stray `harness.handlers.session_shutdown` at line ~2320 of the 2585-line `permission-system.test.ts`.
+  Impact: one failing-test iteration, caught immediately by running the affected test file; ~1 extra tool cycle, no follow-up commit.
+  The existing testing-skill "grep all call sites before removal" rules were followed in spirit — the slip was truncating the grep output, an execution detail not worth a durable rule.
+
+#### What caused friction (user side)
+
+- None.
+  User involvement was strategic and minimal: two `ask_user` decisions during planning (consolidation scope, and characterize-vs-fix for target 6) set the direction for the whole session, and the "did we find any bugs?"
+  check between ship and retro confirmed the #302 hand-off landed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the `pre-completion-reviewer` subagent ran on `anthropic/claude-sonnet-4-6` (its frontmatter default), an appropriate fit for judgment-heavy review work; it correctly surfaced the one documentation-staleness WARN.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the single test failure resolved in one iteration.
+- **Feedback-loop gap analysis** — verification ran incrementally after each TDD step; no gap.
+- **Unused-tool detection** — `colgrep` was barely used during implementation, but exact-symbol `grep`/`Read` were the right tools here (the relevant symbols were already known), so no missed-tool finding.
+
+### Changes made
+
+1. Added the file-based forwarding round-trip test pattern (fire-without-await → poll `requests/` → write `responses/<id>.json` → await) to the Testing section of `.pi/skills/package-pi-permission-system/SKILL.md`, to help the #302 follow-up write composition-root forwarding tests without hitting the 10-minute timeout.
+2. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0297-composition-root-test-coverage.md`.
+
 [#221]: https://github.com/gotgenes/pi-packages/issues/221
 [#296]: https://github.com/gotgenes/pi-packages/issues/296
