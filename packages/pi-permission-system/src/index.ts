@@ -29,6 +29,7 @@ import { createSessionLogger } from "./session-logger";
 import { isSubagentExecutionContext } from "./subagent-context";
 import { subscribeSubagentLifecycle } from "./subagent-lifecycle-events";
 import { SubagentSessionRegistry } from "./subagent-registry";
+import { ToolInputFormatterRegistry } from "./tool-input-formatter-registry";
 import {
   canResolveAskPermissionRequest,
   shouldAutoApprovePermissionState,
@@ -37,6 +38,7 @@ import {
 export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const runtime = createExtensionRuntime();
   const subagentRegistry = new SubagentSessionRegistry();
+  const formatterRegistry = new ToolInputFormatterRegistry();
 
   const prompter = new PermissionPrompter({
     getConfig: () => runtime.config,
@@ -121,6 +123,9 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     getToolPermission(toolName, agentName) {
       return runtime.permissionManager.getToolPermission(toolName, agentName);
     },
+    registerToolInputFormatter(toolName, formatter) {
+      return formatterRegistry.register(toolName, formatter);
+    },
   };
   publishPermissionsService(permissionsService);
 
@@ -145,7 +150,12 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     unpublishPermissionsService();
   });
   const agentPrep = new AgentPrepHandler(session, toolRegistry);
-  const gates = new PermissionGateHandler(session, pi.events, toolRegistry);
+  const gates = new PermissionGateHandler(
+    session,
+    pi.events,
+    toolRegistry,
+    formatterRegistry,
+  );
 
   pi.on("session_start", (event, ctx) =>
     lifecycle.handleSessionStart(event, ctx),

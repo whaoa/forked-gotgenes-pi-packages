@@ -6,6 +6,7 @@ import {
   publishPermissionsService,
   unpublishPermissionsService,
 } from "#src/service";
+import { ToolInputFormatterRegistry } from "#src/tool-input-formatter-registry";
 import type { PermissionCheckResult } from "#src/types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -16,6 +17,7 @@ function makeService(
   return {
     checkPermission: vi.fn(),
     getToolPermission: vi.fn(),
+    registerToolInputFormatter: vi.fn(),
     ...overrides,
   };
 }
@@ -136,6 +138,7 @@ describe("service adapter delegation", () => {
       getToolPermission(toolName, agentName) {
         return getToolPermissionFn(toolName, agentName);
       },
+      registerToolInputFormatter: vi.fn(),
     };
 
     publishPermissionsService(service);
@@ -157,6 +160,7 @@ describe("service adapter delegation", () => {
       getToolPermission(toolName, agentName) {
         return getToolPermissionFn(toolName, agentName);
       },
+      registerToolInputFormatter: vi.fn(),
     };
 
     publishPermissionsService(service);
@@ -180,5 +184,53 @@ describe("service adapter delegation", () => {
     getPermissionsService()!.checkPermission("read", "/tmp/file");
 
     expect(checkPermission).toHaveBeenCalledWith("read", {}, undefined, []);
+  });
+});
+
+// ── registerToolInputFormatter delegation ─────────────────────────────────
+
+describe("registerToolInputFormatter delegation", () => {
+  afterEach(() => {
+    unpublishPermissionsService();
+  });
+
+  it("delegates to the registry and returns its disposer", () => {
+    const registry = new ToolInputFormatterRegistry();
+    const formatter = () => "preview";
+
+    const service = makeService({
+      registerToolInputFormatter(toolName, fmt) {
+        return registry.register(toolName, fmt);
+      },
+    });
+
+    publishPermissionsService(service);
+    const dispose = getPermissionsService()!.registerToolInputFormatter(
+      "my-tool",
+      formatter,
+    );
+
+    // Registry received the registration
+    expect(registry.get("my-tool")).toBe(formatter);
+
+    // Disposer returned from service removes it from the registry
+    dispose();
+    expect(registry.get("my-tool")).toBeUndefined();
+  });
+
+  it("throws when a formatter is already registered for the tool name", () => {
+    const registry = new ToolInputFormatterRegistry();
+    registry.register("my-tool", () => undefined);
+
+    const service = makeService({
+      registerToolInputFormatter(toolName, fmt) {
+        return registry.register(toolName, fmt);
+      },
+    });
+
+    publishPermissionsService(service);
+    expect(() =>
+      getPermissionsService()!.registerToolInputFormatter("my-tool", () => ""),
+    ).toThrow("my-tool");
   });
 });

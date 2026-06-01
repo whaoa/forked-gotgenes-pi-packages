@@ -16,6 +16,7 @@ import {
   formatUnknownToolReason,
 } from "#src/permission-prompts";
 import type { PermissionSession } from "#src/permission-session";
+import type { ToolInputFormatterLookup } from "#src/tool-input-formatter-registry";
 import {
   resolveToolPreviewLimits,
   ToolPreviewFormatter,
@@ -54,6 +55,7 @@ export class PermissionGateHandler {
     private readonly session: PermissionSession,
     private readonly events: PermissionEventBus,
     private readonly toolRegistry: ToolRegistry,
+    private readonly customFormatters?: ToolInputFormatterLookup,
   ) {}
 
   async handleToolCall(
@@ -145,6 +147,7 @@ export class PermissionGateHandler {
 
     const formatter = new ToolPreviewFormatter(
       resolveToolPreviewLimits(this.session.config),
+      this.customFormatters,
     );
 
     // ── Ordered gate pipeline ─────────────────────────────────────────────

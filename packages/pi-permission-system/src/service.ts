@@ -11,9 +11,10 @@
  * reference — this ensures resilience across `/reload` and load-order edge cases.
  */
 
+import type { ToolInputFormatter } from "./tool-input-formatter-registry";
 import type { PermissionCheckResult, PermissionState } from "./types";
 
-export type { PermissionCheckResult, PermissionState };
+export type { PermissionCheckResult, PermissionState, ToolInputFormatter };
 
 /** Process-global key for the service slot. */
 const SERVICE_KEY = Symbol.for("@gotgenes/pi-permission-system:service");
@@ -42,6 +43,25 @@ export interface PermissionsService {
     value?: string,
     agentName?: string,
   ): PermissionCheckResult;
+
+  /**
+   * Register a custom preview formatter for a specific tool name.
+   *
+   * The formatter is consulted first inside `ToolPreviewFormatter.formatToolInputForPrompt`;
+   * returning `undefined` falls through to the built-in switch (and ultimately
+   * the JSON default).
+   *
+   * Only one formatter may be registered per tool name — a second call for the
+   * same name throws.  The returned disposer unregisters the formatter.
+   *
+   * @param toolName  - Exact tool name to register for (e.g. `"mcp"`, `"my-server:run"`).
+   * @param formatter - Receives the raw `input` record; return a string to use
+   *                    as the prompt preview, or `undefined` to decline.
+   */
+  registerToolInputFormatter(
+    toolName: string,
+    formatter: ToolInputFormatter,
+  ): () => void;
 
   /**
    * Query the tool-level permission state for pre-filtering tools before
