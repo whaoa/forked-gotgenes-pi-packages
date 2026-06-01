@@ -196,7 +196,7 @@ flowchart TD
 
     subgraph PreProcess["Surface-specific input normalization"]
         MCP["MCP target derivation<br/>→ candidate values[]"]
-        Bash["Bash command extraction<br/>→ command string"]
+        Bash["Bash command decomposition<br/>→ top-level commands[]<br/>→ most restrictive wins"]
         Skill["Skill name extraction<br/>→ skill name"]
         PathGate["Cross-cutting path gate<br/>(all file access: tools + bash)<br/>→ most restrictive wins"]
         ExtDir["External directory detection<br/>(tree-sitter-bash AST for bash; direct path for tools)<br/>→ normalized path<br/>(Pi infrastructure reads auto-allowed before gate)"]
@@ -509,8 +509,9 @@ src/
 │       ├── bash-path.ts      describeBashPathGate — async descriptor/bypass factory for bash path rules; selects the worst uncovered token via `pickMostRestrictive`
 │       ├── candidate-check.ts `pickMostRestrictive` — pure deny > ask > allow selection over PermissionCheckResults (first-wins on ties); shared by the bash gates
 │       ├── bash-token-classification.ts Pure token classifiers — `classifyTokenAsPathCandidate` (strict: `/`, `~/`, `..`) and `classifyTokenAsRuleCandidate` (broader: also dot-files and relative paths); shared `rejectNonPathToken` predicate
-│       ├── bash-program.ts   `BashProgram` value object — parses a bash command once (tree-sitter-bash) and exposes typed slices (`pathTokens()`, cd-aware `externalPaths(cwd)`); owns the AST walker and `cd`-target detection; classifiers imported from `bash-token-classification.ts`
+│       ├── bash-program.ts   `BashProgram` value object — parses a bash command once (tree-sitter-bash) and exposes typed slices (`pathTokens()`, cd-aware `externalPaths(cwd)`, chain-splitting `topLevelCommands()`); owns the AST walker and `cd`-target detection; classifiers imported from `bash-token-classification.ts`
 │       ├── bash-path-extractor.ts Thin facades (`extractTokensForPathRules`, `extractExternalPathsFromBashCommand`) over `BashProgram`
+│       ├── bash-command.ts   `resolveBashCommandCheck` — decomposes a bash chain via `BashProgram.topLevelCommands()`, checks each command on the `bash` surface, and selects via `pickMostRestrictive` (#301)
 │       ├── path.ts           describePathGate — pure descriptor factory for cross-cutting path rules
 │       ├── tool.ts           describeToolGate — pure descriptor factory
 │       └── index.ts          Barrel re-exports

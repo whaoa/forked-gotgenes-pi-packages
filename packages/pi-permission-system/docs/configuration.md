@@ -180,16 +180,26 @@ Only specific paths are restricted at call time.
 
 ### `bash` Surface
 
-Command patterns use wildcards matched against the full command string:
+Command patterns use wildcards matched against each top-level command in the chain:
 
 - `*` matches zero or more of any character (including `/` and other separators — there is no single-segment vs. multi-segment distinction; `**` is not a supported token and is equivalent to `*`).
 - `?` matches exactly one character.
 
-**Last matching rule wins** — put broad catch-alls first, specific overrides after.
+**Last matching rule wins** within a single command — put broad catch-alls first, specific overrides after.
+
+A bash invocation may be a chain of commands joined by `&&`, `||`, `;`, `|`, `&`, or newlines.
+Each top-level command is evaluated independently against the patterns, and the most restrictive result wins (`deny` > `ask` > `allow`).
+So `cd /repo && npm install x` evaluates both `cd /repo` and `npm install x`; if `npm *` is denied, the whole invocation is denied even when `cd *` is allowed.
+
+Quotes are respected (an operator inside `'…'` or `"…"` does not split the command), and the contents of command substitution (`$(…)`, backticks) and subshells (`( … )`) are matched as part of their enclosing command rather than evaluated independently.
 
 A pattern ending with `*` (space + wildcard) also matches the bare command without arguments.
 For example, `"git *"` matches both `"git status"` and bare `"git"`.
 Use a more specific pattern before it to carve out exceptions.
+
+> **Patterns match individual commands, not whole chains.**
+> A pattern that embeds a chain operator (e.g. `"cd * && npm *"`) will not match, because each command in the chain is evaluated separately.
+> Write one pattern per command instead.
 
 ```jsonc
 {
