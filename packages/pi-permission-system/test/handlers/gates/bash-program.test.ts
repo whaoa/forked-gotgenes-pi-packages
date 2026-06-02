@@ -69,6 +69,37 @@ describe("BashProgram", () => {
         const program = await BashProgram.parse("cd nested | cat ../b");
         expect(program.externalPaths(cwd)).toContain("/projects/b");
       });
+
+      it("folds a cd inside a subshell for paths within that subshell", async () => {
+        // Inside the subshell the effective dir is cwd/sub, so ../x → cwd/x.
+        const program = await BashProgram.parse("( cd sub && cat ../x )");
+        expect(program.externalPaths(cwd)).toHaveLength(0);
+      });
+
+      it("does not leak a subshell cd to following commands", async () => {
+        // The subshell cd resets on exit, so ../y resolves against cwd.
+        const program = await BashProgram.parse("( cd sub ) && cat ../y");
+        expect(program.externalPaths(cwd)).toContain("/projects/y");
+      });
+
+      it("persists a cd inside a brace group to later commands in the group", async () => {
+        // Brace groups run in the current shell, so cd sub persists to cat ../x.
+        const program = await BashProgram.parse("{ cd sub; cat ../x; }");
+        expect(program.externalPaths(cwd)).toHaveLength(0);
+      });
+
+      it("persists a brace-group cd to following sibling commands", async () => {
+        const program = await BashProgram.parse("{ cd sub; } && cat ../x");
+        expect(program.externalPaths(cwd)).toHaveLength(0);
+      });
+
+      it("conservatively flags a relative path inside a command substitution", async () => {
+        // Interior cd folding inside substitutions is deferred: the interior
+        // inherits the enclosing base (cwd), so ../r is flagged rather than
+        // resolved against cwd/q. Conservative — never misses an escape.
+        const program = await BashProgram.parse("echo $(cd q && cat ../r)");
+        expect(program.externalPaths(cwd)).toContain("/projects/r");
+      });
     });
   });
 

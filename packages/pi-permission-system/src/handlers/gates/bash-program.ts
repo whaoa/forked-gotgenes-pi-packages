@@ -797,10 +797,20 @@ function walkForCandidates(
     case "command":
       tagTokens(collectCommandTokens(node), base, out);
       return foldCd(node, base);
+    case "subshell":
+      // A subshell runs in a child shell: its interior `cd`s fold within the
+      // subshell but reset on exit, so the folded base is discarded.
+      walkCurrentShellSequence(node, base, out);
+      return base;
+    case "compound_statement":
+      // A `{ … }` brace group runs in the current shell, so its `cd`s persist
+      // to following commands — thread and return the folded base.
+      return walkCurrentShellSequence(node, base, out);
     default:
-      // Subshells, brace groups, pipelines, control-flow bodies, redirect
-      // targets: collect every candidate in the subtree tagged with the
-      // enclosing base and do not fold their internal `cd`s.
+      // Pipelines, control-flow bodies, redirect targets, and command/process
+      // substitution interiors: collect every candidate in the subtree tagged
+      // with the enclosing base and do not fold their internal `cd`s. (Folding
+      // inside substitutions is deferred — conservative, never under-flags.)
       tagTokens(collectPathCandidateTokens(node), base, out);
       return base;
   }
