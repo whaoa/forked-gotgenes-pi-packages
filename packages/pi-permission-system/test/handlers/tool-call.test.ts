@@ -329,6 +329,44 @@ describe("handleToolCall — bash command chain gate", () => {
     expect(result).toMatchObject({ block: true });
   });
 
+  it("blocks a command nested inside command substitution (#306)", async () => {
+    const checkPermission = vi
+      .fn()
+      .mockImplementation((surface: string, input: unknown) => {
+        if (surface === "bash") {
+          const command = (input as { command?: string }).command ?? "";
+          return /^rm\b/.test(command)
+            ? makeCheckResult({
+                state: "deny",
+                source: "bash",
+                command,
+                matchedPattern: "rm *",
+              })
+            : makeCheckResult({
+                state: "allow",
+                source: "bash",
+                command,
+                matchedPattern: "echo *",
+              });
+        }
+        return makeCheckResult({ state: "allow" });
+      });
+    const { handler } = makeHandler({
+      session: { checkPermission },
+      toolRegistry: {
+        getAll: vi.fn().mockReturnValue([{ name: "bash" }]),
+      },
+    });
+    const event = {
+      type: "tool_call",
+      toolCallId: "tc-bash-substitution",
+      name: "bash",
+      input: { command: "echo $(rm -rf foo)" },
+    };
+    const result = await handler.handleToolCall(event, makeCtx());
+    expect(result).toMatchObject({ block: true });
+  });
+
   it("allows a single non-chained bash command", async () => {
     const checkPermission = vi
       .fn()

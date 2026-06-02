@@ -21,6 +21,8 @@ interface TSNode {
   readonly type: string;
   readonly text: string;
   readonly childCount: number;
+  /** False for anonymous tokens (operators, delimiters); true for named nodes. */
+  readonly isNamed: boolean;
   child(index: number): TSNode | null;
 }
 
@@ -81,7 +83,7 @@ export class BashProgram {
   private constructor(
     private readonly rawTokens: readonly string[],
     private readonly leadingCdTarget: string | undefined,
-    private readonly topLevelCommandTexts: readonly string[],
+    private readonly commandUnits: readonly BashCommand[],
   ) {}
 
   /**
@@ -100,8 +102,8 @@ export class BashProgram {
     try {
       const leadingCdTarget = extractLeadingCdTarget(tree.rootNode);
       const rawTokens = collectPathCandidateTokens(tree.rootNode);
-      const topLevelCommandTexts = collectTopLevelCommandTexts(tree.rootNode);
-      return new BashProgram(rawTokens, leadingCdTarget, topLevelCommandTexts);
+      const commandUnits = collectCommands(tree.rootNode);
+      return new BashProgram(rawTokens, leadingCdTarget, commandUnits);
     } finally {
       tree.delete();
     }
@@ -142,7 +144,7 @@ export class BashProgram {
   // ctor), so it reports a false positive here.
   // fallow-ignore-next-line unused-class-member
   commands(): BashCommand[] {
-    return this.topLevelCommandTexts.map((text) => ({ text }));
+    return [...this.commandUnits];
   }
 
   /**
@@ -596,14 +598,12 @@ function collectPathCandidateTokens(node: TSNode): string[] {
 // which exports classifyTokenAsPathCandidate and classifyTokenAsRuleCandidate
 // with a shared rejectNonPathToken predicate eliminating the prior clone.
 
-// ── Top-level command enumeration ───────────────────────────────────────────
+// ── Command enumeration ──────────────────────────────────────────────────────
 
 /**
- * Container node types descended into when enumerating top-level commands.
- * A `cd` or `rm` inside a subshell or compound statement is NOT a top-level
- * command, so those node types are deliberately absent.
+ * Container node types descended into when enumerating command units.
  */
-const TOP_LEVEL_COMMAND_DESCEND = new Set([
+const COMMAND_ENUM_DESCEND = new Set([
   "program",
   "list",
   "pipeline",
@@ -611,18 +611,12 @@ const TOP_LEVEL_COMMAND_DESCEND = new Set([
 ]);
 
 /**
- * Node types skipped during top-level command enumeration: chain-operator and
- * separator tokens, redirect targets, comments, and heredoc bodies. None of
- * these is a command to evaluate.
+ * Named node types skipped during command enumeration: redirect targets,
+ * comments, and heredoc bodies — none is a command to evaluate. Anonymous
+ * tokens (chain operators `&&`/`;`/`|`, substitution and subshell delimiters
+ * `$(`/`)`/`` ` ``/`(`) are filtered by the `isNamed` guard, not listed here.
  */
-const TOP_LEVEL_COMMAND_SKIP = new Set([
-  "&&",
-  "||",
-  ";",
-  "&",
-  "|",
-  "|&",
-  "\n",
+const COMMAND_ENUM_SKIP = new Set([
   "file_redirect",
   "heredoc_redirect",
   "herestring_redirect",
@@ -632,29 +626,89 @@ const TOP_LEVEL_COMMAND_SKIP = new Set([
 ]);
 
 /**
- * Collect the text of each top-level simple-command in the program.
+ * Nested execution contexts whose interior commands really execute and must be
+ * evaluated too: command substitution (`$(…)`, backticks) and process
+ * substitution (`<(…)`/`>(…)`). Subshells (`( … )`) are handled separately
+ * because they are also emitted whole.
+ */
+const NESTED_EXECUTION_CONTEXTS = new Set([
+  "command_substitution",
+  "process_substitution",
+]);
+
+/**
+ * Enumerate the command units of a bash program, in source order.
  *
  * Descends container nodes (`program`, `list`, `pipeline`, `redirected_statement`)
- * and emits each `command` node's text. Chain-operator tokens and redirect
- * targets are skipped. Any other top-level statement node (subshell, compound
- * statement, control-flow) is emitted whole without descending, so its inner
- * commands are matched as part of the enclosing statement's text rather than
- * independently (the top-level scope).
+ * and emits each `command` node whole. Additionally descends into the three
+ * nested execution contexts — command substitution (`$(…)`, backticks), process
+ * substitution (`<(…)`/`>(…)`), and subshells (`( … )`) — emitting each inner
+ * command as its own unit *in addition to* the enclosing command, since those
+ * inner commands really execute (#306). Control-flow bodies and `{ … }` brace
+ * groups are emitted whole without descending (deferred).
+ *
+ * The enclosing command/subshell is always still emitted whole, so adding the
+ * nested units can only ever produce a more-restrictive decision, never weaker.
  */
-function collectTopLevelCommandTexts(node: TSNode): string[] {
-  if (node.type === "command") return [node.text];
-  if (TOP_LEVEL_COMMAND_SKIP.has(node.type)) return [];
-  if (TOP_LEVEL_COMMAND_DESCEND.has(node.type)) {
-    const texts: string[] = [];
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child) texts.push(...collectTopLevelCommandTexts(child));
-    }
-    return texts;
+function collectCommands(node: TSNode): BashCommand[] {
+  const out: BashCommand[] = [];
+  collectCommandsInto(node, out);
+  return out;
+}
+
+function collectCommandsInto(node: TSNode, out: BashCommand[]): void {
+  // Anonymous tokens (operators `&&`/`;`/`|`, delimiters `$(`/`)`/`` ` ``/`(`)
+  // carry no command.
+  if (!node.isNamed) return;
+  if (COMMAND_ENUM_SKIP.has(node.type)) return;
+
+  if (node.type === "command") {
+    out.push({ text: node.text });
+    // A command's text already contains any substitution; descend its subtree
+    // to ALSO emit the inner commands of command/process substitutions.
+    collectSubstitutionCommands(node, out);
+    return;
   }
-  // Any other named statement node (subshell, compound_statement, if/while/for,
-  // function_definition, …): emit whole, do not descend.
-  return [node.text];
+
+  if (node.type === "subshell") {
+    out.push({ text: node.text }); // never-weaker whole emit
+    descendCommandChildren(node, out);
+    return;
+  }
+
+  if (COMMAND_ENUM_DESCEND.has(node.type)) {
+    descendCommandChildren(node, out);
+    return;
+  }
+
+  // Any other named statement (compound_statement `{ … }`, if/while/for/case,
+  // function_definition): emit whole, do not descend — deferred (#306).
+  out.push({ text: node.text });
+}
+
+function descendCommandChildren(node: TSNode, out: BashCommand[]): void {
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (child) collectCommandsInto(child, out);
+  }
+}
+
+/**
+ * Search a command's subtree for command/process substitutions and enumerate
+ * the commands inside them. A substitution can nest under `command_name` (when
+ * the whole command is `$(…)`) or under an argument, so the entire subtree is
+ * searched.
+ */
+function collectSubstitutionCommands(node: TSNode, out: BashCommand[]): void {
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (!child) continue;
+    if (NESTED_EXECUTION_CONTEXTS.has(child.type)) {
+      descendCommandChildren(child, out);
+    } else {
+      collectSubstitutionCommands(child, out);
+    }
+  }
 }
 
 // ── Leading cd detection ───────────────────────────────────────────────────
