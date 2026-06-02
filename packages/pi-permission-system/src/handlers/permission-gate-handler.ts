@@ -195,7 +195,7 @@ export class PermissionGateHandler {
           tcc.toolName === "bash" && bashProgram
             ? resolveBashCommandCheck(
                 command ?? "",
-                bashProgram.commands().map((c) => c.text),
+                bashProgram.commands(),
                 tcc.agentName ?? undefined,
                 getSessionRuleset(),
                 checkPermission,

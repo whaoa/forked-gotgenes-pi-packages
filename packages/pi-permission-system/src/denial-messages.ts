@@ -1,5 +1,5 @@
 import { EXTENSION_ID } from "./extension-config";
-import type { PermissionCheckResult } from "./types";
+import type { BashCommandContext, PermissionCheckResult } from "./types";
 
 // ── Extension attribution tag ──────────────────────────────────────────────
 
@@ -114,11 +114,52 @@ function buildToolDenyBody(
     parts.push(`command '${check.command}'`);
   }
 
-  if (check.matchedPattern) {
-    parts.push(`(matched '${check.matchedPattern}')`);
+  const qualifier = matchQualifier(check.matchedPattern, check.commandContext);
+  if (qualifier) {
+    parts.push(qualifier);
   }
 
   return `${parts.join(" ")}.`;
+}
+
+/**
+ * Human-readable label for a nested bash execution context, or `undefined` for
+ * a current-shell (top-level) command.
+ */
+export function describeBashCommandContext(
+  context?: BashCommandContext,
+): string | undefined {
+  switch (context) {
+    case "command_substitution":
+      return "command substitution";
+    case "process_substitution":
+      return "process substitution";
+    case "subshell":
+      return "subshell";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Build the parenthetical qualifier for a bash decision, folding the matched
+ * rule and (for a nested command) its execution context into one clause, e.g.
+ * `(matched 'rm *', inside command substitution)`. Returns `""` when neither
+ * applies.
+ */
+export function matchQualifier(
+  matchedPattern?: string,
+  context?: BashCommandContext,
+): string {
+  const parts: string[] = [];
+  if (matchedPattern) {
+    parts.push(`matched '${matchedPattern}'`);
+  }
+  const label = describeBashCommandContext(context);
+  if (label) {
+    parts.push(`inside ${label}`);
+  }
+  return parts.length > 0 ? `(${parts.join(", ")})` : "";
 }
 
 function buildUnavailableBody(ctx: DenialContext): string {

@@ -10,6 +10,7 @@ import {
   isSafeSystemPath,
   normalizePathForComparison,
 } from "#src/path-utils";
+import type { BashCommandContext } from "#src/types";
 
 // ── tree-sitter-bash lazy parser ───────────────────────────────────────────
 
@@ -67,6 +68,11 @@ function getParser(): Promise<TSParser> {
  */
 export interface BashCommand {
   readonly text: string;
+  /**
+   * Execution context for a nested command (substitution or subshell); absent
+   * for a current-shell (top-level) command.
+   */
+  readonly context?: BashCommandContext;
 }
 
 /**
@@ -631,9 +637,9 @@ const COMMAND_ENUM_SKIP = new Set([
  * substitution (`<(…)`/`>(…)`). Subshells (`( … )`) are handled separately
  * because they are also emitted whole.
  */
-const NESTED_EXECUTION_CONTEXTS = new Set([
-  "command_substitution",
-  "process_substitution",
+const NESTED_EXECUTION_CONTEXTS = new Map<string, BashCommandContext>([
+  ["command_substitution", "command_substitution"],
+  ["process_substitution", "process_substitution"],
 ]);
 
 /**
@@ -652,18 +658,22 @@ const NESTED_EXECUTION_CONTEXTS = new Set([
  */
 function collectCommands(node: TSNode): BashCommand[] {
   const out: BashCommand[] = [];
-  collectCommandsInto(node, out);
+  collectCommandsInto(node, undefined, out);
   return out;
 }
 
-function collectCommandsInto(node: TSNode, out: BashCommand[]): void {
+function collectCommandsInto(
+  node: TSNode,
+  context: BashCommandContext | undefined,
+  out: BashCommand[],
+): void {
   // Anonymous tokens (operators `&&`/`;`/`|`, delimiters `$(`/`)`/`` ` ``/`(`)
   // carry no command.
   if (!node.isNamed) return;
   if (COMMAND_ENUM_SKIP.has(node.type)) return;
 
   if (node.type === "command") {
-    out.push({ text: node.text });
+    out.push(makeUnit(node.text, context));
     // A command's text already contains any substitution; descend its subtree
     // to ALSO emit the inner commands of command/process substitutions.
     collectSubstitutionCommands(node, out);
@@ -671,40 +681,52 @@ function collectCommandsInto(node: TSNode, out: BashCommand[]): void {
   }
 
   if (node.type === "subshell") {
-    out.push({ text: node.text }); // never-weaker whole emit
-    descendCommandChildren(node, out);
+    out.push(makeUnit(node.text, context)); // never-weaker whole emit
+    descendCommandChildren(node, "subshell", out);
     return;
   }
 
   if (COMMAND_ENUM_DESCEND.has(node.type)) {
-    descendCommandChildren(node, out);
+    descendCommandChildren(node, context, out);
     return;
   }
 
   // Any other named statement (compound_statement `{ … }`, if/while/for/case,
   // function_definition): emit whole, do not descend — deferred (#306).
-  out.push({ text: node.text });
+  out.push(makeUnit(node.text, context));
 }
 
-function descendCommandChildren(node: TSNode, out: BashCommand[]): void {
+function makeUnit(
+  text: string,
+  context: BashCommandContext | undefined,
+): BashCommand {
+  return context ? { text, context } : { text };
+}
+
+function descendCommandChildren(
+  node: TSNode,
+  context: BashCommandContext | undefined,
+  out: BashCommand[],
+): void {
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i);
-    if (child) collectCommandsInto(child, out);
+    if (child) collectCommandsInto(child, context, out);
   }
 }
 
 /**
  * Search a command's subtree for command/process substitutions and enumerate
- * the commands inside them. A substitution can nest under `command_name` (when
- * the whole command is `$(…)`) or under an argument, so the entire subtree is
- * searched.
+ * the commands inside them, tagged with the substitution's execution context.
+ * A substitution can nest under `command_name` (when the whole command is
+ * `$(…)`) or under an argument, so the entire subtree is searched.
  */
 function collectSubstitutionCommands(node: TSNode, out: BashCommand[]): void {
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i);
     if (!child) continue;
-    if (NESTED_EXECUTION_CONTEXTS.has(child.type)) {
-      descendCommandChildren(child, out);
+    const nestedContext = NESTED_EXECUTION_CONTEXTS.get(child.type);
+    if (nestedContext) {
+      descendCommandChildren(child, nestedContext, out);
     } else {
       collectSubstitutionCommands(child, out);
     }

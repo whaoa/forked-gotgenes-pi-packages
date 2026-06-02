@@ -30,7 +30,7 @@ describe("resolveBashCommandCheck", () => {
 
     const result = resolveBashCommandCheck(
       "npm install pkg",
-      ["npm install pkg"],
+      [{ text: "npm install pkg" }],
       undefined,
       [],
       checkPermission,
@@ -58,7 +58,7 @@ describe("resolveBashCommandCheck", () => {
 
     const result = resolveBashCommandCheck(
       "cd /p && npm install pkg",
-      ["cd /p", "npm install pkg"],
+      [{ text: "cd /p" }, { text: "npm install pkg" }],
       undefined,
       [],
       checkPermission,
@@ -81,7 +81,7 @@ describe("resolveBashCommandCheck", () => {
 
     const result = resolveBashCommandCheck(
       "cd /p && git push",
-      ["cd /p", "git push"],
+      [{ text: "cd /p" }, { text: "git push" }],
       undefined,
       [],
       checkPermission,
@@ -102,7 +102,7 @@ describe("resolveBashCommandCheck", () => {
 
     const result = resolveBashCommandCheck(
       "a && b",
-      ["a", "b"],
+      [{ text: "a" }, { text: "b" }],
       undefined,
       [],
       checkPermission,
@@ -126,6 +126,7 @@ describe("resolveBashCommandCheck", () => {
     );
 
     expect(result.state).toBe("ask");
+    expect(result.commandContext).toBeUndefined();
     expect(checkPermission).toHaveBeenCalledTimes(1);
     expect(checkPermission).toHaveBeenCalledWith(
       "bash",
@@ -145,7 +146,7 @@ describe("resolveBashCommandCheck", () => {
 
     resolveBashCommandCheck(
       "npm i",
-      ["npm i"],
+      [{ text: "npm i" }],
       "agent-x",
       sessionRules,
       checkPermission,
@@ -157,5 +158,48 @@ describe("resolveBashCommandCheck", () => {
       "agent-x",
       sessionRules,
     );
+  });
+
+  it("tags the winning result with the offending command's execution context", () => {
+    const checkPermission = vi
+      .fn<CheckPermissionFn>()
+      .mockImplementation((_surface, input) => {
+        const command = (input as { command: string }).command;
+        return command.startsWith("rm")
+          ? bashResult("deny", command, "rm *")
+          : bashResult("allow", command, "echo *");
+      });
+
+    const result = resolveBashCommandCheck(
+      "echo $(rm -rf foo)",
+      [
+        { text: "echo $(rm -rf foo)" },
+        { text: "rm -rf foo", context: "command_substitution" },
+      ],
+      undefined,
+      [],
+      checkPermission,
+    );
+
+    expect(result.state).toBe("deny");
+    expect(result.command).toBe("rm -rf foo");
+    expect(result.commandContext).toBe("command_substitution");
+  });
+
+  it("leaves commandContext unset when the winning command is top-level", () => {
+    const checkPermission = vi
+      .fn<CheckPermissionFn>()
+      .mockReturnValue(bashResult("deny", "rm -rf foo", "rm *"));
+
+    const result = resolveBashCommandCheck(
+      "rm -rf foo",
+      [{ text: "rm -rf foo" }],
+      undefined,
+      [],
+      checkPermission,
+    );
+
+    expect(result.state).toBe("deny");
+    expect(result.commandContext).toBeUndefined();
   });
 });

@@ -1,3 +1,4 @@
+import { matchQualifier } from "./denial-messages";
 import type { SkillPromptEntry } from "./skill-prompt-sanitizer";
 import type { ToolPreviewFormatter } from "./tool-preview-formatter";
 import type { PermissionCheckResult } from "./types";
@@ -36,10 +37,12 @@ export function formatAskPrompt(
   const subject = agentName ? `Agent '${agentName}'` : "Current agent";
 
   if (result.toolName === "bash") {
-    const patternInfo = result.matchedPattern
-      ? ` (matched '${result.matchedPattern}')`
-      : "";
-    return `${subject} requested bash command '${result.command ?? ""}'${patternInfo}. Allow this command?`;
+    const qualifier = matchQualifier(
+      result.matchedPattern,
+      result.commandContext,
+    );
+    const qualifierInfo = qualifier ? ` ${qualifier}` : "";
+    return `${subject} requested bash command '${result.command ?? ""}'${qualifierInfo}. Allow this command?`;
   }
 
   if ((result.source === "mcp" || result.toolName === "mcp") && result.target) {

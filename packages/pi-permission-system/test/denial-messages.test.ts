@@ -98,6 +98,22 @@ describe("formatDenyReason", () => {
       );
     });
 
+    test("bash with nested execution context", () => {
+      expect(
+        formatDenyReason(
+          toolCtx(
+            toolCheck("bash", {
+              command: "rm -rf foo",
+              matchedPattern: "rm *",
+              commandContext: "command_substitution",
+            }),
+          ),
+        ),
+      ).toBe(
+        "[pi-permission-system] is not permitted to run 'bash' command 'rm -rf foo' (matched 'rm *', inside command substitution).",
+      );
+    });
+
     test("MCP source with target on non-mcp toolName", () => {
       expect(
         formatDenyReason(

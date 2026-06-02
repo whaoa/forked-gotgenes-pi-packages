@@ -151,6 +151,22 @@ describe("formatAskPrompt", () => {
     expect(result).toContain("matched 'git *'");
   });
 
+  test("formats bash prompt with nested execution context", () => {
+    const result = formatAskPrompt(
+      toolResult("bash", {
+        command: "rm -rf foo",
+        matchedPattern: "rm *",
+        commandContext: "command_substitution",
+      }),
+      undefined,
+      undefined,
+      makeFormatter(),
+    );
+    expect(result).toContain(
+      "bash command 'rm -rf foo' (matched 'rm *', inside command substitution).",
+    );
+  });
+
   test("formats MCP prompt with target", () => {
     const result = formatAskPrompt(
       mcpResult("server:query"),

