@@ -28,3 +28,22 @@ Plan committed as a 3-step TDD sequence (enumeration descent → context tag + m
 - Design-review check on the shared-interface change: `PermissionCheckResult` gains one optional field read by two presentation modules and written by one resolver, riding the existing result-carries-context pattern (same as `command` / `matchedPattern`) — no new parameter threading, no LoD / output-argument smells.
 - `configuration.md` documents the current limitation explicitly (nested contents "matched as part of their enclosing command rather than evaluated independently") — that prose and the "subshells … are not parsed" caveat are the required doc updates.
 - Carried forward from #308: these are `feat:` commits (not `refactor:`), so #306 will appear in the changelog normally; no explicit-close caveat needed for release-please.
+
+## Stage: Implementation — TDD (2026-06-02T00:54:01Z)
+
+### Session summary
+
+Implemented #306 across three TDD cycles (two `feat:` code commits + one `docs:` commit) exactly as planned: step 1 added the enumeration descent (the security fix), step 2 added the `context` field end-to-end with its message consumers in one commit, step 3 updated `configuration.md` + `architecture.md`.
+Test count went 1704 → 1716 (+12: 8 enumeration tests in step 1, 4 context/message tests in step 2).
+`pnpm run check`, `pnpm run lint`, `pnpm run test`, and `pnpm fallow dead-code` (repo root, 203 entry points) all green; no lockfile change.
+
+### Observations
+
+- No deviations from the plan — the file-by-file changes, the 3-step ordering, and the fallow-driven "field + consumer in one commit" split all held.
+- The AST probe from planning paid off: `command_substitution` nesting **under** `command_name` (when the whole command is `$(…)`) is handled by `collectSubstitutionCommands` searching the full command subtree, and `node.isNamed` cleanly skips every delimiter/operator token without enumerating fragile anonymous type strings.
+- Refined one planning detail during implementation: `NESTED_EXECUTION_CONTEXTS` became a `Map<string, BashCommandContext>` (node-type → context) instead of a `Set`, so `collectSubstitutionCommands` reads the context off the map rather than re-deriving it — decouples tree-sitter type strings from the union and avoids a cast.
+- Step 2 threaded an optional `context` param through `collectCommandsInto` / `descendCommandChildren` and added a tiny `makeUnit(text, context)` helper so top-level units stay `{ text }` (no `context: undefined`), keeping the existing top-level `commands()` and whole-`PermissionCheckResult` assertions green under `toEqual`.
+- One mechanical hiccup: an `Edit` to the `resolveBashCommandCheck` JSDoc failed because the `oldText` anchor started mid-line (`Matching the whole string…` is not a line start); re-anchored on the prior line and it applied.
+  No rework.
+- Pre-completion reviewer verdict: **PASS** (all deterministic checks green; code-design, docs forward/reverse, Mermaid, and dead-code all PASS; no acceptance-criteria list in the issue, so that check was SKIP).
+  No warnings.
