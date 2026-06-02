@@ -27,7 +27,7 @@ describe("runGateCheck", () => {
 
   it("returns block and emits policy_deny when policy is deny", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "deny", matchedPattern: "*" }),
@@ -49,7 +49,7 @@ describe("runGateCheck", () => {
 
   it("returns allow and emits session_approved on session hit", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ source: "session", matchedPattern: "git *" }),
@@ -83,7 +83,7 @@ describe("runGateCheck", () => {
 
   it("returns allow and emits user_approved when ask + user approves", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -104,7 +104,7 @@ describe("runGateCheck", () => {
 
   it("returns allow, emits user_approved_for_session, and records session rule on approved_for_session", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -130,7 +130,7 @@ describe("runGateCheck", () => {
 
   it("calls recordSessionApproval once with the full SessionApproval when sessionApproval has multiple patterns", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -152,7 +152,7 @@ describe("runGateCheck", () => {
 
   it("returns block and emits user_denied when ask + user denies", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -173,7 +173,7 @@ describe("runGateCheck", () => {
 
   it("returns block and emits confirmation_unavailable when ask + no UI", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -192,7 +192,7 @@ describe("runGateCheck", () => {
 
   it("emits auto_approved resolution when decision has autoApproved flag", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -212,14 +212,14 @@ describe("runGateCheck", () => {
     );
   });
 
-  it("uses preResolved.state instead of calling checkPermission", async () => {
+  it("uses preResolved.state instead of calling resolve", async () => {
     const deps = makeRunnerDeps();
     const descriptor = makeDescriptor({
       preResolved: { state: "deny" },
     });
     const result = await runGateCheck(descriptor, null, "tc-1", deps);
     expect(result).toMatchObject({ action: "block" });
-    expect(deps.checkPermission).not.toHaveBeenCalled();
+    expect(deps.resolve).not.toHaveBeenCalled();
     expect(deps.emitDecision).toHaveBeenCalledWith(
       expect.objectContaining({
         resolution: "policy_deny",
@@ -227,14 +227,14 @@ describe("runGateCheck", () => {
     );
   });
 
-  it("uses preResolved.state allow without calling checkPermission", async () => {
+  it("uses preResolved.state allow without calling resolve", async () => {
     const deps = makeRunnerDeps();
     const descriptor = makeDescriptor({
       preResolved: { state: "allow" },
     });
     const result = await runGateCheck(descriptor, null, "tc-1", deps);
     expect(result).toEqual({ action: "allow" });
-    expect(deps.checkPermission).not.toHaveBeenCalled();
+    expect(deps.resolve).not.toHaveBeenCalled();
     expect(deps.emitDecision).toHaveBeenCalledWith(
       expect.objectContaining({
         resolution: "policy_allow",
@@ -242,7 +242,7 @@ describe("runGateCheck", () => {
     );
   });
 
-  it("passes agentName to checkPermission and decision event", async () => {
+  it("passes agentName to resolve and decision event", async () => {
     const deps = makeRunnerDeps();
     const result = await runGateCheck(
       makeDescriptor(),
@@ -251,12 +251,7 @@ describe("runGateCheck", () => {
       deps,
     );
     expect(result).toEqual({ action: "allow" });
-    expect(deps.checkPermission).toHaveBeenCalledWith(
-      "read",
-      {},
-      "test-agent",
-      [],
-    );
+    expect(deps.resolve).toHaveBeenCalledWith("read", {}, "test-agent");
     expect(deps.emitDecision).toHaveBeenCalledWith(
       expect.objectContaining({
         agentName: "test-agent",
@@ -266,7 +261,7 @@ describe("runGateCheck", () => {
 
   it("passes requestId from toolCallId to promptPermission", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -280,7 +275,7 @@ describe("runGateCheck", () => {
 
   it("does not call recordSessionApproval when user approves once (no sessionApproval)", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -293,7 +288,7 @@ describe("runGateCheck", () => {
     expect(deps.recordSessionApproval).not.toHaveBeenCalled();
   });
 
-  it("uses preCheck result directly instead of calling checkPermission", async () => {
+  it("uses preCheck result directly instead of calling resolve", async () => {
     const deps = makeRunnerDeps();
     const descriptor = makeDescriptor({
       preCheck: makeCheckResult({
@@ -304,7 +299,7 @@ describe("runGateCheck", () => {
     });
     const result = await runGateCheck(descriptor, null, "tc-1", deps);
     expect(result).toMatchObject({ action: "block" });
-    expect(deps.checkPermission).not.toHaveBeenCalled();
+    expect(deps.resolve).not.toHaveBeenCalled();
     expect(deps.emitDecision).toHaveBeenCalledWith(
       expect.objectContaining({
         resolution: "policy_deny",
@@ -316,7 +311,7 @@ describe("runGateCheck", () => {
 
   it("does not call recordSessionApproval when user approves for session but no sessionApproval on descriptor", async () => {
     const deps = makeRunnerDeps({
-      checkPermission: vi
+      resolve: vi
         .fn()
         .mockReturnValue(
           makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -361,7 +356,7 @@ describe("runGateCheck", () => {
 
     it("uses denialContext to format denyReason with extension tag", async () => {
       const deps = makeRunnerDeps({
-        checkPermission: vi
+        resolve: vi
           .fn()
           .mockReturnValue(
             makeCheckResult({ state: "deny", matchedPattern: "*" }),
@@ -387,7 +382,7 @@ describe("runGateCheck", () => {
 
     it("uses denialContext to format unavailableReason with extension tag", async () => {
       const deps = makeRunnerDeps({
-        checkPermission: vi
+        resolve: vi
           .fn()
           .mockReturnValue(
             makeCheckResult({ state: "ask", matchedPattern: "*" }),
@@ -413,7 +408,7 @@ describe("runGateCheck", () => {
 
     it("uses denialContext to format userDeniedReason with extension tag", async () => {
       const deps = makeRunnerDeps({
-        checkPermission: vi
+        resolve: vi
           .fn()
           .mockReturnValue(
             makeCheckResult({ state: "ask", matchedPattern: "*" }),

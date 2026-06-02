@@ -40,11 +40,10 @@ export async function runGateCheck(
       origin: "builtin",
     };
   } else {
-    check = deps.checkPermission(
+    check = deps.resolve(
       descriptor.surface,
       descriptor.input,
       agentName ?? undefined,
-      deps.getSessionRuleset(),
     );
   }
 

@@ -67,10 +67,7 @@ export function makeRunnerDeps(
   overrides: Partial<GateRunnerDeps> = {},
 ): GateRunnerDeps {
   return {
-    checkPermission: vi
-      .fn()
-      .mockReturnValue(makeCheckResult({ matchedPattern: "*" })),
-    getSessionRuleset: vi.fn().mockReturnValue([]),
+    resolve: vi.fn().mockReturnValue(makeCheckResult({ matchedPattern: "*" })),
     recordSessionApproval: vi.fn(),
     writeReviewLog: vi.fn(),
     emitDecision: vi.fn(),

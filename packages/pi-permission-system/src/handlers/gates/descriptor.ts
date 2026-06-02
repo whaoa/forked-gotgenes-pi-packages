@@ -2,7 +2,7 @@ import type { DenialContext } from "#src/denial-messages";
 import type { PermissionPromptDecision } from "#src/permission-dialog";
 import type { PermissionDecisionEvent } from "#src/permission-events";
 import type { PromptPermissionDetails } from "#src/permission-prompter";
-import type { Rule } from "#src/rule";
+import type { PermissionResolver } from "#src/permission-resolver";
 import type { SessionApproval } from "#src/session-approval";
 import type { PermissionCheckResult, PermissionState } from "#src/types";
 
@@ -79,14 +79,7 @@ export type GateResult = GateDescriptor | GateBypass | null;
  * Handles all side effects: permission checks, logging, event emission,
  * session-rule recording.
  */
-export interface GateRunnerDeps {
-  checkPermission(
-    surface: string,
-    input: unknown,
-    agentName?: string,
-    sessionRules?: Rule[],
-  ): PermissionCheckResult;
-  getSessionRuleset(): Rule[];
+export interface GateRunnerDeps extends PermissionResolver {
   recordSessionApproval(approval: SessionApproval): void;
   writeReviewLog(event: string, details: Record<string, unknown>): void;
   emitDecision(event: PermissionDecisionEvent): void;
