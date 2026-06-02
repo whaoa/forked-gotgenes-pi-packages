@@ -1,5 +1,5 @@
 import { getNonEmptyString, toRecord } from "#src/common";
-import type { Rule } from "#src/rule";
+import type { PermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { PermissionCheckResult } from "#src/types";
@@ -8,14 +8,6 @@ import { pickMostRestrictive } from "./candidate-check";
 import type { GateResult } from "./descriptor";
 import { formatPathAskPrompt } from "./path";
 import type { ToolCallContext } from "./types";
-
-/** Function type for checkPermission used by the descriptor factory. */
-type CheckPermissionFn = (
-  surface: string,
-  input: unknown,
-  agentName?: string,
-  sessionRules?: Rule[],
-) => PermissionCheckResult;
 
 /**
  * Build a pure descriptor for the cross-cutting path permission gate (bash).
@@ -33,8 +25,7 @@ type CheckPermissionFn = (
 export function describeBashPathGate(
   tcc: ToolCallContext,
   bashProgram: BashProgram | null,
-  checkPermission: CheckPermissionFn,
-  getSessionRuleset: () => Rule[],
+  resolver: PermissionResolver,
 ): GateResult {
   if (tcc.toolName !== "bash") return null;
 
@@ -46,20 +37,16 @@ export function describeBashPathGate(
   const tokens = bashProgram.pathTokens();
   if (tokens.length === 0) return null;
 
-  // Check each token against path rules with session rules appended.
-  const sessionRules = getSessionRuleset();
-
   // Tokens whose resolved state needs a check (deny/ask), paired with the
   // token that produced them so the descriptor can derive its pattern.
   const uncovered: Array<{ token: string; check: PermissionCheckResult }> = [];
   let allSessionCovered = true;
 
   for (const token of tokens) {
-    const check = checkPermission(
+    const check = resolver.resolve(
       "path",
       { path: token },
       tcc.agentName ?? undefined,
-      sessionRules,
     );
 
     // No explicit path rule matched — only the universal default fired.

@@ -176,13 +176,7 @@ export class PermissionGateHandler {
       () => describePathGate(tcc, resolver),
       () => describeExternalDirectoryGate(tcc, infraDirs),
       () => describeBashExternalDirectoryGate(tcc, bashProgram, resolver),
-      () =>
-        describeBashPathGate(
-          tcc,
-          bashProgram,
-          checkPermission,
-          getSessionRuleset,
-        ),
+      () => describeBashPathGate(tcc, bashProgram, resolver),
       () => {
         // Bash commands may chain several sub-commands (`a && b`, `a | b`, …);
         // evaluate each unit from the shared parse on the bash surface and
