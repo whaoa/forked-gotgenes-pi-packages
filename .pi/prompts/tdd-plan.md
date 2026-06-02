@@ -162,6 +162,7 @@ Before stopping, persist implementation observations for cross-session continuit
 4. Commit: `git add <retro-file> && git commit -m "docs(retro): add TDD stage notes for issue #N"`.
 
 Wrap code identifiers, filenames, and text containing underscores in backticks in the retro file.
+Append with the `Edit` tool (or `Write` for a new file), not a shell heredoc.
 
 Stop.
 The next step is `/ship-issue`.

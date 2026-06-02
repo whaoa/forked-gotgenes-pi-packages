@@ -64,3 +64,51 @@ Test count unchanged (1704 → 1704 — the renamed/reshaped suites assert the s
 - The extractor facades (`extractTokensForPathRules`, `extractExternalPathsFromBashCommand`) are untouched and remain live via the 1027-line `test/bash-external-directory.test.ts` characterization suite (the #304 lift-and-shift seam); they are now a test-only seam in production terms.
 - Pre-completion reviewer verdict: **PASS** (all deterministic checks green; deviation to sync gates verified behavior-preserving; Mermaid diagrams parsed clean; dead-code clean).
 - Ship-time warning still applies: this is a `refactor:`-heavy enabler; release-please omits `refactor:` commits from the changelog, so if #308 ships stacked under #306 it must be closed explicitly.
+
+## Stage: Final Retrospective (2026-06-02T00:04:58Z)
+
+### Session summary
+
+Shipped #308 across the TDD-implementation and ship sessions: five commits (three `refactor:` code, one `docs:`, one `refactor:` fallow cleanup) plus stage/retro docs, all green through CI, with the issue closed explicitly (no release triggered — `refactor:`-only).
+The implementation matched the plan's structure but diverged on one point the plan did not anticipate (the bash gates became synchronous instead of `async`), which the deterministic lint gate surfaced and which turned out to be the cleaner design.
+
+### Observations
+
+#### What went well
+
+- The `require-await` constraint turned the plan's "keep the gates `async` for signature symmetry" into the cleaner synchronous outcome — a deterministic gate enforced better design than the plan specified, and the sync gates now match their sibling descriptor factories (`describePathGate`, `describeExternalDirectoryGate`).
+- Testing the injected `BashProgram` via a local `describeGate` helper that mirrors the handler's parse-once derivation exactly kept the gate suites faithful to production wiring instead of hand-building token lists; the pre-completion reviewer flagged this as a strength.
+- The 14-call-site rename in `bash-path.test.ts` used a single `sed` on `await describeBashPathGate(` → `await describeGate(`, exploiting that the import binding and the helper's own call are not preceded by `await`, so the mechanical migration never touched the helper definition.
+
+#### What caused friction (agent side)
+
+- `missing-context` — I checked the root `eslint.config.js` for `require-await` and saw `"off"` (line 157) but did not read the enclosing override's `files: ["packages/*/test/**/*.ts"]` scope (line 148), so I followed the plan and kept the two bash path gates `async`.
+  The pre-commit hook rejected the step-2 commit with `require-await` errors on `src/` files.
+  Impact: one failed commit attempt and a mid-step pivot converting `describeBashPathGate`, `describeBashExternalDirectoryGate`, and (in step 3) `resolveBashCommandCheck` to synchronous, plus the handler's tool-gate producer.
+  No wasted code — the sync form is cleaner — but the misread cost a verification cycle and forced re-reasoning the plan deviation.
+  Self-corrected via the pre-commit hook (not user-caught).
+- `instruction-violation` — appended the TDD stage notes with a shell heredoc (`cat >> … << 'EOF'`), which `AGENTS.md` and the `markdown-conventions` skill forbid ("Author and append markdown with the `Write`/`Edit` tools, not shell heredocs").
+  The `tdd-plan` prompt does not list `markdown-conventions` in its "Load skills" step, so the rule was not in context when its "Write stage notes" step ran.
+  Impact: none this time — the content was one-sentence-per-line and `rumdl` passed — but heredocs do not interpolate `\uXXXX` escapes and make one-sentence-per-line slips easy.
+  Self-unidentified.
+- `other` (minor) — the first `find '308-*.md'` for the plan returned nothing because plan files are zero-padded (`0308-…`); recovered immediately with `grep -rl 'issue: 308'`.
+  A first `Edit` to `bash-path.test.ts` also failed because I guessed the trailing dash run of a `// ── tests ──` divider; re-anchored on the unique type block instead.
+  Impact: two extra tool round-trips, no rework.
+
+#### What caused friction (user side)
+
+- None — the user ran the three workflow stages (`/tdd-plan`, `/ship-issue`, `/retro`) back-to-back with no mid-stage correction; involvement was mechanical oversight, not strategic redirection.
+  Opportunity (not criticism): the plan's "stays `async`" note could have carried a "verify against `require-await` scope" caveat at plan time, which would have pre-empted the implementation pivot.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatch was the `pre-completion-reviewer` on `anthropic/claude-sonnet-4-6`, appropriate for judgment-heavy read-only code review; no mismatch.
+- **Feedback-loop gap analysis** — `pnpm run check` and the targeted `vitest` file ran after every step, and the full suite plus `fallow dead-code` (from the repo root) ran at the end; however, `pnpm run lint` was deferred to the pre-commit hook for steps 1–2, so the `require-await` violation surfaced at commit time rather than from a package-scoped `eslint .` after the step-2 interface change.
+  Step 3 then ran `lint` explicitly before committing.
+- **Escalation-delay tracking** — no `rabbit-hole`: the `require-await` failure was diagnosed in one grep and resolved in two edits; no sequence exceeded five tool calls on the same error.
+
+### Changes made
+
+1. `.pi/skills/code-design/SKILL.md` — added a Tooling rule: when lifting the only `await` out of a `src/` function, drop `async` and return synchronously, because `@typescript-eslint/require-await` is enabled for `src/` (disabled only for `test/`).
+2. `.pi/prompts/tdd-plan.md` — added a line to "Write stage notes": append with the `Edit`/`Write` tools, not a shell heredoc.
+3. `.pi/prompts/build-plan.md` — added the same "Write stage notes" reminder for parity with `tdd-plan`.
