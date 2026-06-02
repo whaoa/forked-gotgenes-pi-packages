@@ -24,3 +24,20 @@ The change is behavior-preserving — the existing `test/mcp-targets.test.ts` is
 - Grep confirmed no `src/`, `test/`, or skill file references the changed symbols beyond `input-normalizer` and the two test files; the architecture doc (Finding 4 / Step 5) is the only doc needing an update.
 - TDD order is 3 cycles: (1) `test:` add `McpTargetList` + tests, (2) `refactor:` rewrite dispatch, (3) `docs:` mark roadmap Step 5 done.
   Next step is `/tdd-plan`.
+
+## Stage: Implementation — TDD (2026-06-02T17:10:00Z)
+
+### Session summary
+
+Completed all 3 TDD cycles from the plan: (1) exported `McpTargetList` class with 6 focused unit tests, (2) rewrote `createMcpPermissionTargets`, `pushMcpToolPermissionTargets`, and `addDerivedMcpServerTargets` to construct and tell an `McpTargetList` instead of threading a `pushTarget` callback, (3) updated `docs/architecture/architecture.md` to mark Finding 4 and Step 5 as ✅ resolved.
+Test count rose from 1753 to 1759 (+6 new `McpTargetList` invariant tests).
+All deterministic checks (check, lint, test, fallow dead-code) passed throughout.
+
+### Observations
+
+- No deviations from the plan.
+  The two private helpers (`addDerivedMcpServerTargets`, `pushMcpToolPermissionTargets`) already accepted a `pushTarget` callback, making the swap to an injected `McpTargetList` mechanical — exactly as anticipated.
+- `toArray()` returning a defensive copy (`[...this.targets]`) was confirmed safe: the sole consumer (`input-normalizer.ts`) spreads the result, so the copy is behavior-invisible.
+- Pre-completion reviewer: **PASS**.
+  One WARN noted: the stepdown ordering in `src/mcp-targets.ts` has private helpers listed above the exported caller (`createMcpPermissionTargets`) — this is pre-existing (not introduced by this PR) and left for a future cleanup.
+- Next step is `/ship-issue #318`.
