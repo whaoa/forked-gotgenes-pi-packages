@@ -98,6 +98,7 @@ Skip a lens entirely when it finds nothing notable.
 ## Step 3 — Write the retro file
 
 Append (or create) `packages/<PKG>/docs/retro/NNNN-<slug>.md` with this structure.
+Author and append the retro file with the `Edit`/`Write` tools, not a shell heredoc.
 When creating a new file, include YAML frontmatter (see `AGENTS.md` § Documentation frontmatter):
 
 ```markdown

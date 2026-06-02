@@ -53,3 +53,58 @@ Pre-completion reviewer verdict: PASS (one non-blocking WARN).
 - Reviewer warnings: WARN — `bash-program.ts` is now ~975 lines and carries two descent strategies (base-threading `walkForCandidates` and flat `collectPathCandidateTokens`) that share leaf collectors; `collectPathCandidateTokens` is dual-used (subordinate helper inside leaf collectors AND the `default:` branch strategy).
   Accurate but mitigated by JSDoc; no structural change required.
   A future cleanup could fold substitution-internal scoping in and unify the two walks (the plan's Open Question convergence).
+
+## Stage: Final Retrospective (2026-06-02T00:00:00Z)
+
+### Session summary
+
+Across planning → TDD → ship, issue #307 landed in four commits and released as `pi-permission-system` `v9.2.0` via release-please PR #311.
+The plan's load-bearing insight — that the strict `classifyTokenAsPathCandidate` only resolves `..`-relative tokens against a base — made the TDD steps nearly surprise-free, and the plan's pre-authorized Open Question fallback let me defer substitution-internal `cd` folding without a new design question.
+CI passed on the first push; the only agent-side friction was a recurring heredoc slip and two trivial lint/portability nits, none causing rework.
+
+### Observations
+
+#### What went well
+
+- Planning pinned the true behavior surface, which front-loaded the surprises: because the strict classifier only resolves `..`-relative candidates against a base, almost every step-3 unknown-base test already passed under step-1 behavior, and only the within-cwd relative case (`cd "$DIR" && cat src/../within.txt`) genuinely needed the `unknown` variant.
+  A plan that identifies the real behavior surface shrinks the test surface and makes each Red predictable.
+- The plan's Open Question pre-authorized deferring substitution-internal `cd` folding; when implementation hit the leaf-collector-refactor cost, I took the documented fallback without re-asking.
+  Pre-deciding the fallback at plan time removed a mid-implementation decision boundary.
+- Verification ran incrementally throughout: `pnpm run check` plus the targeted `vitest` file after each step, then the full suite, `eslint`, and `pnpm fallow dead-code` (from the repo root) before each commit and again pre-push — no end-of-session verification pile-up.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` — appended the TDD stage notes with a shell heredoc (`cat >> … << 'EOF'`), which `AGENTS.md`, the `markdown-conventions` skill, AND `.pi/prompts/tdd-plan.md` line 165 all forbid.
+  Self-identified immediately after; verified the Unicode (em-dashes, `…`) rendered correctly, so zero rework.
+  Notable because the [#308] retro ADDED that exact `tdd-plan.md` line and it still did not prevent the slip — the reminder sits at the end of a long prompt and lost to heredoc habit.
+  The one multi-stage prompt that lacks the reminder is `.pi/prompts/retro.md`.
+- `other` (environment) — `git log | grep -oP` failed in the ship stage because macOS BSD `grep` lacks `-P`; recovered in one retry with `grep -Eo`.
+  Same friction the [#306] retro noted and explicitly rejected as a process change (environment-specific).
+  One round-trip, no rework.
+- `other` (mechanical) — two `@typescript-eslint/prefer-optional-chain` nits in step 1 (`next !== null && !next.isNamed`, `!child || !child.isNamed`), fixed with an early-return guard and `!child?.isNamed`.
+  Caught by package `eslint` before the commit; routine.
+
+#### What caused friction (user side)
+
+- None.
+  The user ran all four stages back-to-back with no strategic redirection; involvement was mechanical oversight plus the two planning `ask_user` design decisions (Tier 1 + Tier 2 scope; conservative unknown-base), both genuine owner-judgment calls posed at the right moment.
+
+#### Follow-up (not for this session)
+
+- The pre-completion reviewer's WARN stands as a real but substantive cleanup: `bash-program.ts` (~975 lines) carries two descent strategies sharing leaf collectors, with `collectPathCandidateTokens` dual-used.
+  Folding substitution-internal scoping in and unifying the two walks (the plan's Open Question convergence) is a multi-file refactor — worth its own issue and `/plan-issue`, not a retro-scoped edit.
+
+### Diagnostic details
+
+- **Escalation-delay tracking** — no `rabbit-hole`; every friction point resolved in ≤2 tool calls.
+- **Feedback-loop gap analysis** — no gap; verification ran after every step and fully before every commit and pre-push.
+- **Unused-tool detection** — no gap; `colgrep` was loaded but correctly unused — every search was exact-symbol (`leadingCdTarget`, `externalPaths`, `rawTokens`), so `grep` was the right tool.
+- **Model-performance correlation** — the only subagent dispatch was the `pre-completion-reviewer` on judgment-heavy read-only review; it returned a thorough PASS with one accurate WARN, an appropriate match.
+  No quality mismatch surfaced from the parent-session model switches.
+
+### Changes made
+
+1. `.pi/prompts/retro.md` — added a one-line reminder to Step 3 ("Author and append the retro file with the `Edit`/`Write` tools, not a shell heredoc"), for parity with `.pi/prompts/tdd-plan.md` and `.pi/prompts/build-plan.md`, closing the one multi-stage prompt that lacked it.
+2. `packages/pi-permission-system/docs/retro/0307-effective-working-directory-projection.md` — appended this Final Retrospective stage entry.
+   Candidates considered and rejected: a BSD `grep -P` portability note (already rejected in the [#306] retro as environment-specific), a `prefer-optional-chain` rule (routine lint), and escalating the heredoc rule in `AGENTS.md`/the `markdown-conventions` skill (already present in three places — the gap was `retro.md` only).
+   The walk-unification cleanup (reviewer WARN) is recorded above as a follow-up for its own issue, not a retro edit.
