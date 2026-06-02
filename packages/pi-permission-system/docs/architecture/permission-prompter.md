@@ -11,11 +11,11 @@
 3. **UI prompt broadcast** — build the `PermissionUiPromptEvent` once via `buildDirectUiPrompt(details)`.
    When `ctx.hasUI`, emit it on `permissions:ui_prompt` so observers (e.g. notification extensions) know the user must respond.
    A non-UI session does not emit here — the parent emits from the forwarded path instead.
-4. **UI/forwarding branch** — delegate to `confirmPermission()` in `forwarded-permissions/polling.ts`, which selects the correct path:
-   - `ctx.hasUI` → show the interactive dialog via `requestPermissionDecisionFromUi`.
+4. **UI/forwarding branch** — delegate to `forwarder.requestApproval()`, which selects the correct path:
+   - `ctx.hasUI` → show the interactive dialog.
    - subagent context → write a forwarded-permission request file (carrying the relayed display fields) and poll for the parent session's response.
    - neither → deny immediately.
-   The prompter relays the built event's `source`/`surface`/`value` to `confirmPermission` so a forwarded request persists them and the parent emits a non-degraded event.
+   The prompter relays the built event's `source`/`surface`/`value` to `requestApproval` so a forwarded request persists them and the parent emits a non-degraded event.
 5. **Review log — outcome** — write `permission_request.approved` or `permission_request.denied` with the final decision state and any denial reason.
 
 ## Why a class instead of a free function
@@ -40,27 +40,38 @@ interface PermissionPrompterApi {
 interface PermissionPrompterDeps {
   getConfig(): PermissionSystemExtensionConfig;  // yolo-mode check
   writeReviewLog(event: string, details: Record<string, unknown>): void;
-  subagentSessionsDir: string;                   // forwarding path detection
-  forwardingDir: string;                         // forwarded-request files
-  events: PermissionEventBus;                     // permissions:ui_prompt broadcast
-  registry?: SubagentSessionRegistry;             // subagent detection + target resolution
-  requestPermissionDecisionFromUi(...): Promise<PermissionPromptDecision>;
+  events: PermissionEventBus;                    // permissions:ui_prompt broadcast
+  forwarder: ApprovalRequester;                  // UI dialog or subagent forwarding
 }
 ```
 
-## Relationship to PermissionForwardingDeps
+`ApprovalRequester` is the narrow seam defined in `src/forwarded-permissions/permission-forwarder.ts`:
 
-`PermissionPrompter` constructs a `PermissionForwardingDeps` internally when calling `confirmPermission()`.
-The `shouldAutoApprove` field in that internal object always returns `false` — yolo-mode is already handled at the prompter level before `confirmPermission` is ever reached.
+```typescript
+interface ApprovalRequester {
+  requestApproval(
+    ctx: ExtensionContext,
+    message: string,
+    options?: RequestPermissionOptions,
+    forwarded?: ForwardedPromptDisplay,
+  ): Promise<PermissionPromptDecision>;
+}
+```
 
-The separate `forwardingDeps` object in `index.ts` (used by `startForwardedPermissionPolling`) is independent: it carries its own `shouldAutoApprove` for the parent-session flow that processes requests forwarded from subagents.
+## Relationship to the forwarder
+
+`PermissionPrompter` delegates the UI/forwarding decision to the injected `ApprovalRequester`.
+It never constructs a `PermissionForwardingDeps` bag internally — the single `PermissionForwarder` instance (constructed in `index.ts`) is shared between the prompter and `ForwardingManager`.
+
+Yolo-mode is handled at the prompter level before `requestApproval` is ever reached, so the forwarder always operates in the "ask the user" path when reached from the prompter.
 
 ## Wiring
 
-`PermissionPrompter` is instantiated once in `piPermissionSystemExtension()` (`src/index.ts`) and injected into `PermissionSessionRuntimeDeps.promptPermission`:
+`PermissionPrompter` is instantiated once in `piPermissionSystemExtension()` (`src/index.ts`) after the `PermissionForwarder`, and injected into `PermissionSessionRuntimeDeps.promptPermission`:
 
 ```typescript
-const prompter = new PermissionPrompter({ … });
+const forwarder = new PermissionForwarder(forwardingDeps);
+const prompter = new PermissionPrompter({ …, forwarder });
 // …
 promptPermission: (ctx, details) => prompter.prompt(ctx, details),
 ```

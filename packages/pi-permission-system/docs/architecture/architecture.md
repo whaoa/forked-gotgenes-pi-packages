@@ -803,11 +803,11 @@ The headline findings are coupling smells (Category C) — anemic behavior, muta
    - Outcome: one forwarder instance replaces the threaded `index.ts` forwarding bag; `ForwardingManager` tells the forwarder instead of threading a deps bag.
      The bag interface itself is dismantled in [#317].
 
-3. **Fold `PermissionPrompter.buildForwardingDeps()` into the injected forwarder** ([#316])
-   - Target: `src/permission-prompter.ts`; `index.ts` (sequence after Step 2).
-   - Inject the `PermissionForwarder` (via a narrow `ApprovalRequester` interface exposing only `requestApproval`) into `PermissionPrompter`; delete `buildForwardingDeps()`, the second `PermissionForwardingDeps` synthesis, and its `eslint-disable unbound-method` cluster.
+3. ✅ **Fold `PermissionPrompter.buildForwardingDeps()` into the injected forwarder** ([#316])
+   - Target: `src/permission-prompter.ts`; `src/forwarded-permissions/permission-forwarder.ts`; `index.ts`.
+   - Added the `ApprovalRequester` narrow seam (alongside `InboxProcessor`) to `permission-forwarder.ts`; narrowed `PermissionPrompterDeps` from 7 fields to 4 (removing `subagentSessionsDir`, `forwardingDir`, `registry`, `requestPermissionDecisionFromUi`); replaced the `confirmPermission(…, this.buildForwardingDeps(), …)` call with `this.deps.forwarder.requestApproval(…)` and deleted `buildForwardingDeps()` and its `eslint-disable unbound-method` cluster; reordered `index.ts` to construct the single forwarder before the prompter and inject it.
    - Smell category: C (relay-only deps / duplicated bag construction).
-   - Outcome: the forwarding dependency set is constructed exactly once; the prompter depends on a one-method interface instead of re-deriving a bag.
+   - Outcome: the forwarding dependency set is constructed exactly once; the prompter depends on a one-method interface instead of re-deriving a bag; `PermissionForwardingDeps` bag is dismantled in [#317].
 
 4. **Remove `PermissionForwardingDeps`; inline the polling logic as forwarder methods** ([#317])
    - Target: `src/forwarded-permissions/polling.ts` → `permission-forwarder.ts` (sequence after Steps 2–3).
