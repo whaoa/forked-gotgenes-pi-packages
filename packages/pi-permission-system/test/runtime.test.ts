@@ -49,10 +49,6 @@ vi.mock("../src/config-reporter", () => ({
   buildResolvedConfigLogEntry: mockBuildResolvedConfigLogEntry,
 }));
 
-vi.mock("../src/forwarded-permissions/polling", () => ({
-  processForwardedPermissionRequests: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock("../src/subagent-context", () => ({
   isSubagentExecutionContext: vi.fn().mockReturnValue(false),
 }));

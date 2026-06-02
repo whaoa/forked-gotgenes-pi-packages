@@ -1,109 +1,295 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { PermissionForwarder } from "#src/forwarded-permissions/permission-forwarder";
-import type { PermissionForwardingDeps } from "#src/forwarded-permissions/polling";
-import type {
-  PermissionPromptDecision,
-  RequestPermissionOptions,
-} from "#src/permission-dialog";
-import type { ForwardedPromptDisplay } from "#src/permission-forwarding";
-
-// ── Mocks ─────────────────────────────────────────────────────────────────
-
-const mockConfirmPermission = vi.hoisted(() => vi.fn());
-const mockProcessForwardedPermissionRequests = vi.hoisted(() => vi.fn());
-
-vi.mock("#src/forwarded-permissions/polling", () => ({
-  confirmPermission: mockConfirmPermission,
-  processForwardedPermissionRequests: mockProcessForwardedPermissionRequests,
-}));
+import {
+  PermissionForwarder,
+  type PermissionForwarderDeps,
+} from "#src/forwarded-permissions/permission-forwarder";
+import { createPermissionForwardingLocation } from "#src/permission-forwarding";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function makeCtx(): ExtensionContext {
-  return {} as unknown as ExtensionContext;
+function makeDeps(
+  overrides: Partial<PermissionForwarderDeps> = {},
+): PermissionForwarderDeps {
+  return {
+    forwardingDir: "/tmp/forwarding",
+    subagentSessionsDir: "/tmp/subagents",
+    logger: { writeReviewLog: vi.fn(), writeDebugLog: vi.fn() },
+    writeReviewLog: vi.fn(),
+    requestPermissionDecisionFromUi: vi
+      .fn()
+      .mockResolvedValue({ approved: true, state: "approved" as const }),
+    shouldAutoApprove: () => false,
+    ...overrides,
+  };
 }
 
-// The forwarder never reads the bag — it stores it and passes it straight to
-// the polling functions — so a sentinel is sufficient to assert identity.
-const deps = { sentinel: "deps" } as unknown as PermissionForwardingDeps;
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
-// ── Tests ─────────────────────────────────────────────────────────────────
+// ── requestApproval ───────────────────────────────────────────────────────
 
-describe("PermissionForwarder", () => {
-  beforeEach(() => {
-    mockConfirmPermission.mockReset();
-    mockProcessForwardedPermissionRequests.mockReset();
+describe("requestApproval — UI fast path", () => {
+  test("calls requestPermissionDecisionFromUi but does not emit a UI prompt event (the prompter does)", async () => {
+    const events = {
+      emit: vi.fn(),
+      on: vi.fn().mockReturnValue(() => undefined),
+    };
+    const requestPermissionDecisionFromUi = vi
+      .fn()
+      .mockResolvedValue({ approved: true, state: "approved" as const });
+
+    const forwarder = new PermissionForwarder(
+      makeDeps({ events, requestPermissionDecisionFromUi }),
+    );
+
+    await forwarder.requestApproval(
+      {
+        hasUI: true,
+        ui: { select: vi.fn(), input: vi.fn() },
+      } as unknown as ExtensionContext,
+      "Allow git push?",
+    );
+
+    expect(requestPermissionDecisionFromUi).toHaveBeenCalled();
+    expect(events.emit).not.toHaveBeenCalledWith(
+      "permissions:ui_prompt",
+      expect.anything(),
+    );
+  });
+});
+
+describe("requestApproval — non-UI, non-subagent path", () => {
+  test("returns denied without showing a dialog or emitting when there is no active UI", async () => {
+    const events = {
+      emit: vi.fn(),
+      on: vi.fn().mockReturnValue(() => undefined),
+    };
+    const requestPermissionDecisionFromUi = vi.fn();
+
+    const forwarder = new PermissionForwarder(
+      makeDeps({ events, requestPermissionDecisionFromUi }),
+    );
+
+    const result = await forwarder.requestApproval(
+      {
+        hasUI: false,
+        sessionManager: {
+          getSessionDir: vi.fn().mockReturnValue(null),
+        },
+      } as unknown as ExtensionContext,
+      "Allow git push?",
+    );
+
+    expect(result).toEqual({ approved: false, state: "denied" });
+    expect(events.emit).not.toHaveBeenCalledWith(
+      "permissions:ui_prompt",
+      expect.anything(),
+    );
+    expect(requestPermissionDecisionFromUi).not.toHaveBeenCalled();
+  });
+});
+
+// ── processInbox ──────────────────────────────────────────────────────────
+
+describe("processInbox", () => {
+  test("emits a UI prompt event before showing a forwarded permission dialog", async () => {
+    const root = mkdtempSync(join(tmpdir(), "permission-forwarding-"));
+    try {
+      const forwardingDir = join(root, "forwarding");
+      const location = createPermissionForwardingLocation(
+        forwardingDir,
+        "parent-session",
+      );
+      mkdirSync(location.requestsDir, { recursive: true });
+      mkdirSync(location.responsesDir, { recursive: true });
+      writeFileSync(
+        join(location.requestsDir, "req-forwarded.json"),
+        JSON.stringify({
+          id: "req-forwarded",
+          createdAt: Date.now(),
+          requesterSessionId: "child-session",
+          targetSessionId: "parent-session",
+          requesterAgentName: "Explore",
+          message: "Allow git push?",
+        }),
+        "utf-8",
+      );
+
+      const events = {
+        emit: vi.fn(),
+        on: vi.fn().mockReturnValue(() => undefined),
+      };
+      const requestPermissionDecisionFromUi = vi
+        .fn()
+        .mockResolvedValue({ approved: true, state: "approved" as const });
+
+      const forwarder = new PermissionForwarder(
+        makeDeps({
+          forwardingDir,
+          events,
+          requestPermissionDecisionFromUi,
+        }),
+      );
+
+      await forwarder.processInbox({
+        hasUI: true,
+        ui: { select: vi.fn(), input: vi.fn() },
+        sessionManager: {
+          getSessionId: vi.fn().mockReturnValue("parent-session"),
+        },
+      } as unknown as ExtensionContext);
+
+      expect(events.emit).toHaveBeenCalledWith(
+        "permissions:ui_prompt",
+        expect.objectContaining({
+          requestId: "req-forwarded",
+          source: "tool_call",
+          surface: null,
+          value: null,
+          agentName: "Explore",
+          message: expect.stringContaining("Allow git push?"),
+          forwarding: {
+            requesterAgentName: "Explore",
+            requesterSessionId: "child-session",
+          },
+        }),
+      );
+      expect(requestPermissionDecisionFromUi).toHaveBeenCalled();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
-  describe("requestApproval", () => {
-    it("delegates to confirmPermission with the stored deps and returns its result", async () => {
-      const decision: PermissionPromptDecision = {
-        approved: true,
-        state: "approved",
-      };
-      mockConfirmPermission.mockResolvedValue(decision);
-      const ctx = makeCtx();
-      const options: RequestPermissionOptions = {
-        sessionLabel: "for this session",
-      };
-      const forwarded: ForwardedPromptDisplay = {
-        source: "tool_call",
-        surface: "bash",
-        value: "ls",
-      };
-
-      const forwarder = new PermissionForwarder(deps);
-      const result = await forwarder.requestApproval(
-        ctx,
-        "needs approval",
-        options,
-        forwarded,
+  test("emits a non-degraded UI prompt event when the request carries display fields", async () => {
+    const root = mkdtempSync(join(tmpdir(), "permission-forwarding-"));
+    try {
+      const forwardingDir = join(root, "forwarding");
+      const location = createPermissionForwardingLocation(
+        forwardingDir,
+        "parent-session",
+      );
+      mkdirSync(location.requestsDir, { recursive: true });
+      mkdirSync(location.responsesDir, { recursive: true });
+      writeFileSync(
+        join(location.requestsDir, "req-forwarded-rich.json"),
+        JSON.stringify({
+          id: "req-forwarded-rich",
+          createdAt: Date.now(),
+          requesterSessionId: "child-session",
+          targetSessionId: "parent-session",
+          requesterAgentName: "Explore",
+          message: "Allow git push?",
+          source: "tool_call",
+          surface: "bash",
+          value: "git push",
+        }),
+        "utf-8",
       );
 
-      expect(mockConfirmPermission).toHaveBeenCalledWith(
-        ctx,
-        "needs approval",
-        deps,
-        options,
-        forwarded,
+      const events = {
+        emit: vi.fn(),
+        on: vi.fn().mockReturnValue(() => undefined),
+      };
+      const requestPermissionDecisionFromUi = vi
+        .fn()
+        .mockResolvedValue({ approved: true, state: "approved" as const });
+
+      const forwarder = new PermissionForwarder(
+        makeDeps({
+          forwardingDir,
+          events,
+          requestPermissionDecisionFromUi,
+        }),
       );
-      expect(result).toBe(decision);
-    });
 
-    it("forwards undefined options and forwarded when omitted", async () => {
-      mockConfirmPermission.mockResolvedValue({
-        approved: false,
-        state: "denied",
-      });
-      const ctx = makeCtx();
+      await forwarder.processInbox({
+        hasUI: true,
+        ui: { select: vi.fn(), input: vi.fn() },
+        sessionManager: {
+          getSessionId: vi.fn().mockReturnValue("parent-session"),
+        },
+      } as unknown as ExtensionContext);
 
-      const forwarder = new PermissionForwarder(deps);
-      await forwarder.requestApproval(ctx, "needs approval");
-
-      expect(mockConfirmPermission).toHaveBeenCalledWith(
-        ctx,
-        "needs approval",
-        deps,
-        undefined,
-        undefined,
+      expect(events.emit).toHaveBeenCalledWith(
+        "permissions:ui_prompt",
+        expect.objectContaining({
+          requestId: "req-forwarded-rich",
+          source: "tool_call",
+          surface: "bash",
+          value: "git push",
+          agentName: "Explore",
+          message: expect.stringContaining("Allow git push?"),
+          forwarding: {
+            requesterAgentName: "Explore",
+            requesterSessionId: "child-session",
+          },
+        }),
       );
-    });
+      expect(requestPermissionDecisionFromUi).toHaveBeenCalled();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
-  describe("processInbox", () => {
-    it("delegates to processForwardedPermissionRequests with the stored deps", async () => {
-      mockProcessForwardedPermissionRequests.mockResolvedValue(undefined);
-      const ctx = makeCtx();
-
-      const forwarder = new PermissionForwarder(deps);
-      await forwarder.processInbox(ctx);
-
-      expect(mockProcessForwardedPermissionRequests).toHaveBeenCalledWith(
-        ctx,
-        deps,
+  test("does not emit a UI prompt event when forwarded permission auto-approves", async () => {
+    const root = mkdtempSync(join(tmpdir(), "permission-forwarding-"));
+    try {
+      const forwardingDir = join(root, "forwarding");
+      const location = createPermissionForwardingLocation(
+        forwardingDir,
+        "parent-session",
       );
-    });
+      mkdirSync(location.requestsDir, { recursive: true });
+      mkdirSync(location.responsesDir, { recursive: true });
+      writeFileSync(
+        join(location.requestsDir, "req-forwarded-auto.json"),
+        JSON.stringify({
+          id: "req-forwarded-auto",
+          createdAt: Date.now(),
+          requesterSessionId: "child-session",
+          targetSessionId: "parent-session",
+          requesterAgentName: "Explore",
+          message: "Allow git push?",
+        }),
+        "utf-8",
+      );
+
+      const events = {
+        emit: vi.fn(),
+        on: vi.fn().mockReturnValue(() => undefined),
+      };
+      const requestPermissionDecisionFromUi = vi.fn();
+
+      const forwarder = new PermissionForwarder(
+        makeDeps({
+          forwardingDir,
+          events,
+          requestPermissionDecisionFromUi,
+          shouldAutoApprove: () => true,
+        }),
+      );
+
+      await forwarder.processInbox({
+        hasUI: true,
+        ui: { select: vi.fn(), input: vi.fn() },
+        sessionManager: {
+          getSessionId: vi.fn().mockReturnValue("parent-session"),
+        },
+      } as unknown as ExtensionContext);
+
+      expect(events.emit).not.toHaveBeenCalledWith(
+        "permissions:ui_prompt",
+        expect.anything(),
+      );
+      expect(requestPermissionDecisionFromUi).not.toHaveBeenCalled();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

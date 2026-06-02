@@ -5,8 +5,10 @@ import type {
 import { registerBuiltinToolInputFormatters } from "./builtin-tool-input-formatters";
 import { registerPermissionSystemCommand } from "./config-modal";
 import { getGlobalConfigPath } from "./config-paths";
-import { PermissionForwarder } from "./forwarded-permissions/permission-forwarder";
-import type { PermissionForwardingDeps } from "./forwarded-permissions/polling";
+import {
+  PermissionForwarder,
+  type PermissionForwarderDeps,
+} from "./forwarded-permissions/permission-forwarder";
 import { ForwardingManager } from "./forwarding-manager";
 import {
   AgentPrepHandler,
@@ -49,7 +51,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const formatterRegistry = new ToolInputFormatterRegistry();
   registerBuiltinToolInputFormatters(formatterRegistry);
 
-  const forwardingDeps: PermissionForwardingDeps = {
+  const forwardingDeps: PermissionForwarderDeps = {
     forwardingDir: runtime.forwardingDir,
     subagentSessionsDir: runtime.subagentSessionsDir,
     registry: subagentRegistry,
