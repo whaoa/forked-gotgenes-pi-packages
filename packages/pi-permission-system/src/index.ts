@@ -5,6 +5,7 @@ import type {
 import { registerBuiltinToolInputFormatters } from "./builtin-tool-input-formatters";
 import { registerPermissionSystemCommand } from "./config-modal";
 import { getGlobalConfigPath } from "./config-paths";
+import { PermissionForwarder } from "./forwarded-permissions/permission-forwarder";
 import type { PermissionForwardingDeps } from "./forwarded-permissions/polling";
 import { ForwardingManager } from "./forwarding-manager";
 import {
@@ -72,6 +73,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     shouldAutoApprove: () =>
       shouldAutoApprovePermissionState("ask", runtime.config),
   };
+  const forwarder = new PermissionForwarder(forwardingDeps);
 
   refreshExtensionConfig(runtime);
 
@@ -80,7 +82,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     createSessionLogger(runtime),
     new ForwardingManager(
       runtime.subagentSessionsDir,
-      forwardingDeps,
+      forwarder,
       subagentRegistry,
     ),
     {

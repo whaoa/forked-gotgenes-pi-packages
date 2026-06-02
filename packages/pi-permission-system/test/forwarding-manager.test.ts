@@ -4,12 +4,10 @@ import { ForwardingManager } from "#src/forwarding-manager";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
 
-const mockProcessForwardedPermissionRequests = vi.hoisted(() => vi.fn());
+const mockProcessInbox = vi.hoisted(() =>
+  vi.fn((): Promise<void> => Promise.resolve()),
+);
 const mockIsSubagentExecutionContext = vi.hoisted(() => vi.fn());
-
-vi.mock("../src/forwarded-permissions/polling", () => ({
-  processForwardedPermissionRequests: mockProcessForwardedPermissionRequests,
-}));
 
 vi.mock("../src/subagent-context", () => ({
   isSubagentExecutionContext: mockIsSubagentExecutionContext,
@@ -27,22 +25,12 @@ function makeCtx(overrides: { hasUI?: boolean; sessionId?: string } = {}) {
   } as unknown as import("@earendil-works/pi-coding-agent").ExtensionContext;
 }
 
-function makeForwardingDeps() {
-  return {
-    forwardingDir: "/agent/sessions/permission-forwarding",
-    subagentSessionsDir: "/agent/subagent-sessions",
-    logger: { writeReviewLog: vi.fn(), writeDebugLog: vi.fn() },
-    writeReviewLog: vi.fn(),
-    requestPermissionDecisionFromUi: vi.fn(),
-    shouldAutoApprove: vi.fn().mockReturnValue(false),
-  } as unknown as import("../src/forwarded-permissions/polling").PermissionForwardingDeps;
+function makeForwarder() {
+  return { processInbox: mockProcessInbox };
 }
 
 function makeManager() {
-  return new ForwardingManager(
-    "/agent/subagent-sessions",
-    makeForwardingDeps(),
-  );
+  return new ForwardingManager("/agent/subagent-sessions", makeForwarder());
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -52,8 +40,8 @@ describe("ForwardingManager", () => {
     vi.useFakeTimers();
     mockIsSubagentExecutionContext.mockReset();
     mockIsSubagentExecutionContext.mockReturnValue(false);
-    mockProcessForwardedPermissionRequests.mockReset();
-    mockProcessForwardedPermissionRequests.mockResolvedValue(undefined);
+    mockProcessInbox.mockReset();
+    mockProcessInbox.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -73,9 +61,9 @@ describe("ForwardingManager", () => {
       manager.stop();
 
       // After stop, the timer fires no more callbacks.
-      mockProcessForwardedPermissionRequests.mockClear();
+      mockProcessInbox.mockClear();
       await vi.advanceTimersByTimeAsync(500);
-      expect(mockProcessForwardedPermissionRequests).not.toHaveBeenCalled();
+      expect(mockProcessInbox).not.toHaveBeenCalled();
     });
   });
 
@@ -86,7 +74,7 @@ describe("ForwardingManager", () => {
       manager.start(ctx);
 
       await vi.advanceTimersByTimeAsync(500);
-      expect(mockProcessForwardedPermissionRequests).not.toHaveBeenCalled();
+      expect(mockProcessInbox).not.toHaveBeenCalled();
     });
 
     it("stops any existing poll and does not start a new one when hasUI is false", async () => {
@@ -98,9 +86,9 @@ describe("ForwardingManager", () => {
       // Now stop the polling by calling start() with no-UI ctx.
       manager.start(noUiCtx);
 
-      mockProcessForwardedPermissionRequests.mockClear();
+      mockProcessInbox.mockClear();
       await vi.advanceTimersByTimeAsync(500);
-      expect(mockProcessForwardedPermissionRequests).not.toHaveBeenCalled();
+      expect(mockProcessInbox).not.toHaveBeenCalled();
     });
 
     it("does not start polling when isSubagentExecutionContext returns true", async () => {
@@ -110,7 +98,7 @@ describe("ForwardingManager", () => {
       manager.start(ctx);
 
       await vi.advanceTimersByTimeAsync(500);
-      expect(mockProcessForwardedPermissionRequests).not.toHaveBeenCalled();
+      expect(mockProcessInbox).not.toHaveBeenCalled();
     });
 
     it("stops any existing poll when called with a subagent context", async () => {
@@ -124,21 +112,18 @@ describe("ForwardingManager", () => {
       const ctx2 = makeCtx();
       manager.start(ctx2);
 
-      mockProcessForwardedPermissionRequests.mockClear();
+      mockProcessInbox.mockClear();
       await vi.advanceTimersByTimeAsync(500);
-      expect(mockProcessForwardedPermissionRequests).not.toHaveBeenCalled();
+      expect(mockProcessInbox).not.toHaveBeenCalled();
     });
 
-    it("starts polling and calls processForwardedPermissionRequests on tick", async () => {
+    it("starts polling and calls processInbox on tick", async () => {
       const manager = makeManager();
       const ctx = makeCtx();
       manager.start(ctx);
 
       await vi.advanceTimersByTimeAsync(250);
-      expect(mockProcessForwardedPermissionRequests).toHaveBeenCalledWith(
-        ctx,
-        expect.anything(),
-      );
+      expect(mockProcessInbox).toHaveBeenCalledWith(ctx);
     });
 
     it("is idempotent — calling start() twice does not create a second timer", async () => {
@@ -149,7 +134,7 @@ describe("ForwardingManager", () => {
 
       await vi.advanceTimersByTimeAsync(250);
       // Only one tick should fire per interval, not two.
-      expect(mockProcessForwardedPermissionRequests).toHaveBeenCalledTimes(1);
+      expect(mockProcessInbox).toHaveBeenCalledTimes(1);
     });
 
     it("updates the context when called again while already running", async () => {
@@ -161,16 +146,13 @@ describe("ForwardingManager", () => {
 
       await vi.advanceTimersByTimeAsync(250);
       // The process call should use the newer context.
-      expect(mockProcessForwardedPermissionRequests).toHaveBeenCalledWith(
-        ctx2,
-        expect.anything(),
-      );
+      expect(mockProcessInbox).toHaveBeenCalledWith(ctx2);
     });
 
     it("skips a tick while processing is in progress", async () => {
-      // Make processForwardedPermissionRequests hang so processing=true persists.
+      // Make processInbox hang so processing=true persists.
       let resolveProcess: () => void;
-      mockProcessForwardedPermissionRequests.mockReturnValue(
+      mockProcessInbox.mockReturnValue(
         new Promise<void>((resolve) => {
           resolveProcess = resolve;
         }),
@@ -182,22 +164,22 @@ describe("ForwardingManager", () => {
 
       // First tick starts processing.
       await vi.advanceTimersByTimeAsync(250);
-      expect(mockProcessForwardedPermissionRequests).toHaveBeenCalledTimes(1);
+      expect(mockProcessInbox).toHaveBeenCalledTimes(1);
 
       // Second tick is skipped because processing flag is still true.
       await vi.advanceTimersByTimeAsync(250);
-      expect(mockProcessForwardedPermissionRequests).toHaveBeenCalledTimes(1);
+      expect(mockProcessInbox).toHaveBeenCalledTimes(1);
 
       // Resolve and a third tick should fire.
       resolveProcess!();
       await vi.advanceTimersByTimeAsync(250);
-      expect(mockProcessForwardedPermissionRequests).toHaveBeenCalledTimes(2);
+      expect(mockProcessInbox).toHaveBeenCalledTimes(2);
     });
 
     it("passes subagentSessionsDir from the constructor to isSubagentExecutionContext", () => {
       const manager = new ForwardingManager(
         "/custom/subagent-dir",
-        makeForwardingDeps(),
+        makeForwarder(),
       );
       const ctx = makeCtx();
       manager.start(ctx);

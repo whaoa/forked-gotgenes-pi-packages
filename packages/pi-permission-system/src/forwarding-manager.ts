@@ -1,7 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import type { PermissionForwardingDeps } from "./forwarded-permissions/polling";
-import { processForwardedPermissionRequests } from "./forwarded-permissions/polling";
+import type { InboxProcessor } from "./forwarded-permissions/permission-forwarder";
 import { PERMISSION_FORWARDING_POLL_INTERVAL_MS } from "./permission-forwarding";
 import { isSubagentExecutionContext } from "./subagent-context";
 import type { SubagentSessionRegistry } from "./subagent-registry";
@@ -30,7 +29,7 @@ export class ForwardingManager {
 
   constructor(
     private readonly subagentSessionsDir: string,
-    private readonly forwardingDeps: PermissionForwardingDeps,
+    private readonly forwarder: InboxProcessor,
     private readonly registry?: SubagentSessionRegistry,
   ) {}
 
@@ -57,10 +56,7 @@ export class ForwardingManager {
         return;
       }
       this.processing = true;
-      void processForwardedPermissionRequests(
-        this.context,
-        this.forwardingDeps,
-      ).finally(() => {
+      void this.forwarder.processInbox(this.context).finally(() => {
         this.processing = false;
       });
     }, PERMISSION_FORWARDING_POLL_INTERVAL_MS);
