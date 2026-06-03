@@ -45,6 +45,11 @@ export type DenialContext =
       skillName: string;
       readPath: string;
       agentName?: string;
+    }
+  | {
+      kind: "skill_input";
+      skillName: string;
+      agentName?: string;
     };
 
 // ── Public formatter API ───────────────────────────────────────────────────
@@ -91,6 +96,8 @@ function buildDenyBody(ctx: DenialContext): string {
       return `${subject(ctx.agentName)} is not permitted to access path '${ctx.pathValue}' via tool 'bash'.`;
     case "skill_read":
       return `${subject(ctx.agentName)} is not permitted to access skill '${ctx.skillName}' via '${ctx.readPath}'.`;
+    case "skill_input":
+      return `${subject(ctx.agentName)} is not permitted to access skill '${ctx.skillName}'.`;
   }
 }
 
@@ -184,6 +191,8 @@ function buildUnavailableBody(ctx: DenialContext): string {
       return `Bash command '${ctx.command}' accesses path '${ctx.pathValue}' which requires approval, but no interactive UI is available.`;
     case "skill_read":
       return `Accessing skill '${ctx.skillName}' requires approval, but no interactive UI is available.`;
+    case "skill_input":
+      return `Accessing skill '${ctx.skillName}' requires approval, but no interactive UI is available.`;
   }
 }
 
@@ -211,6 +220,8 @@ function buildUserDeniedBody(
     case "bash_path":
       return `User denied path access for bash command '${ctx.command}' (path '${ctx.pathValue}').${reasonSuffix(denialReason)}`;
     case "skill_read":
+      return `User denied access to skill '${ctx.skillName}'.${reasonSuffix(denialReason)}`;
+    case "skill_input":
       return `User denied access to skill '${ctx.skillName}'.${reasonSuffix(denialReason)}`;
   }
 }
