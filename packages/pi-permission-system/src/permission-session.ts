@@ -7,6 +7,7 @@ import {
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ExtensionPaths } from "./extension-paths";
 import type { ForwardingController } from "./forwarding-manager";
+import type { GatePrompter } from "./gate-prompter";
 import type { PermissionPromptDecision } from "./permission-dialog";
 import type { PermissionManager } from "./permission-manager";
 import type { PromptPermissionDetails } from "./permission-prompter";
@@ -14,6 +15,7 @@ import type { PermissionResolver } from "./permission-resolver";
 import type { Rule } from "./rule";
 import { createPermissionManagerForCwd } from "./runtime";
 import type { SessionApproval } from "./session-approval";
+import type { SessionApprovalRecorder } from "./session-approval-recorder";
 import type { SessionLogger } from "./session-logger";
 import { SessionRules } from "./session-rules";
 import type { SkillPromptEntry } from "./skill-prompt-sanitizer";
@@ -55,7 +57,9 @@ export interface PermissionSessionRuntimeDeps {
  * - `ForwardingController` — polling lifecycle
  * - `PermissionSessionRuntimeDeps` — config refresh + log delegates
  */
-export class PermissionSession implements PermissionResolver {
+export class PermissionSession
+  implements PermissionResolver, SessionApprovalRecorder, GatePrompter
+{
   private context: ExtensionContext | null = null;
   private permissionManager: PermissionManager;
   private readonly sessionRules = new SessionRules();
@@ -292,6 +296,31 @@ export class PermissionSession implements PermissionResolver {
     details: PromptPermissionDetails,
   ): Promise<PermissionPromptDecision> {
     return this.runtimeDeps.promptPermission(ctx, details);
+  }
+
+  /**
+   * Whether an interactive confirmation is possible using the stored context.
+   * Returns `false` when no context is active (before `activate` is called).
+   * Implements {@link GatePrompter}.
+   */
+  canConfirm(): boolean {
+    return this.context !== null && this.canPrompt(this.context);
+  }
+
+  /**
+   * Prompt the user for a permission decision using the stored context.
+   * Throws if no context is active — `canConfirm()` guards this in normal use.
+   * Implements {@link GatePrompter}.
+   */
+  promptPermission(
+    details: PromptPermissionDetails,
+  ): Promise<PermissionPromptDecision> {
+    if (this.context === null) {
+      return Promise.reject(
+        new Error("promptPermission called before the session was activated"),
+      );
+    }
+    return this.prompt(this.context, details);
   }
 
   /** Generate a unique ID for a permission request. */

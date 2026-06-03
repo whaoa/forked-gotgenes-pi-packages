@@ -605,6 +605,62 @@ describe("PermissionSession", () => {
     });
   });
 
+  describe("canConfirm", () => {
+    it("returns true when context is active and canPrompt returns true", () => {
+      const { session } = createSession();
+      session.activate(makeCtx());
+      expect(session.canConfirm()).toBe(true);
+    });
+
+    it("returns false when no context is active", () => {
+      const { session } = createSession();
+      expect(session.canConfirm()).toBe(false);
+    });
+
+    it("returns false when canPrompt returns false", () => {
+      const runtimeDeps = makeRuntimeDeps();
+      (
+        runtimeDeps.canRequestPermissionConfirmation as ReturnType<typeof vi.fn>
+      ).mockReturnValue(false);
+      const { session } = createSession({ runtimeDeps });
+      session.activate(makeCtx());
+      expect(session.canConfirm()).toBe(false);
+    });
+  });
+
+  describe("promptPermission", () => {
+    it("delegates to prompt with stored context", async () => {
+      const { session, runtimeDeps } = createSession();
+      const ctx = makeCtx();
+      session.activate(ctx);
+      const details = {
+        requestId: "req-1",
+        source: "tool_call" as const,
+        agentName: null,
+        message: "Allow?",
+      };
+
+      const result = await session.promptPermission(details);
+
+      expect(runtimeDeps.promptPermission).toHaveBeenCalledWith(ctx, details);
+      expect(result).toEqual({ approved: true, state: "approved" });
+    });
+
+    it("throws when no context is active", async () => {
+      const { session } = createSession();
+      const details = {
+        requestId: "req-1",
+        source: "tool_call" as const,
+        agentName: null,
+        message: "Allow?",
+      };
+
+      await expect(session.promptPermission(details)).rejects.toThrow(
+        "promptPermission called before the session was activated",
+      );
+    });
+  });
+
   describe("canPrompt", () => {
     it("delegates to runtimeDeps.canRequestPermissionConfirmation", () => {
       const { session, runtimeDeps } = createSession();
