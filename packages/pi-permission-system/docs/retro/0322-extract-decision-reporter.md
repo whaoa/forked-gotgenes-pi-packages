@@ -51,3 +51,51 @@ Pre-completion reviewer verdict: PASS.
 - Architecture doc update expanded beyond the plan: the previous S6 Mermaid node encoded the entire four-step chain in a single label (a holdover from the original coarse planning).
   Flattened to 11 discrete steps (S6–S11) per the user's direction, adding placeholder steps for #323 and #325 alongside the renumbering of the composition-root (#320) and test-fixture (#321) steps.
   Pre-completion reviewer: PASS.
+
+## Stage: Final Retrospective (2026-06-03T01:23:15Z)
+
+### Session summary
+
+One continuous session carried #322 from planning through TDD to ship-ready: an 8-commit arc that extracted a `DecisionReporter` role (interface + `GateDecisionReporter`), rewired the gate runner and `handleInput` through it, and flattened the Phase 3 roadmap in `architecture.md` to 11 discrete steps.
+Test count 1763 → 1770 (+7); all gates green; pre-completion reviewer PASS after two WARN fixes.
+The dominant theme across stages was local-minimal edits that missed the broader structural picture — both required user redirection.
+
+### Observations
+
+#### What went well
+
+- The plan's narrow test-churn prediction held exactly: the four handler integration test files (`tool-call`, `tool-call-events`, `input`, `input-events`) needed **zero** changes because they assert through the real event bus (`getDecisionEvents` on `events.emit`) and the `session.logger.review` mock — both routed identically by the reporter.
+  Accurate test-impact analysis at plan time meant the TDD churn landed precisely where predicted (`gate-fixtures.ts`, `runner.test.ts`, one new file).
+- The pre-completion reviewer earned its keep: it flagged the vestigial `private readonly events` field that Biome reports only as a *warning* (exit 0), so the pre-commit hook let it through — the reviewer caught what the deterministic gate did not.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the planning-stage architecture-doc update referenced only #319/#322/#323 in the gate-runner decomposition chain and omitted #325, the phase capstone that depends on #322. #325 was not named in #322's issue body, so following only the issue's own references missed it; a forward search for dependents (`gh issue list --search "#322"`) would have surfaced it.
+  Impact: user-caught; plan amended (4 edits) during planning, no code rework.
+- `premature-convergence` — asked to thread #325 into the roadmap, the first attempt did the minimal in-place edit: it left the compressed `S6` Mermaid node encoding the whole four-issue chain in one label and added a redundant `S7`, producing an inconsistent hybrid.
+  The user redirected ("the cleanest approach is to flatten and renumber the steps, no?
+  … it saves us in the end"), and the chain was re-expanded to 11 flat one-issue-per-step nodes.
+  Impact: user-caught; one extra round-trip plus a redo of the Mermaid graph, step list, and Tracks table.
+- `missing-context` — TDD step 2 dropped two still-needed imports prematurely: `emitDecisionEvent` (still used by `handleInput`, broke 14 tests) and `PermissionDecisionEvent` (still referenced by `GateBypass.decision` in `descriptor.ts`, made it implicitly `any` and tripped `@typescript-eslint/no-unsafe-argument`).
+  Impact: self-caught — the affected-file test run and the pre-commit eslint hook each caught one within 1–2 tool calls; near-zero rework.
+
+#### What caused friction (user side)
+
+- Both user redirects (#325 omission, hybrid flatten) were structural-breadth catches the user had to make twice in the same session.
+  Opportunity: a forward-dependency check and a "keep the roadmap step list flat" convention, encoded once, would let the user stay in strategic-review mode rather than mechanically catching the same class of local-minimal slip.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the parent session bounced across `anthropic/claude-opus-4-8`, `anthropic/claude-sonnet-4-6`, and `opencode-go/deepseek-v4-flash`.
+  Both structural-breadth slips were user-caught rather than self-caught; the timeline cannot be confidently pinned to a specific model from the session data, but the pattern is consistent with a lighter model running during the architecture-doc edits.
+  The `pre-completion-reviewer` subagent did judgment-heavy work (261s, 36 tool uses) and returned two accurate WARNs — appropriately capable for the task.
+- **Escalation-delay tracking** — no rabbit-holes; the two premature-import errors were each resolved in 1–2 tool calls.
+  No sequence exceeded 5 consecutive calls on one error.
+- **Unused-tool detection** — `gh issue list --search "#322"` (or `--search "depends 322"`) was available and never run during planning; it would have surfaced #325 before the user did.
+  No subagent was needed.
+- **Feedback-loop gap analysis** — verification was incremental and healthy: each TDD step ran its affected test file red→green, then the full suite + `check` + `lint` + `fallow dead-code` ran after the last step, with pre-commit hooks catching the eslint slip at commit time.
+  No end-only-verification gap.
+
+### Changes made
+
+1. Added a two-sentence rule to `.pi/skills/package-pi-permission-system/SKILL.md` (right after the `docs/plans/` line): the `architecture.md` phase roadmap is a flat one-issue-per-step list (never a chain inside one node label), and a plan touching it must enumerate the whole phase via a dependent search (`gh issue list --search "#N"`), not just the issues the current one references.

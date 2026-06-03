@@ -16,6 +16,9 @@ The `/permission-system` slash command name is the only upstream identity preser
 Read `docs/plans/` before making architectural changes.
 Pre-monorepo plans from the upstream fork live in `docs/plans/archive/` — issue numbers there refer to the upstream repo, not this monorepo.
 
+`docs/architecture/architecture.md` tracks the improvement phases as a flat numbered step list plus a Mermaid graph — one issue per step, never a chain inside a single node label.
+When a plan touches that roadmap, enumerate the whole phase: search dependents too (`gh issue list --search "#N"`), not just the issues the current one references.
+
 ## Implementation Priorities
 
 - Default to least privilege — when in doubt, prompt (`ask`), do not silently allow.
