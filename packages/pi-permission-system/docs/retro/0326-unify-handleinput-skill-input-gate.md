@@ -34,3 +34,20 @@ This planning session then produced the numbered plan for #326, the first pivot 
 - **Known test edit.** `input.test.ts`'s "passes agentName…" assertion uses `expect.anything()` for the prompt's first arg; prompting now flows through the context-bound `promptPermission(details)`, so that one assertion must retarget `session.promptPermission`.
 - **Process note.**
   Per the user's direction, this is a recursive "discover → note in architecture.md → file issues → backtrack" loop; expect further smells (e.g. the `ToolCallGatePipeline` shape in #327, and the `index.ts` composition root in #320) to be refined as those issues are planned.
+
+## Stage: Implementation — TDD (2026-06-02T23:20:00Z)
+
+### Session summary
+
+Completed two TDD cycles in order.
+Step 1 added the `skill_input` variant to `DenialContext` and its three switch cases in `buildDenyBody`, `buildUnavailableBody`, and `buildUserDeniedBody`, with 5 new tests in `test/denial-messages.test.ts`.
+Step 2 created `src/handlers/gates/skill-input.ts` (`describeSkillInputGate` pure factory, 10 unit tests), rewrote `handleInput` to delegate to `this.runner.run(...)`, removed the inline `applyPermissionGate` block and the nested resolution ternary, and updated the one `input.test.ts` prompt assertion to target `session.promptPermission`.
+Test count went from 1781 to 1796 (+15).
+
+### Observations
+
+- **`input-events.test.ts` passed unchanged**, confirming the runner reproduces all six resolutions (`policy_allow`, `policy_deny`, `user_approved`, `user_denied`, `auto_approved`, `confirmation_unavailable`) identically.
+- **Single prompt-assertion fix in `input.test.ts`** was exactly as anticipated: the `expect.anything()` first argument was replaced by `session.promptPermission(details)` with no second argument.
+- **No dead-code window**: `describeSkillInputGate` was introduced in the same commit as the `handleInput` rewrite, satisfying the fallow constraint.
+- **`applyPermissionGate` and `formatSkillAskPrompt` cleanly removed** from `permission-gate-handler.ts`; lint passed on first run.
+- **Pre-completion reviewer: PASS** — one WARN note that `architecture.md` step 9 lacks the ✅ prefix; reviewer confirmed this is intentional (the project pattern defers ✅ updates to post-ship).
