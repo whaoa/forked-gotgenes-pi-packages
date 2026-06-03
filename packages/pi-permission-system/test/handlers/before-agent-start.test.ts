@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { AgentPrepSession } from "#src/agent-prep-session";
 import {
   AgentPrepHandler,
   shouldExposeTool,
 } from "#src/handlers/before-agent-start";
-import type { PermissionSession } from "#src/permission-session";
 import type { ToolRegistry } from "#src/tool-registry";
 
-import { makeCtx } from "#test/helpers/handler-fixtures";
+import { makeCheckResult, makeCtx } from "#test/helpers/handler-fixtures";
 
 // ── SDK stubs ──────────────────────────────────────────────────────────────
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
@@ -26,24 +26,48 @@ function makeEvent(systemPrompt = "You are an assistant.") {
 }
 
 function makeSession(
-  overrides: Partial<Record<keyof PermissionSession, unknown>> = {},
-): PermissionSession {
+  overrides: Partial<AgentPrepSession> = {},
+): AgentPrepSession {
   return {
-    logger: { debug: vi.fn(), review: vi.fn(), warn: vi.fn() },
-    activate: vi.fn(),
-    refreshConfig: vi.fn(),
-    resolveAgentName: vi.fn().mockReturnValue(null),
-    getToolPermission: vi.fn().mockReturnValue("allow"),
-    checkPermission: vi.fn().mockReturnValue({ state: "allow" }),
-    shouldUpdateActiveTools: vi.fn().mockReturnValue(true),
-    commitActiveToolsCacheKey: vi.fn(),
-    getPolicyCacheStamp: vi.fn().mockReturnValue("stamp-1"),
-    shouldUpdatePromptState: vi.fn().mockReturnValue(true),
-    commitPromptStateCacheKey: vi.fn(),
-    setActiveSkillEntries: vi.fn(),
-    getActiveSkillEntries: vi.fn().mockReturnValue([]),
-    ...overrides,
-  } as unknown as PermissionSession;
+    activate: overrides.activate ?? vi.fn<AgentPrepSession["activate"]>(),
+    refreshConfig:
+      overrides.refreshConfig ?? vi.fn<AgentPrepSession["refreshConfig"]>(),
+    resolveAgentName:
+      overrides.resolveAgentName ??
+      vi.fn<AgentPrepSession["resolveAgentName"]>().mockReturnValue(null),
+    checkPermission:
+      overrides.checkPermission ??
+      vi
+        .fn<AgentPrepSession["checkPermission"]>()
+        .mockReturnValue(makeCheckResult()),
+    getToolPermission:
+      overrides.getToolPermission ??
+      vi.fn<AgentPrepSession["getToolPermission"]>().mockReturnValue("allow"),
+    shouldUpdateActiveTools:
+      overrides.shouldUpdateActiveTools ??
+      vi
+        .fn<AgentPrepSession["shouldUpdateActiveTools"]>()
+        .mockReturnValue(true),
+    commitActiveToolsCacheKey:
+      overrides.commitActiveToolsCacheKey ??
+      vi.fn<AgentPrepSession["commitActiveToolsCacheKey"]>(),
+    getPolicyCacheStamp:
+      overrides.getPolicyCacheStamp ??
+      vi
+        .fn<AgentPrepSession["getPolicyCacheStamp"]>()
+        .mockReturnValue("stamp-1"),
+    shouldUpdatePromptState:
+      overrides.shouldUpdatePromptState ??
+      vi
+        .fn<AgentPrepSession["shouldUpdatePromptState"]>()
+        .mockReturnValue(true),
+    commitPromptStateCacheKey:
+      overrides.commitPromptStateCacheKey ??
+      vi.fn<AgentPrepSession["commitPromptStateCacheKey"]>(),
+    setActiveSkillEntries:
+      overrides.setActiveSkillEntries ??
+      vi.fn<AgentPrepSession["setActiveSkillEntries"]>(),
+  };
 }
 
 function makeToolRegistry(overrides: Partial<ToolRegistry> = {}): ToolRegistry {
@@ -55,11 +79,11 @@ function makeToolRegistry(overrides: Partial<ToolRegistry> = {}): ToolRegistry {
 }
 
 function makeHandler(overrides?: {
-  session?: Partial<Record<keyof PermissionSession, unknown>>;
+  session?: Partial<AgentPrepSession>;
   toolRegistry?: Partial<ToolRegistry>;
 }): {
   handler: AgentPrepHandler;
-  session: PermissionSession;
+  session: AgentPrepSession;
   toolRegistry: ToolRegistry;
 } {
   const session = makeSession(overrides?.session);
