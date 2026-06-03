@@ -19,6 +19,10 @@ import type { SessionApprovalRecorder } from "./session-approval-recorder";
 import type { SessionLogger } from "./session-logger";
 import { SessionRules } from "./session-rules";
 import type { SkillPromptEntry } from "./skill-prompt-sanitizer";
+import {
+  resolveToolPreviewLimits,
+  type ToolPreviewFormatterOptions,
+} from "./tool-preview-formatter";
 import type { PermissionCheckResult, PermissionState } from "./types";
 
 /**
@@ -281,6 +285,31 @@ export class PermissionSession
   /** Config-derived infrastructure read paths (current at call time). */
   getInfrastructureReadPaths(): string[] {
     return this.config.piInfrastructureReadPaths ?? [];
+  }
+
+  /**
+   * Combined infrastructure read directories: static paths from
+   * `ExtensionPaths` plus config-derived paths.
+   *
+   * Replaces the handler's hand-rolled
+   * `[...getInfrastructureDirs(), ...getInfrastructureReadPaths()]` concat
+   * so gate-construction code asks for a single clean value.
+   */
+  getInfrastructureReadDirs(): string[] {
+    return [
+      ...this.paths.piInfrastructureDirs,
+      ...(this.config.piInfrastructureReadPaths ?? []),
+    ];
+  }
+
+  /**
+   * Resolved tool-preview formatter options from the current config.
+   *
+   * Replaces the handler's `resolveToolPreviewLimits(session.config)` reach
+   * so the pipeline reads a clean value rather than pulling raw config.
+   */
+  getToolPreviewLimits(): ToolPreviewFormatterOptions {
+    return resolveToolPreviewLimits(this.config);
   }
 
   // ── Prompting ──────────────────────────────────────────────────────────

@@ -526,6 +526,27 @@ describe("PermissionSession", () => {
       const { session } = createSession();
       expect(session.getInfrastructureReadPaths()).toEqual([]);
     });
+
+    it("getInfrastructureReadDirs combines piInfrastructureDirs and piInfrastructureReadPaths", () => {
+      const runtimeDeps = makeRuntimeDeps();
+      (runtimeDeps.getConfig as ReturnType<typeof vi.fn>).mockReturnValue({
+        piInfrastructureReadPaths: ["/extra/path"],
+      });
+      const { session } = createSession({ runtimeDeps });
+      expect(session.getInfrastructureReadDirs()).toEqual([
+        "/test/agent",
+        "/test/agent/git",
+        "/extra/path",
+      ]);
+    });
+
+    it("getInfrastructureReadDirs returns only piInfrastructureDirs when config omits the field", () => {
+      const { session } = createSession();
+      expect(session.getInfrastructureReadDirs()).toEqual([
+        "/test/agent",
+        "/test/agent/git",
+      ]);
+    });
   });
 
   describe("config delegation", () => {
@@ -550,6 +571,26 @@ describe("PermissionSession", () => {
       );
       const { session } = createSession({ runtimeDeps });
       expect(session.config).toBe(fakeConfig);
+    });
+
+    it("getToolPreviewLimits returns resolved preview limits from config", () => {
+      const runtimeDeps = makeRuntimeDeps();
+      (runtimeDeps.getConfig as ReturnType<typeof vi.fn>).mockReturnValue({
+        toolInputPreviewMaxLength: 400,
+        toolTextSummaryMaxLength: 120,
+      });
+      const { session } = createSession({ runtimeDeps });
+      const limits = session.getToolPreviewLimits();
+      expect(limits.toolInputPreviewMaxLength).toBe(400);
+      expect(limits.toolTextSummaryMaxLength).toBe(120);
+    });
+
+    it("getToolPreviewLimits falls back to built-in defaults when config omits fields", () => {
+      const { session } = createSession();
+      const limits = session.getToolPreviewLimits();
+      expect(limits.toolInputPreviewMaxLength).toBeGreaterThan(0);
+      expect(limits.toolTextSummaryMaxLength).toBeGreaterThan(0);
+      expect(limits.toolInputLogPreviewMaxLength).toBeGreaterThan(0);
     });
   });
 
