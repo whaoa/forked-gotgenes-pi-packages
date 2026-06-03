@@ -935,7 +935,7 @@ flowchart TD
     S8["Step 8: ✅ GateRunner class, role collaborators (#323)"]
     S9["Step 9: ✅ Unify handleInput with GateRunner (#326)"]
     S10["Step 10: ✅ Extract ToolCallGatePipeline (#327)"]
-    S11["Step 11: PermissionGateHandler role-interface retyping (#325)"]
+    S11["Step 11: ✅ PermissionGateHandler role-interface retyping (#325)"]
     S12["Step 12: Extract SkillInputGatePipeline (#329)"]
     S13["Step 13: Relocate createPermissionRequestId (#330)"]
     S14["Step 14: Narrow remaining handlers (#331)"]
