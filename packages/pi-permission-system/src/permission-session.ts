@@ -278,22 +278,9 @@ export class PermissionSession
 
   // ── Infrastructure paths ───────────────────────────────────────────────
 
-  getInfrastructureDirs(): readonly string[] {
-    return this.paths.piInfrastructureDirs;
-  }
-
-  /** Config-derived infrastructure read paths (current at call time). */
-  getInfrastructureReadPaths(): string[] {
-    return this.config.piInfrastructureReadPaths ?? [];
-  }
-
   /**
    * Combined infrastructure read directories: static paths from
    * `ExtensionPaths` plus config-derived paths.
-   *
-   * Replaces the handler's hand-rolled
-   * `[...getInfrastructureDirs(), ...getInfrastructureReadPaths()]` concat
-   * so gate-construction code asks for a single clean value.
    */
   getInfrastructureReadDirs(): string[] {
     return [

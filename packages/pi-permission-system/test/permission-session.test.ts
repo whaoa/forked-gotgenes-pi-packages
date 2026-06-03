@@ -505,28 +505,6 @@ describe("PermissionSession", () => {
   });
 
   describe("infrastructure paths", () => {
-    it("getInfrastructureDirs returns paths from ExtensionPaths", () => {
-      const { session } = createSession();
-      expect(session.getInfrastructureDirs()).toEqual([
-        "/test/agent",
-        "/test/agent/git",
-      ]);
-    });
-
-    it("getInfrastructureReadPaths returns config paths", () => {
-      const runtimeDeps = makeRuntimeDeps();
-      (runtimeDeps.getConfig as ReturnType<typeof vi.fn>).mockReturnValue({
-        piInfrastructureReadPaths: ["/extra/path"],
-      });
-      const { session } = createSession({ runtimeDeps });
-      expect(session.getInfrastructureReadPaths()).toEqual(["/extra/path"]);
-    });
-
-    it("getInfrastructureReadPaths returns empty when config omits the field", () => {
-      const { session } = createSession();
-      expect(session.getInfrastructureReadPaths()).toEqual([]);
-    });
-
     it("getInfrastructureReadDirs combines piInfrastructureDirs and piInfrastructureReadPaths", () => {
       const runtimeDeps = makeRuntimeDeps();
       (runtimeDeps.getConfig as ReturnType<typeof vi.fn>).mockReturnValue({
