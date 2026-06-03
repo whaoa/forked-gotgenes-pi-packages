@@ -64,3 +64,56 @@ Test count was 1807 before and after (behavior-preserving refactor).
 - The `external-directory-integration.test.ts` had an unused `PromptPermissionDetails` import after the refactor (the type is now inferred from the `vi.fn<T>()` generic); removed in the Step 2 commit.
 - Pre-completion reviewer verdict: WARN — one minor finding: the S11 Mermaid node in `architecture.md` was missing the ✅ marker carried by the completed S8/S9/S10 nodes.
   Fixed in a follow-up `docs:` commit.
+
+## Stage: Final Retrospective (2026-06-03T02:35:00Z)
+
+### Session summary
+
+Reviewed the full two-stage arc (Planning + TDD) for issue #325.
+The TDD session executed all three plan steps cleanly across 90 turns on `claude-sonnet-4-6` with zero user corrections, zero rework, and one pre-completion `WARN` (a missing Mermaid ✅ marker, fixed in the same session).
+The one substantive deviation — the plan's prescribed `{ ...defaults, ...overrides }` spread did not typecheck under a precise return annotation — was self-identified and resolved by adopting the existing `gate-fixtures.ts` per-field `??` pattern.
+
+### Observations
+
+#### What went well
+
+- Thorough pre-implementation reconnaissance before Step 2: turns 34–51 ran ~15 targeted `grep` calls to enumerate every `makeHandler({ session: … })` override key across all six handler test files before touching the shared `makeSession` type.
+  This confirmed no caller passed the vestigial `getToolPermission` / `config` keys, so dropping them was provably safe — no rework, no broken test surfaced later.
+- Incremental verification: `pnpm run check` + package test suite ran after Step 1 (turns 31–32) and again after Step 2 (turns 57–58), with `lint` after each.
+  A type regression would have been caught at the step that introduced it, not at the end.
+- Self-identified plan deviation handled cleanly: the plan's `{ ...defaults, ...overrides }` spread approach conflicts with the `testing` skill's known mock-typing pitfall.
+  The agent recognized this without being told and pivoted to the per-field `?? vi.fn<T>()` pattern already established in `gate-fixtures.ts` (`makeGateInputs` / `makeGateRunner`) — a novel win: the codebase's own convention resolved a plan-prescribed dead end.
+
+#### What caused friction (agent side)
+
+- `missing-context` (planning-side, not TDD) — the plan's Design Overview prescribed defining the delegations inline "then spread `...overrides` last," which does not typecheck once the const is annotated `MockGateHandlerSession` (spread of `Partial<T>` into `T` makes required fields optional).
+  Impact: no rework — the deviation was caught at design-read time and resolved in the first Step 2 write; cost was a few minutes of re-derivation.
+  The `testing` skill already warns the spread "erases mock methods," but it does not name the constructive alternative (per-field `??` + `vi.fn<T>()` + precise return annotation) nor connect it to the cast-removal use case.
+- `other` (minor) — a transient unused `PromptPermissionDetails` import lingered in `external-directory-integration.test.ts` after the `vi.fn<T>()` generics made the explicit annotation unnecessary.
+  Impact: caught by `lint` immediately (turn 59), removed in the same step (turn 62); no rework beyond one edit.
+
+#### What caused friction (user side)
+
+- None.
+  The session ran end-to-end without user intervention, which is the expected shape for a behavior-preserving refactor with a complete plan.
+  No earlier-context opportunity applies.
+
+### Diagnostic details
+
+- **Model-performance correlation** — all 90 TDD turns ran on `claude-sonnet-4-6`, appropriate for mechanical-plus-type-level refactoring.
+  The single subagent dispatch (pre-completion-reviewer, turn 80) ran on its agent-frontmatter default model and produced a thorough 39-tool-use report; no model mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; no sequence exceeded 5 consecutive tool calls on the same error.
+  The longest same-purpose run (the turn 34–51 grep sweep) was deliberate reconnaissance, not stuck-state thrashing.
+- **Unused-tool detection** — the grep sweep used exact-symbol matching (`makeHandler({`, `checkPermission`), which is the correct tool; `colgrep` would not have improved exact-key enumeration.
+  No Explore/Plan dispatch was warranted.
+- **Feedback-loop gap analysis** — verification was incremental (check/test after each of Steps 1 and 2, full suite + `fallow dead-code` + lockfile check after Step 3); no end-only verification gap.
+
+### Proposed follow-ups
+
+- Refine the `testing` skill to name the per-field `?? vi.fn<T>()` cast-removal pattern and its exception to the "do not annotate the return type" rule (the annotation is correct when callers supply pre-built mocks via overrides, which is what makes the completeness check enforce cast safety).
+  Deferred at the maintainer's direction — recorded here rather than applied inline.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0325-narrow-permission-gate-handler-roles.md`.
+   No prompt or `AGENTS.md` edits were made; the one proposed `testing`-skill refinement is recorded above as a deferred follow-up per the maintainer's choice.
