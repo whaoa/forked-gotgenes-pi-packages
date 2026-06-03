@@ -492,13 +492,14 @@ src/
 ├── permission-dialog.ts      Dialog options (once / session / deny)
 ├── permission-resolver.ts    `PermissionResolver` interface - `resolve(surface, input, agentName)`; collapses the checkPermission + getSessionRuleset relay (#319). Implemented by `PermissionSession`
 ├── decision-reporter.ts      `DecisionReporter` interface + `GateDecisionReporter` class - owns `SessionLogger` and event bus; writes review-log entries and emits decision events (#322)
+├── gate-handler-session.ts   `GateHandlerSession` interface — the four-method session role `PermissionGateHandler` depends on: `activate`, `resolveAgentName`, `checkPermission`, `createPermissionRequestId` (#325). Transitional: shrinks to two methods when [#329] extracts `SkillInputGatePipeline`
 │
-├── permission-session.ts     PermissionSession class - encapsulates all mutable session state; implements `PermissionResolver`; exposes `getInfrastructureReadDirs()` and `getToolPreviewLimits()` for Tell-Don't-Ask gate inputs (#327)
+├── permission-session.ts     `PermissionSession` class - encapsulates all mutable session state; implements `PermissionResolver`, `SessionApprovalRecorder`, `GatePrompter`, `GateHandlerSession`; exposes `getInfrastructureReadDirs()` and `getToolPreviewLimits()` for Tell-Don't-Ask gate inputs (#327)
 ├── handlers/                 Handler classes with narrow constructor injection
 │   ├── index.ts              Barrel re-exports
 │   ├── lifecycle.ts          SessionLifecycleHandler (session + cleanupRpc)
 │   ├── before-agent-start.ts AgentPrepHandler (session + toolRegistry); shouldExposeTool pure helper
-│   ├── permission-gate-handler.ts PermissionGateHandler (session + events + toolRegistry + pipeline); delegates gate-producer assembly and the run loop to the injected `ToolCallGatePipeline` (#327); validateRequestedTool + getEventInput + extractSkillNameFromInput pure helpers
+│   ├── permission-gate-handler.ts PermissionGateHandler (session: GateHandlerSession + toolRegistry + pipeline + runner); `GateRunner` and `GateDecisionReporter` are built in `index.ts` and injected (#325); validateRequestedTool + getEventInput + extractSkillNameFromInput pure helpers
 │   └── gates/               Pure descriptor factories + runner
 │       ├── types.ts          GateOutcome, ToolCallContext
 │       ├── descriptor.ts     GateDescriptor (with DenialContext), GateBypass, GateResult types
@@ -871,11 +872,11 @@ The headline findings are coupling smells (Category C) - anemic behavior, mutabl
     - Smell category: C (anemic getters / missing collaborator).
     - Outcome: gate construction has an owner the handler tells; `handleToolCall` shrinks to activate → validate → build `tcc` → pipeline.evaluate → map outcome; the handler's residual `PermissionSession` surface ahead of Step 11 ([#325]) is `activate` + `resolveAgentName` plus the skill-input path's `checkPermission` + `createPermissionRequestId`.
 
-11. **Retype `PermissionGateHandler` against narrow role interfaces** ([#325])
+11. ✅ **Retype `PermissionGateHandler` against narrow role interfaces** ([#325])
     - Target: new `src/gate-handler-session.ts`; `src/permission-session.ts`; `src/handlers/permission-gate-handler.ts`; `src/index.ts`; `test/helpers/handler-fixtures.ts`; `test/handlers/external-directory-integration.test.ts`; `test/handlers/external-directory-session-dedup.test.ts`.
     - The handler's constructor takes `session: PermissionSession` (concrete class, 36 public members); the `as unknown as PermissionSession` casts in every test mock disable TypeScript's structural check — the regression that prompted this (a mock missing `resolve()`) broke at runtime in [#319], not at `pnpm run check`.
       After Steps 9-10 ([#326], [#327]) the handler's residual session surface is four methods — `activate`, `resolveAgentName`, `checkPermission`, `createPermissionRequestId` — plus the `session.logger` read and the three roles passed to `GateRunner`.
-      Introduce a `GateHandlerSession` role (those four methods, top-level `src/`, implemented by `PermissionSession`); inject the pre-built `GateRunner` (build the `GateDecisionReporter` + `GateRunner` in `index.ts`) so the handler stops constructing collaborators and reaching `session.logger`, and drop the `events` constructor param; retype the three `makeSession` fixtures to the precise role intersection and drop the casts.
+      Introduced `GateHandlerSession` (those four methods, top-level `src/`, implemented by `PermissionSession`); injected the pre-built `GateRunner` (build `GateDecisionReporter` + `GateRunner` in `index.ts`) so the handler stops constructing collaborators and reaching `session.logger`, and dropped the `events` constructor param; retyped the three `makeSession` fixtures to the `MockGateHandlerSession` intersection using `vi.fn<T>()` and dropped the casts.
     - Planning surfaced three follow-ups that finish the arc: extract a `SkillInputGatePipeline` ([#329], which shrinks `GateHandlerSession` to a two-method context role), relocate `createPermissionRequestId` onto the request-creation collaborator ([#330]), and narrow `AgentPrepHandler` + `SessionLifecycleHandler` the same way ([#331]).
     - Smell category: C (concrete class dependency forces wide mocks; narrow interfaces enforce completeness at the type level).
     - Outcome: `as unknown as PermissionSession` casts are gone from the gate-handler mocks; the runner is injected, not built in the handler; a consumer calling a method the mock lacks fails at `pnpm run check`, not at runtime.
