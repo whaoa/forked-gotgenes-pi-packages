@@ -50,3 +50,59 @@ Pre-completion reviewer returned PASS.
 [#314]: https://github.com/gotgenes/pi-packages/issues/314
 [#317]: https://github.com/gotgenes/pi-packages/issues/317
 [#320]: https://github.com/gotgenes/pi-packages/issues/320
+
+## Stage: Final Retrospective (2026-06-03T22:30:00Z)
+
+### Session summary
+
+Single-day execution of the full lifecycle (plan → build → ship) for the four-family test-fixture extraction.
+All 5 build steps landed green with the suite holding at 86 files / 1834 tests, duplication dropped 7.6% → 6.6% (clone groups 133 → 122), and the pre-completion reviewer returned PASS.
+No release-please PR was opened because the change is entirely `test:`/`docs:` commits; the issue closed cleanly with no version bump.
+
+### Observations
+
+#### What went well
+
+1. The [#288] recurring friction — stale imports after deleting local factory definitions — was carried forward from the prior retro into the [#321] plan as an explicit per-step instruction (“grep each removed symbol before committing”).
+   The build session then had **zero** stale-import slips: every deletion step ran a verifying `grep` (msgs 38, 47, 62) and found only legitimate survivors (`makeResolver`) or doc-comment references.
+   This is a prior retro observation closing the loop — a documented friction pattern eliminated by a planning adjustment.
+2. The upfront `ask_user` in planning (one decision: “both” — consolidate factories AND add convenience shortcuts) produced zero design churn across all 5 build steps; every helper the plan named was used as specified.
+3. Incremental verification was clean: `pnpm run check` + `vitest run` ran after every build step (msgs 37, 46, 53/55, 61, 74), so each commit left the suite green with no broken-baseline commits.
+4. The `code-design` “structural reasons before extracting duplication” heuristic was applied at plan time to fence off genuine per-test intent (per-agent `agentAwareCheck`, `toolName`-alias events, multi-condition path dispatch), so no shared helper became a discriminator-laden leaky abstraction.
+
+#### What caused friction (agent side)
+
+1. `other` (tooling) — a `fallow dupes --json` attempt during planning (msg 13) returned exit 2 with an empty file; `fallow` also truncates its plain-text output to the top 10 clone groups, so a follow-up `tee` to capture the full list also came up short (msg 15, error).
+   The agent recovered by reading the four target files directly instead of relying on `fallow`'s per-file clone breakdown.
+   Impact: ~3 extra exploratory tool calls in planning; no rework, and the direct reads were the higher-fidelity path anyway.
+2. `other` (mechanical) — a TS2783 (`state` specified more than once) in the new `makeSurfaceCheck` (msg 53): the explicit `state: base.state` was redundant with the trailing `...base` spread.
+   Caught immediately by the post-step `pnpm run check`, fixed in one edit (msg 54).
+   Impact: 1 extra check+fix cycle (~2 tool calls); no rework beyond the single line.
+3. `other` (tooling) — the first commit of step 2 (msg 48) failed because the pre-commit eslint hook reformatted `gate-fixtures.ts` (import sort); re-staging the auto-fixed file and re-committing succeeded (msg 50).
+   Impact: 1 extra add+commit cycle; no rework.
+
+#### What caused friction (user side)
+
+1. None substantive.
+   The two `Continue.` nudges in the build session (msgs 42, 45) were mechanical pacing prompts, not redirections — the work was on-track (mid-step-2 migration) at each.
+
+#### Estimation gap (not friction)
+
+1. The plan's stated target was duplication < 6%; the realized figure was 6.6%.
+   The gap was foreseen in planning (`external-directory-session-dedup.test.ts` was explicitly scoped out as a fifth family) and handled correctly at build time — the architecture roadmap records the realized 6.6%, and the residual session-dedup family is flagged for a follow-up issue.
+   No correction needed; this is an accurate-estimate-with-documented-shortfall, not a miss.
+
+### Diagnostic details
+
+- **Model-performance correlation** — no mismatches.
+  Planning + retro ran on `claude-opus-4-8` (judgment-heavy: design decision, plan synthesis, cross-stage retro), the build on `claude-sonnet-4-6` (mechanical migration with type-checking), the pre-completion reviewer subagent on `anthropic/claude-sonnet-4-6` (judgment-heavy review), and shipping on `opencode-go/deepseek-v4-flash` (deterministic checklist).
+  Each model matched its task complexity; the cheap flash model on the mechanical ship checklist is appropriate cost optimization.
+- **Escalation-delay tracking** — no `rabbit-hole` friction points; the two mechanical issues (TS2783, eslint hook) each resolved in a single cycle, well under the 5-call threshold.
+- **Unused-tool detection** — `colgrep` was not used despite the planning prompt recommending it, but the agent knew exact symbol names (`makeSession`, `makeCheckPermission`, etc.), so `grep` and direct file reads were the correct lower-latency choice; no missing-context friction resulted.
+- **Feedback-loop gap analysis** — no gaps.
+  Verification ran incrementally after each of the 5 build steps, not just at the end.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0321-continue-shared-test-fixture-extraction.md`.
+   No prompt or `AGENTS.md` changes — the user chose retro-file-only; the single tooling candidate (a `fallow dupes` truncation/`--json` note) was a single self-recovered instance below the bar for a new rule, recorded here only.
