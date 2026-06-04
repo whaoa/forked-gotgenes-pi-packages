@@ -19,7 +19,6 @@ import {
   getLegacyExtensionConfigPath,
   getLegacyGlobalPolicyPath,
   getLegacyProjectPolicyPath,
-  getProjectConfigPath,
   REVIEW_LOG_FILENAME,
 } from "./config-paths";
 import { buildResolvedConfigLogEntry } from "./config-reporter";
@@ -75,41 +74,6 @@ export interface ExtensionRuntime extends ExtensionPaths, SessionState {
   // ── Logging (backed by logger created at construction) ─────────────────
   writeDebugLog(event: string, details?: Record<string, unknown>): void;
   writeReviewLog(event: string, details?: Record<string, unknown>): void;
-}
-
-// ── Pure helpers ───────────────────────────────────────────────────────────
-
-/**
- * Derive Pi project-level config and agents paths from a working directory.
- * Returns null when cwd is absent (headless / global-only config).
- */
-export function derivePiProjectPaths(cwd: string | undefined | null): {
-  projectGlobalConfigPath: string;
-  projectAgentsDir: string;
-} | null {
-  if (!cwd) {
-    return null;
-  }
-  return {
-    projectGlobalConfigPath: getProjectConfigPath(cwd),
-    projectAgentsDir: join(cwd, ".pi", "agent", "agents"),
-  };
-}
-
-/**
- * Create a new PermissionManager scoped to a working directory's config hierarchy.
- * Pass `cwd` as null/undefined to use global config only.
- */
-export function createPermissionManagerForCwd(
-  agentDir: string,
-  cwd: string | undefined | null,
-): PermissionManager {
-  const projectPaths = derivePiProjectPaths(cwd);
-  return new PermissionManager({
-    globalConfigPath: getGlobalConfigPath(agentDir),
-    projectGlobalConfigPath: projectPaths?.projectGlobalConfigPath,
-    projectAgentsDir: projectPaths?.projectAgentsDir,
-  });
 }
 
 /**
@@ -261,7 +225,7 @@ export function createExtensionRuntime(options?: {
     ...paths,
     config: { ...DEFAULT_EXTENSION_CONFIG },
     runtimeContext: null,
-    permissionManager: createPermissionManagerForCwd(agentDir, undefined),
+    permissionManager: new PermissionManager({ agentDir }),
     activeSkillEntries: [],
     lastKnownActiveAgentName: null,
     lastActiveToolsCacheKey: null,

@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── logger stub ────────────────────────────────────────────────────────────
@@ -63,19 +62,9 @@ vi.mock("../src/session-rules", () => ({
 }));
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import {
-  getGlobalConfigPath,
-  getGlobalLogsDir,
-  getProjectConfigPath,
-} from "#src/config-paths";
+import { getGlobalLogsDir } from "#src/config-paths";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
-import { PermissionManager } from "#src/permission-manager";
-import {
-  createExtensionRuntime,
-  createPermissionManagerForCwd,
-  derivePiProjectPaths,
-  refreshExtensionConfig,
-} from "#src/runtime";
+import { createExtensionRuntime, refreshExtensionConfig } from "#src/runtime";
 
 // ── test suite ─────────────────────────────────────────────────────────────
 
@@ -348,75 +337,6 @@ describe("createExtensionRuntime", () => {
     const rt2 = createExtensionRuntime({ agentDir: "/agent/b" });
     rt1.lastKnownActiveAgentName = "agent-a";
     expect(rt2.lastKnownActiveAgentName).toBeNull();
-  });
-});
-
-// ── derivePiProjectPaths ───────────────────────────────────────────────────
-
-describe("derivePiProjectPaths", () => {
-  it("returns null for null cwd", () => {
-    expect(derivePiProjectPaths(null)).toBeNull();
-  });
-
-  it("returns null for undefined cwd", () => {
-    expect(derivePiProjectPaths(undefined)).toBeNull();
-  });
-
-  it("returns null for empty string cwd", () => {
-    expect(derivePiProjectPaths("")).toBeNull();
-  });
-
-  it("returns projectGlobalConfigPath via getProjectConfigPath", () => {
-    const result = derivePiProjectPaths("/my/project");
-    expect(result?.projectGlobalConfigPath).toBe(
-      getProjectConfigPath("/my/project"),
-    );
-  });
-
-  it("returns projectAgentsDir as .pi/agent/agents under cwd", () => {
-    const result = derivePiProjectPaths("/my/project");
-    expect(result?.projectAgentsDir).toBe(
-      join("/my/project", ".pi", "agent", "agents"),
-    );
-  });
-});
-
-// ── createPermissionManagerForCwd ─────────────────────────────────────────
-
-describe("createPermissionManagerForCwd", () => {
-  beforeEach(() => {
-    // PermissionManager is already mocked as vi.fn() at module scope.
-  });
-
-  it("creates a PermissionManager with globalConfigPath from agentDir", () => {
-    const MockPM = PermissionManager as ReturnType<typeof vi.fn>;
-    MockPM.mockClear();
-    createPermissionManagerForCwd("/test/agent", null);
-    expect(MockPM).toHaveBeenCalledWith(
-      expect.objectContaining({
-        globalConfigPath: getGlobalConfigPath("/test/agent"),
-      }),
-    );
-  });
-
-  it("includes projectGlobalConfigPath when cwd is provided", () => {
-    const MockPM = PermissionManager as ReturnType<typeof vi.fn>;
-    MockPM.mockClear();
-    createPermissionManagerForCwd("/test/agent", "/my/project");
-    expect(MockPM).toHaveBeenCalledWith(
-      expect.objectContaining({
-        globalConfigPath: getGlobalConfigPath("/test/agent"),
-        projectGlobalConfigPath: getProjectConfigPath("/my/project"),
-      }),
-    );
-  });
-
-  it("excludes projectGlobalConfigPath when cwd is null", () => {
-    const MockPM = PermissionManager as ReturnType<typeof vi.fn>;
-    MockPM.mockClear();
-    createPermissionManagerForCwd("/test/agent", null);
-    const callArg = MockPM.mock.calls[0][0] as Record<string, unknown>;
-    expect(callArg.projectGlobalConfigPath).toBeUndefined();
   });
 });
 

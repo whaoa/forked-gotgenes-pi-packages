@@ -77,23 +77,6 @@ export interface PermissionManagerOptions extends PolicyLoaderOptions {
   agentDir?: string;
 }
 
-/**
- * Derive `PolicyLoaderOptions` from an agentDir + an optional cwd.
- * Setting agentsDir explicitly from agentDir removes the hidden
- * `getAgentDir()` env-read that FilePolicyLoader's default would perform.
- */
-function derivePolicyLoaderOptions(
-  agentDir: string,
-  cwd: string | undefined | null,
-): PolicyLoaderOptions {
-  return {
-    globalConfigPath: getGlobalConfigPath(agentDir),
-    agentsDir: join(agentDir, "agents"),
-    projectGlobalConfigPath: cwd ? getProjectConfigPath(cwd) : undefined,
-    projectAgentsDir: cwd ? join(cwd, ".pi", "agent", "agents") : undefined,
-  };
-}
-
 export class PermissionManager implements ScopedPermissionManager {
   private readonly agentDir: string | undefined;
   private loader: PolicyLoader;
@@ -283,6 +266,23 @@ export class PermissionManager implements ScopedPermissionManager {
       ...extras,
     };
   }
+}
+
+/**
+ * Derive `PolicyLoaderOptions` from an agentDir + an optional cwd.
+ * Setting agentsDir explicitly from agentDir removes the hidden
+ * `getAgentDir()` env-read that FilePolicyLoader's default would perform.
+ */
+function derivePolicyLoaderOptions(
+  agentDir: string,
+  cwd: string | undefined | null,
+): PolicyLoaderOptions {
+  return {
+    globalConfigPath: getGlobalConfigPath(agentDir),
+    agentsDir: join(agentDir, "agents"),
+    projectGlobalConfigPath: cwd ? getProjectConfigPath(cwd) : undefined,
+    projectAgentsDir: cwd ? join(cwd, ".pi", "agent", "agents") : undefined,
+  };
 }
 
 /**
