@@ -26,6 +26,27 @@ This is a pure test refactor (no `src/` changes), so the next stage is `/build-p
 - Scope guard: `external-directory-session-dedup.test.ts` shares the local-`makeSession` clone family but is the fifth file, outside the issue's named four; flagged as a conditional follow-up issue if the sub-6% target is missed, not scope creep here.
 
 [#288]: https://github.com/gotgenes/pi-packages/issues/288
+
+## Stage: Implementation — Build (2026-06-03T11:40:00Z)
+
+### Session summary
+
+Completed all 5 build steps from the plan: runner gate migration (Step 1), bash-path gate migration (Step 2), tool-call handler migration (Step 3), external-directory integration migration (Step 4), and docs refresh (Step 5).
+Test count held steady at 86 files / 1834 tests throughout — pure refactor, no assertions changed.
+Pre-completion reviewer returned PASS.
+
+### Observations
+
+- **Step 1** Fixed a TS2783 (`state` specified twice) in the `makeSurfaceCheck` implementation in `handler-fixtures.ts`; resolved by removing the redundant explicit `state: base.state` before the spread, letting `...base` cover it.
+  One extra check+fix cycle.
+- **Step 2** A pre-commit eslint hook reformatted `gate-fixtures.ts` on the first commit attempt (exit 1); re-staged the auto-fixed file and committed cleanly.
+- **Steps 3–4** `makeSurfaceCheck` and `makeExtDirCheck` (a local thin wrapper in `external-directory-integration.test.ts`) replaced the surface-dispatch boilerplate cleanly; no assertion changes needed.
+  The shared `makeSession` default `getInfrastructureReadDirs` (`[\u201c/test/agent\u201d, ...]`) did not intersect any ext-dir test path, confirming the planning analysis.
+- **Target miss**: duplication landed at 6.6% (122 clone groups), not under 6%.
+  The remaining gap is the `external-directory-session-dedup.test.ts` family (local `makeSession`/`makeToolRegistry` clones across ext-dir + session-dedup + handler-fixtures), which was out of the four-file scope.
+  A follow-up issue should be filed per the plan’s Open Questions.
+- No stale imports or `GateDescriptor`/`makeCheckPermission`/`makeDenialContextDescriptor` leaks found at any step.
+- **Reviewer verdict**: PASS — all deterministic checks green, new helpers documented in `SKILL.md`, architecture roadmap updated.
 [#314]: https://github.com/gotgenes/pi-packages/issues/314
 [#317]: https://github.com/gotgenes/pi-packages/issues/317
 [#320]: https://github.com/gotgenes/pi-packages/issues/320
