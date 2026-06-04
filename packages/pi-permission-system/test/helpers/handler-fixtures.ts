@@ -30,7 +30,7 @@ import type { SessionApprovalRecorder } from "#src/session-approval-recorder";
 import type { SessionLogger } from "#src/session-logger";
 import { resolveToolPreviewLimits } from "#src/tool-preview-formatter";
 import type { ToolRegistry } from "#src/tool-registry";
-import type { PermissionCheckResult } from "#src/types";
+import type { PermissionCheckResult, PermissionState } from "#src/types";
 
 /**
  * Precise mock boundary for PermissionGateHandler integration tests.
@@ -221,6 +221,78 @@ export function makeToolRegistry(
 }
 
 /**
+ * Surface-dispatching `checkPermission` mock.
+ *
+ * Builds a `vi.fn()` that returns a `PermissionCheckResult` for each surface,
+ * using `bySurface[surface]` when matched and `defaultResult` otherwise.
+ * Default fields: `toolName` = the surface string, `source: "tool"`,
+ * `origin: "builtin"` — callers override by including the field in the
+ * per-surface or default partial (e.g. `{ path: { state: "allow", source: "special" } }`).
+ *
+ * Return type is intentionally unannotated so callers retain full `vi.fn()`
+ * mock access (`mock.calls`, `toHaveBeenCalledWith`, etc.).
+ */
+export function makeSurfaceCheck(
+  bySurface: Record<
+    string,
+    Partial<PermissionCheckResult> & { state: PermissionState }
+  >,
+  defaultResult: Partial<PermissionCheckResult> & { state: PermissionState } = {
+    state: "allow",
+  },
+) {
+  return vi
+    .fn<MockGateHandlerSession["checkPermission"]>()
+    .mockImplementation((surface): PermissionCheckResult => {
+      const base = bySurface[surface] ?? defaultResult;
+      return {
+        toolName: surface,
+        source: "tool",
+        origin: "builtin",
+        ...base,
+      };
+    });
+}
+
+/**
+ * Bash-surface `checkPermission` mock that dispatches on a command regex.
+ *
+ * For the `bash` surface: returns a deny result when `opts.deny` matches the
+ * command, and an allow result otherwise.  For all other surfaces, returns a
+ * plain allow result.
+ *
+ * Return type is intentionally unannotated so callers retain full `vi.fn()`
+ * mock access.
+ */
+export function makeBashCommandCheck(opts: {
+  deny: RegExp;
+  denyMatched: string;
+  allowMatched?: string;
+}) {
+  return vi
+    .fn<MockGateHandlerSession["checkPermission"]>()
+    .mockImplementation((surface, input): PermissionCheckResult => {
+      if (surface === "bash") {
+        const command = (input as { command?: string }).command ?? "";
+        return opts.deny.test(command)
+          ? makeCheckResult({
+              state: "deny",
+              source: "bash",
+              command,
+              matchedPattern: opts.denyMatched,
+            })
+          : makeCheckResult({
+              state: "allow",
+              source: "bash",
+              command,
+              matchedPattern: opts.allowMatched,
+            });
+      }
+      return makeCheckResult({ state: "allow" });
+    });
+}
+
+/**
  * Constructs a PermissionGateHandler with mocked collaborators.
  *
  * Returns all collaborators so each test file can destructure only what
@@ -229,10 +301,19 @@ export function makeToolRegistry(
 export function makeHandler(overrides?: {
   session?: Partial<MockGateHandlerSession>;
   toolRegistry?: Partial<ToolRegistry>;
+  /** Sugar: builds the `getAll` mock from a list of tool names. */
+  tools?: string[];
 }) {
   const session = makeSession(overrides?.session);
   const events = makeEvents();
-  const toolRegistry = makeToolRegistry(overrides?.toolRegistry);
+  const toolRegistry =
+    overrides?.tools !== undefined
+      ? makeToolRegistry({
+          getAll: vi
+            .fn()
+            .mockReturnValue(overrides.tools.map((name) => ({ name }))),
+        })
+      : makeToolRegistry(overrides?.toolRegistry);
   const pipeline = new ToolCallGatePipeline(session);
   const skillInputPipeline = new SkillInputGatePipeline(session);
   const reporter = new GateDecisionReporter(session.logger, events);

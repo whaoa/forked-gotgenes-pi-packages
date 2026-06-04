@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { getEventInput } from "#src/handlers/permission-gate-handler";
 
 import {
+  makeBashCommandCheck,
   makeCheckResult,
   makeCtx,
   makeHandler,
+  makeSurfaceCheck,
   makeToolCallEvent,
 } from "#test/helpers/handler-fixtures";
 
@@ -65,11 +67,7 @@ describe("handleToolCall", () => {
   });
 
   it("blocks when tool is not registered", async () => {
-    const { handler } = makeHandler({
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "read" }]),
-      },
-    });
+    const { handler } = makeHandler({ tools: ["read"] });
     const result = await handler.handleToolCall(
       makeToolCallEvent("unknown-tool"),
       makeCtx(),
@@ -170,16 +168,11 @@ describe("handleToolCall — external-directory gate", () => {
           .fn()
           .mockReturnValue(makeCheckResult({ state: "deny" })),
       },
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "read" }]),
-      },
+      tools: ["read"],
     });
-    const event = {
-      type: "tool_call",
-      toolCallId: "tc-ext",
-      name: "read",
+    const event = makeToolCallEvent("read", {
       input: { path: "/outside/project/file.ts" },
-    };
+    });
     const result = await handler.handleToolCall(event, makeCtx());
     expect(result).toMatchObject({ block: true });
   });
@@ -195,16 +188,11 @@ describe("handleToolCall — bash external-directory gate", () => {
           .fn()
           .mockReturnValue(makeCheckResult({ state: "deny" })),
       },
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "bash" }]),
-      },
+      tools: ["bash"],
     });
-    const event = {
-      type: "tool_call",
-      toolCallId: "tc-bash-ext",
-      name: "bash",
+    const event = makeToolCallEvent("bash", {
       input: { command: "cat /outside/project/file.ts" },
-    };
+    });
     const result = await handler.handleToolCall(event, makeCtx());
     expect(result).toMatchObject({ block: true });
   });
@@ -214,44 +202,24 @@ describe("handleToolCall — bash external-directory gate", () => {
 
 describe("handleToolCall — path gate (tools)", () => {
   it("blocks a read of .env when path surface denies *.env", async () => {
-    const checkPermission = vi
-      .fn()
-      .mockImplementation(
-        (surface: string, _input: unknown, _agentName?: string) => {
-          if (surface === "path") {
-            return makeCheckResult({ state: "deny", matchedPattern: "*.env" });
-          }
-          return makeCheckResult();
-        },
-      );
     const { handler } = makeHandler({
-      session: { checkPermission },
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "read" }]),
+      session: {
+        checkPermission: makeSurfaceCheck({
+          path: { state: "deny", matchedPattern: "*.env" },
+        }),
       },
+      tools: ["read"],
     });
-    const event = {
-      type: "tool_call",
-      toolCallId: "tc-path",
-      name: "read",
-      input: { path: ".env" },
-    };
+    const event = makeToolCallEvent("read", { input: { path: ".env" } });
     const result = await handler.handleToolCall(event, makeCtx());
     expect(result).toMatchObject({ block: true });
   });
 
   it("allows a read when path surface allows", async () => {
-    const { handler } = makeHandler({
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "read" }]),
-      },
-    });
-    const event = {
-      type: "tool_call",
-      toolCallId: "tc-path-ok",
-      name: "read",
+    const { handler } = makeHandler({ tools: ["read"] });
+    const event = makeToolCallEvent("read", {
       input: { path: "src/index.ts" },
-    };
+    });
     const result = await handler.handleToolCall(event, makeCtx());
     expect(result).toEqual({});
   });
@@ -261,28 +229,15 @@ describe("handleToolCall — path gate (tools)", () => {
 
 describe("handleToolCall — bash path gate", () => {
   it("blocks a bash command accessing .env when path surface denies", async () => {
-    const checkPermission = vi
-      .fn()
-      .mockImplementation(
-        (surface: string, _input: unknown, _agentName?: string) => {
-          if (surface === "path") {
-            return makeCheckResult({ state: "deny", matchedPattern: "*.env" });
-          }
-          return makeCheckResult();
-        },
-      );
     const { handler } = makeHandler({
-      session: { checkPermission },
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "bash" }]),
+      session: {
+        checkPermission: makeSurfaceCheck({
+          path: { state: "deny", matchedPattern: "*.env" },
+        }),
       },
+      tools: ["bash"],
     });
-    const event = {
-      type: "tool_call",
-      toolCallId: "tc-bash-path",
-      name: "bash",
-      input: { command: "cat .env" },
-    };
+    const event = makeToolCallEvent("bash", { input: { command: "cat .env" } });
     const result = await handler.handleToolCall(event, makeCtx());
     expect(result).toMatchObject({ block: true });
   });
@@ -292,108 +247,44 @@ describe("handleToolCall — bash path gate", () => {
 
 describe("handleToolCall — bash command chain gate", () => {
   it("blocks a chain when a later sub-command is denied (#301)", async () => {
-    const checkPermission = vi
-      .fn()
-      .mockImplementation((surface: string, input: unknown) => {
-        if (surface === "bash") {
-          const command = (input as { command?: string }).command ?? "";
-          return /^npm\b/.test(command)
-            ? makeCheckResult({
-                state: "deny",
-                source: "bash",
-                command,
-                matchedPattern: "npm *",
-              })
-            : makeCheckResult({
-                state: "allow",
-                source: "bash",
-                command,
-                matchedPattern: "echo *",
-              });
-        }
-        return makeCheckResult({ state: "allow" });
-      });
     const { handler } = makeHandler({
-      session: { checkPermission },
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "bash" }]),
+      session: {
+        checkPermission: makeBashCommandCheck({
+          deny: /^npm\b/,
+          denyMatched: "npm *",
+          allowMatched: "echo *",
+        }),
       },
+      tools: ["bash"],
     });
-    const event = {
-      type: "tool_call",
-      toolCallId: "tc-bash-chain",
-      name: "bash",
+    const event = makeToolCallEvent("bash", {
       input: { command: "echo start && npm install compromised-package" },
-    };
+    });
     const result = await handler.handleToolCall(event, makeCtx());
     expect(result).toMatchObject({ block: true });
   });
 
   it("blocks a command nested inside command substitution (#306)", async () => {
-    const checkPermission = vi
-      .fn()
-      .mockImplementation((surface: string, input: unknown) => {
-        if (surface === "bash") {
-          const command = (input as { command?: string }).command ?? "";
-          return /^rm\b/.test(command)
-            ? makeCheckResult({
-                state: "deny",
-                source: "bash",
-                command,
-                matchedPattern: "rm *",
-              })
-            : makeCheckResult({
-                state: "allow",
-                source: "bash",
-                command,
-                matchedPattern: "echo *",
-              });
-        }
-        return makeCheckResult({ state: "allow" });
-      });
     const { handler } = makeHandler({
-      session: { checkPermission },
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "bash" }]),
+      session: {
+        checkPermission: makeBashCommandCheck({
+          deny: /^rm\b/,
+          denyMatched: "rm *",
+          allowMatched: "echo *",
+        }),
       },
+      tools: ["bash"],
     });
-    const event = {
-      type: "tool_call",
-      toolCallId: "tc-bash-substitution",
-      name: "bash",
+    const event = makeToolCallEvent("bash", {
       input: { command: "echo $(rm -rf foo)" },
-    };
+    });
     const result = await handler.handleToolCall(event, makeCtx());
     expect(result).toMatchObject({ block: true });
   });
 
   it("allows a single non-chained bash command", async () => {
-    const checkPermission = vi
-      .fn()
-      .mockImplementation((surface: string, input: unknown) => {
-        if (surface === "bash") {
-          const command = (input as { command?: string }).command ?? "";
-          return makeCheckResult({
-            state: "allow",
-            source: "bash",
-            command,
-            matchedPattern: "echo *",
-          });
-        }
-        return makeCheckResult({ state: "allow" });
-      });
-    const { handler } = makeHandler({
-      session: { checkPermission },
-      toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "bash" }]),
-      },
-    });
-    const event = {
-      type: "tool_call",
-      toolCallId: "tc-bash-single",
-      name: "bash",
-      input: { command: "echo hi" },
-    };
+    const { handler } = makeHandler({ tools: ["bash"] });
+    const event = makeToolCallEvent("bash", { input: { command: "echo hi" } });
     const result = await handler.handleToolCall(event, makeCtx());
     expect(result).toEqual({});
   });
