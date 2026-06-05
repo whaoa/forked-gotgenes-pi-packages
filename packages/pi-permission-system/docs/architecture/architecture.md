@@ -634,7 +634,7 @@ The nine steps are filed as [#334]–[#342].
 Production first (Steps 1-8), then the test-cleanup tail (Step 9).
 Each step is a behavior-preserving refactor that leaves the suite green; the success metric is the constructibility table above moving toward zero, observed as fewer `vi.mock` module stubs, smaller fixtures, and dropped casts.
 
-1. **Inject a single `PermissionManager` into `PermissionSession`** ([#334])
+1. **Inject a single `PermissionManager` into `PermissionSession`** ([#334]) ✓ complete
    - Target: `permission-manager.ts` (add `configureForCwd(cwd)`); `permission-session.ts` constructor + `resetForNewSession` + `reload`; `index.ts`.
    - `PermissionSession` holds one injected `PermissionManager` and calls `configureForCwd(ctx.cwd)` once at `session_start`, instead of constructing a new manager via the `createPermissionManagerForCwd` free function on every lifecycle event; tests pass a real or fake manager directly.
    - The per-call reconstruction implied the project cwd can change across a session; it cannot (verified against Pi core — `AgentSession._cwd` and `ExtensionRunner.cwd` are each assigned once and never reassigned; `/reload` re-emits `session_start` with the same cwd).
@@ -642,7 +642,7 @@ Each step is a behavior-preserving refactor that leaves the suite green; the suc
    - Smell category: C (DIP violation — addresses Finding 1).
    - Outcome: `vi.mock("../src/runtime")` and `as unknown as PermissionManager` leave `permission-session.test.ts`; the manager is a single injected, substitutable collaborator — no `Factory` class.
 
-2. **Extract a `ConfigStore` from the runtime free-functions** ([#335])
+2. **Extract a `ConfigStore` from the runtime free-functions** ([#335]) ✓ complete
    - Target: new `src/config-store.ts` class owning `config` + `lastConfigWarning` with `current()` / `refresh(ctx?)` / `save(next, ctx)` / `logResolvedPaths()`; convert `refreshExtensionConfig` / `saveExtensionConfig` / `logResolvedConfigPaths` from `(runtime, …)` free functions into methods.
    - Consumers hold the store and call `store.current()` instead of capturing `() => runtime.config`.
    - Smell category: C (mutable shared state → owner — addresses Finding 3, part 1).
