@@ -24,7 +24,6 @@ import { PermissionSession } from "./permission-session";
 import { LocalPermissionsService } from "./permissions-service";
 import {
   createExtensionRuntime,
-  logResolvedConfigPaths,
   refreshExtensionConfig,
   saveExtensionConfig,
 } from "./runtime";
@@ -81,10 +80,8 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
       subagentRegistry,
     ),
     sessionManager,
+    runtime.configStore,
     {
-      refreshExtensionConfig: (ctx) => refreshExtensionConfig(runtime, ctx),
-      logResolvedConfigPaths: () => logResolvedConfigPaths(runtime),
-      getConfig: () => runtime.config,
       canRequestPermissionConfirmation: (ctx) =>
         canResolveAskPermissionRequest({
           config: runtime.config,

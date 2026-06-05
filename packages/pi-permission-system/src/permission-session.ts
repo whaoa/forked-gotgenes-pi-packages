@@ -5,6 +5,7 @@ import {
   getActiveAgentNameFromSystemPrompt,
 } from "./active-agent";
 import type { AgentPrepSession } from "./agent-prep-session";
+import type { SessionConfigStore } from "./config-store";
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ExtensionPaths } from "./extension-paths";
 import type { ForwardingController } from "./forwarding-manager";
@@ -34,12 +35,6 @@ import type { PermissionCheckResult, PermissionState } from "./types";
  * where the `ExtensionRuntime` is available.
  */
 export interface PermissionSessionRuntimeDeps {
-  /** Reload merged config from disk; optionally update the stored runtime context. */
-  refreshExtensionConfig(ctx?: ExtensionContext): void;
-  /** Write the resolved config path set to the review and debug logs. */
-  logResolvedConfigPaths(): void;
-  /** Read current extension config (called at query time). */
-  getConfig(): PermissionSystemExtensionConfig;
   /** Whether the current context can show an interactive permission prompt. */
   canRequestPermissionConfirmation(ctx: ExtensionContext): boolean;
   /** Prompt the user for a permission decision, log the outcome, and return it. */
@@ -61,7 +56,8 @@ export interface PermissionSessionRuntimeDeps {
  * - `ExtensionPaths` — immutable path constants
  * - `SessionLogger` — debug + review + warn
  * - `ForwardingController` — polling lifecycle
- * - `PermissionSessionRuntimeDeps` — config refresh + log delegates
+ * - `SessionConfigStore` — owns extension config; provides refresh, log, read
+ * - `PermissionSessionRuntimeDeps` — prompting + permission-confirmation bridge
  */
 export class PermissionSession
   implements
@@ -84,6 +80,7 @@ export class PermissionSession
     readonly logger: SessionLogger,
     private readonly forwarding: ForwardingController,
     private readonly permissionManager: ScopedPermissionManager,
+    private readonly configStore: SessionConfigStore,
     private readonly runtimeDeps: PermissionSessionRuntimeDeps,
   ) {}
 
@@ -260,17 +257,17 @@ export class PermissionSession
 
   /** Reload merged config from disk; optionally update the stored runtime context. */
   refreshConfig(ctx?: ExtensionContext): void {
-    this.runtimeDeps.refreshExtensionConfig(ctx);
+    this.configStore.refresh(ctx);
   }
 
   /** Write the resolved config path set to the review and debug logs. */
   logResolvedConfigPaths(): void {
-    this.runtimeDeps.logResolvedConfigPaths();
+    this.configStore.logResolvedPaths();
   }
 
   /** Read current extension config. */
   get config(): PermissionSystemExtensionConfig {
-    return this.runtimeDeps.getConfig();
+    return this.configStore.current();
   }
 
   // ── Infrastructure paths ───────────────────────────────────────────────

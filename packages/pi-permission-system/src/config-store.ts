@@ -34,6 +34,17 @@ export interface ConfigReader {
 }
 
 /**
+ * Narrow subset of `ConfigStore` that `PermissionSession` depends on.
+ *
+ * Using an interface rather than the concrete class avoids private-member
+ * coupling between the class and test doubles.
+ */
+export interface SessionConfigStore extends ConfigReader {
+  refresh(ctx?: ExtensionContext): void;
+  logResolvedPaths(): void;
+}
+
+/**
  * Transitional get/set seam over the runtime-owned context.
  *
  * Retired in Step 4 (#337) when context ownership moves to `PermissionSession`.
@@ -71,7 +82,7 @@ export interface ConfigStoreDeps {
  * Implements {@link ConfigReader} so consumers that only read the current config
  * can depend on the narrow interface rather than the full class.
  */
-export class ConfigStore implements ConfigReader {
+export class ConfigStore implements SessionConfigStore {
   private config: PermissionSystemExtensionConfig;
   private lastConfigWarning: string | null = null;
 

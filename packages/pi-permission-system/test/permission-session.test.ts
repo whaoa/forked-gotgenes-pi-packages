@@ -17,6 +17,8 @@ vi.mock("../src/active-agent", () => ({
 
 // ── Test helpers ───────────────────────────────────────────────────────────
 
+import type { SessionConfigStore } from "#src/config-store";
+import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import type { ExtensionPaths } from "#src/extension-paths";
 import type { ForwardingController } from "#src/forwarding-manager";
 import type { ScopedPermissionManager } from "#src/permission-manager";
@@ -66,11 +68,22 @@ function makeLogger(): SessionLogger {
   };
 }
 
+function makeConfigStore(
+  overrides: Partial<SessionConfigStore> = {},
+): SessionConfigStore {
+  return {
+    current:
+      overrides.current ??
+      vi
+        .fn<() => typeof DEFAULT_EXTENSION_CONFIG>()
+        .mockReturnValue({ ...DEFAULT_EXTENSION_CONFIG }),
+    refresh: overrides.refresh ?? vi.fn<(ctx?: ExtensionContext) => void>(),
+    logResolvedPaths: overrides.logResolvedPaths ?? vi.fn<() => void>(),
+  };
+}
+
 function makeRuntimeDeps(): PermissionSessionRuntimeDeps {
   return {
-    refreshExtensionConfig: vi.fn(),
-    logResolvedConfigPaths: vi.fn(),
-    getConfig: vi.fn().mockReturnValue({}),
     canRequestPermissionConfirmation: vi.fn().mockReturnValue(true),
     promptPermission: vi
       .fn()
@@ -116,12 +129,14 @@ function createSession(overrides?: {
   logger?: SessionLogger;
   forwarding?: ForwardingController;
   permissionManager?: ScopedPermissionManager;
+  configStore?: SessionConfigStore;
   runtimeDeps?: PermissionSessionRuntimeDeps;
 }): {
   session: PermissionSession;
   paths: ExtensionPaths;
   logger: SessionLogger;
   forwarding: ForwardingController;
+  configStore: SessionConfigStore;
   runtimeDeps: PermissionSessionRuntimeDeps;
 } {
   const paths = makePaths(overrides?.paths);
@@ -129,15 +144,17 @@ function createSession(overrides?: {
   const forwarding = overrides?.forwarding ?? makeForwarding();
   const permissionManager =
     overrides?.permissionManager ?? makePermissionManager();
+  const configStore = overrides?.configStore ?? makeConfigStore();
   const runtimeDeps = overrides?.runtimeDeps ?? makeRuntimeDeps();
   const session = new PermissionSession(
     paths,
     logger,
     forwarding,
     permissionManager,
+    configStore,
     runtimeDeps,
   );
-  return { session, paths, logger, forwarding, runtimeDeps };
+  return { session, paths, logger, forwarding, configStore, runtimeDeps };
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -484,11 +501,12 @@ describe("PermissionSession", () => {
 
   describe("infrastructure paths", () => {
     it("getInfrastructureReadDirs combines piInfrastructureDirs and piInfrastructureReadPaths", () => {
-      const runtimeDeps = makeRuntimeDeps();
-      (runtimeDeps.getConfig as ReturnType<typeof vi.fn>).mockReturnValue({
-        piInfrastructureReadPaths: ["/extra/path"],
+      const configStore = makeConfigStore({
+        current: vi.fn().mockReturnValue({
+          piInfrastructureReadPaths: ["/extra/path"],
+        }),
       });
-      const { session } = createSession({ runtimeDeps });
+      const { session } = createSession({ configStore });
       expect(session.getInfrastructureReadDirs()).toEqual([
         "/test/agent",
         "/test/agent/git",
@@ -506,36 +524,36 @@ describe("PermissionSession", () => {
   });
 
   describe("config delegation", () => {
-    it("refreshConfig delegates to runtimeDeps", () => {
-      const { session, runtimeDeps } = createSession();
+    it("refreshConfig delegates to configStore.refresh", () => {
+      const { session, configStore } = createSession();
       const ctx = makeCtx();
       session.refreshConfig(ctx);
-      expect(runtimeDeps.refreshExtensionConfig).toHaveBeenCalledWith(ctx);
+      expect(configStore.refresh).toHaveBeenCalledWith(ctx);
     });
 
-    it("logResolvedConfigPaths delegates to runtimeDeps", () => {
-      const { session, runtimeDeps } = createSession();
+    it("logResolvedConfigPaths delegates to configStore.logResolvedPaths", () => {
+      const { session, configStore } = createSession();
       session.logResolvedConfigPaths();
-      expect(runtimeDeps.logResolvedConfigPaths).toHaveBeenCalled();
+      expect(configStore.logResolvedPaths).toHaveBeenCalled();
     });
 
-    it("config getter delegates to runtimeDeps.getConfig", () => {
-      const runtimeDeps = makeRuntimeDeps();
-      const fakeConfig = { debugLog: true };
-      (runtimeDeps.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
-        fakeConfig,
-      );
-      const { session } = createSession({ runtimeDeps });
+    it("config getter delegates to configStore.current()", () => {
+      const fakeConfig = { debugLog: true } as typeof DEFAULT_EXTENSION_CONFIG;
+      const configStore = makeConfigStore({
+        current: vi.fn().mockReturnValue(fakeConfig),
+      });
+      const { session } = createSession({ configStore });
       expect(session.config).toBe(fakeConfig);
     });
 
     it("getToolPreviewLimits returns resolved preview limits from config", () => {
-      const runtimeDeps = makeRuntimeDeps();
-      (runtimeDeps.getConfig as ReturnType<typeof vi.fn>).mockReturnValue({
-        toolInputPreviewMaxLength: 400,
-        toolTextSummaryMaxLength: 120,
+      const configStore = makeConfigStore({
+        current: vi.fn().mockReturnValue({
+          toolInputPreviewMaxLength: 400,
+          toolTextSummaryMaxLength: 120,
+        }),
       });
-      const { session } = createSession({ runtimeDeps });
+      const { session } = createSession({ configStore });
       const limits = session.getToolPreviewLimits();
       expect(limits.toolInputPreviewMaxLength).toBe(400);
       expect(limits.toolTextSummaryMaxLength).toBe(120);
