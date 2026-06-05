@@ -24,6 +24,11 @@ The `pi-autoformat` extension emits a `[pi-autoformat] Formatted N file(s)` mess
 It is informational — not a turn boundary.
 Continue the current step (e.g. Red→Green→Commit) until it is complete.
 
+### Edit tool batches
+
+A multi-edit `Edit` call is atomic: if one `oldText` fails to match, the whole batch is rejected and nothing is applied.
+After a rejection, re-apply every intended edit (not just the ones you retried) and run `pnpm run check` to confirm none were silently dropped.
+
 ### Multi-session issue lifecycle
 
 Larger issues span multiple sessions, each handling one stage.

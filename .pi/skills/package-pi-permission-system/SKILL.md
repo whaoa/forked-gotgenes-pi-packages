@@ -18,6 +18,7 @@ Pre-monorepo plans from the upstream fork live in `docs/plans/archive/` — issu
 
 `docs/architecture/architecture.md` tracks the improvement phases as a flat numbered step list plus a Mermaid graph — one issue per step, never a chain inside a single node label.
 When a plan touches that roadmap, enumerate the whole phase: search dependents too (`gh issue list --search "#N"`), not just the issues the current one references.
+When a roadmap step ships, mark it complete in `docs/architecture/architecture.md` (append `✓ complete` to the step line) as part of the shipping change — do not leave it for a later session.
 
 ## Implementation Priorities
 
