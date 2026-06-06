@@ -564,7 +564,7 @@ src/
 ├── forwarded-permissions/     Poll-based approval forwarding for subagents
 │   ├── permission-forwarder.ts `PermissionForwarder` class (`ApprovalRequester` + `InboxProcessor`) - owns the forwarding lifecycle: `requestApproval()` polls for the parent's decision, `processInbox()` drains forwarded requests (#315, #316, #317)
 │   └── io.ts                  Forwarding filesystem helpers - request/response read-write, location derivation, atomic JSON writes
-├── session-logger.ts          SessionLogger interface + createSessionLogger() factory
+├── session-logger.ts          SessionLogger interface + createSessionLogger(deps) factory; owns JSONL-writer composition, IO-failure warning dedup, and notify sink (#336)
 ├── logging.ts                 JSONL review/debug log writer
 ├── status.ts                  Footer status bar integration
 ├── yolo-mode.ts               Auto-approve logic
@@ -648,7 +648,7 @@ Each step is a behavior-preserving refactor that leaves the suite green; the suc
    - Smell category: C (mutable shared state → owner — addresses Finding 3, part 1).
    - Outcome: 4× `() => runtime.config` closures and 3× runtime-arg config free-functions are gone; config has one owner.
 
-3. **Make the logger injectable; drop `createSessionLogger(runtime)`** ([#336])
+3. **Make the logger injectable; drop `createSessionLogger(runtime)`** ([#336]) ✓ complete
    - Target: `src/session-logger.ts`, `src/logging.ts`, `index.ts`.
    - Construct the logger from `ExtensionPaths` + the `ConfigStore` (debug toggle) + a narrow notify sink — not the whole runtime; remove the `runtime.writeDebugLog` / `runtime.runtimeContext?.ui.notify` reach-through.
    - Smell category: C (Law-of-Demeter reach-through — addresses Finding 3, part 2).
