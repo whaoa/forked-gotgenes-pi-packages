@@ -49,3 +49,49 @@ Architecture doc updated with Step 3 `✓ complete` mark and revised `session-lo
 - **WARN** — `src/index.ts` lines 49–52, 61, 109: five `(event, details) => runtime.logger.review(event, details)` closures are unnecessary (bare references type-check under contravariance), but `@typescript-eslint/unbound-method` blocks bare references without a project-wide ESLint config change.
   Deferred to [#338] which already owns the consumer deps bag cleanup.
 - **WARN** — `src/runtime.ts` notify sink (`runtimeContext?.ui.notify`) is a transitional LoD seam; acknowledged in the plan, deferred to [#337].
+
+## Stage: Final Retrospective (2026-06-06T22:18:35Z)
+
+### Session summary
+
+One continuous session carried #336 through plan → TDD → ship → retro across three models (`opus-4-8` planning, `sonnet-4-6` TDD, `deepseek-v4-flash` ship).
+The injectable-`SessionLogger` refactor landed in two clean lift-and-shift commits plus a docs commit, CI passed, and the issue closed with no release (all `refactor:`/`docs:` commits).
+The only notable friction was a mid-TDD path-confusion correction from the user and a one-round-trip ESLint rule conflict.
+
+### Observations
+
+#### What went well
+
+- The lazy `getConfig: () => configStore.current()` thunk broke the logger ↔ `ConfigStore` construction cycle on the first try — no stub-then-reassign, no test flakiness.
+  The plan predicted this exactly; implementation matched.
+- Two-step lift-and-shift kept the repo green between commits: Step 1 added `runtime.logger` with the old methods as thin delegators, Step 2 removed them.
+  `pnpm run check` / `lint` / full suite ran after every step, not just at the end — no feedback-loop gap.
+- Pre-completion reviewer (fresh-context subagent) correctly flagged the five gratuitous wrapper closures as a non-blocking WARN, and the agent verified the contravariance claim with a throwaway `tsc` check before accepting it.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (user-caught) — during TDD the agent ran package-scoped commands as `cd packages/pi-permission-system && grep/sed/pnpm run …`, and in one case mixed that with a bare `grep "init-declar" ../../eslint.config.js` (no `cd`), which resolved *outside* the repo from the CWD and returned a misleading "not found".
+  `AGENTS.md` already says to run package scripts from the root via `pnpm --filter` / `pnpm -C`, not `cd packages/<pkg> && …`.
+  Impact: user intervened ("I don't trust that you are looking at the correct paths") at message 37; the agent re-verified with `pwd` + absolute paths.
+  No rework to committed code (the config facts happened to be correct), but a real trust dip and one wrong-path read.
+- `rabbit-hole` (minor) — the `unbound-method` ESLint error on bare `logger.review` references was first "fixed" by annotating the `SessionLogger` interface with `this: void` (the rule's own suggestion), which `@typescript-eslint/no-invalid-void-type` then rejected.
+  Impact: ~5 tool calls and one revert before settling on arrow wrappers; self-resolved, no user involvement.
+
+#### What caused friction (user side)
+
+- The path-confusion correction at message 37 was a terse distrust signal rather than a pointer to the specific bad command.
+  A redirect naming the `cd`-into-subdir + `../../` mix (or the `AGENTS.md` root-run rule) would have shortened the recovery.
+  Framed as opportunity, not criticism — the signal was correct and well-timed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — planning on `opus-4-8` (judgment-heavy design) and TDD on `sonnet-4-6` (implementation) were well-matched.
+  Ship ran on `deepseek-v4-flash`, a low-cost model, and handled a non-trivial judgment (detecting the `#335 → #338` stacked sequence, asking the user, diagnosing why no release-please PR existed) correctly — no quality mismatch in outcome.
+  The pre-completion-reviewer ran as a separate subagent (its model is set by agent frontmatter, not visible in the parent transcript).
+- **Escalation-delay tracking** — the `unbound-method` / `this: void` / `no-invalid-void-type` sequence spanned ~5 consecutive tool calls (messages 63–71) with one wrong turn; below the "dispatch a subagent" threshold and self-resolved.
+- **Feedback-loop gap analysis** — none; verification ran incrementally after each change, plus full suite + `pnpm fallow dead-code` before the Step 2 commit.
+
+### Changes made
+
+1. `AGENTS.md` — added the `unbound-method` / `no-invalid-void-type` conflict (rule + arrow-wrapper fix) to the existing "Biome / ESLint linter conflicts" section.
+2. `packages/pi-permission-system/docs/retro/0336-inject-session-logger.md` — appended this Final Retrospective stage entry.

@@ -150,6 +150,9 @@ Biome's `noNonNullAssertion` bans `x!` and ESLint's `no-unnecessary-type-asserti
 When both linters run on the same file, assertion-based workarounds create an unsolvable loop.
 Fix: restructure the code to eliminate the assertion entirely (explicit `if` guard with early return).
 
+Passing an interface method as a bare value (`writeReviewLog: logger.review`) trips `@typescript-eslint/unbound-method`; the rule's suggested `this: void` fix is itself rejected by `@typescript-eslint/no-invalid-void-type`.
+Fix: wrap in an arrow (`(e, d) => logger.review(e, d)`).
+
 Before implementing, refactoring, or reviewing code, load the `code-design` skill for design principles and structural heuristics.
 
 ## Markdown
