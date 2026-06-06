@@ -48,3 +48,53 @@ Pre-completion reviewer returned WARN; both findings were resolved inline.
 - The `@typescript-eslint/no-deprecated` lint error on `PERMISSIONS_RPC_CHECK_CHANNEL` in the new composition-root test was fixed by extracting the channel value to a local `const rpcCheckChannel: string = PERMISSIONS_RPC_CHECK_CHANNEL` with a single `eslint-disable-next-line` annotation — cleaner than per-use suppressions.
 - Reviewer WARN 1 (Step 4 not marked `✓ complete` in `architecture.md`) was addressed immediately with an additional `docs:` commit, per the package skill requirement to mark steps complete at ship time rather than deferring.
 - Reviewer WARN 2 (pre-existing three-field cache reset in `permission-session.ts` without a `clearCaches()` helper) is a known smell documented in the Phase 4 plans; not introduced by this PR.
+
+## Stage: Final Retrospective (2026-06-06T23:33:45Z)
+
+### Session summary
+
+Shipped Phase 4 Step 4 end-to-end across four stages (plan → TDD → ship → retro): dissolved the `ExtensionRuntime` god object, fixed the session-rules / `PermissionManager` split-brain, and released `pi-permission-system@v10.3.1`.
+The plan was accurate enough that TDD execution matched it almost line-for-line; all friction was lint-driven micro-rework caught pre-commit by the verification loop.
+No user corrections were needed beyond a single "Continue." nudge and a status check.
+
+### Observations
+
+#### What went well
+
+- Model-task fit across the workflow was clean (see Diagnostic details): `opus` for plan/retro judgment, `sonnet` for implementation, and a `deepseek-v4-flash` model executing the deterministic `/ship-issue` workflow flawlessly — correctly escalating the one judgment point (stacked-release batch-vs-now) to the user via `ask_user` rather than deciding alone.
+- The `sessionNotify: PermissionSession | null` nullable-holder pattern cleanly resolved the forward-reference + Biome/ESLint conflict in `index.ts` without an `as unknown as` cast on the session reference (the `configStore` ref kept the pre-existing `null as unknown as ConfigStore` idiom).
+- Plan accuracy: the two-split-brain diagnosis, the `fix:` + `refactor:` split, and the zero-coverage-loss deletion of `runtime.test.ts` all played out exactly as the plan predicted — the planning-stage exploration (reading every consumer + `extension-paths.test.ts` overlap) paid off directly.
+- The verification loop ran incrementally (`pnpm run check` after each interface change, targeted `vitest` for red/green, full lint+test before every commit), so every slip was caught before commit.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (self-identified) — the first `index.ts` rewrite used `configStore!.current()` (a `!` assertion) plus an `eslint-disable` for `@typescript-eslint/no-non-null-assertion`, despite AGENTS.md's "Biome / ESLint linter conflicts" rule banning `x!`.
+  `pnpm run lint` flagged it (5 errors: 2× `prefer-const`, the unused disable directive, 2× unnecessary optional chain); the fix was the nullable-holder rewrite.
+  Impact: one `index.ts` rewrite, caught pre-commit — no wasted commit, no shipped defect.
+- `other` (self-identified) — appending the TDD stage entry to the retro via `Edit` produced a malformed file: the supplied `newText` was incomplete (ended mid-sentence) and the one-sentence-per-line autoformat interleaved it into the Planning observations.
+  Re-reading caught it; a full `Write` fixed it.
+  Impact: one retro rewrite.
+  Note: retro files accumulate repeated `### Observations` / `### Session summary` headers across stages, so `Edit` anchors on those headers are inherently ambiguous.
+- `other` (self-identified) — two transient editing slips in `config-store.ts` / the deprecated-channel test: a dead `cwdOrNull` local (removed immediately) and `eslint-disable` comments placed on the wrong lines (refactored to a single local-const disable).
+  Impact: ~1 extra edit each; no rework beyond the same step.
+
+#### What caused friction (user side)
+
+- None of substance.
+  The user's involvement was light-touch oversight (one "Continue." after a turn ended without a trailing tool call, and one "Where are we?"
+  status check) rather than strategic correction — appropriate for a session executing a detailed pre-approved plan.
+
+### Diagnostic details
+
+- **Model-performance correlation** — Planning `anthropic/claude-opus-4-8` (judgment-heavy design tracing), TDD `anthropic/claude-sonnet-4-6` (implementation), Shipping `opencode-go/deepseek-v4-flash` (mechanical procedural workflow), Retro `anthropic/claude-opus-4-8` (synthesis).
+  No mismatches: the flash model on `/ship-issue` is the intended fit — a deterministic workflow where the sole judgment call was correctly delegated to the user.
+  The `pre-completion-reviewer` subagent ran on its own frontmatter model and produced a thorough WARN report (deterministic checks, acceptance criteria, code design, Mermaid parse) — quality adequate for the judgment-heavy review.
+- **Escalation-delay tracking** — no rabbit-holes; the longest same-error sequence was the `index.ts` lint conflict at one lint run → one rewrite (well under the 5-call threshold).
+- **Unused-tool detection** — no `missing-context` or `rabbit-hole` points; no subagent or `colgrep` opportunity was missed (planning-stage `grep`/`read` exploration was sufficient).
+- **Feedback-loop gap analysis** — no gap; verification was incremental throughout, not end-loaded.
+
+### Changes made
+
+1. `.pi/prompts/tdd-plan.md` — added retro-append guidance: anchor the `Edit` on the file's last line or use `Write`, since repeated stage headers make header-anchored edits ambiguous.
+2. `.pi/prompts/build-plan.md` — same retro-append guidance line.
+3. `.pi/prompts/retro.md` — same guidance, added beside the existing "append the new entry" instruction in Step 3.

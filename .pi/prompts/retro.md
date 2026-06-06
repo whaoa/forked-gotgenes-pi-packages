@@ -133,6 +133,7 @@ issue_title: "<exact title from `gh issue view N`>"
 ```
 
 If the file already exists with prior stage entries, **append** the new entry — do not overwrite existing content.
+Anchor the `Edit` on the file's last line or use `Write` with the full content — the repeated `### Observations` / `### Session summary` headers make header-anchored edits ambiguous.
 The retro file accumulates entries across sessions.
 
 Wrap all code identifiers, filenames, route paths, CLI names, and any text containing underscores in backticks.
