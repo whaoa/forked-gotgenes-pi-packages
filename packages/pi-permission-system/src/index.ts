@@ -116,13 +116,12 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // Connect the notify sink now that session is available.
   sessionNotify = session;
 
+  const configPath = getGlobalConfigPath(agentDir);
   registerPermissionSystemCommand(pi, {
     config: configStore,
-    getConfigPath: () => getGlobalConfigPath(agentDir),
-    getComposedRules: () =>
-      permissionManager.getComposedConfigRules(
-        session.lastKnownActiveAgentName ?? undefined,
-      ),
+    configPath,
+    permissionManager,
+    session,
   });
 
   const rpcHandles = registerPermissionRpcHandlers(pi.events, {

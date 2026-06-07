@@ -9,7 +9,7 @@ import {
   normalizePermissionSystemConfig,
   type PermissionSystemExtensionConfig,
 } from "#src/extension-config";
-import type { Rule } from "#src/rule";
+import type { Rule, Ruleset } from "#src/rule";
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
   getSettingsListTheme: () => ({}),
@@ -88,7 +88,9 @@ test("permission-system command completions expose top-level config actions", ()
     };
     const controller = {
       config: configStore,
-      getConfigPath: () => configPath,
+      configPath,
+      permissionManager: { getComposedConfigRules: () => [] as Ruleset },
+      session: { lastKnownActiveAgentName: null },
     };
 
     let definition: {
@@ -160,7 +162,9 @@ test("permission-system command handlers manage config summary, persistence, and
     };
     const controller = {
       config: configStore,
-      getConfigPath: () => configPath,
+      configPath,
+      permissionManager: { getComposedConfigRules: () => [] as Ruleset },
+      session: { lastKnownActiveAgentName: null },
     };
 
     let registeredName = "";
@@ -257,8 +261,9 @@ test("show output includes rule origins when getComposedRules is provided", asyn
 
   const controller = {
     config: { current: () => config, save: () => {} } as CommandConfigStore,
-    getConfigPath: () => "/fake/config.json",
-    getComposedRules: () => composedRules,
+    configPath: "/fake/config.json",
+    permissionManager: { getComposedConfigRules: () => composedRules },
+    session: { lastKnownActiveAgentName: null },
   };
 
   let definition: {
@@ -289,8 +294,9 @@ test("show output omits rule summary when getComposedRules is not provided", asy
 
   const controller = {
     config: { current: () => config, save: () => {} } as CommandConfigStore,
-    getConfigPath: () => "/fake/config.json",
-    // no getComposedRules
+    configPath: "/fake/config.json",
+    permissionManager: { getComposedConfigRules: () => [] as Ruleset },
+    session: { lastKnownActiveAgentName: null },
   };
 
   let definition: {
