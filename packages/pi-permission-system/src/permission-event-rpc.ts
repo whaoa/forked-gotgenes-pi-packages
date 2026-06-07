@@ -28,7 +28,6 @@ import {
 } from "./permission-events";
 import type { PermissionManager } from "./permission-manager";
 import { buildRpcUiPrompt } from "./permission-ui-prompt";
-import type { Rule } from "./rule";
 import type { ReviewLogger } from "./session-logger";
 import type { SessionRules } from "./session-rules";
 
