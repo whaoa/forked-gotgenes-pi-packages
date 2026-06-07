@@ -13,7 +13,7 @@ import type { GateHandlerSession } from "./gate-handler-session";
 import type { ScopedPermissionManager } from "./permission-manager";
 import type { PromptingGatewayLifecycle } from "./prompting-gateway";
 import type { Rule } from "./rule";
-import type { SessionLifecycleSession } from "./session-lifecycle-session";
+
 import type { SessionLogger } from "./session-logger";
 import type { SessionRules } from "./session-rules";
 import type { SkillPromptEntry } from "./skill-prompt-sanitizer";
@@ -38,9 +38,7 @@ import type { PermissionCheckResult, PermissionState } from "./types";
  * - `SessionConfigStore` — owns extension config; provides refresh, log, read
  * - `PromptingGatewayLifecycle` — prompting lifecycle forwarded via activate/deactivate
  */
-export class PermissionSession
-  implements GateHandlerSession, AgentPrepSession, SessionLifecycleSession
-{
+export class PermissionSession implements GateHandlerSession, AgentPrepSession {
   private context: ExtensionContext | null = null;
   private skillEntries: SkillPromptEntry[] = [];
   private knownAgentName: string | null = null;
@@ -96,10 +94,6 @@ export class PermissionSession
 
   getToolPermission(toolName: string, agentName?: string): PermissionState {
     return this.permissionManager.getToolPermission(toolName, agentName);
-  }
-
-  getConfigIssues(agentName?: string): string[] {
-    return this.permissionManager.getConfigIssues(agentName);
   }
 
   getPolicyCacheStamp(agentName?: string): string {

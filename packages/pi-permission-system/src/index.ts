@@ -157,9 +157,14 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     setActive: (names: string[]) => pi.setActiveTools(names),
   };
 
-  const lifecycle = new SessionLifecycleHandler(session, serviceLifecycle);
-  const agentPrep = new AgentPrepHandler(session, toolRegistry);
   const resolver = new PermissionResolver(permissionManager, sessionRules);
+
+  const lifecycle = new SessionLifecycleHandler(
+    session,
+    resolver,
+    serviceLifecycle,
+  );
+  const agentPrep = new AgentPrepHandler(session, toolRegistry);
 
   const reporter = new GateDecisionReporter(session.logger, pi.events);
   const gateRunner = new GateRunner(resolver, sessionRules, gateway, reporter);

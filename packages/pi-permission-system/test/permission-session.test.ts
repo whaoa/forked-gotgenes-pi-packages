@@ -83,15 +83,6 @@ describe("PermissionSession", () => {
       expect(result).toBe("allow");
     });
 
-    it("delegates getConfigIssues to internal PermissionManager", () => {
-      const pm = makePermissionManager();
-      vi.mocked(pm.getConfigIssues).mockReturnValue(["issue1"]);
-      const { session } = createSession({ permissionManager: pm });
-
-      expect(session.getConfigIssues("agent1")).toEqual(["issue1"]);
-      expect(pm.getConfigIssues).toHaveBeenCalledWith("agent1");
-    });
-
     it("delegates getPolicyCacheStamp to internal PermissionManager", () => {
       const pm = makePermissionManager();
       const { session } = createSession({ permissionManager: pm });

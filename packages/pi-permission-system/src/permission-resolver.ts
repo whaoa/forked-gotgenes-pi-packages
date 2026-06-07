@@ -72,7 +72,6 @@ export class PermissionResolver implements ScopedPermissionResolver {
     return this.permissionManager.getToolPermission(toolName, agentName);
   }
 
-  // fallow-ignore-next-line unused-class-member
   getConfigIssues(agentName?: string): string[] {
     return this.permissionManager.getConfigIssues(agentName);
   }
