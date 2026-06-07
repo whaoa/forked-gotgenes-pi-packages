@@ -79,6 +79,7 @@ Run `pnpm run check` (`tsc --noEmit`) for type-only changes.
 - When adding a field to a shared interface, grep for ALL test files that construct a compatible mock — not just factory helpers.
 - When a TDD step removes a field from a shared interface, grep all `src/` files that reference the removed field — every file that reads or passes the field must update in the same step.
   This is the inverse of the excess-property rule: TypeScript rejects reading a property that no longer exists on the type.
+- When a TDD step removes an interface from an `extends` or intersection chain, grep for types that compose it (`extends <Interface>`, `<Interface> &`) — intersection mock supertypes (e.g. `MockGateHandlerSession`) silently lose the removed members and break at the construction site, not the type definition.
 - When removing fields from a shared init type, grep for all test files and factory helpers that pass the removed field — esbuild won't reject unknown properties at runtime, so tests silently get wrong default values instead of failing.
 - When a change moves *when* a value or service becomes available (e.g. factory-init → `session_start`), grep all test files for consumers that resolve it — not just the tests you already plan to touch.
   A timing change breaks them at runtime (the full suite), not at typecheck, so `pnpm run check` will not flag them.

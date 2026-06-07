@@ -64,6 +64,9 @@ export type KeepThisType = string;
 // fallow-ignore-file
 ```
 
+The kind token must be the exact singular issue kind (`unused-class-member`, not `unused-class-members`) and the only text after the directive — fallow parses every space-separated token as a kind, so trailing prose (`-- because …`) produces "stale suppression" noise.
+Put rationale on the line above the directive.
+
 Use `/** @public */` or `/** @expected-unused */` JSDoc tags for library API exports.
 
 ## Auto-fix cycle
