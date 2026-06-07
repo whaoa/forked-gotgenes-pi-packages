@@ -30,3 +30,19 @@ Plan filed at `packages/pi-permission-system/docs/plans/0339-extract-prompting-g
 [#334]: https://github.com/gotgenes/pi-packages/issues/334
 [#340]: https://github.com/gotgenes/pi-packages/issues/340
 [#341]: https://github.com/gotgenes/pi-packages/issues/341
+
+## Stage: Implementation — TDD (2026-06-07T14:57:32Z)
+
+### Session summary
+
+Completed all 9 TDD cycles: added `PromptingGateway` (cycle 1), wired it into production and shed the session's prompting role with a transitional bridge (cycle 2), renamed `GatePrompter.promptPermission` → `prompt` (cycle 3), migrated 5 handler test suites to steer via the `prompter` mock (cycles 4–8), and removed the bridge and all `undefined as unknown as ExtensionContext` casts (cycle 9).
+Test count held at 87 files / 1,823 tests throughout (net zero: the 14 new gateway tests replaced the 4 prompting `describe` blocks removed from `permission-session.test.ts`, plus prior tests migrated rather than added).
+Pre-completion reviewer returned WARN with one finding (roadmap Step 6 not marked complete) and one non-blocking lint note (unused `beforeEach` import); both fixed before stage notes.
+
+### Observations
+
+- The cycle 2 → cycle 9 split worked exactly as planned: `MockGateHandlerSession` kept its prompting extras until cycle 9; no handler test case needed touching until its own migration cycle.
+- One deviation from the plan: `external-directory-integration.test.ts` had a latent `session.prompt` use in the `"external_directory — allow external reads"` describe block that the plan didn’t list explicitly; it was caught and fixed in cycle 9 when `pnpm run check` rejected the stale session field.
+- `GatePrompter` rename sequencing worked cleanly: cycle 3 renamed the interface only after the session dropped it in cycle 2, avoiding the collision with the session’s own `prompt(ctx, details)` method.
+- `makeHandlerForSession` in `external-directory-session-dedup.test.ts` was redesigned in cycle 8 to accept an optional `GatePrompter` and return `{ handler, prompter }`, which kept the final cycle 9 cleanup contained to one function.
+- Pre-completion reviewer: WARN (resolved before commit — Step 6 marked `✓ complete` in `architecture.md`; unused `beforeEach` import removed from `test/prompting-gateway.test.ts`).
