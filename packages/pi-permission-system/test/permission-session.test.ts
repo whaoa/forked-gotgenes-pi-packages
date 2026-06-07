@@ -17,20 +17,20 @@ vi.mock("../src/active-agent", () => ({
 
 // ── Test helpers ───────────────────────────────────────────────────────────
 
-import type { SessionConfigStore } from "#src/config-store";
-import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
-import type { ExtensionPaths } from "#src/extension-paths";
-import type { ForwardingController } from "#src/forwarding-manager";
-import type { ScopedPermissionManager } from "#src/permission-manager";
-import { PermissionSession } from "#src/permission-session";
-import type { PromptingGatewayLifecycle } from "#src/prompting-gateway";
-import type { Ruleset } from "#src/rule";
+import type { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import { SessionApproval } from "#src/session-approval";
-import type { SessionLogger } from "#src/session-logger";
 import { SessionRules } from "#src/session-rules";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
-import type { PermissionCheckResult, PermissionState } from "#src/types";
 import { makeCtx } from "#test/helpers/handler-fixtures";
+import {
+  makeConfigStore,
+  makeFakePermissionManager,
+  makeRealSession,
+} from "#test/helpers/session-fixtures";
+
+// Alias so the existing tests read naturally.
+const createSession = makeRealSession;
+const makePermissionManager = makeFakePermissionManager;
 
 function makeSkillEntry(
   name: string,
@@ -44,125 +44,6 @@ function makeSkillEntry(
     normalizedLocation: `/${name}/SKILL.md`,
     normalizedBaseDir: `/${name}`,
     ...overrides,
-  };
-}
-
-function makePaths(overrides: Partial<ExtensionPaths> = {}): ExtensionPaths {
-  return {
-    agentDir: "/test/agent",
-    sessionsDir: "/test/agent/sessions",
-    subagentSessionsDir: "/test/agent/subagent-sessions",
-    forwardingDir: "/test/agent/sessions/permission-forwarding",
-    globalLogsDir: "/test/agent/logs",
-    piInfrastructureDirs: ["/test/agent", "/test/agent/git"],
-    ...overrides,
-  };
-}
-
-function makeLogger(): SessionLogger {
-  return {
-    debug: vi.fn(),
-    review: vi.fn(),
-    warn: vi.fn(),
-  };
-}
-
-function makeConfigStore(
-  overrides: Partial<SessionConfigStore> = {},
-): SessionConfigStore {
-  return {
-    current:
-      overrides.current ??
-      vi
-        .fn<() => typeof DEFAULT_EXTENSION_CONFIG>()
-        .mockReturnValue({ ...DEFAULT_EXTENSION_CONFIG }),
-    refresh: overrides.refresh ?? vi.fn<(ctx?: ExtensionContext) => void>(),
-    logResolvedPaths: overrides.logResolvedPaths ?? vi.fn<() => void>(),
-  };
-}
-
-function makeGateway(): PromptingGatewayLifecycle {
-  return {
-    activate: vi.fn<PromptingGatewayLifecycle["activate"]>(),
-    deactivate: vi.fn<PromptingGatewayLifecycle["deactivate"]>(),
-  };
-}
-
-function makeForwarding(): ForwardingController {
-  return {
-    start: vi.fn(),
-    stop: vi.fn(),
-  };
-}
-
-function makePermissionManager() {
-  return {
-    configureForCwd: vi.fn<(cwd: string | undefined | null) => void>(),
-    checkPermission: vi
-      .fn<
-        (
-          toolName: string,
-          input: unknown,
-          agentName?: string,
-          sessionRules?: Ruleset,
-        ) => PermissionCheckResult
-      >()
-      .mockReturnValue({
-        state: "allow",
-        toolName: "read",
-        source: "tool",
-        origin: "builtin",
-      }),
-    getToolPermission: vi
-      .fn<(toolName: string, agentName?: string) => PermissionState>()
-      .mockReturnValue("allow"),
-    getConfigIssues: vi.fn((): string[] => []),
-    getPolicyCacheStamp: vi.fn((): string => "stamp-1"),
-  };
-}
-
-function createSession(overrides?: {
-  paths?: Partial<ExtensionPaths>;
-  logger?: SessionLogger;
-  forwarding?: ForwardingController;
-  permissionManager?: ScopedPermissionManager;
-  sessionRules?: SessionRules;
-  configStore?: SessionConfigStore;
-  gateway?: PromptingGatewayLifecycle;
-}): {
-  session: PermissionSession;
-  paths: ExtensionPaths;
-  logger: SessionLogger;
-  forwarding: ForwardingController;
-  sessionRules: SessionRules;
-  configStore: SessionConfigStore;
-  gateway: PromptingGatewayLifecycle;
-} {
-  const paths = makePaths(overrides?.paths);
-  const logger = overrides?.logger ?? makeLogger();
-  const forwarding = overrides?.forwarding ?? makeForwarding();
-  const permissionManager =
-    overrides?.permissionManager ?? makePermissionManager();
-  const sessionRules = overrides?.sessionRules ?? new SessionRules();
-  const configStore = overrides?.configStore ?? makeConfigStore();
-  const gateway = overrides?.gateway ?? makeGateway();
-  const session = new PermissionSession(
-    paths,
-    logger,
-    forwarding,
-    permissionManager,
-    sessionRules,
-    configStore,
-    gateway,
-  );
-  return {
-    session,
-    paths,
-    logger,
-    forwarding,
-    sessionRules,
-    configStore,
-    gateway,
   };
 }
 
