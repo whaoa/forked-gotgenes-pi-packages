@@ -2,7 +2,11 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { normalizeOptionalPositiveInt, toRecord } from "./common";
+import {
+  normalizeOptionalPositiveInt,
+  normalizeOptionalStringArray,
+  toRecord,
+} from "./common";
 
 export const EXTENSION_ID = "pi-permission-system";
 
@@ -50,12 +54,9 @@ export function normalizePermissionSystemConfig(
   raw: unknown,
 ): PermissionSystemExtensionConfig {
   const record = toRecord(raw);
-  const rawPaths = record.piInfrastructureReadPaths;
-  const piInfrastructureReadPaths: string[] | undefined =
-    Array.isArray(rawPaths) &&
-    rawPaths.every((p): p is string => typeof p === "string")
-      ? rawPaths
-      : undefined;
+  const piInfrastructureReadPaths = normalizeOptionalStringArray(
+    record.piInfrastructureReadPaths,
+  );
   const result: PermissionSystemExtensionConfig = {
     debugLog: record.debugLog === true,
     permissionReviewLog: record.permissionReviewLog !== false,

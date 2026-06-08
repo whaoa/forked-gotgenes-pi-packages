@@ -5,6 +5,7 @@ import {
   getNonEmptyString,
   isPermissionState,
   normalizeOptionalPositiveInt,
+  normalizeOptionalStringArray,
   parseSimpleYamlMap,
   toRecord,
 } from "#src/common";
@@ -186,6 +187,44 @@ describe("parseSimpleYamlMap", () => {
     const yaml = '"quoted-key": value';
     const result = parseSimpleYamlMap(yaml);
     expect(result["quoted-key"]).toBe("value");
+  });
+});
+
+describe("normalizeOptionalStringArray", () => {
+  it("returns the array for a valid string array", () => {
+    expect(normalizeOptionalStringArray(["a", "b", "c"])).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
+  it("returns an empty array for an empty array", () => {
+    expect(normalizeOptionalStringArray([])).toEqual([]);
+  });
+
+  it("returns undefined for a plain string", () => {
+    expect(normalizeOptionalStringArray("x")).toBeUndefined();
+  });
+
+  it("returns undefined for a number", () => {
+    expect(normalizeOptionalStringArray(42)).toBeUndefined();
+  });
+
+  it("returns undefined for a plain object", () => {
+    expect(normalizeOptionalStringArray({ a: "b" })).toBeUndefined();
+  });
+
+  it("returns undefined for a mixed-type array", () => {
+    expect(normalizeOptionalStringArray(["a", 1])).toBeUndefined();
+  });
+
+  it("returns undefined for undefined", () => {
+    expect(normalizeOptionalStringArray(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined for null", () => {
+    expect(normalizeOptionalStringArray(null)).toBeUndefined();
   });
 });
 
