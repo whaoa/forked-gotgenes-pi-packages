@@ -300,3 +300,99 @@ describe("external-directory session dedup", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Moved from permission-system.test.ts catch-all (#342)
+// ---------------------------------------------------------------------------
+
+describe("session shutdown clears external-directory approvals", () => {
+  it("re-prompts for the same path after session shutdown", async () => {
+    // Build a fully wired handler inline so we can access session directly.
+    const { session, permissionManager, sessionRules, logger } =
+      makeRealSession();
+    const { resolver } = makeRealResolver(permissionManager, sessionRules);
+
+    // external_directory=ask; session-covered paths return allow/session.
+    vi.mocked(permissionManager.checkPermission).mockImplementation(
+      (surface, input, _agentName, rules): PermissionCheckResult => {
+        if (surface === "external_directory") {
+          const record = (input ?? {}) as Record<string, unknown>;
+          const pathValue =
+            typeof record.path === "string" ? record.path : null;
+          if (pathValue && rules && rules.length > 0) {
+            const match = rules.findLast(
+              (r) =>
+                r.surface === "external_directory" &&
+                wildcardMatch(r.pattern, pathValue),
+            );
+            if (match) {
+              return {
+                state: "allow",
+                toolName: surface,
+                source: "session",
+                origin: "session",
+                matchedPattern: match.pattern,
+              };
+            }
+          }
+          return {
+            state: "ask",
+            toolName: surface,
+            source: "special",
+            origin: "global",
+          };
+        }
+        return {
+          state: "allow",
+          toolName: surface,
+          source: "tool",
+          origin: "builtin",
+        };
+      },
+    );
+
+    const events = makeEvents();
+    const reporter = new GateDecisionReporter(logger, events);
+    const prompter: GatePrompter = {
+      canConfirm: vi.fn().mockReturnValue(true),
+      // Simulate "Yes, for this session" on first call, "Yes" on subsequent.
+      prompt: vi
+        .fn<GatePrompter["prompt"]>()
+        .mockResolvedValue({ approved: true, state: "approved_for_session" }),
+    };
+    const runner = new GateRunner(resolver, sessionRules, prompter, reporter);
+    const handler = new PermissionGateHandler(
+      session,
+      makeToolRegistry({
+        getAll: vi.fn().mockReturnValue([{ name: "read" }]),
+      }),
+      new ToolCallGatePipeline(resolver, session),
+      new SkillInputGatePipeline(resolver),
+      runner,
+    );
+
+    const externalPath = "/tmp/sibling/foo.ts";
+    const ctx = makeCtx();
+    const event = {
+      type: "tool_call",
+      toolCallId: "tc-1",
+      toolName: "read",
+      input: { path: externalPath },
+    };
+
+    // First access: prompt fires and records session approval.
+    await handler.handleToolCall(event, ctx);
+    expect(vi.mocked(prompter.prompt)).toHaveBeenCalledTimes(1);
+
+    // Second access: covered by session approval — no re-prompt.
+    await handler.handleToolCall({ ...event, toolCallId: "tc-2" }, ctx);
+    expect(vi.mocked(prompter.prompt)).toHaveBeenCalledTimes(1);
+
+    // Shutdown clears session approvals.
+    session.shutdown();
+
+    // Third access: session rules cleared — must re-prompt.
+    await handler.handleToolCall({ ...event, toolCallId: "tc-3" }, ctx);
+    expect(vi.mocked(prompter.prompt)).toHaveBeenCalledTimes(2);
+  });
+});
