@@ -92,6 +92,11 @@ When the same set of fields is reset to the same values in multiple places, extr
 When a new parameter must flow through a callback chain, check whether the intermediaries actually need it.
 If they only relay it, the parameter belongs on an object the endpoints share — not threaded through every layer.
 
+### Unbounded loops
+
+An ESLint `no-unnecessary-condition` flag on `while (true)` signals an unbounded loop with hand-rolled termination, not just a lint nuisance.
+Bound it over a known sequence (e.g. iterate the path components) rather than dodging the rule with `for (;;)` — `for (;;)` carries the same smell.
+
 ### Cross-extension composition
 
 When one extension needs to communicate with another, prefer event-driven composition over outbound bridge modules.

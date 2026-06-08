@@ -152,4 +152,8 @@ When planning a refactoring that targets testability, read the test files alongs
 
 When planning a refactoring that touches handler wiring or shared interfaces, load the `design-review` skill to audit for structural smells before writing the plan.
 
+The bash `external_directory` gate only sees tokens that `classifyTokenAsPathCandidate` accepts — absolute, `~/`-relative, or `..`-traversal paths.
+A plain `./relative` token (e.g. `cat ./link/hosts`) is dropped before that gate and is instead gated by the broader `path` surface (`classifyTokenAsRuleCandidate`).
+When a plan or test asserts a specific bash repro string, trace the token through the classifier first — an issue's headline repro can describe a symptom whose literal input never reaches the gate being changed.
+
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
