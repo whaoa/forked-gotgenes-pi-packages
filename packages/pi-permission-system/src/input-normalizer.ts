@@ -1,7 +1,7 @@
-import { toRecord } from "./common";
+import { getNonEmptyString, toRecord } from "./common";
 import { expandHomePath } from "./expand-home";
 import { createMcpPermissionTargets } from "./mcp-targets";
-import { getPathBearingToolPath, PATH_BEARING_TOOLS } from "./path-utils";
+import { PATH_BEARING_TOOLS } from "./path-utils";
 
 /**
  * Construct a surface-appropriate input object from a raw value string.
@@ -69,11 +69,9 @@ export function normalizeInput(
 ): NormalizedInput {
   // --- Special surfaces (path, external_directory) ---
   if (SPECIAL_PERMISSION_KEYS.has(toolName)) {
-    const record = toRecord(input);
-    const pathValue = typeof record.path === "string" ? record.path : null;
     return {
       surface: toolName,
-      values: [pathValue === null ? "*" : expandHomePath(pathValue)],
+      values: [normalizePathSurfaceValue(input)],
       resultExtras: {},
     };
   }
@@ -117,10 +115,9 @@ export function normalizeInput(
 
   // --- Path-bearing tools (read, write, edit, grep, find, ls) ---
   if (PATH_BEARING_TOOLS.has(toolName)) {
-    const path = getPathBearingToolPath(toolName, input);
     return {
       surface: toolName,
-      values: [path === null ? "*" : expandHomePath(path)],
+      values: [normalizePathSurfaceValue(input)],
       resultExtras: {},
     };
   }
@@ -131,4 +128,18 @@ export function normalizeInput(
     values: ["*"],
     resultExtras: {},
   };
+}
+
+/**
+ * Extract and home-expand the `input.path` lookup value shared by every path
+ * surface (`path`, `external_directory`, and the path-bearing tools).
+ *
+ * Missing, empty, or whitespace-only paths collapse to the surface catch-all
+ * `"*"`; otherwise `~/…` and `$HOME/…` prefixes are expanded to the OS home
+ * directory so values match home-anchored patterns symmetrically with how
+ * `compileWildcardPattern` expands the patterns themselves (#350).
+ */
+function normalizePathSurfaceValue(input: unknown): string {
+  const path = getNonEmptyString(toRecord(input).path);
+  return path === null ? "*" : expandHomePath(path);
 }

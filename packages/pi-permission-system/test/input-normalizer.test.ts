@@ -34,6 +34,16 @@ describe("normalizeInput — non-MCP surfaces", () => {
       expect(result.values).toEqual(["*"]);
     });
 
+    it("falls back to '*' when path is an empty string", () => {
+      const result = normalizeInput("path", { path: "" }, []);
+      expect(result.values).toEqual(["*"]);
+    });
+
+    it("falls back to '*' when path is whitespace-only", () => {
+      const result = normalizeInput("path", { path: "   " }, []);
+      expect(result.values).toEqual(["*"]);
+    });
+
     it("handles null input", () => {
       const result = normalizeInput("path", null, []);
       expect(result.values).toEqual(["*"]);
@@ -79,6 +89,11 @@ describe("normalizeInput — non-MCP surfaces", () => {
 
     it("falls back to '*' when path is not a string", () => {
       const result = normalizeInput("external_directory", { path: 42 }, []);
+      expect(result.values).toEqual(["*"]);
+    });
+
+    it("falls back to '*' when path is an empty string", () => {
+      const result = normalizeInput("external_directory", { path: "" }, []);
       expect(result.values).toEqual(["*"]);
     });
 
