@@ -216,3 +216,60 @@ describe("describeBashPathGate", () => {
     expect(desc.decision.value).toBe(".env");
   });
 });
+
+// Home-relative path characterization (#350) ──────────────────────────────
+//
+// The parser extracts ~/... tokens from bash commands; the resolver receives
+// the raw token and normalizeInput handles expansion. These tests verify the
+// gate correctly dispatches ~/... tokens through the deny/ask path.
+
+describe("describeBashPathGate — home-relative paths", () => {
+  it("extracts ~/... token and builds descriptor on deny", async () => {
+    // node:os is mocked: homedir() returns "/mock/home".
+    // cat ~/.ssh/config → token "~/.ssh/config" extracted.
+    const resolver = makePathDispatchResolver(
+      {
+        "~/.ssh/config": makeCheckResult({
+          state: "deny",
+          matchedPattern: "~/.ssh/*",
+        }),
+      },
+      makeCheckResult({ state: "allow" }),
+    );
+    const result = (await describeGate(
+      makeTcc({ input: { command: "cat ~/.ssh/config" } }),
+      resolver,
+    )) as GateDescriptor;
+
+    expect(isGateDescriptor(result)).toBe(true);
+    expect(result.preCheck?.state).toBe("deny");
+    expect(result.denialContext).toMatchObject({
+      kind: "bash_path",
+      command: "cat ~/.ssh/config",
+      pathValue: "~/.ssh/config",
+    });
+  });
+
+  it("extracts $HOME/... token and builds descriptor on deny", async () => {
+    const resolver = makePathDispatchResolver(
+      {
+        "$HOME/.ssh/config": makeCheckResult({
+          state: "deny",
+          matchedPattern: "$HOME/.ssh/*",
+        }),
+      },
+      makeCheckResult({ state: "allow" }),
+    );
+    const result = (await describeGate(
+      makeTcc({ input: { command: "cat $HOME/.ssh/config" } }),
+      resolver,
+    )) as GateDescriptor;
+
+    expect(isGateDescriptor(result)).toBe(true);
+    expect(result.preCheck?.state).toBe("deny");
+    expect(result.denialContext).toMatchObject({
+      kind: "bash_path",
+      pathValue: "$HOME/.ssh/config",
+    });
+  });
+});

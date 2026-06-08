@@ -148,3 +148,61 @@ describe("describePathGate", () => {
     );
   });
 });
+
+// Home-relative path characterization (#350) ──────────────────────────────
+//
+// The gate passes the raw path to the resolver; home expansion is handled
+// downstream by normalizeInput. These tests lock in that the gate works
+// correctly when the tool input contains a ~/... or $HOME/... path.
+
+describe("describePathGate — home-relative paths", () => {
+  it("passes raw ~/... path to resolver and builds descriptor on deny", () => {
+    const resolver = makeResolver(
+      makeCheckResult({ state: "deny", matchedPattern: "~/.ssh/*" }),
+    );
+    const result = describePathGate(
+      makeTcc({ input: { path: "~/.ssh/config" } }),
+      resolver,
+    ) as GateDescriptor;
+
+    expect(isGateDescriptor(result)).toBe(true);
+    expect(result.preCheck?.state).toBe("deny");
+    // Raw path preserved in denial context for display.
+    expect(result.denialContext).toMatchObject({
+      kind: "path",
+      toolName: "read",
+      pathValue: "~/.ssh/config",
+    });
+    expect(resolver.resolve).toHaveBeenCalledWith(
+      "path",
+      { path: "~/.ssh/config" },
+      undefined,
+    );
+  });
+
+  it("passes raw $HOME/... path to resolver and builds descriptor on deny", () => {
+    const resolver = makeResolver(
+      makeCheckResult({ state: "deny", matchedPattern: "$HOME/.ssh/*" }),
+    );
+    const result = describePathGate(
+      makeTcc({ input: { path: "$HOME/.ssh/config" } }),
+      resolver,
+    ) as GateDescriptor;
+
+    expect(isGateDescriptor(result)).toBe(true);
+    expect(result.preCheck?.state).toBe("deny");
+    expect(result.denialContext).toMatchObject({
+      kind: "path",
+      pathValue: "$HOME/.ssh/config",
+    });
+  });
+
+  it("returns null when home-relative path resolves to allow", () => {
+    const resolver = makeResolver(makeCheckResult({ state: "allow" }));
+    const result = describePathGate(
+      makeTcc({ input: { path: "~/.ssh/config" } }),
+      resolver,
+    );
+    expect(result).toBeNull();
+  });
+});
