@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.5.3](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v10.5.2...pi-permission-system-v10.5.3) (2026-06-08)
+
+
+### Bug Fixes
+
+* merge tool preview length fields across config layers ([803fbb4](https://github.com/gotgenes/pi-packages/commit/803fbb4a118d4c26dc7b23fcec3f88d23aec0065))
+* parse tool preview length fields in unified config loader ([3241956](https://github.com/gotgenes/pi-packages/commit/3241956b5656bc44788061c4a0a4ee334cb3ace5))
+
 ## [10.5.2](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v10.5.1...pi-permission-system-v10.5.2) (2026-06-08)
 
 
