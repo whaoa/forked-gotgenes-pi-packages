@@ -371,6 +371,20 @@ describe("ConfigStore", () => {
       store.save({ ...DEFAULT_EXTENSION_CONFIG }, ctx);
       expect(mockUnlinkSync).toHaveBeenCalled();
     });
+
+    it("preserves an existing global toolInputPreviewMaxLength on save", () => {
+      const { store } = makeStore();
+      // Simulate a global config.json that already has the preview-length field.
+      mockLoadUnifiedConfig.mockReturnValue({
+        config: { toolInputPreviewMaxLength: 800 },
+      });
+      store.save({ ...DEFAULT_EXTENSION_CONFIG }, makeCommandCtx());
+      expect(mockWriteFileSync).toHaveBeenCalledWith(
+        expect.stringContaining(".tmp"),
+        expect.stringContaining('"toolInputPreviewMaxLength": 800'),
+        "utf-8",
+      );
+    });
   });
 
   // ── logResolvedPaths() ─────────────────────────────────────────────────
