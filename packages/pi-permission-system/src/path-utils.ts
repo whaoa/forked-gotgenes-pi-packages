@@ -1,4 +1,3 @@
-import { homedir } from "node:os";
 import { join, normalize, resolve, sep } from "node:path";
 
 import { getNonEmptyString, toRecord } from "./common";
@@ -15,15 +14,7 @@ export function normalizePathForComparison(
   }
 
   let normalizedPath = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
-
-  if (normalizedPath === "~") {
-    normalizedPath = homedir();
-  } else if (
-    normalizedPath.startsWith("~/") ||
-    normalizedPath.startsWith("~\\")
-  ) {
-    normalizedPath = join(homedir(), normalizedPath.slice(2));
-  }
+  normalizedPath = expandHomePath(normalizedPath);
 
   const absolutePath = resolve(cwd, normalizedPath);
   const normalizedAbsolutePath = normalize(absolutePath);

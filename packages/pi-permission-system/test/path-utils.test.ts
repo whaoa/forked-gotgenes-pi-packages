@@ -47,6 +47,16 @@ describe("normalizePathForComparison", () => {
     );
   });
 
+  test("expands bare $HOME to homedir", () => {
+    expect(normalizePathForComparison("$HOME", cwd)).toBe("/mock/home");
+  });
+
+  test("expands $HOME/... to homedir-relative path", () => {
+    expect(normalizePathForComparison("$HOME/.ssh/config", cwd)).toBe(
+      join("/mock/home", ".ssh/config"),
+    );
+  });
+
   test("strips leading @ before resolving", () => {
     expect(normalizePathForComparison("@/usr/local/bin", cwd)).toBe(
       "/usr/local/bin",
