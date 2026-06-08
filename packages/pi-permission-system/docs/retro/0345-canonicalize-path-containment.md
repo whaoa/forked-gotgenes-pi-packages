@@ -24,3 +24,28 @@ Filed at `packages/pi-permission-system/docs/plans/0345-canonicalize-path-contai
 - Kept `normalizePathForComparison` lexical (skill-read / skill-prompt matching is not a security boundary); canonicalization is surgical to the two containment paths.
 - Deferred (Non-Goals): the optional path-pattern deny-evasion surface (symlink alias vs `*.env`) and skill-read canonicalization.
 - TOCTOU is inherent and accepted — the fix narrows the gap, does not close it.
+
+## Stage: Implementation — TDD (2026-06-08T22:46:22Z)
+
+### Session summary
+
+Completed all 4 TDD cycles: added `src/canonicalize-path.ts` + 8-test suite; switched `isPathOutsideWorkingDirectory` and `describeExternalDirectoryGate` to canonical comparison; canonicalized `BashProgram.externalPaths`; updated architecture docs.
+Test count rose from 1858 to 1873 (+15) across 91 test files.
+Pre-completion reviewer returned PASS.
+
+### Observations
+
+- **Loop form deviation:** The plan used `while (true)` but `@typescript-eslint/no-unnecessary-condition` rejected it.
+  During the user review pause, refactored from a `for (;;)` walk-up to a split-based `for (let i = parts.length; i >= 0; i--)` loop — explicit bound, no `toReversed()`, no root-detection heuristic.
+  Cleaner and correct.
+- **Critical bash classifier discovery:** The plan's bash symlink-escape test used `cat ./link/hosts`.
+  `classifyTokenAsPathCandidate` only accepts absolute, `~/`-relative, and `..`-traversal tokens — it rejects `./relative` paths entirely, so the bash external-directory gate never processes them.
+  The correct test surface is the absolute form `cat /projects/my-app/link/hosts`.
+  Noted in commit body.
+  This means `cat ./link/hosts` is not fixed by canonicalization; it is a separate classifier-scope gap.
+- **macOS platform hazard:** `test/bash-external-directory.test.ts` (top-level integration suite) uses real paths like `/etc/hosts`.
+  On macOS, `/etc -> /private/etc`, so `realpathSync("/etc/hosts")` returns `/private/etc/hosts`, breaking all expected-value literals.
+  Added an identity `node:fs` mock to the file — not anticipated in the plan.
+  Any test file importing `bash-program.ts` transitively needs this mock after canonicalization was added.
+- **WARN from reviewer:** `canonicalNormalizePathForComparison` reads `process.platform` directly (consistent with pre-existing `normalizePathForComparison` pattern); not a blocker.
+- Pre-completion reviewer verdict: PASS.
