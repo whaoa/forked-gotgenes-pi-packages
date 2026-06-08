@@ -47,3 +47,51 @@ The 2,785-line `permission-system.test.ts` catch-all was deleted; the suite is n
   Both fixed before the final commit.
 - `pnpm fallow dead-code` exited zero — no dead exports introduced.
 - Pre-completion reviewer: PASS.
+
+## Stage: Final Retrospective (2026-06-08T13:19:34Z)
+
+### Session summary
+
+Shipped issue #342 across four stages (Planning, TDD implementation, Ship, Retrospective): the 2,785-line `permission-system.test.ts` catch-all was dissolved into 12 co-located files, 10 redundant async tests dropped, and the suite is now fully co-located at 90 files / 1813 tests.
+This completed Phase 4 (Step 9) of the permission-system structural roadmap.
+The execution was notably clean — no rework cycles, no rabbit-holes, and the only friction was a one-shot pre-commit lint auto-fix.
+
+### Observations
+
+#### What went well
+
+- The planning-stage `ask_user` decision (drop-redundant / move-unique for async tests; behavior-preserving assertions) gave the TDD stage a crisp rule to apply.
+  All 16 async tests were classified without mid-execution thrashing — 10 dropped, 6 moved — exactly as the rule predicted.
+- Incremental verification was exemplary: every one of the 9 migration steps ran the affected test file, then the full suite, then committed.
+  The feedback-loop gap lens finds nothing to flag — this is the inverse of the "verify only at the end" anti-pattern.
+- The `pre-completion-reviewer` subagent earned its keep: it caught two real documentation gaps (the `manager-harness.ts` skill doc missing the new `createManagerWithProject` export, and a pre-existing missing `✓ complete` on roadmap Step 8) that would otherwise have shipped stale.
+- Both planning open questions resolved cleanly at execution time without re-opening the decision (`getResolvedPolicyPaths` → `permission-manager-unified.test.ts`; `session_shutdown clears` → inline-wired test in `external-directory-session-dedup.test.ts`).
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (self-identified) — wrote `vi.mocked(prompter.prompt).mock.calls[0]![0]` with a non-null assertion in `test/handlers/tool-call.test.ts`; the pre-commit `eslint` hook auto-stripped the `!` (`no-unnecessary-type-assertion`, since the tsconfig does not flag the index access), modifying the file and failing the first commit attempt.
+  `AGENTS.md` already documents the Biome/ESLint non-null-assertion conflict.
+  Impact: 3 extra tool calls (lint check, `git diff`, re-commit) — ~1 min, no test-logic rework; the hook applied the fix automatically.
+- `other` (no rework) — `pi-autoformat` reflowed edited files mid-stream, occasionally requiring a re-read before the next edit (already noted in the TDD stage; no failures resulted).
+
+#### What caused friction (user side)
+
+- The plan explicitly recommended executing with `/build-plan` (test-only, no red phase), but the session ran `/tdd-plan`.
+  The agent adapted cleanly — treating each step as move → verify → commit without a red phase — so no rework resulted.
+  Opportunity, not criticism: when a plan's execution-model recommendation and the chosen slash command diverge, the divergence was harmless here because the two prompts share the verify-and-commit spine.
+
+### Diagnostic details
+
+- **Model-performance correlation** — Planning ran on `anthropic/claude-opus-4-8` (judgment-heavy: inventory, the `ask_user` design decision, plan authoring) — appropriate.
+  TDD implementation ran on `anthropic/claude-sonnet-4-6` (mechanical lift-and-shift across 9 steps) — well-matched cost/capability for behavior-preserving moves.
+  Ship ran on `opencode-go/deepseek-v4-flash` (push, CI watch, issue close, release check) — mostly mechanical, but Step 4b (multi-issue sequence: release now vs. batch) and the stacked-issue close-detection are genuine judgment points; the flash model handled them correctly here only because the situation was simple (`test:`/`docs:`-only range, no release-please PR, final step of a finished phase).
+  Borderline fit — a more capable model would be safer on a ship step that carried a live release-please merge or sibling-issue closes.
+  Retrospective ran on `anthropic/claude-opus-4-8` — appropriate for synthesis.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the lint auto-fix resolved in 3 tool calls, well under the 5-call threshold.
+- **Unused-tool detection** — no `missing-context` gaps; `grep`/`bash` were correctly preferred over `colgrep` for the catch-all inventory (exact `test()`-block counting and fixture-usage mapping is exact-match work, not semantic search).
+- **Feedback-loop gap analysis** — verification ran incrementally after every step, not just at the end; no gap to flag.
+
+### Changes made
+
+1. Added this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0342-retire-permission-system-test-catch-all.md`.
+   No `AGENTS.md` or prompt changes — the session's single friction point is already covered by `AGENTS.md` and auto-fixed by the pre-commit hook (user confirmed: land retro only).
