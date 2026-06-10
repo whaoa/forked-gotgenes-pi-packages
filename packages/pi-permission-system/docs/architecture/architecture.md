@@ -526,7 +526,7 @@ src/
 │       └── index.ts          Barrel re-exports
 │
 ├── index.ts                  Extension factory - event wiring, collaborator construction (~170 lines after #320; established injection-bag wiring kept inline per anti-procedure-splitting rule)
-├── permissions-service.ts    `LocalPermissionsService` class - in-process implementation of `PermissionsService`; injected with `PermissionManager`, `SessionRules`, `FormatterRegistry` (#320)
+├── permissions-service.ts    `LocalPermissionsService` class - in-process implementation of `PermissionsService`; injected with narrow collaborator interfaces `ScopedPermissionManager`, `Pick<SessionRules, "getRuleset">`, `ToolInputFormatterRegistrar` (#320, narrowed #366)
 ├── service-lifecycle.ts      `ServiceLifecycle` interface + `PermissionServiceLifecycle` class — owns the process-global service publish (#302 child-gated), ready emit, and session teardown ordering (#320)
 ├── service.ts                PermissionsService interface, Symbol.for() accessor (cross-extension API)
 ├── permission-events.ts      Event channel constants, payload types, emit helpers
@@ -551,7 +551,7 @@ src/
 ├── tool-input-preview.ts              Pure tool-input text utilities (truncation, line counting, count formatting), serialization + default constants
 ├── tool-input-prompt-formatters.ts    Pure per-tool prompt formatters (edit/write/read) + getPromptPath helper (#314)
 ├── tool-preview-formatter.ts          ToolPreviewFormatter class - config-dependent prompt + log formatting; seam-first dispatch consults ToolInputFormatterLookup before built-in switch (#266, #283)
-├── tool-input-formatter-registry.ts   ToolInputFormatter type, ToolInputFormatterLookup interface, ToolInputFormatterRegistry class - persistent registry for custom previews (#283)
+├── tool-input-formatter-registry.ts   ToolInputFormatter type, ToolInputFormatterLookup + ToolInputFormatterRegistrar interfaces, ToolInputFormatterRegistry class - persistent registry for custom previews (#283, #366)
 ├── builtin-tool-input-formatters.ts   Built-in formatters registered at startup: formatMcpInputForPrompt keyed to "mcp" (#283)
 ├── tool-registry.ts           ToolRegistry interface + tool name validation
 ├── active-agent.ts            Agent name detection from session/system prompt
