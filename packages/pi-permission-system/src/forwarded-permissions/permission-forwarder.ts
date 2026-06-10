@@ -1,14 +1,14 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-
 import {
   getActiveAgentName,
   getActiveAgentNameFromSystemPrompt,
+  type SessionEntryView,
 } from "#src/active-agent";
 import { toRecord } from "#src/common";
 import type { ConfigReader } from "#src/config-store";
 import type {
+  PermissionDecisionUi,
   PermissionPromptDecision,
   RequestPermissionOptions,
 } from "#src/permission-dialog";
@@ -48,6 +48,25 @@ import {
 } from "./io";
 
 /**
+ * Narrow context the forwarder reads: the UI gate (`hasUI`), the dialog UI
+ * surface, and the three session-manager readers it uses directly or via
+ * {@link isSubagentExecutionContext} / {@link getActiveAgentName}.
+ *
+ * `getSystemPrompt` is read reflectively (see `getContextSystemPrompt`), so it
+ * is intentionally not a typed member. A full `ExtensionContext` satisfies this
+ * structurally, so production callers pass `ctx` unchanged.
+ */
+export interface ForwarderContext {
+  hasUI: boolean;
+  ui: PermissionDecisionUi;
+  sessionManager: {
+    getSessionId(): string;
+    getSessionDir(): string;
+    getEntries(): readonly SessionEntryView[];
+  };
+}
+
+/**
  * Constructor config for `PermissionForwarder`.
  *
  * Replaces the `PermissionForwardingDeps` interface that was previously
@@ -63,7 +82,7 @@ export interface PermissionForwarderDeps {
   events?: PermissionEventBus;
   logger: DebugReviewLogger;
   requestPermissionDecisionFromUi: (
-    ui: ExtensionContext["ui"],
+    ui: PermissionDecisionUi,
     title: string,
     message: string,
     options?: RequestPermissionOptions,
@@ -74,7 +93,7 @@ export interface PermissionForwarderDeps {
 
 // ── Module-private helpers ────────────────────────────────────────────────
 
-function getSessionId(ctx: ExtensionContext): string {
+function getSessionId(ctx: ForwarderContext): string {
   try {
     const sessionId = ctx.sessionManager.getSessionId();
     if (typeof sessionId === "string" && sessionId.trim()) {
@@ -85,7 +104,7 @@ function getSessionId(ctx: ExtensionContext): string {
   return "unknown";
 }
 
-function getContextSystemPrompt(ctx: ExtensionContext): string | undefined {
+function getContextSystemPrompt(ctx: ForwarderContext): string | undefined {
   const getSystemPrompt = toRecord(ctx).getSystemPrompt;
   if (typeof getSystemPrompt !== "function") {
     return undefined;
@@ -132,7 +151,7 @@ function formatForwardedPermissionPrompt(
  */
 export interface ApprovalRequester {
   requestApproval(
-    ctx: ExtensionContext,
+    ctx: ForwarderContext,
     message: string,
     options?: RequestPermissionOptions,
     forwarded?: ForwardedPromptDisplay,
@@ -148,7 +167,7 @@ export interface ApprovalRequester {
  * `{ processInbox: vi.fn() }` mock.
  */
 export interface InboxProcessor {
-  processInbox(ctx: ExtensionContext): Promise<void>;
+  processInbox(ctx: ForwarderContext): Promise<void>;
 }
 
 // ── PermissionForwarder ───────────────────────────────────────────────────
@@ -169,7 +188,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
   private readonly events: PermissionEventBus | undefined;
   private readonly logger: DebugReviewLogger;
   private readonly requestPermissionDecisionFromUi: (
-    ui: ExtensionContext["ui"],
+    ui: PermissionDecisionUi,
     title: string,
     message: string,
     options?: RequestPermissionOptions,
@@ -193,7 +212,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
    * when this session has UI, otherwise forward to the parent session.
    */
   requestApproval(
-    ctx: ExtensionContext,
+    ctx: ForwarderContext,
     message: string,
     options?: RequestPermissionOptions,
     forwarded?: ForwardedPromptDisplay,
@@ -217,7 +236,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
   }
 
   /** Drain and respond to this session's forwarded-permission inbox. */
-  async processInbox(ctx: ExtensionContext): Promise<void> {
+  async processInbox(ctx: ForwarderContext): Promise<void> {
     if (!ctx.hasUI) {
       return;
     }
@@ -263,7 +282,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
   // ── Private methods ────────────────────────────────────────────────────
 
   private async waitForForwardedApproval(
-    ctx: ExtensionContext,
+    ctx: ForwarderContext,
     message: string,
     forwarded?: ForwardedPromptDisplay,
   ): Promise<PermissionPromptDecision> {
@@ -345,7 +364,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
   }
 
   private buildForwardedRequest(
-    ctx: ExtensionContext,
+    ctx: ForwarderContext,
     message: string,
     requesterSessionId: string,
     targetSessionId: string,
@@ -430,7 +449,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
   }
 
   private async processSingleForwardedRequest(
-    ctx: ExtensionContext,
+    ctx: ForwarderContext,
     request: ForwardedPermissionRequest,
     location: PermissionForwardingLocation,
     requestPath: string,
