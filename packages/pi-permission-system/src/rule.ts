@@ -1,3 +1,4 @@
+import { PATH_SURFACES } from "./path-utils";
 import type { PermissionState } from "./types";
 import { wildcardMatch } from "./wildcard-matcher";
 
@@ -52,10 +53,19 @@ export function evaluate(
   pattern: string,
   rules: Ruleset,
   defaultAction?: PermissionState,
+  platform: NodeJS.Platform = process.platform,
 ): Rule {
+  // On Windows, path-surface values are canonicalized + lowercased; fold the
+  // pattern→value match (case and separators) so mixed-case / forward-slash
+  // overrides still match. The surface→surface match stays exact.
+  const matchOptions =
+    platform === "win32" && PATH_SURFACES.has(surface)
+      ? { caseInsensitive: true, windowsSeparators: true }
+      : undefined;
   const rule = rules.findLast(
     (r) =>
-      wildcardMatch(r.surface, surface) && wildcardMatch(r.pattern, pattern),
+      wildcardMatch(r.surface, surface) &&
+      wildcardMatch(r.pattern, pattern, matchOptions),
   );
   if (rule !== undefined) return rule;
   return {

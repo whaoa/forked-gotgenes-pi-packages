@@ -232,6 +232,81 @@ describe("evaluate", () => {
       expect(evaluate("read", "*", [rule]).origin).toBe(origin);
     }
   });
+
+  // ── Windows: path-surface patterns fold case (last-match-wins) ──────────
+
+  const denyExternalAll: Rule = {
+    surface: "external_directory",
+    pattern: "*",
+    action: "deny",
+    layer: "config",
+    origin: "global",
+  };
+  const allowExternalPi: Rule = {
+    surface: "external_directory",
+    pattern: "C:\\Users\\Foo\\pi\\*",
+    action: "allow",
+    layer: "config",
+    origin: "global",
+  };
+
+  test("win32: external_directory allow override matches a lowercased path over a preceding deny", () => {
+    const result = evaluate(
+      "external_directory",
+      "c:\\users\\foo\\pi\\docs\\readme.md",
+      [denyExternalAll, allowExternalPi],
+      undefined,
+      "win32",
+    );
+    expect(result.action).toBe("allow");
+  });
+
+  test("posix: the same mixed-case override stays case-sensitive (falls through to deny)", () => {
+    const result = evaluate(
+      "external_directory",
+      "c:\\users\\foo\\pi\\docs\\readme.md",
+      [denyExternalAll, allowExternalPi],
+      undefined,
+      "linux",
+    );
+    expect(result.action).toBe("deny");
+  });
+
+  test("win32: a forward-slash external_directory pattern matches a backslash value", () => {
+    const allowForwardSlash: Rule = {
+      surface: "external_directory",
+      pattern: "C:/Users/Foo/pi/*",
+      action: "allow",
+      layer: "config",
+      origin: "global",
+    };
+    const result = evaluate(
+      "external_directory",
+      "c:\\users\\foo\\pi\\docs\\readme.md",
+      [denyExternalAll, allowForwardSlash],
+      undefined,
+      "win32",
+    );
+    expect(result.action).toBe("allow");
+  });
+
+  test("win32: bash surface stays case-sensitive (not a path surface)", () => {
+    const result = evaluate(
+      "bash",
+      "GIT push",
+      [
+        {
+          surface: "bash",
+          pattern: "git *",
+          action: "allow",
+          origin: "global",
+        },
+      ],
+      undefined,
+      "win32",
+    );
+    expect(result.action).toBe("ask");
+  });
 });
 
 describe("evaluateFirst", () => {
