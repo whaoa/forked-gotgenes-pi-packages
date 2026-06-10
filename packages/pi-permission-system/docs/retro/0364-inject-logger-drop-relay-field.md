@@ -25,3 +25,20 @@ Confirmed both prerequisites ([#362], [#363]) are CLOSED and present on `main`, 
 
 [#362]: https://github.com/gotgenes/pi-packages/issues/362
 [#363]: https://github.com/gotgenes/pi-packages/issues/363
+
+## Stage: Implementation — TDD (2026-06-10T02:56:30Z)
+
+### Session summary
+
+Completed all three planned TDD steps plus one unplanned cleanup commit in a single session.
+Two `refactor:` commits implement the injection and field removal; one `docs:` commit updates the package skill; one additional `refactor:` commit removes the stale `logger` member from `MockGateHandlerSession` (the plan's deferred Open Question, resolved in-session).
+Test count held at 1903 across 91 files — no new tests, no regressions.
+
+### Observations
+
+- Step 1 (inject into `SessionLifecycleHandler`) landed cleanly on its own: the four-argument constructor, three `this.logger.*` replacements, and `index.ts` wiring update all compiled without touching `PermissionSession`.
+- Step 2's atomic commit covered six files as predicted: `permission-session.ts`, `index.ts`, `session-fixtures.ts`, `handler-fixtures.ts`, `external-directory-integration.test.ts` — the TypeScript type-level interlock enforced the boundary correctly.
+- The `lifecycle.test.ts` red-phase used a session-independent `makeLogger()` instance, confirming the existing `logger.warn` / `logger.debug` assertions now genuinely test direct injection rather than reach-through.
+- The Open Question (`MockGateHandlerSession.logger`) was resolved in-session: confirmed no test ever passed `logger` through the session override bag, the `SessionLogger` import became unused after removal, and `fallow dead-code` stayed clean.
+  Cleaned up in commit 4 `refactor: remove stale logger member from MockGateHandlerSession (#364)`.
+- Pre-completion reviewer: PASS — all deterministic checks clean, code design and test artifacts reviewed, SKILL.md updates verified.
