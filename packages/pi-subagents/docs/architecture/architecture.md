@@ -526,7 +526,7 @@ In the target state, pi-subagents publishes events and a provider seam; other pa
 
 Composition test: install neither extension, only permissions, only workspaces, or both — the core is byte-for-byte identical in all four cases, and the two extensions never reference each other.
 
-This is achieved across phases: Phase 14 (strip policy), Phase 16 (invert dependencies — extensions on a minimal core), and Phase 17 (extract UI).
+This is achieved across phases: Phase 14 (strip policy), Phase 16 (invert dependencies — extensions on a minimal core), and Phase 18 (extract UI).
 
 ## Current structural analysis
 
@@ -765,16 +765,162 @@ All five steps are closed: [#261], [#262], [#263], [#264], [#265].
 The earlier "agent collaborator architecture" framing (#256 superseded, #257 parked, #258 and #259 closed not-planned) was abandoned; its structural win was reached cleanly via the workspace seam.
 See [phase-16-invert-dependencies.md](history/phase-16-invert-dependencies.md) for details.
 
-## Improvement roadmap (Phase 17 — extract UI)
+## Improvement roadmap (Phase 17 — core consolidation)
 
-Phase 17 is the long-deferred UI extraction (originally Phase 6).
-The widget, conversation viewer, and `/agents` command menu move to a separate `pi-subagents-ui` extension that consumes the `SubagentsService` API.
-By this point the core is minimal and stable — the API boundary has been proven across Phases 14–16.
+Phase 17 consolidates the core's remaining structural debt before the UI extraction (now Phase 18).
+The findings come from the standard discovery pass — fallow suite, entry-point trace, design-review checklist, and test-constructibility audit — run after Phase 16 landed.
+
+### Findings summary
+
+Updated health metrics (fallow, package-wide including tests):
+
+| Metric                     | Phase 16 baseline              | Current                                       |
+| -------------------------- | ------------------------------ | --------------------------------------------- |
+| Health score               | 78/100 (B)                     | 78/100 (B)                                    |
+| Source LOC                 | 7,778 (57 files)               | ~7,400 (56 files)                             |
+| Dead code                  | 0 files, 0 exports             | 0 files, 0 exports                            |
+| Maintainability index      | 90.8 (good)                    | 90.8 (good)                                   |
+| Avg / P90 cyclomatic       | 1.4 / 2                        | 1.4 / 2                                       |
+| Production duplication     | 11 lines (1 internal group)    | 34 lines (1 internal + 1 cross-package group) |
+| Test duplication           | 42 groups, 661 lines           | 44 groups, ~750 lines                         |
+| Fallow refactoring targets | 0                              | 0                                             |
+| Top churn hotspot          | `index.ts` 65.0 ▲ accelerating | `index.ts` 31.3 ▼ cooling                     |
+
+The syntactic metrics are healthy and stable — the remaining debt is structural, mostly invisible to fallow, and concentrated in three places:
+
+1. **`Subagent` construction duality.**
+   `SubagentInit` carries ~20 fields, nearly all optional with "required for run(), optional for tests" semantics, and `run()` compensates with runtime throws ("not configured for execution").
+   This violates principle 8 (construct complete): the class is simultaneously a passive record (tests build display-only snapshots) and an executor (production wires factory, observer, run config, workspace provider).
+   The symptoms are in the tests: external writes `record.promise = …` (manager, queue callback, four test files) and `record.notification = new NotificationState(…)` (seven test sites) are output-argument smells on fields the object should own.
+2. **Wiring debt in `index.ts`.**
+   Two forward references (settings → queue, queue → manager) are replicated with an `eslint-disable prefer-const` dance in `test/lifecycle/subagent-manager.test.ts`; the queue's start callback (`record.promise = record.run()` after a status check) is duplicated verbatim between `index.ts` and the test helper.
+   A ~70-line inline `SubagentManagerObserver` literal mixes three concerns (event emission, `appendEntry` persistence, notification dispatch).
+   `runtime.widget` is assigned post-construction behind five relay-only delegation methods on `SubagentRuntime`.
+3. **Duplication.**
+   A 23-line cross-package production clone (`settings.ts:198-211` ↔ `pi-subagents-worktrees/src/config.ts:51-73`: the layered global/project settings-file loader) and 44 test clone groups (~750 lines), with clone families concentrated in `test/lifecycle/` and `test/ui/`.
+
+Deferred findings (scored below the priority cut, tracked here rather than as steps): the `resolveModel` error-as-string union return (callers branch on `typeof resolved === "string"`), the file-top SDK `eslint-disable` headers in 14 files (re-audit when the Pi SDK exports improve), missing unit tests for `observation/renderer.ts` (the top CRAP-risk file), and the 11-line internal clone in `ui/agent-config-editor.ts` (folds into the Phase 18 UI extraction).
+
+### Steps
+
+Priority = Impact × (6 − Risk).
+
+| Step | Title                                                                                | Category | Impact | Risk | Priority |
+| ---- | ------------------------------------------------------------------------------------ | -------- | ------ | ---- | -------- |
+| 1    | Move ConcurrencyQueue ownership into SubagentManager                                 | C        | 4      | 2    | 16       |
+| 2    | Decompose `SubagentInit` into `SubagentOptions` (identity, run spec, execution deps) | B/D      | 4      | 3    | 12       |
+| 3    | Encapsulate run start and notification attachment on Subagent                        | C        | 3      | 2    | 12       |
+| 4    | Extract run-listener and workspace-bracket collaborators from Subagent               | B/C      | 3      | 2    | 12       |
+| 5    | Extract the manager observer from index.ts into a class                              | B/E      | 3      | 2    | 12       |
+| 6    | Split widget delegation out of SubagentRuntime                                       | C        | 3      | 3    | 9        |
+| 7    | Consolidate lifecycle test fixtures                                                  | D        | 3      | 1    | 15       |
+| 8    | Consolidate UI and tools test fixtures                                               | D        | 2      | 1    | 10       |
+| 9    | Resolve the cross-package settings-loader duplication                                | A        | 2      | 2    | 8        |
+
+#### Step 1 — Move ConcurrencyQueue ownership into SubagentManager
+
+- Targets: `src/index.ts`, `src/lifecycle/subagent-manager.ts`, `src/lifecycle/concurrency-queue.ts`, `test/lifecycle/subagent-manager.test.ts`.
+- Smell: Category C — forward references / temporal coupling; the queue→manager start callback is duplicated between `index.ts` and the test helper, each with its own safety comment.
+- Change: `SubagentManager` constructs the queue itself (options gain `getMaxConcurrent`, lose `queue`) and owns the start-queued callback; expose `drainQueue()` for the settings `onMaxConcurrentChanged` hook.
+- Outcome: no forward-referenced bindings in `index.ts` or test setup; the `prefer-const` eslint-disable in the test helper is deleted; the start-queued logic exists in exactly one place.
+
+#### Step 2 — Decompose `SubagentInit` into `SubagentOptions` (identity, run spec, execution deps)
+
+- Targets: `src/lifecycle/subagent.ts` (`SubagentInit`, constructor, `run()` guards), `src/lifecycle/subagent-manager.ts` (`spawn`), `test/helpers/make-subagent.ts`.
+- Smell: Category B (god interface — ~20 fields) and Category D (constructibility: "optional for tests" fields with compensating runtime throws).
+- Change: group the per-run fields (snapshot, prompt, model, maxTurns, thinkingLevel, parentSession, signal) into a `SubagentRunSpec` and the shared collaborators (createSubagentSession, observer, getRunConfig, getWorkspaceProvider, baseCwd) into `SubagentExecutionDeps`; the pair is either fully present (executable agent) or fully absent (passive record), collapsing `run()`'s two guards into one.
+  Rename the decomposed bag `SubagentInit` → `SubagentOptions`: it is the codebase's only DOM-style `*Init` name, while sibling constructor bags use `Options` (`SubagentManagerOptions`, `TurnLoopOptions`).
+- Outcome: `SubagentOptions` (née `SubagentInit`) top-level fields ~20 → ≤ 9; a passive test record is constructible without any execution fields; the record-vs-executor duality is explicit in the types.
+
+#### Step 3 — Encapsulate run start and notification attachment on Subagent
+
+- Targets: `src/lifecycle/subagent.ts`, `src/lifecycle/subagent-manager.ts`, `test/tools/get-result-tool.test.ts`, `test/lifecycle/subagent-manager.test.ts`, `test/service/service-adapter.test.ts`, `test/observation/notification.test.ts`, `test/helpers/make-subagent.ts`.
+- Smell: Category C — output arguments: external writes to `record.promise` (3 production/test sites) and `record.notification` (7 test sites).
+- Change: add `Subagent.start()` that runs and stores its own promise (plus an awaitable accessor for `spawnAndWait`/`waitForAll`); make `promise` and `notification` externally read-only; tests attach notification state through `SubagentOptions.parentSession.toolCallId` or a dedicated options field.
+- Outcome: zero external writes to `Subagent` fields outside its own methods (grep-verifiable: `\.promise =` and `\.notification =` appear only inside `subagent.ts`).
+
+#### Step 4 — Extract run-listener and workspace-bracket collaborators from Subagent
+
+- Targets: `src/lifecycle/subagent.ts` (533 LOC — largest source file, accelerating churn).
+- Smell: Category B (oversized class; per-run listener fields declared mid-class) and Category C (state owns its mutations: workspace dispose logic appears in `run()`'s catch, `completeRun`, and `failRun`).
+- Change: extract a `RunListeners` object owning the observer-unsubscribe and signal-detach handles (`attach`/`release`), and a workspace-bracket collaborator owning prepare/dispose-with-addendum, so the three dispose paths collapse into one.
+- Outcome: `subagent.ts` ≤ 450 LOC; workspace disposal logic in exactly one place; listener handles no longer raw nullable fields.
+
+#### Step 5 — Extract the manager observer from index.ts into a class
+
+- Targets: `src/index.ts` (inline `SubagentManagerObserver` literal, ~70 lines), new module under `src/observation/`.
+- Smell: Category B/E — `index.ts` is the dominant churn hotspot (31.3, 91 commits); the literal mixes event emission, record persistence (`appendEntry`), and notification dispatch; principle 9 (state and behavior belong in classes, not closure-captured literals).
+- Change: extract a class (e.g. `SubagentEventsObserver`) constructed with narrow deps (`emit`, `appendEntry`, the `NotificationSystem`).
+- Outcome: `index.ts` < 170 lines; the observer's three concerns unit-tested directly without booting the extension.
+
+#### Step 6 — Split widget delegation out of SubagentRuntime
+
+- Targets: `src/runtime.ts`, `src/tools/agent-tool.ts` (`AgentToolRuntime`), `src/tools/foreground-runner.ts`, `src/tools/background-spawner.ts`, `src/observation/notification.ts` (`NotificationManager` constructor), `src/index.ts`.
+- Smell: Category C — relay-only dependency (five delegation methods that only forward to `widget`) and a post-construction `runtime.widget =` write violating principle 8.
+- Change: pass the existing `WidgetLike` handle directly to the consumers that need it (tool deps, `NotificationManager`) and construct the widget before them; remove the `widget` field and the five relay methods from `SubagentRuntime`.
+- Outcome: `SubagentRuntime` has zero widget knowledge; no post-construction field writes in `index.ts`; tool fixtures stub a 5-method `WidgetLike` instead of widget methods on the runtime mock.
+
+#### Step 7 — Consolidate lifecycle test fixtures
+
+- Targets: `test/lifecycle/subagent-manager.test.ts` (766 LOC), `test/lifecycle/subagent.test.ts`, `test/lifecycle/subagent-session.test.ts`, `test/lifecycle/create-subagent-session.test.ts`, `test/lifecycle/create-subagent-session-extension-tools.test.ts`, `test/lifecycle/concurrency-queue.test.ts`, `test/helpers/`.
+- Smell: Category D — fallow reports five clone families across the lifecycle tests.
+- Change: extract the repeated spawn/run/factory arrangements into shared helpers, migrating incrementally (lift-and-shift, never a single-step rewrite of a large test file).
+- Outcome: lifecycle clone families 5 → ≤ 1; package test duplication below 600 lines.
+
+#### Step 8 — Consolidate UI and tools test fixtures
+
+- Targets: `test/ui/agent-creation-wizard.test.ts`, `test/ui/agent-config-editor.test.ts`, `test/ui/ui-observer.test.ts`, `test/tools/foreground-runner.test.ts`, `test/tools/background-spawner.test.ts`, `test/session/session-config.test.ts`.
+- Smell: Category D — remaining clone families outside the lifecycle tree.
+- Change: extract per-file repeated arrangements into local helpers or `test/helpers/` where shared across files.
+- Outcome: package clone groups 44 → ≤ 25; overall duplication ≤ 0.6%.
+
+#### Step 9 — Resolve the cross-package settings-loader duplication
+
+- Targets: `src/settings.ts:198-211`, `packages/pi-subagents-worktrees/src/config.ts:51-73`.
+- Smell: Category A — 23-line production clone: the layered global/project JSON read-sanitize-warn-merge loader.
+- Change: decide explicitly between (a) exporting a small `loadLayeredSettings` helper from pi-subagents' public surface for worktrees to consume, and (b) documenting the duplication as intentional (separate release cadences, registry-resolved dependency) with a recorded fallow suppression.
+  The issue weighs the public-API cost (type bundle, `verify:public-types`, docs for third-party authors) against living with the flag.
+- Outcome: `pnpm fallow:dupes` no longer reports the pair, via extraction or recorded suppression.
+
+### Step dependencies
+
+```mermaid
+flowchart TB
+    S1["Step 1<br/>Queue into manager"]
+    S2["Step 2<br/>SubagentOptions decomposition"]
+    S3["Step 3<br/>Encapsulate start + notification"]
+    S4["Step 4<br/>Run collaborators extraction"]
+    S5["Step 5<br/>Observer class from index.ts"]
+    S6["Step 6<br/>Widget handle out of runtime"]
+    S7["Step 7<br/>Lifecycle test fixtures"]
+    S8["Step 8<br/>UI/tools test fixtures"]
+    S9["Step 9<br/>Settings-loader duplication"]
+
+    S1 --> S3
+    S2 --> S3
+    S3 --> S4
+    S4 --> S7
+    S5 --> S6
+```
+
+Steps 8 and 9 have no dependencies and can run at any point.
+
+### Tracks
+
+| Track                         | Steps         | Theme                                                                              |
+| ----------------------------- | ------------- | ---------------------------------------------------------------------------------- |
+| A — Subagent constructibility | 2 → 3 → 4 → 7 | Construct complete; encapsulate run state; then consolidate the tests that churned |
+| B — Wiring debt               | 1, 5 → 6      | Shrink index.ts; eliminate forward references and relay delegation                 |
+| C — Test hygiene              | 8             | Clone families outside the lifecycle tree                                          |
+| D — Duplication policy        | 9             | Cross-package clone decision                                                       |
+
+Tracks A and B intersect only at Step 3 (which needs Step 1's queue relocation); otherwise they proceed in parallel.
+Tracks C and D are fully independent.
 
 ## Refactoring history
 
 Phases 1–5, 7–16 are complete.
-Phase 6 (UI extraction to a separate package) is deferred → Phase 17.
+Phase 6 (UI extraction to a separate package) is deferred → Phase 18.
 Detailed records are preserved in per-phase history files:
 
 | Phase | Title                                               | Status              | History                                                                              |
@@ -795,7 +941,8 @@ Detailed records are preserved in per-phase history files:
 | 14    | Strip policy from core                              | Complete            | [phase-14-strip-policy.md](history/phase-14-strip-policy.md)                         |
 | 15    | Domain model evolution                              | Complete            | [phase-15-domain-model-evolution.md](history/phase-15-domain-model-evolution.md)     |
 | 16    | Invert dependencies (extensions on a minimal core)  | Complete            | [phase-16-invert-dependencies.md](history/phase-16-invert-dependencies.md)           |
-| 17    | Extract UI to separate package                      | Planned             | —                                                                                    |
+| 17    | Core consolidation                                  | Planned             | —                                                                                    |
+| 18    | Extract UI to separate package                      | Planned             | —                                                                                    |
 
 ### Structural refactoring issues
 
