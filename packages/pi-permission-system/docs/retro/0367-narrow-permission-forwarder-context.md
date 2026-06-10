@@ -17,8 +17,12 @@ The plan therefore narrows those collaborators too, which incidentally clears th
 
 - The forwarder's `requestPermissionDecisionFromUi` dep already receives a `PermissionDecisionUi`-typed function (from `permission-dialog.ts`) but redundantly widens the parameter to `ExtensionContext["ui"]`.
   Narrowing it to `PermissionDecisionUi` is what makes the `{ select, input }` test stubs satisfy `ForwarderContext.ui` without a cast.
-- Two deliberate SDK divergences are required to let the existing test stubs satisfy the narrow interface without casts: `getSessionDir(): string | null` (SDK says `string`, but `isSubagentExecutionContext` reads it defensively and a test stubs `null`) and a minimal `SessionEntryView` for `getEntries` (the SDK `SessionEntry` union is not satisfiable by the tests' simplified entry literals).
-  Both narrow types remain assignable from the SDK types, so full-`ExtensionContext` callers are unaffected.
+- Verified the SDK signatures against the live dev source (`~/development/pi/pi`, `v0.79.1`), not just the pinned `0.75.4` in `node_modules`: `getSessionId` / `getSessionDir` / `getEntries` / the `SessionEntry` union are identical across both, so the narrow interfaces are upgrade-safe.
+- That check collapsed one proposed divergence: an early draft used `getSessionDir(): string | null` to fit a test stub returning `null`, but the SDK returns `string` in every version (`null` is unreachable) — the production `if (!sessionDir)` guard is really the empty-string case.
+  Kept `getSessionDir(): string` faithful to the SDK and coerced the test stub to `""` (`vi.fn(() => sessionDir ?? "")`).
+  The only standing local type is `SessionEntryView` (the structural slice `getActiveAgentName` already operated on; the SDK union's nine variants aren't satisfiable by the tests' simplified entry literals).
+- Process note: a concurrent session committed a `pi-subagents` doc change between the retro commit and a plan-revision amend, so the amend folded the plan edit into the wrong commit; recovered with `git reset --soft` + re-split into two clean commits.
+  Prefer a fresh commit over `--amend` when other sessions may be active in the repo.
 - Followed the `0366` sibling-plan precedent (Track C Step 5): single atomic `refactor:` commit, narrow interfaces over wide types, "method bodies unchanged," reuse-over-strict-ISP for the collaborator interface (`SubagentDetectionContext` carries `getSessionDir` even though `isRegisteredSubagentChild` reads only `getSessionId`).
 - No `ask_user` was needed — the design is determined by type constraints and the 0366 precedent; the collaborator narrowing is forced, not a discretionary scope choice.
 - Grep confirmed all production callers of the narrowed collaborators pass a full `ExtensionContext` (assignable), mocked callers use `vi.mock`, and `index.ts` re-exports only `PermissionForwarder` / `PermissionForwarderDeps` — so the change is non-breaking and stays off the public surface.
