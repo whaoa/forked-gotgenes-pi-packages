@@ -25,7 +25,6 @@ import { PermissionGateHandler } from "#src/handlers/permission-gate-handler";
 import type { PermissionDecisionEvent } from "#src/permission-events";
 import { PERMISSIONS_DECISION_CHANNEL } from "#src/permission-events";
 import type { Rule } from "#src/rule";
-import type { SessionLogger } from "#src/session-logger";
 import { SessionRules } from "#src/session-rules";
 import type { ToolRegistry } from "#src/tool-registry";
 import type { PermissionCheckResult, PermissionState } from "#src/types";
@@ -49,8 +48,6 @@ import {
  */
 export type MockGateHandlerSession = ToolCallGateInputs &
   SkillInputGateInputs & {
-    /** Logger shape expected by GateDecisionReporter. */
-    logger: SessionLogger;
     /** 4-arg form so surface-check mocks can receive optional rules. */
     checkPermission(
       surface: string,
