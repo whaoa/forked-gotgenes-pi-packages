@@ -254,6 +254,3 @@ There is no incremental lift-and-shift here — no large test file is rewritten 
 
 - None.
   The design is determined by the issue, the type constraints, and the 0366 precedent; deferred items (the remaining four casts, `permission-event-rpc.ts`, the roadmap completion mark) are captured under Non-Goals.
-
-[#366]: https://github.com/gotgenes/pi-packages/issues/366
-[#367]: https://github.com/gotgenes/pi-packages/issues/367
