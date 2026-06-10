@@ -535,14 +535,14 @@ src/
 ├── config-store.ts           `ConfigStore` class — owns `config` + `lastConfigWarning`; `ConfigReader`, `SessionConfigStore`, `CommandConfigStore` narrow interfaces (#335, #337)
 ├── config-loader.ts          File I/O, format detection
 ├── config-paths.ts           Path derivation
-├── extension-paths.ts        `ExtensionPaths` value object - immutable path constants derived from `agentDir` at startup (`computeExtensionPaths`)
+├── extension-paths.ts        `ExtensionPaths` value object - immutable path constants derived from `agentDir` (and optional Pi `getPackageDir()`) at startup (`computeExtensionPaths`)
 ├── config-reporter.ts        Structured log entries for resolved config
 ├── config-modal.ts           /permission-system slash command UI
 ├── extension-config.ts       Runtime knobs (debugLog, yoloMode, etc.)
 │
 ├── permission-merge.ts        Deep-shallow merge for flat permission configs
 ├── canonicalize-path.ts       Best-effort symlink resolution via `realpathSync` — walks up to longest existing ancestor and re-appends non-existent tail; ENOENT/ENOTDIR safe, EACCES/ELOOP fall back to lexical form
-├── path-utils.ts              Path normalization, within-directory, outside-CWD (canonical), safe-system-path, path-bearing-tool, Pi infrastructure read; `canonicalNormalizePathForComparison` for containment decisions
+├── path-utils.ts              Path normalization, within-directory (case-insensitive on Windows via `path.relative`), outside-CWD (canonical), safe-system-path, path-bearing-tool, Pi infrastructure read; `canonicalNormalizePathForComparison` for containment decisions
 ├── node-modules-discovery.ts  Global node_modules resolution (walk-up + npm root -g fallback)
 ├── system-prompt-sanitizer.ts Remove denied tools from system prompt
 ├── skill-prompt-sanitizer.ts  Skill prompt filtering by policy

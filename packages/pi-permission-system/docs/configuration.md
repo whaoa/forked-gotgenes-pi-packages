@@ -391,10 +391,15 @@ Infrastructure directories include:
 1. The agent config directory (`~/.pi/agent/` or `$PI_CODING_AGENT_DIR`)
 2. Git-cloned global packages (`<agentDir>/git/`)
 3. The global `node_modules` root (auto-discovered from the extension's own install path; falls back to `npm root -g` when running from a local development checkout)
-4. Project-local Pi packages (`<cwd>/.pi/npm/` and `<cwd>/.pi/git/`)
-5. Any paths listed in `piInfrastructureReadPaths`
+4. Pi's own install directory (auto-discovered via the coding-agent `getPackageDir()` API, so Pi's bundled docs and examples are readable regardless of install layout)
+5. Project-local Pi packages (`<cwd>/.pi/npm/` and `<cwd>/.pi/git/`)
+6. Any paths listed in `piInfrastructureReadPaths`
 
 Write tools (`write`, `edit`) to infrastructure paths are **not** auto-allowed and still go through the gate.
+
+On Windows, path matching for `external_directory`, `path`, and the path-bearing tools is case-insensitive and tolerant of either separator (`\` or `/`), matching the case-insensitive filesystem.
+A mixed-case allow override such as `~/AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent/*` therefore matches a lowercased, backslash-normalized path value.
+POSIX matching remains case-sensitive.
 
 ### Home Directory Expansion in Patterns
 
