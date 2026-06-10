@@ -70,6 +70,8 @@ Run `pnpm run check` (`tsc --noEmit`) for type-only changes.
 
 - When a TDD step changes behavior, account for existing tests that will break.
   Either fold the test updates into the same step or place a dedicated test-update step immediately before it.
+- When a TDD step deletes a test or test helper, re-check the file's remaining imports for orphans.
+  Biome's `noUnusedImports` is warning-level (exit 0), so `pnpm run lint` stays green and the pre-completion reviewer is the only backstop.
 - When a TDD plan lists separate steps that share a type definition, changing that type in step N breaks steps N+1…N+k.
   Either fold them into one step or introduce the new type alongside the old one and migrate callers incrementally.
 - When a TDD step narrows a union type (removes variants), grep all test files for fixtures or mocks that use the removed variant — those test fixes must land in the same step as the type change, not in later steps.
