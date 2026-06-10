@@ -116,6 +116,11 @@ If the difference is incidental, extract.
 
 Sandi Metz: "duplication is far cheaper than the wrong abstraction."
 
+### Preparatory refactoring (tidy first)
+
+Before planning or landing a refactor as one atomic commit, ask whether a preparatory step would shrink it — a pure-addition interface, or migrating tests to a shared fixture — landed as separate commits first.
+Kent Beck: "make the change that makes the change easy, then make the easy change."
+
 ## TypeScript
 
 - Avoid `any` unless absolutely necessary.

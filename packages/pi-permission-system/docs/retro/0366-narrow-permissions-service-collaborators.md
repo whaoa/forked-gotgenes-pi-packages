@@ -40,3 +40,50 @@ All deterministic gates pass: `check`, `lint`, full `test`, and `fallow dead-cod
 - The pre-completion reviewer's WARN (two stale `architecture.md` lines describing the injected collaborators and the registry module) was addressed in this session with a `docs:` commit, not deferred — only the roadmap `✓ complete` mark remains for ship time.
 - Pre-completion reviewer: PASS (ready for `/ship-issue`).
   Reviewer warnings: two `architecture.md` staleness items — both now fixed in commit `docs: reflect narrowed LocalPermissionsService collaborators in architecture (#366)`.
+
+## Stage: Final Retrospective (2026-06-10T10:30:00Z)
+
+### Session summary
+
+Shipped #366 end-to-end across Planning, TDD, and Ship stages: `LocalPermissionsService` now depends on `ScopedPermissionManager`, `Pick<SessionRules, "getRuleset">`, and the new `ToolInputFormatterRegistrar` instead of concrete classes, with all three `as unknown as` casts removed.
+Released as `pi-permission-system-v10.9.0`; issue closed.
+The defining moment was a mid-TDD user intervention ("make the change that makes the change easy") that turned a planned single atomic commit into a clean tidy-first decomposition.
+
+### Observations
+
+#### What went well
+
+- The tidy-first decomposition, once prompted, executed cleanly: a pure-addition interface commit (`feat:`), a test-fixture migration commit (`test:`), then an 18-line main `refactor:` diff — a textbook Kent Beck sequence with `pnpm run check` + targeted test run after each commit.
+- The `pre-completion-reviewer` subagent caught two stale `architecture.md` lines (the injected-collaborator description and the `tool-input-formatter-registry.ts` module listing) that the plan had not flagged — the plan deferred only the `✓ complete` roadmap mark.
+  The agent correctly recognized post-step #7 obligated fixing them in-session, converting latent doc-staleness into a `docs:` commit before shipping.
+
+#### What caused friction (agent side)
+
+- `premature-convergence` — During TDD the agent began executing the plan's single-commit cycle literally (the first Red-step edit to `permissions-service.test.ts`) without considering whether preparatory tidyings would shrink the change; the better structure emerged only after the user invoked Kent Beck.
+  Root cause is upstream in planning: the plan locked in a "single atomic type change" in its TDD Order and never weighed a tidy-first split.
+  Impact: one premature edit reverted via `git checkout`, then re-done as three clean commits — minimal rework (~1 reverted edit), but the cleaner outcome depended on user intervention rather than a proactive planning heuristic.
+  User-caught (strategic redirect, not an error correction).
+- `other` (tooling) — Ship stage used `grep -oP` (Perl regex), which macOS BSD `grep` rejects; self-corrected to `grep -oE` on the next call.
+  Impact: 1 extra tool call, no rework.
+- `other` (minor) — Planning emitted plan markdown that tripped markdownlint MD053 (reference-link definition without a matching body reference), fixed with one follow-up edit before committing.
+  Impact: 1 extra edit, no rework.
+
+#### What caused friction (user side)
+
+- The "make the change that makes the change easy" intervention was high-leverage judgment delivered at exactly the right moment — before the messy single-commit landed.
+  Opportunity (not criticism): encoding tidy-first decomposition as a planning heuristic would let the decomposition surface proactively at plan time rather than relying on the user to catch it mid-implementation.
+
+### Diagnostic details
+
+- Model-performance correlation — Planning ran on `claude-opus-4-8` (judgment-heavy design) — appropriate.
+  TDD opened on `claude-sonnet-4-6` (the premature single-commit Red edit happened here); the strategic A/B/C decomposition ran on `claude-opus-4-8` after the user nudge — heavier reasoning for the harder call.
+  Ship ran on `deepseek-v4-flash` (mechanical push/CI/close/merge) — an appropriate tier, though it produced the `grep -oP` misfire.
+  The `pre-completion-reviewer` ran as a separate subagent (model set by its own frontmatter, not visible in the parent transcript).
+- Escalation-delay — No rabbit-holes; the single tooling error resolved in 1 retry, well under the 5-call threshold.
+- Unused-tool — The `premature-convergence` gap was a planning-heuristic gap, not a missing-tool gap; no Explore/`colgrep` dispatch would have surfaced the tidy-first split — only proactive consideration would.
+- Feedback-loop — Verification was incremental: `check` + targeted test after each of commits A/B/C, then full suite + `lint` + `fallow dead-code` at the end.
+  No end-only-verification gap.
+
+### Changes made
+
+1. Added a `### Preparatory refactoring (tidy first)` subsection to the Structural Design section of `.pi/skills/code-design/SKILL.md` — encodes the Kent Beck "make the change that makes the change easy" heuristic so a preparatory split (pure-addition interface, shared-fixture migration) is considered proactively at plan time rather than relying on a mid-implementation user nudge.
