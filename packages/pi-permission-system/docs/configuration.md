@@ -58,7 +58,7 @@ Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`) use simple replace
     "read": "allow",
     "write": "deny",
     "edit": "deny",
-    "bash": { "git status": "allow", "git *": "ask" },
+    "bash": { "git *": "ask", "git status": "allow" },
     "mcp": { "mcp_status": "allow" },
     "skill": { "*": "ask" },
     "external_directory": "ask"
@@ -199,7 +199,7 @@ Control-flow bodies (`if`/`while`/`for`/`case`) and `{ … }` brace groups are n
 
 A pattern ending with `*` (space + wildcard) also matches the bare command without arguments.
 For example, `"git *"` matches both `"git status"` and bare `"git"`.
-Use a more specific pattern before it to carve out exceptions.
+Place a more specific pattern *after* it to carve out exceptions — the later matching rule wins.
 
 > **Patterns match individual commands, not whole chains.**
 > A pattern that embeds a chain operator (e.g. `"cd * && npm *"`) will not match, because each command in the chain is evaluated separately.
@@ -210,9 +210,9 @@ Use a more specific pattern before it to carve out exceptions.
   "permission": {
     "bash": {
       "*": "ask",
+      "git *": "ask",
       "git status": "allow",
       "git diff": "allow",
-      "git *": "ask",
       "rm -rf *": "deny"
     }
   }
@@ -440,8 +440,8 @@ permission:
   write: deny
   mcp: allow
   bash:
-    git status: allow
     git *: ask
+    git status: allow
   mcp:
     chrome_devtools_*: deny
     exa_*: allow

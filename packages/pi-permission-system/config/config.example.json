@@ -23,9 +23,9 @@
     "edit": "deny",
     "bash": {
       "*": "ask",
+      "git *": "ask",
       "git status": "allow",
-      "git diff": "allow",
-      "git *": "ask"
+      "git diff": "allow"
     },
     "mcp": { "*": "ask", "mcp_status": "allow", "mcp_list": "allow" },
     "skill": { "*": "ask" },
