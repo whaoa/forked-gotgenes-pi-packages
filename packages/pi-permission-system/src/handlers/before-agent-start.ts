@@ -38,7 +38,7 @@ export function shouldExposeTool(
  * Constructor deps:
  * - `session` — encapsulates all mutable session state and lifecycle operations
  * - `resolver` — owns permission-query surface: `getToolPermission`, `getPolicyCacheStamp`, skill check
- * - `toolRegistry` — Pi tool API subset (getAll + setActive)
+ * - `toolRegistry` — Pi tool API subset (getActive + setActive)
  */
 export class AgentPrepHandler {
   constructor(
@@ -56,10 +56,10 @@ export class AgentPrepHandler {
     this.session.refreshConfig(ctx);
 
     const agentName = this.session.resolveAgentName(ctx, event.systemPrompt);
-    const allTools = this.toolRegistry.getAll();
+    const activeTools = this.toolRegistry.getActive();
     const allowedTools: string[] = [];
 
-    for (const tool of allTools) {
+    for (const tool of activeTools) {
       const toolName = getToolNameFromValue(tool);
       if (!toolName) {
         continue;

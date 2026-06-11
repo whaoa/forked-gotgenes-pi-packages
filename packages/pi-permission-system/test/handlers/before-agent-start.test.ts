@@ -127,7 +127,7 @@ describe("AgentPrepHandler.handle", () => {
     const { handler, toolRegistry } = makeSetup({
       toolPermission: "deny",
       toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "write" }, { name: "read" }]),
+        getActive: vi.fn().mockReturnValue(["write", "read"]),
       },
     });
     await handler.handle(makeEvent(), makeCtx());
@@ -137,17 +137,44 @@ describe("AgentPrepHandler.handle", () => {
   it("includes allowed and ask tools in the active list", async () => {
     const { handler, toolRegistry } = makeSetup({
       toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "read" }, { name: "write" }]),
+        getActive: vi.fn().mockReturnValue(["read", "write"]),
       },
     });
     await handler.handle(makeEvent(), makeCtx());
     expect(toolRegistry.setActive).toHaveBeenCalledWith(["read", "write"]);
   });
 
+  it("does not activate registered tools pi left inactive (find/grep/ls)", async () => {
+    // Regression for #385: the active set is the base, not the full registry.
+    const { handler, toolRegistry } = makeSetup({
+      toolRegistry: {
+        getActive: vi.fn().mockReturnValue(["read", "bash", "edit", "write"]),
+        getAll: vi
+          .fn()
+          .mockReturnValue([
+            { name: "read" },
+            { name: "bash" },
+            { name: "edit" },
+            { name: "write" },
+            { name: "find" },
+            { name: "grep" },
+            { name: "ls" },
+          ]),
+      },
+    });
+    await handler.handle(makeEvent(), makeCtx());
+    expect(toolRegistry.setActive).toHaveBeenCalledWith([
+      "read",
+      "bash",
+      "edit",
+      "write",
+    ]);
+  });
+
   it("calls setActive once across repeated calls with the same allowed tools", async () => {
     const { handler, toolRegistry } = makeSetup({
       toolRegistry: {
-        getAll: vi.fn().mockReturnValue([{ name: "read" }]),
+        getActive: vi.fn().mockReturnValue(["read"]),
       },
     });
     await handler.handle(makeEvent(), makeCtx());
