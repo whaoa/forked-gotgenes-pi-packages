@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.10.1](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v10.10.0...pi-permission-system-v10.10.1) (2026-06-11)
+
+
+### Documentation
+
+* fix bash rule precedence examples and wording ([#387](https://github.com/gotgenes/pi-packages/issues/387)) ([9e18d6f](https://github.com/gotgenes/pi-packages/commit/9e18d6faab6e3ceaa1a8839f5b6753d5457a2a28))
+
 ## [10.10.0](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v10.9.0...pi-permission-system-v10.10.0) (2026-06-10)
 
 
