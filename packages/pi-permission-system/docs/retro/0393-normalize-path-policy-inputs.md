@@ -60,3 +60,21 @@ Co-authored-by: moekyo <shigotods@outlook.com>
 
 The ship-stage PR close comment thanks `@moekyo` by name and links the implementing SHA(s).
 Reference the PR as `Refs #393` / `(#393)` in commits — never `Closes #393` (it pre-empts the curated close comment).
+
+## Stage: Planning (2026-06-12T00:00:00Z)
+
+### Session summary
+
+Produced `docs/plans/0393-normalize-path-policy-inputs.md` planning the simplified design the PR-review stage chose: keep `getPathPolicyValues`/`normalizePathPolicyLiteral`, `evaluateAnyValue`, and the cwd plumbing, but replace the `INTERNAL_PATH_POLICY_VALUES` symbol side-channel with an explicit `checkPathPolicy`/`resolvePathPolicy` method pair and remove the orphaned `pathTokens`/`extractTokensForPathRules` chain.
+The `Decide` gate was already satisfied by the recorded PR-review decision, so the third-party `ask_user` direction gate was not re-run.
+Plan is 9 TDD cycles (two `feat!:`), committed; next step is `/tdd-plan`.
+
+### Observations
+
+- Confirmed `runDescriptor` (`runner.ts`) uses `descriptor.preCheck` whenever set, and the bash path gate always sets it — so the PR's symbol stamp on `descriptor.input` was vestigial.
+  The simplified design carries the per-token policy values through a dedicated resolver method instead of any field on `input`, eliminating both the symbol and the user-string-spoofing concern.
+- Chose a new narrow method (`checkPathPolicy(values)` on `ScopedPermissionManager`, `resolvePathPolicy(values)` on `ScopedPermissionResolver`) over threading a `resolveBase` through `resolve`/`normalizeInput`: the `unknown`-base and no-cwd "literal only" decisions are bash-specific, so bash must own value computation and pass the finished array.
+- Flagged the interface breaks (steps 4 and 5) as fold-fixtures-in-same-commit: `makeFakePermissionManager` (`session-fixtures.ts`) gains `checkPathPolicy`; `makeResolver`/`makeGateRunner`/`makePathDispatchResolver` (`gate-fixtures.ts`) gain `resolvePathPolicy`; grep both interface names for inline mocks.
+- Used lift-and-shift for `pathTokens` removal (add `pathRuleCandidates` → migrate gate → delete) to keep every commit compiling.
+- Did not port the PR's symbol-spoofing tests; replaced with one `normalizeInput` no-side-channel assertion.
+- Breaking classification kept (`feat!:` on the manager and bash-gate steps) — relative inputs now match absolute allowlists, a loosening change for a least-privilege package; no config opt-out is named because none exists.
