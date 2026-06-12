@@ -10,6 +10,23 @@ import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import piColGrepExtension from "#src/extension";
 
+// Mock config loading so tests control `indexOnStartup` without touching the
+// real filesystem. Path builders stay real.
+const { loadConfig } = vi.hoisted(() => ({
+  loadConfig: vi.fn<() => { indexOnStartup: boolean }>(() => ({
+    indexOnStartup: true,
+  })),
+}));
+
+vi.mock("#src/lib/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("#src/lib/config")>();
+  return { ...actual, loadConfig };
+});
+
+beforeEach(() => {
+  loadConfig.mockReturnValue({ indexOnStartup: true });
+});
+
 // ---- TestPi stub ----
 
 type HandlerFn = (event: unknown, ctx: TestCtx) => Promise<void> | void;
@@ -139,6 +156,9 @@ describe("extension — session_start reindex", () => {
       },
     );
     await pi.trigger("session_start", makeSessionStartEvent(), ctx);
+    // Startup indexing is now fire-and-forget; drain it via shutdown so the
+    // status-clear has run before asserting.
+    await pi.trigger("session_shutdown", {}, ctx);
     expect(statusCalls.some(([, t]) => t?.startsWith("colgrep:"))).toBe(true);
     expect(statusCalls.at(-1)).toEqual(["colgrep", undefined]);
   });
@@ -150,6 +170,67 @@ describe("extension — session_start reindex", () => {
       "colgrep",
       ["init", "-y", "."],
       expect.objectContaining({ cwd: "/workspace/myproject" }),
+    );
+  });
+});
+
+// ---- Issue #389: background, config-gated startup index ----
+
+describe("extension — session_start background indexing (#389)", () => {
+  let pi: TestPi;
+  let ctx: TestCtx;
+
+  beforeEach(() => {
+    pi = new TestPi();
+    ctx = makeCtx();
+    pi.exec.mockResolvedValue({ stdout: "", stderr: "", code: 0 });
+    piColGrepExtension(pi.asExtensionAPI());
+  });
+
+  it("kicks off the startup index without blocking on it", async () => {
+    // Hold the `init` exec so it never resolves during the handler.
+    let resolveInit: (() => void) | undefined;
+    pi.exec.mockImplementation((_cmd, args) => {
+      if (args[0] === "init") {
+        return new Promise((resolve) => {
+          resolveInit = () => resolve({ stdout: "", stderr: "", code: 0 });
+        });
+      }
+      return Promise.resolve({ stdout: "", stderr: "", code: 0 });
+    });
+    const statusCalls: Array<[string, string | undefined]> = [];
+    ctx.ui.setStatus.mockImplementation((key, text) => {
+      statusCalls.push([key, text]);
+    });
+
+    await pi.trigger("session_start", makeSessionStartEvent(), ctx);
+
+    // The init was launched...
+    expect(pi.exec).toHaveBeenCalledWith(
+      "colgrep",
+      ["init", "-y", "."],
+      expect.objectContaining({ cwd: "/project" }),
+    );
+    // ...but the handler returned before it completed: the indexing status is
+    // still set (not cleared), proving startup is non-blocking.
+    expect(statusCalls.at(-1)).toEqual(["colgrep", "colgrep: indexing\u2026"]);
+
+    resolveInit?.();
+  });
+
+  it("does not run the startup index when indexOnStartup is false", async () => {
+    loadConfig.mockReturnValue({ indexOnStartup: false });
+    await pi.trigger("session_start", makeSessionStartEvent(), ctx);
+    expect(pi.exec).not.toHaveBeenCalledWith(
+      "colgrep",
+      ["init", "-y", "."],
+      expect.anything(),
+    );
+    // Availability is still checked.
+    expect(pi.exec).toHaveBeenCalledWith(
+      "colgrep",
+      ["--version"],
+      expect.anything(),
     );
   });
 });

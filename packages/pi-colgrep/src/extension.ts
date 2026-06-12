@@ -1,5 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { createAvailabilityState } from "./lib/availability";
+import {
+  getGlobalConfigPath,
+  getProjectConfigPath,
+  loadConfig,
+} from "./lib/config";
 import { createReindexer, type Reindexer } from "./lib/reindex";
 import { registerColGrep } from "./tools/colgrep";
 
@@ -41,12 +47,22 @@ export default function piColGrepExtension(pi: ExtensionAPI): void {
       return;
     }
 
+    const config = loadConfig({
+      globalConfigPath: getGlobalConfigPath(getAgentDir()),
+      projectConfigPath: getProjectConfigPath(ctx.cwd),
+    });
+
     reindexer = createReindexer({
       exec,
       cwd: ctx.cwd,
       onStatus: (text) => setColGrepStatus(ctx, text),
     });
-    await reindexer.runNow();
+
+    if (config.indexOnStartup) {
+      // Fire-and-forget: kick the index build off in the background so it never
+      // blocks Pi startup. `shutdown()` awaits the in-flight run on session end.
+      void reindexer.runNow();
+    }
   });
 
   pi.on("tool_result", (event, _ctx) => {
