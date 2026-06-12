@@ -69,9 +69,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@earendil-works/pi-ai": "0.75.4",
-    "@earendil-works/pi-coding-agent": "0.75.4",
-    "@earendil-works/pi-tui": "0.75.4",
+    "@earendil-works/pi-ai": "0.79.1",
+    "@earendil-works/pi-coding-agent": "0.79.1",
+    "@earendil-works/pi-tui": "0.79.1",
     "@types/node": "catalog:",
     "rollup": "^4.60.4",
     "rollup-plugin-dts": "^6.4.1",
