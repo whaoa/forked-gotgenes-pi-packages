@@ -23,12 +23,14 @@ vi.mock("node:fs", () => ({
 import {
   canonicalNormalizePathForComparison,
   getPathBearingToolPath,
+  getPathPolicyValues,
   getToolInputPath,
   isPathOutsideWorkingDirectory,
   isPathWithinDirectory,
   isPiInfrastructureRead,
   isSafeSystemPath,
   normalizePathForComparison,
+  normalizePathPolicyLiteral,
   PATH_BEARING_TOOLS,
   READ_ONLY_PATH_BEARING_TOOLS,
   SAFE_SYSTEM_PATHS,
@@ -540,5 +542,75 @@ describe("isPiInfrastructureRead", () => {
         "win32",
       ),
     ).toBe(false);
+  });
+});
+
+describe("normalizePathPolicyLiteral", () => {
+  test("returns a relative token unchanged", () => {
+    expect(normalizePathPolicyLiteral("src/foo.ts")).toBe("src/foo.ts");
+  });
+
+  test("trims and strips simple wrapping quotes", () => {
+    expect(normalizePathPolicyLiteral("  'src/foo.ts'  ")).toBe("src/foo.ts");
+    expect(normalizePathPolicyLiteral('"a/b"')).toBe("a/b");
+  });
+
+  test("strips a leading @ prefix", () => {
+    expect(normalizePathPolicyLiteral("@src/foo.ts")).toBe("src/foo.ts");
+  });
+
+  test("expands ~ to the home directory", () => {
+    expect(normalizePathPolicyLiteral("~/docs/readme.md")).toBe(
+      join("/mock/home", "docs/readme.md"),
+    );
+  });
+
+  test("does not resolve a relative value against any cwd", () => {
+    expect(normalizePathPolicyLiteral("foo.ts")).toBe("foo.ts");
+  });
+
+  test("returns empty string for blank input", () => {
+    expect(normalizePathPolicyLiteral("   ")).toBe("");
+  });
+
+  test("preserves the surface catch-all", () => {
+    expect(normalizePathPolicyLiteral("*")).toBe("*");
+  });
+});
+
+describe("getPathPolicyValues", () => {
+  const cwd = "/projects/my-app";
+
+  test("returns only the literal when no base is available", () => {
+    expect(getPathPolicyValues("src/foo.ts")).toEqual(["src/foo.ts"]);
+    expect(getPathPolicyValues("src/foo.ts", {})).toEqual(["src/foo.ts"]);
+  });
+
+  test("adds absolute and project-relative aliases for a relative token", () => {
+    expect(getPathPolicyValues("src/foo.ts", { cwd })).toEqual([
+      "/projects/my-app/src/foo.ts",
+      "src/foo.ts",
+    ]);
+  });
+
+  test("omits the relative alias for a token outside cwd", () => {
+    expect(getPathPolicyValues("/etc/hosts", { cwd })).toEqual(["/etc/hosts"]);
+  });
+
+  test("resolves against resolveBase while aliasing relative to cwd", () => {
+    expect(
+      getPathPolicyValues("foo.txt", {
+        cwd,
+        resolveBase: "/projects/my-app/nested",
+      }),
+    ).toEqual(["/projects/my-app/nested/foo.txt", "nested/foo.txt", "foo.txt"]);
+  });
+
+  test("preserves the surface catch-all", () => {
+    expect(getPathPolicyValues("*", { cwd })).toEqual(["*"]);
+  });
+
+  test("returns empty for blank input", () => {
+    expect(getPathPolicyValues("   ", { cwd })).toEqual([]);
   });
 });
