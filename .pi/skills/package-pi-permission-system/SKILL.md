@@ -80,6 +80,7 @@ The `permission` object uses deep-shallow merge; scalar fields use simple replac
 - When adding an optional field to `PermissionSystemExtensionConfig`, do not include it in `DEFAULT_EXTENSION_CONFIG` with an explicit `undefined` value — tests use `deepEqual` and it breaks equality.
 - When adding a field to `PermissionSystemExtensionConfig`, also carry it through the loader's `UnifiedPermissionConfig` (`config-loader.ts`): parse it in `normalizeUnifiedConfig()` and merge it in `mergeUnifiedConfigs()`.
   A field on the runtime type but not the merge intermediate is silently dropped before runtime (the #332 / #347 bug class).
+  After #356, omitting a field from `UnifiedPermissionConfig` that `normalizePermissionSystemConfig` reads is a **compile error** — `normalizePermissionSystemConfig` reads fields directly from the typed `UnifiedPermissionConfig` parameter, so `tsc` catches the gap immediately.
 - When a config example sets a policy for `write`, include the same policy for `edit` — both tools modify files and users expect them gated together.
 
 ## Cross-Extension Integration
