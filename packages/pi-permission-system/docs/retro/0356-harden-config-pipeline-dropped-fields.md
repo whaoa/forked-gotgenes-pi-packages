@@ -22,3 +22,20 @@ Operator chose the full retype and a new dedicated test file.
 - Accepted minor ISP slack: the function reads 6/7 `UnifiedPermissionConfig` fields (never `permission`); narrowing to `Omit<..., "permission">` rejected as speculative since the issue prescribes the `UnifiedPermissionConfig` type and the compile-error property holds regardless.
 - TDD ordering puts the seam regression test first (passes immediately, since #332 already fixed the loader) as a safety net before the refactor; the refactor is one atomic commit because the type change breaks tests and call sites at the type level.
 - `config-modal.test.ts` call-site fix routes through `loadUnifiedConfig(configPath).config` instead of `JSON.parse(...) as unknown`, which mirrors the production load path more faithfully.
+
+## Stage: Implementation — TDD (2026-06-12)
+
+### Session summary
+
+Completed both TDD steps cleanly: (1) added `test/config-pipeline.test.ts` with 4 full-pipeline seam tests, all green on first run (the #332 loader fix was already in place); (2) atomic refactor commit retypes `normalizePermissionSystemConfig` to `(raw: UnifiedPermissionConfig)`, drops the redundant `toRecord`/`normalizeOptional*` body, deletes 4 garbage-input tests from `test/extension-config.test.ts`, and fixes 2 `as unknown` call sites in `test/config-modal.test.ts`.
+Final suite: 94 test files, 1951 tests — net count unchanged (4 deleted, 4 added).
+
+### Observations
+
+- Step 1 passed immediately as designed — the seam test is a regression guard, not a new-behavior test.
+- The atomic Step 2 commit required 3 file edits (src + 2 test files) but `pnpm run check` passed cleanly — `PermissionSystemExtensionConfig` is structurally assignable to `UnifiedPermissionConfig` so both production call sites compiled unchanged.
+- `readFileSync` import stayed in `test/config-modal.test.ts` — it has a third use at line 215 unrelated to the `normalizePermissionSystemConfig` call sites.
+- The 4-test deletion in `test/extension-config.test.ts` was exactly offset by the 4-test addition in `test/config-pipeline.test.ts`, keeping the total at 1951.
+- Post-implementation: fallow dead-code clean; lint/check/test all green.
+- Pre-completion reviewer: WARN — one finding: package `SKILL.md` still said "silently dropped before runtime" after the change makes it a compile error.
+  Addressed immediately with a `docs:` commit updating the skill to note the `tsc` enforcement.
