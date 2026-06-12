@@ -29,6 +29,7 @@
     "packages/pi-autoformat/docs/assets",
     "packages/pi-autoformat/docs/plans",
     "packages/pi-autoformat/docs/retro",
+    "packages/pi-colgrep/docs/architecture",
     "packages/pi-colgrep/docs/plans",
     "packages/pi-colgrep/docs/retro",
     "packages/pi-github-tools/docs/plans",
