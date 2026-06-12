@@ -78,3 +78,25 @@ Plan is 9 TDD cycles (two `feat!:`), committed; next step is `/tdd-plan`.
 - Used lift-and-shift for `pathTokens` removal (add `pathRuleCandidates` → migrate gate → delete) to keep every commit compiling.
 - Did not port the PR's symbol-spoofing tests; replaced with one `normalizeInput` no-side-channel assertion.
 - Breaking classification kept (`feat!:` on the manager and bash-gate steps) — relative inputs now match absolute allowlists, a loosening change for a least-privilege package; no config opt-out is named because none exists.
+
+## Stage: Implementation — TDD (2026-06-12T00:00:00Z)
+
+### Session summary
+
+Implemented all 9 planned TDD cycles plus two follow-up docs commits (architecture listing + fixture skill), 11 commits total, every commit `Co-authored-by: moekyo`.
+The simplified design landed as planned: `getPathPolicyValues`/`normalizePathPolicyLiteral` (`path-utils.ts`), `evaluateAnyValue` (`rule.ts`), cwd plumbing + `checkPathPolicy` + shared `buildCheckResult` (`permission-manager.ts`), `resolvePathPolicy` (`permission-resolver.ts`), `pathRuleCandidates` (`bash-program.ts`), and the gate migration — with the `INTERNAL_PATH_POLICY_VALUES` symbol replaced by the explicit `checkPathPolicy`/`resolvePathPolicy` pair and the orphaned `pathTokens`/`extractTokensForPathRules` chain removed.
+Full suite green at 1972 tests (net change from a 1951 baseline: added ~40 new cases across 6 files, removed ~19 from the deleted `pathTokens`/`extractTokensForPathRules` blocks); `check`, `lint`, and `fallow dead-code` all clean.
+
+### Observations
+
+- One unplanned fixture fix: the bash path gate now resolves through `checkPathPolicy`, so `makeHandler` (`handler-fixtures.ts`) had to route `permissionManager.checkPathPolicy` through the same surface dispatcher as `checkPermission` — otherwise `makeSurfaceCheck({ path: deny })` only stubbed `checkPermission` and the real `tool-call.test.ts` bash-path block silently passed allow.
+  Caught by the full-suite run after step 7, not by the directly-edited test file.
+- The home-relative bash tests (`~/.ssh/config`, `$HOME/.ssh/config`) needed their `makePathDispatchResolver` `byPath` keys changed from the raw token to the home-expanded `/mock/home/.ssh/config`, because policy values now expand `~`/`$HOME` before dispatch while the raw token is kept only for prompts.
+  Relative-token tests were unaffected since the literal alias stays in `policyValues`.
+- Confirmed the PR's symbol stamp on `descriptor.input` was vestigial: `runDescriptor` uses `preCheck` whenever set and the bash path gate always sets it, so `descriptor.input` is never re-resolved — the simplified design drops the symbol with no behavior loss.
+- Two interface-break steps (manager `checkPathPolicy`, resolver `resolvePathPolicy`) each folded their fixture/inline-mock updates into the same commit; `pnpm run check` immediately after each caught the `permission-resolver.test.ts` inline fake manager that needed `checkPathPolicy`.
+- Deviation from the plan's Module-Level Changes: also updated `docs/architecture/architecture.md` (lines for `bash-path.ts`, `bash-program.ts`, `bash-path-extractor.ts`) — the plan didn't list it but its own guidance to check `docs/architecture/` for stale module listings applied.
+  Committed as a separate `docs:`.
+- Pre-completion reviewer: WARN (no FAILs).
+  Sole finding — stale fixture descriptions in `package-pi-permission-system/SKILL.md` (`makeResolver`, `makePathDispatchResolver`, `makeFakePermissionManager` omitted the new stubs).
+  Fixed in the final `docs:` commit before shipping, so the WARN is resolved.
