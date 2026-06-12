@@ -58,6 +58,7 @@ Each prompt template calls `set_session_name` (from `pi-session-tools`) to label
 
 | Stage                | Session name format          |
 | -------------------- | ---------------------------- |
+| PR review            | `#N PR Review — <title>`     |
 | Planning             | `#N Planning — <title>`      |
 | TDD implementation   | `#N TDD — <title>`           |
 | Build implementation | `#N Build — <title>`         |

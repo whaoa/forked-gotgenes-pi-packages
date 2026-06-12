@@ -52,3 +52,53 @@ Every implementation/docs commit carries the `Co-authored-by: moekyo <shigotods@
 - The full suite (not just the affected files) was run before the `feat!` Cycle 3 commit since it changes shared gate behavior — caught nothing, but the right call for a breaking change.
 - Pre-completion reviewer verdict: WARN (no FAILs).
   Two non-blocking findings: (1) the `package-pi-permission-system` skill was stale — fixed in commit `30824366` (added the extractor-registry / default-on note + testing bullet); (2) the two planning-stage docs commits (`d7e881ac`, `1eece29b`) lack the `Co-authored-by` trailer — accepted as-is, since moekyo did not author the plan prose and all five implementation commits plus the eventual close comment carry the attribution.
+
+## Stage: Final Retrospective (2026-06-12T03:33:14Z)
+
+### Session summary
+
+Shipped #352 end-to-end (TDD → Ship): closed the path-gating bypass for extension/MCP tools, released `pi-permission-system-v12.0.0` (a major bump from the `feat!`), and closed the PR-issue with an explicit `@moekyo` credit comment.
+The ship stage was clean (CI green, release-please `UNSTABLE`-no-checks case handled correctly).
+The attribution mechanics worked: every implementation/docs commit carried the `Co-authored-by: moekyo <shigotods@outlook.com>` trailer and the close comment thanked `@moekyo` by name and linked the SHAs.
+
+### Observations
+
+#### What went well
+
+- The plan's simplified design held through implementation and ship with **zero rework** — the lean value-only extractor and the decision to leave `normalizeInput`/`PermissionManager` untouched kept the diff tight and reviewable for a security-sensitive package.
+- The third-party attribution workflow (encode `Co-authored-by` in the plan → carry on every commit → credit in the close comment) executed cleanly and is a reusable template for adopting external contributions without merging them.
+- Release automation handled the major version bump (`12.0.0`) correctly from the `feat!` + `BREAKING CHANGE:` footer; the `UNSTABLE`/empty-rollup `GITHUB_TOKEN` merge case was recognized and merged without blocking.
+
+#### What caused friction (agent side)
+
+- `other` (Edit tool-schema misuse) — repeatedly included a non-schema `endText` property in `Edit` calls (4+ times this session, plus earlier in the broader work); each was rejected and retried.
+  Impact: ~1–2 wasted tool calls per occurrence, no code impact.
+  No project-doc remedy — this is tool-call hygiene, not a convention gap.
+- `other` (linter/hook churn) — in Cycle 3, a redundant `(x as string)` after a `typeof x === "string"` narrowing in test mocks was auto-stripped by ESLint's `no-unnecessary-type-assertion`, then `biome` reflowed the resulting ternary, aborting the pre-commit hook twice.
+  Impact: ~4 extra tool calls (paren cleanup + two re-stage/re-commit cycles).
+  Repeatable gotcha worth a one-line AGENTS.md note (proposed).
+
+#### What caused friction (user side)
+
+- None blocking.
+  The earlier "no `/pr-review` template" remark surfaced a real structural gap (below) rather than friction.
+
+### Follow-ups
+
+- A dedicated `/pr-review` (or contribution-triage) prompt template: third-party PRs arriving as issues is now a recurring pattern (`#389` graelo, `#352` moekyo), and `/plan-issue` is being overloaded as a stand-in.
+  A purpose-built template would standardize the evaluate-vs-adopt decision, the attribution mechanics, and the simplified-re-implementation path.
+  Substantive (a new prompt) — open an issue and run `/plan-issue`, do not add inline here.
+
+### Diagnostic details
+
+- **Feedback-loop** — clean and incremental: `pnpm run check` / `biome` ran after each interface-touching cycle (3, 4), and the full suite ran before the `feat!` Cycle 3 commit (correct for a breaking change).
+  No end-only verification gap.
+- **Escalation-delay** — the Cycle 3 hook churn was 2 aborted commits / ~4 tool calls, under the 5-call threshold; resolved by removing the cast rather than fighting the hook.
+- **Model-performance** — one subagent (pre-completion-reviewer) on `claude-sonnet-4-6`, appropriate for judgment-heavy review; returned WARN with two correct findings.
+
+### Changes made
+
+1. Created `.pi/prompts/pr-review.md` — a new `/pr-review` slash-command template (operator-directed, using #352 as the worked example).
+   It evaluates a third-party PR, separates the underlying problem from the implementation, runs a required third-party `ask-user` direction gate (adopt-as-is / adopt-with-simplified-design / decline), bakes in the `Co-authored-by` + close-comment attribution mechanics, and — in the common case — records a triage note and hands off to `/plan-issue` rather than merging.
+2. Added a `PR review` row to the session-naming table in `AGENTS.md` (`#N PR Review — <title>`) so the convention table stays consistent with the new template's `set_session_name` call.
+3. Did **not** add the redundant-cast gotcha to `AGENTS.md` (the other ask-user option) — the operator redirected to building `/pr-review`; left here as a recorded observation only.
