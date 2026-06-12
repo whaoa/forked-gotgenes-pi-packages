@@ -45,3 +45,54 @@ Pre-completion reviewer returned PASS; 3512 tests across seven packages all gree
   Decision: adopt `ctx.isProjectTrusted()` guard in a follow-up issue.
 - `typebox@1.1.38` also appears in the lockfile as a transitive dep inside the Pi SDK itself (`@earendil-works/pi-coding-agent@0.79.1` → `typebox@1.1.38`); both versions coexist correctly.
 - Pre-completion reviewer: PASS — all ACs verified, no warnings.
+
+## Stage: Final Retrospective (2026-06-12T22:04:41Z)
+
+### Session summary
+
+Three-stage cross-package dependency update (Planning → Build → Ship) executed cleanly: all six deferred dependencies bumped, project-trust adoption recorded as ADR-0001, six packages released, issue closed.
+The only rework was a one-line `style:` fixup commit for a duplicate markdown link-reference definition in the retro file; the only plan deviation was an unanticipated explicit-devDep addition in `pi-subagents-worktrees`.
+
+### Observations
+
+#### What went well
+
+- **Planning verified every claim in the issue table rather than trusting it.**
+  The issue named `pi-subagents` `14.0.1` and listed `pi-permission-system` as needing the SDK bump; planning checked npm (`15.0.1` is latest), git (`pi-permission-system` already on `0.79.1` via [#382]), and the `pi-subagents` CHANGELOG (confirmed `WorkspaceProvider` unaffected by the `14.0.0` event-payload break) before writing.
+  The scope correction dropped one package and retargeted another major.
+- **Tight incremental feedback loop in Build.**
+  `check` / `lint` / `test` ran after every one of the five steps, not just at the end — plus targeted gates (`verify:public-types` after the `rollup` bump, worktree integration tests after the floor bump).
+  No end-of-session surprise.
+- **Clean deviation handling in Build Step 2.**
+  The stale-`0.75.4` peer resolution was investigated (lockfile reads), diagnosed (no SDK devDep in `pi-subagents-worktrees`), fixed, and folded into the same commit with an explanatory body — no separate churn commit.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the Build stage rewrote the retro with `Write`, re-adding `[#360]:` / `[#382]:` link-reference definitions that the Planning stage had already defined at the end of the file.
+  Link reference definitions are file-scoped, so the duplicate tripped markdownlint MD053 (caught by `rumdl check` at turn 105).
+  Impact: one extra fixup commit (`style: fix duplicate link definitions in retro #370`, `9f93b135`).
+- `missing-context` — the plan's Module-Level Changes for `pi-subagents-worktrees` listed only the `pi-subagents` pin bump; it did not anticipate that the package declares the SDK only as a peer (no devDep), so pnpm resolved the peer to the stale `0.75.4` after the Step 1 bump.
+  Impact: ~8 investigation tool calls (turns 43–51) and one unplanned `package.json` edit, folded into the Step 2 commit (no separate commit).
+- `rabbit-hole` (minor) — on the `typebox` step, `pnpm install --force` was run reactively (turn 58) before confirming why `1.1.38` lingered; it turned out to be a transitive dep of the Pi SDK and coexists with `1.2.8` by design.
+  Impact: ~6 tool calls of confirmation; no rework, no commit churn.
+
+#### What caused friction (user side)
+
+- None.
+  The Planning `ask_user` gate resolved all three direction choices (pi-subagents floor, typebox target, project-trust scope) up front, so Build and Ship needed no mid-flight user input.
+
+### Diagnostic details
+
+- **Model-performance correlation** — Planning ran on `anthropic/claude-opus-4-8` (judgment-heavy: scope verification, ambiguity surfacing); Build and Ship ran on `anthropic/claude-sonnet-4-6` (mechanical edits + verification).
+  Appropriate split; no mismatch.
+- **Feedback-loop gap analysis** — no gap: verification ran incrementally after each Build step, not deferred to the end.
+- **Escalation-delay tracking** — the two longest investigation runs (worktrees peer, ~8 calls; typebox transitive, ~6 calls) were productive lockfile reads, not repeated spinning on one error; neither warranted an Explore/Plan subagent.
+
+### Follow-up (not implemented inline)
+
+- The `pi-subagents-worktrees` peer-without-devDep gotcha is real but pnpm-specific and niche; recorded here as a lesson rather than a prompt rule.
+  If it recurs in another package, revisit whether the planning prompt should flag peer-only SDK declarations.
+
+### Changes made
+
+1. `.pi/skills/markdown-conventions/SKILL.md` — appended a sentence to the reference-style links bullet noting that link reference definitions are file-scoped, so an appended stage entry must not re-add a `[#N]:` already defined earlier in the file (prevents the MD053 duplicate that caused the `style:` fixup commit this session).
