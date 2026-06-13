@@ -126,12 +126,8 @@ function buildToolDenyBody(
     parts.push(qualifier);
   }
 
-  let message = `${parts.join(" ")}.`;
-  // Append the custom denial reason after the sentence-ending period.
-  if (check.reason) {
-    message += ` Reason: ${check.reason}.`;
-  }
-  return message;
+  // reasonSuffix appends ` Reason: <reason>.` after the sentence-ending period.
+  return `${parts.join(" ")}.${reasonSuffix(check.reason)}`;
 }
 
 /**
