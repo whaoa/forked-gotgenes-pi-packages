@@ -48,6 +48,8 @@ interface Rule {
   pattern: string;
   /** The decision. */
   action: PermissionState;
+  /** Custom denial reason for deny rules (optional). */
+  reason?: string;
   /**
    * Origin layer - used to derive PermissionCheckResult.source after evaluation.
    * Not used by evaluate(); purely informational metadata.
