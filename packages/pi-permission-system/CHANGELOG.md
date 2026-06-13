@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.1.0](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v13.0.0...pi-permission-system-v13.1.0) (2026-06-13)
+
+
+### Features
+
+* **pi-permission-system:** add DenyWithReason type and shared guard ([51750e1](https://github.com/gotgenes/pi-packages/commit/51750e188592520798eaf9676a15a709a779cf96)), closes [#395](https://github.com/gotgenes/pi-packages/issues/395)
+* **pi-permission-system:** append custom reason to denial messages ([d8e5756](https://github.com/gotgenes/pi-packages/commit/d8e575632678b806d381f1436dbb06197d742104)), closes [#395](https://github.com/gotgenes/pi-packages/issues/395)
+* **pi-permission-system:** build deny rules with reason in normalizeFlatConfig ([186c15a](https://github.com/gotgenes/pi-packages/commit/186c15a74944bc2800bcea738984021169fabc8d)), closes [#395](https://github.com/gotgenes/pi-packages/issues/395)
+* **pi-permission-system:** preserve deny-with-reason from JSON config ([3201bfd](https://github.com/gotgenes/pi-packages/commit/3201bfd55d68aac1ee87ac452723f6d0783dba6d)), closes [#395](https://github.com/gotgenes/pi-packages/issues/395)
+* **pi-permission-system:** thread deny reason into PermissionCheckResult ([ed712e4](https://github.com/gotgenes/pi-packages/commit/ed712e47458a662e3d1159e2f5096c709ab2ddf5)), closes [#395](https://github.com/gotgenes/pi-packages/issues/395)
+
+
+### Documentation
+
+* **pi-permission-system:** document deny-with-reason config form ([45be4e7](https://github.com/gotgenes/pi-packages/commit/45be4e72c0ca43040cb0f55ca196a0cab0b9fc14)), closes [#395](https://github.com/gotgenes/pi-packages/issues/395)
+
 ## [13.0.0](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v12.0.0...pi-permission-system-v13.0.0) (2026-06-12)
 
 
