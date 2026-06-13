@@ -35,6 +35,7 @@ import { shouldAutoApprovePermissionState } from "#src/yolo-mode";
 
 import {
   cleanupPermissionForwardingLocationIfEmpty,
+  ensureDirectoryExists,
   ensurePermissionForwardingLocation,
   getExistingPermissionForwardingLocation,
   listRequestFiles,
@@ -252,6 +253,20 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
 
     const requestFiles = listRequestFiles(this.logger, location.requestsDir);
     if (requestFiles.length === 0) {
+      return;
+    }
+
+    // Defensively recreate responses/ before writing any response — a
+    // concurrent cleanup pass may have removed it between the requestsDir
+    // existence check above and the write inside processSingleForwardedRequest
+    // (the ENOENT write loop reported in issue #398).
+    if (
+      !ensureDirectoryExists(
+        this.logger,
+        location.responsesDir,
+        "permission forwarding responses",
+      )
+    ) {
       return;
     }
 

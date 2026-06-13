@@ -307,4 +307,63 @@ describe("processInbox", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test("recreates a missing responses/ directory and still writes the response", async () => {
+    const root = mkdtempSync(join(tmpdir(), "permission-forwarding-"));
+    try {
+      const forwardingDir = join(root, "forwarding");
+      const location = createPermissionForwardingLocation(
+        forwardingDir,
+        "parent-session",
+      );
+      // Simulate the race: requests/ exists with a pending file, but
+      // responses/ was removed by a concurrent cleanup pass.
+      mkdirSync(location.requestsDir, { recursive: true });
+      // Deliberately do NOT create location.responsesDir.
+      writeFileSync(
+        join(location.requestsDir, "req-race.json"),
+        JSON.stringify({
+          id: "req-race",
+          createdAt: Date.now(),
+          requesterSessionId: "child-session",
+          targetSessionId: "parent-session",
+          requesterAgentName: "Explore",
+          message: "Allow read?",
+        }),
+        "utf-8",
+      );
+
+      const logger = { review: vi.fn(), debug: vi.fn() };
+      const requestPermissionDecisionFromUi = vi
+        .fn()
+        .mockResolvedValue({ approved: true, state: "approved" as const });
+
+      const forwarder = new PermissionForwarder(
+        makeDeps({
+          forwardingDir,
+          logger,
+          requestPermissionDecisionFromUi,
+        }),
+      );
+
+      await forwarder.processInbox(
+        makeCtx({
+          hasUI: true,
+          sessionManager: {
+            getSessionId: vi.fn(() => "parent-session"),
+          },
+        }),
+      );
+
+      // processInbox must have recreated responses/ and written a response
+      // file — no permission_forwarding.error should have been logged.
+      expect(logger.review).not.toHaveBeenCalledWith(
+        "permission_forwarding.error",
+        expect.anything(),
+      );
+      expect(requestPermissionDecisionFromUi).toHaveBeenCalled();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
