@@ -175,13 +175,20 @@ export function getExistingPermissionForwardingLocation(
   return existsSync(location.requestsDir) ? location : null;
 }
 
+/**
+ * Attempt to remove a directory if it is empty.
+ *
+ * Returns `true` when the directory is absent after the call (successfully
+ * removed, or never existed).  Returns `false` when the directory still exists
+ * (non-empty, or a filesystem error prevented removal).
+ */
 export function tryRemoveDirectoryIfEmpty(
   logger: DebugReviewLogger | null,
   path: string,
   description: string,
-): void {
+): boolean {
   if (!existsSync(path)) {
-    return;
+    return true;
   }
 
   let entries: string[];
@@ -193,18 +200,22 @@ export function tryRemoveDirectoryIfEmpty(
       `Failed to inspect ${description} directory '${path}'`,
       error,
     );
-    return;
+    return false;
   }
 
   if (entries.length > 0) {
-    return;
+    return false;
   }
 
   try {
     rmdirSync(path);
+    return true;
   } catch (error) {
-    if (isErrnoCode(error, "ENOENT") || isErrnoCode(error, "ENOTEMPTY")) {
-      return;
+    if (isErrnoCode(error, "ENOENT")) {
+      return true;
+    }
+    if (isErrnoCode(error, "ENOTEMPTY")) {
+      return false;
     }
 
     logPermissionForwardingWarning(
@@ -212,6 +223,7 @@ export function tryRemoveDirectoryIfEmpty(
       `Failed to remove empty ${description} directory '${path}'`,
       error,
     );
+    return false;
   }
 }
 
@@ -219,16 +231,20 @@ export function cleanupPermissionForwardingLocationIfEmpty(
   logger: DebugReviewLogger | null,
   location: PermissionForwardingLocation,
 ): void {
-  tryRemoveDirectoryIfEmpty(
+  // Only remove responses/ when requests/ is already gone — removing responses/
+  // while a request is still pending causes the ENOENT write loop (issue #398).
+  const requestsGone = tryRemoveDirectoryIfEmpty(
     logger,
     location.requestsDir,
     `${location.label} permission forwarding requests`,
   );
-  tryRemoveDirectoryIfEmpty(
-    logger,
-    location.responsesDir,
-    `${location.label} permission forwarding responses`,
-  );
+  if (requestsGone) {
+    tryRemoveDirectoryIfEmpty(
+      logger,
+      location.responsesDir,
+      `${location.label} permission forwarding responses`,
+    );
+  }
   tryRemoveDirectoryIfEmpty(
     logger,
     location.sessionRootDir,

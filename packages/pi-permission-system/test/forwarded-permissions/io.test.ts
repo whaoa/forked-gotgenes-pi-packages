@@ -1,11 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  cleanupPermissionForwardingLocationIfEmpty,
   formatUnknownErrorMessage,
   isErrnoCode,
   logPermissionForwardingError,
   logPermissionForwardingWarning,
+  tryRemoveDirectoryIfEmpty,
 } from "#src/forwarded-permissions/io";
+import { createPermissionForwardingLocation } from "#src/permission-forwarding";
 import type { DebugReviewLogger } from "#src/session-logger";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -128,5 +141,111 @@ describe("logPermissionForwardingError", () => {
 
   it("does not throw when logger is null", () => {
     expect(() => logPermissionForwardingError(null, "ignored")).not.toThrow();
+  });
+});
+
+// ── tryRemoveDirectoryIfEmpty ──────────────────────────────────────────────
+
+describe("tryRemoveDirectoryIfEmpty", () => {
+  let root: string;
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("returns true when the directory does not exist", () => {
+    root = mkdtempSync(join(tmpdir(), "io-test-"));
+    const absent = join(root, "nonexistent");
+    expect(tryRemoveDirectoryIfEmpty(null, absent, "test")).toBe(true);
+  });
+
+  it("returns true and removes an empty directory", () => {
+    root = mkdtempSync(join(tmpdir(), "io-test-"));
+    const dir = join(root, "empty");
+    mkdirSync(dir);
+    expect(tryRemoveDirectoryIfEmpty(null, dir, "test")).toBe(true);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it("returns false and leaves a non-empty directory in place", () => {
+    root = mkdtempSync(join(tmpdir(), "io-test-"));
+    const dir = join(root, "nonempty");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "file.json"), "{}", "utf-8");
+    expect(tryRemoveDirectoryIfEmpty(null, dir, "test")).toBe(false);
+    expect(existsSync(dir)).toBe(true);
+  });
+});
+
+// ── cleanupPermissionForwardingLocationIfEmpty ─────────────────────────────
+
+describe("cleanupPermissionForwardingLocationIfEmpty", () => {
+  let root: string;
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("preserves responses/ when requests/ is non-empty (the concurrent-request race)", () => {
+    root = mkdtempSync(join(tmpdir(), "io-cleanup-"));
+    const forwardingDir = join(root, "forwarding");
+    const location = createPermissionForwardingLocation(
+      forwardingDir,
+      "parent-session",
+    );
+    // Simulate: requests/ has a pending file, responses/ is momentarily empty
+    mkdirSync(location.requestsDir, { recursive: true });
+    mkdirSync(location.responsesDir, { recursive: true });
+    writeFileSync(join(location.requestsDir, "req-b.json"), "{}", "utf-8");
+    // responses/ is empty (sibling subagent A already cleaned up its response)
+
+    cleanupPermissionForwardingLocationIfEmpty(null, location);
+
+    // requests/ is non-empty → should NOT be removed
+    expect(existsSync(location.requestsDir)).toBe(true);
+    // responses/ must survive — removing it causes the ENOENT write loop
+    expect(existsSync(location.responsesDir)).toBe(true);
+    // sessionRoot must also survive while subdirs are present
+    expect(existsSync(location.sessionRootDir)).toBe(true);
+  });
+
+  it("removes both subdirs and sessionRoot when both are empty (normal serial cleanup)", () => {
+    root = mkdtempSync(join(tmpdir(), "io-cleanup-"));
+    const forwardingDir = join(root, "forwarding");
+    const location = createPermissionForwardingLocation(
+      forwardingDir,
+      "parent-session",
+    );
+    mkdirSync(location.requestsDir, { recursive: true });
+    mkdirSync(location.responsesDir, { recursive: true });
+    // Both empty — normal end-of-lifecycle state
+
+    cleanupPermissionForwardingLocationIfEmpty(null, location);
+
+    expect(existsSync(location.requestsDir)).toBe(false);
+    expect(existsSync(location.responsesDir)).toBe(false);
+    expect(existsSync(location.sessionRootDir)).toBe(false);
+  });
+
+  it("leaves responses/ in place when it is non-empty even if requests/ is empty", () => {
+    root = mkdtempSync(join(tmpdir(), "io-cleanup-"));
+    const forwardingDir = join(root, "forwarding");
+    const location = createPermissionForwardingLocation(
+      forwardingDir,
+      "parent-session",
+    );
+    mkdirSync(location.requestsDir, { recursive: true });
+    mkdirSync(location.responsesDir, { recursive: true });
+    writeFileSync(join(location.responsesDir, "resp.json"), "{}", "utf-8");
+    // requests/ is empty, responses/ has a stale response
+
+    cleanupPermissionForwardingLocationIfEmpty(null, location);
+
+    // requests/ is empty so it gets removed
+    expect(existsSync(location.requestsDir)).toBe(false);
+    // responses/ is non-empty → survives
+    expect(existsSync(location.responsesDir)).toBe(true);
+    // sessionRoot survives because responses/ is still present
+    expect(existsSync(location.sessionRootDir)).toBe(true);
   });
 });
