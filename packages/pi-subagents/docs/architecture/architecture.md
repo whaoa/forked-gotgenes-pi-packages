@@ -274,7 +274,7 @@ sequenceDiagram
 
 ## Module organization
 
-The extension has 56 source files organized into six domains plus entry-point wiring.
+The extension has 58 source files organized into six domains plus entry-point wiring.
 All eight domains have directories: `config/`, `session/`, `lifecycle/`, `observation/`, `service/`, `tools/`, `ui/`, and `handlers/`.
 Issue #164 moved the 26 previously flat root-level files into five new domain directories, reducing the root to 5 files + 8 directories.
 
@@ -353,6 +353,7 @@ src/
 │
 └── handlers/                       event handlers
     ├── index.ts                    barrel re-export
+    ├── interrupt.ts                turn_start handler — abort all subagents on parent interrupt (ESC)
     ├── lifecycle.ts                session_start, session_before_switch, session_shutdown
     └── tool-start.ts               tool_execution_start handler
 ```
