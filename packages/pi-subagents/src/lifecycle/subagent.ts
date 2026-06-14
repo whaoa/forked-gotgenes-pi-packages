@@ -24,8 +24,8 @@ import { debugLog } from "#src/debug";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import type { SubagentSession, TurnLoopResult } from "#src/lifecycle/subagent-session";
+import { SubagentState, type SubagentStatus } from "#src/lifecycle/subagent-state";
 import type { LifetimeUsage } from "#src/lifecycle/usage";
-import { addUsage } from "#src/lifecycle/usage";
 import type { Workspace, WorkspaceProvider } from "#src/lifecycle/workspace";
 import { NotificationState } from "#src/observation/notification-state";
 import { subscribeSubagentObserver } from "#src/observation/record-observer";
@@ -44,14 +44,7 @@ export interface SubagentLifecycleObserver {
 	onCompacted?(agent: Subagent, info: CompactionInfo): void;
 }
 
-export type SubagentStatus =
-	| "queued"
-	| "running"
-	| "completed"
-	| "steered"
-	| "aborted"
-	| "stopped"
-	| "error";
+export type { SubagentStatus } from "#src/lifecycle/subagent-state";
 
 export interface SubagentInit {
 	// Identity
@@ -95,31 +88,17 @@ export class Subagent {
 	readonly description: string;
 	readonly invocation?: AgentInvocation;
 
-	// Transition state — encapsulated behind getters, mutated only via transition methods
-	private _status: SubagentStatus;
-	get status(): SubagentStatus { return this._status; }
-
-	private _result?: string;
-	get result(): string | undefined { return this._result; }
-
-	private _error?: string;
-	get error(): string | undefined { return this._error; }
-
-	private _startedAt: number;
-	get startedAt(): number { return this._startedAt; }
-
-	private _completedAt?: number;
-	get completedAt(): number | undefined { return this._completedAt; }
-
-	// Stats — accumulated via mutation methods, readable via getters
-	private _toolUses: number;
-	get toolUses(): number { return this._toolUses; }
-
-	private _lifetimeUsage: LifetimeUsage;
-	get lifetimeUsage(): Readonly<LifetimeUsage> { return this._lifetimeUsage; }
-
-	private _compactionCount: number;
-	get compactionCount(): number { return this._compactionCount; }
+	// Lifecycle status and metrics — owned by a private value object; getters and
+	// mutation methods below delegate to it one line.
+	private readonly state: SubagentState;
+	get status(): SubagentStatus { return this.state.status; }
+	get result(): string | undefined { return this.state.result; }
+	get error(): string | undefined { return this.state.error; }
+	get startedAt(): number { return this.state.startedAt; }
+	get completedAt(): number | undefined { return this.state.completedAt; }
+	get toolUses(): number { return this.state.toolUses; }
+	get lifetimeUsage(): Readonly<LifetimeUsage> { return this.state.lifetimeUsage; }
+	get compactionCount(): number { return this.state.compactionCount; }
 
 	/** AbortController for cancelling this agent. Created at construction. */
 	readonly abortController: AbortController;
@@ -207,17 +186,14 @@ export class Subagent {
 		this.description = init.description;
 		this.invocation = init.invocation;
 
-		// Status
-		this._status = init.status ?? "queued";
-		this._result = init.result;
-		this._error = init.error;
-		this._startedAt = init.startedAt ?? Date.now();
-		this._completedAt = init.completedAt;
-
-		// Stats
-		this._toolUses = 0;
-		this._lifetimeUsage = { input: 0, output: 0, cacheWrite: 0 };
-		this._compactionCount = 0;
+		// Lifecycle status and metrics
+		this.state = new SubagentState({
+			status: init.status,
+			result: init.result,
+			error: init.error,
+			startedAt: init.startedAt,
+			completedAt: init.completedAt,
+		});
 
 		// Abort controller — always created, never injected
 		this.abortController = new AbortController();
@@ -352,23 +328,22 @@ export class Subagent {
 
 	/** Increment tool use count. Called by record-observer on tool_execution_end. */
 	incrementToolUses(): void {
-		this._toolUses++;
+		this.state.incrementToolUses();
 	}
 
 	/** Accumulate a usage delta into lifetimeUsage. Called by record-observer on message_end. */
 	addUsage(delta: { input: number; output: number; cacheWrite: number }): void {
-		addUsage(this._lifetimeUsage, delta);
+		this.state.addUsage(delta);
 	}
 
 	/** Increment compaction count. Called by record-observer on compaction_end. */
 	incrementCompactions(): void {
-		this._compactionCount++;
+		this.state.incrementCompactions();
 	}
 
 	/** Transition to running state. Sets status and startedAt. */
 	markRunning(startedAt: number): void {
-		this._status = "running";
-		this._startedAt = startedAt;
+		this.state.markRunning(startedAt);
 	}
 
 	/**
@@ -376,11 +351,7 @@ export class Subagent {
 	 * Always sets result and completedAt (??=). Only changes status if not stopped.
 	 */
 	markCompleted(result: string, completedAt?: number): void {
-		this._result = result;
-		this._completedAt ??= completedAt ?? Date.now();
-		if (this._status !== "stopped") {
-			this._status = "completed";
-		}
+		this.state.markCompleted(result, completedAt);
 	}
 
 	/**
@@ -388,11 +359,7 @@ export class Subagent {
 	 * Always sets result and completedAt (??=). Only changes status if not stopped.
 	 */
 	markAborted(result: string, completedAt?: number): void {
-		this._result = result;
-		this._completedAt ??= completedAt ?? Date.now();
-		if (this._status !== "stopped") {
-			this._status = "aborted";
-		}
+		this.state.markAborted(result, completedAt);
 	}
 
 	/**
@@ -400,11 +367,7 @@ export class Subagent {
 	 * Always sets result and completedAt (??=). Only changes status if not stopped.
 	 */
 	markSteered(result: string, completedAt?: number): void {
-		this._result = result;
-		this._completedAt ??= completedAt ?? Date.now();
-		if (this._status !== "stopped") {
-			this._status = "steered";
-		}
+		this.state.markSteered(result, completedAt);
 	}
 
 	/**
@@ -412,17 +375,12 @@ export class Subagent {
 	 * Always sets error (formatted) and completedAt (??=). Only changes status if not stopped.
 	 */
 	markError(error: unknown, completedAt?: number): void {
-		this._error = error instanceof Error ? error.message : String(error);
-		this._completedAt ??= completedAt ?? Date.now();
-		if (this._status !== "stopped") {
-			this._status = "error";
-		}
+		this.state.markError(error, completedAt);
 	}
 
 	/** Transition to stopped state. Always valid — no guard. */
 	markStopped(completedAt?: number): void {
-		this._status = "stopped";
-		this._completedAt = completedAt ?? Date.now();
+		this.state.markStopped(completedAt);
 	}
 
 	/**
@@ -432,7 +390,7 @@ export class Subagent {
 	 * then no-ops on the queued-status guard.
 	 */
 	abort(): boolean {
-		if (this._status !== "running") return false;
+		if (this.status !== "running") return false;
 		this.abortController.abort();
 		this.markStopped();
 		return true;
@@ -459,11 +417,7 @@ export class Subagent {
 
 	/** Reset for resume: running status, new startedAt, clear completedAt/result/error/listeners. */
 	resetForResume(startedAt: number): void {
-		this._status = "running";
-		this._startedAt = startedAt;
-		this._completedAt = undefined;
-		this._result = undefined;
-		this._error = undefined;
+		this.state.resetForResume(startedAt);
 		this.releaseListeners();
 	}
 
