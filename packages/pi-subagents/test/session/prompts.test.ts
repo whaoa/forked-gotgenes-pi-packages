@@ -244,7 +244,7 @@ describe("buildAgentPrompt", () => {
   // extensions (e.g. @gotgenes/pi-permission-system) can resolve per-agent
   // policy by parsing the child's system prompt.
   describe("active_agent tag injection", () => {
-    it("prepends <active_agent name=...> tag in replace mode", () => {
+    it("includes <active_agent name=...> tag in replace mode after identity prefix", () => {
       const config: AgentConfig = {
         name: "Explore",
         description: "Explore",
@@ -254,10 +254,18 @@ describe("buildAgentPrompt", () => {
         inheritContext: false,
         runInBackground: false,
       };
-      const prompt = buildAgentPrompt(config, "/workspace", env);
-      expect(prompt.startsWith('<active_agent name="Explore"/>\n\n')).toBe(
-        true,
+      // Replace mode now places identity (parent/genericBase) first for KV
+      // cache reuse; the tag follows after the cacheable prefix.
+      const prompt = buildAgentPrompt(
+        config,
+        "/workspace",
+        env,
+        "Parent identity prefix.",
       );
+      const idxIdentity = prompt.indexOf("Parent identity prefix.");
+      const idxTag = prompt.indexOf('<active_agent name="Explore"/>');
+      expect(idxTag).toBeGreaterThan(-1);
+      expect(idxTag).toBeGreaterThan(idxIdentity);
     });
 
     it("includes <active_agent name=...> tag in append mode after sub_agent_context", () => {
@@ -311,8 +319,9 @@ describe("buildAgentPrompt", () => {
       const replacePrompt = buildAgentPrompt(replaceConfig, "/workspace", env);
       const tagIdx = replacePrompt.indexOf('<active_agent name="agent-a"/>');
       const envIdx = replacePrompt.indexOf("# Environment");
-      // Replace mode: tag is still prepended at position 0
-      expect(tagIdx).toBe(0);
+      // Replace mode: tag follows the identity prefix (not at position 0)
+      // but still precedes the env block.
+      expect(tagIdx).toBeGreaterThan(0);
       expect(envIdx).toBeGreaterThan(tagIdx);
 
       const appendConfig: AgentConfig = {
