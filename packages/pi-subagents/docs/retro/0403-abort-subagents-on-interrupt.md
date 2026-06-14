@@ -47,3 +47,44 @@ Test count went from 967 to 975 (+8: 6 `InterruptHandler` unit tests, 2 foregrou
   Fixed the current-state prose claim (`56` → `58` source files).
   Left the fallow health-metrics snapshot rows (line ~650, `7,778 (57 files)`) intact — those are point-in-time analysis tables where the file count was computed alongside LOC and other metrics, so bumping one cell in isolation would desync the snapshot.
   Amended the fix into the docs commit (not yet pushed).
+
+## Stage: Final Retrospective (2026-06-14T20:00:00Z)
+
+### Session summary
+
+Shipped issue #403 end-to-end across four stages (plan → TDD → ship → live verification): root-caused the bug, implemented the `InterruptHandler` (single `fix:` commit), guarded the already-working foreground path, and released `pi-subagents-v16.1.1`.
+The operator then live-tested all three abort paths (background subagent, foreground subagent, main agent) and confirmed a single Escape aborts each immediately.
+Near-zero rework: one reviewer WARN (stale doc file count) fixed by amend, no follow-up commits, no failed CI.
+
+### Observations
+
+#### What went well
+
+1. The planning-stage SDK trace paid dividends two stages later.
+   When the operator asked during live testing "is it supposed to take two Escapes or just one?", the answer came straight from the `restoreQueuedMessagesToEditor → agent.abort()` trace captured at planning time — no re-investigation.
+   The same trace explained the main-agent and foreground-subagent abort paths immediately.
+2. The keystone de-risking finding (`finishRun()` discards the per-run `AbortController` without aborting it, so the `abort` event fires only on a real interrupt) held up in practice — no spurious turn-end aborts were observed in live testing.
+3. The foreground guard test passed on its first run, confirming the planning trace, so the plan's pre-typed `test:` commit type was correct and the whole implementation landed with zero rework.
+4. Verification was incremental throughout TDD: green baseline first, per-step affected-file runs, `pnpm run check` after the interface-touching step, and full `test`/`check`/`lint`/`fallow` at the end.
+
+#### What caused friction (agent side)
+
+1. `missing-context` — when adding the new source file `interrupt.ts`, I updated the `handlers/` directory listing in `architecture.md` but not the prose total-file count at line 277 (which was already stale: `56` vs the pre-change actual of `57`).
+   Impact: one pre-completion reviewer WARN, fixed by amending the docs commit before push — no rework, no extra commit, no CI cost.
+
+#### What caused friction (user side)
+
+1. None.
+   The operator's involvement was high-value: the third-party-issue direction gate (planning) and the live three-path abort verification (post-ship) validated behavior that unit tests cannot reach (real ESC keypress through the interactive TUI).
+
+### Diagnostic details
+
+1. Model-performance correlation — ship stage and the `pre-completion-reviewer` subagent both ran on `claude-sonnet-4-6` (mechanical orchestration and checklist review — appropriate); retro synthesis on `claude-opus-4-8` (judgment — appropriate).
+   No mismatch.
+2. Escalation-delay tracking — no `rabbit-hole` friction points; the planning SDK dig was productive forward exploration, not repeated calls against one error.
+3. Unused-tool detection — the planning SDK trace navigated minified `node_modules/.pnpm` dist files by hand; `colgrep` (project-code semantic search) and an Explore subagent (project-code understanding) were not suited to reverse-engineering pinned third-party `dist` JS, so no tool was wrongly skipped.
+4. Feedback-loop gap analysis — no gap; verification ran incrementally per TDD step, not only at the end.
+
+### Changes made
+
+1. Added an "Abort / interrupt signal lifecycle" section to `.pi/skills/pi-extension-lifecycle/SKILL.md` documenting the per-run `AbortController`, the ESC → `agent.abort()` path, the `finishRun()` discard-without-abort behavior, and the `ctx.signal` / `tool.execute(signal)` exposure — so future interrupt-timing work need not re-derive it from the pinned SDK `dist` files.
