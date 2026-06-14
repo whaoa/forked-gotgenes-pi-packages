@@ -28,3 +28,23 @@ Issue is first-party (`gotgenes`) and unambiguous — skipped the `ask_user` gat
   Step 3 is unavoidably one atomic commit (removing optional fields breaks every construction at the type level at once).
 - **Doc updates identified**: `architecture.md` (lifecycle file listing, `Subagent` class diagram, mark Step 2 ✅ Complete, Phase 17 prose ~line 879, type-complexity table ~line 649) and `SKILL.md` (Lifecycle 10→11 modules, total 56→57 files).
 - Deferred per scope boundary: metrics-as-projection and result-delivery domain extraction (the other two of the four conflated domains).
+
+## Stage: Implementation — TDD (2026-06-14T09:23:00Z)
+
+### Session summary
+
+Executed all four planned steps as separate commits: (1) extract `SubagentState` value object + new `subagent-state.test.ts`, (2) retarget `subscribeSubagentObserver` at `SubagentState`, (3) the atomic flip making `SubagentExecution` a mandatory collaborator and deleting the two `run()` throws, (4) docs.
+Test count moved 966 → 967 (net): +26 new `SubagentState` tests, minus the migrated state-machine duplicates and the obsolete missing-factory test.
+Pre-completion reviewer returned **PASS**; `check`/`lint`/`test`/`fallow` all clean.
+
+### Observations
+
+- The plan held exactly — every file in Module-Level Changes was touched and nothing else.
+  The `createTestSubagent` consumers (`conversation-viewer`, `notification`, `get-result-tool`, `make-subagent.test`) stayed untouched as predicted; the helper absorbed the construction change via a `TestSubagentOptions` shape that splits passive-state shorthands from identity/execution.
+- **Explicit-`undefined` preservation** (testing-skill warning) mattered: `createTestSubagent` and the local `makeSubagent` build their `SubagentState` via spread of the rest-captured state overrides (`{ defaults, ...stateOverrides }`) so callers passing `completedAt: undefined` (running-status records in `get-result-tool.test`) still get `undefined`, not the `2000` default.
+- The lift-and-shift prep in Step 1 (local `makeSubagent` helper + perl-routing the single-line constructions) paid off: Step 3's breaking flip only had to edit the helper, `createRunnableAgent`, `createResumableAgent`, `createCompletionAgent`, and the constructor describe — not the whole file.
+- Removed the obsolete "throws when the session factory is missing" test (the guard is gone by construction); the construct-complete invariant is now type-level, not runtime-testable.
+  An initial replacement comment was dropped per reviewer/operator feedback as unhelpful.
+- `SubagentExecution` carries 12 fields (4 mandatory).
+  Reviewer flagged it as wide but accepted per the plan's recorded decision to keep it concrete rather than split further.
+- Pre-completion reviewer: **PASS** (no WARN findings).
