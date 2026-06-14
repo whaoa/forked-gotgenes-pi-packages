@@ -20,6 +20,7 @@ Prefer names that reveal intent — for functions, methods, classes, variables, 
 
 If a comment is needed to explain _what_ code does, extract a well-named function or rename the symbol.
 Comments should explain _why_ — the reasoning or non-obvious context behind a decision.
+Do not leave tombstone comments that narrate removed code or the absence of a guard, test, or branch — the type system and the diff already document it.
 
 ### Scope-appropriate naming
 
