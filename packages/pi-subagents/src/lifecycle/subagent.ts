@@ -277,8 +277,8 @@ export class Subagent {
 		}
 
 		this.flushPendingSteers();
-		this.attachObserver(subscribeSubagentObserver(this.subagentSession, this, {
-			onCompact: (r, info) => this.observer?.onCompacted?.(r, info),
+		this.attachObserver(subscribeSubagentObserver(this.subagentSession, this.state, {
+			onCompact: (info) => this.observer?.onCompacted?.(this, info),
 		}));
 		this.observer?.onSessionCreated?.(this);
 
@@ -312,8 +312,8 @@ export class Subagent {
 		}
 
 		this.resetForResume(Date.now());
-		this.attachObserver(subscribeSubagentObserver(subagentSession, this, {
-			onCompact: (r, info) => this.observer?.onCompacted?.(r, info),
+		this.attachObserver(subscribeSubagentObserver(subagentSession, this.state, {
+			onCompact: (info) => this.observer?.onCompacted?.(this, info),
 		}));
 
 		try {
