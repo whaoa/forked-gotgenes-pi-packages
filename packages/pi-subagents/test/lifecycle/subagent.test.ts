@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
-import { Subagent, type SubagentInit, type SubagentLifecycleObserver } from "#src/lifecycle/subagent";
+import { Subagent, type SubagentExecution, type SubagentLifecycleObserver } from "#src/lifecycle/subagent";
 import type { SubagentSession, TurnLoopResult } from "#src/lifecycle/subagent-session";
+import { SubagentState, type SubagentStateInit } from "#src/lifecycle/subagent-state";
 import type { Workspace, WorkspaceProvider } from "#src/lifecycle/workspace";
-import type { CompactionInfo } from "#src/types";
+import type { AgentInvocation, CompactionInfo, SubagentType } from "#src/types";
+import { makeStubExecution } from "#test/helpers/make-subagent";
 import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
@@ -21,30 +23,37 @@ function defaultFactory(): SessionFactory {
 	return createFactory().factory;
 }
 
-/** Construct a Subagent with default identity, overridable per test. */
-function makeSubagent(overrides: Partial<SubagentInit> = {}): Subagent {
-	return new Subagent({ id: "1", type: "general-purpose", description: "test", ...overrides });
+interface MakeSubagentOptions extends SubagentStateInit {
+	id?: string;
+	type?: SubagentType;
+	description?: string;
+	invocation?: AgentInvocation;
+	execution?: SubagentExecution;
+}
+
+/** Construct a Subagent with default identity and a stub execution, overridable per test. */
+function makeSubagent(overrides: MakeSubagentOptions = {}): Subagent {
+	const { id, type, description, invocation, execution, ...stateOverrides } = overrides;
+	return new Subagent({
+		id: id ?? "1",
+		type: type ?? "general-purpose",
+		description: description ?? "test",
+		invocation,
+		execution: execution ?? makeStubExecution(),
+		state: Object.keys(stateOverrides).length > 0 ? new SubagentState(stateOverrides) : undefined,
+	});
 }
 
 describe("Subagent — constructor", () => {
 	it("sets required fields from init", () => {
-		const record = new Subagent({
-			id: "abc-123",
-			type: "Explore",
-			description: "Find stale TODOs",
-		});
+		const record = makeSubagent({ id: "abc-123", type: "Explore", description: "Find stale TODOs" });
 		expect(record.id).toBe("abc-123");
 		expect(record.type).toBe("Explore");
 		expect(record.description).toBe("Find stale TODOs");
 	});
 
 	it("passes through optional identity fields", () => {
-		const record = new Subagent({
-			id: "1",
-			type: "general-purpose",
-			description: "test",
-			invocation: { modelName: "haiku" },
-		});
+		const record = makeSubagent({ invocation: { modelName: "haiku" } });
 		expect(record.abortController).toBeInstanceOf(AbortController);
 		expect(record.invocation).toEqual({ modelName: "haiku" });
 		// Stats always start at zero — set via mutation methods after construction
@@ -53,12 +62,9 @@ describe("Subagent — constructor", () => {
 		expect(record.lifetimeUsage).toEqual({ input: 0, output: 0, cacheWrite: 0 });
 	});
 
-	it("leaves optional fields undefined when not provided", () => {
-		const record = new Subagent({
-			id: "1",
-			type: "general-purpose",
-			description: "test",
-		});
+	it("defaults to a fresh queued state when none is supplied", () => {
+		const record = makeSubagent();
+		expect(record.status).toBe("queued");
 		expect(record.result).toBeUndefined();
 		expect(record.error).toBeUndefined();
 		expect(record.completedAt).toBeUndefined();
@@ -68,42 +74,26 @@ describe("Subagent — constructor", () => {
 	});
 
 	it("always creates its own AbortController", () => {
-		const record = new Subagent({
-			id: "1",
-			type: "general-purpose",
-			description: "test",
-		});
+		const record = makeSubagent();
 		expect(record.abortController).toBeInstanceOf(AbortController);
 		expect(record.abortController.signal.aborted).toBe(false);
 	});
 
-	it("creates NotificationState when parentSession.toolCallId is provided", () => {
-		const record = new Subagent({
-			id: "1",
-			type: "general-purpose",
-			description: "test",
-			parentSession: { toolCallId: "tc-42" },
-		});
+	it("creates NotificationState when execution.parentSession.toolCallId is provided", () => {
+		const record = makeSubagent({ execution: makeStubExecution({ parentSession: { toolCallId: "tc-42" } }) });
 		expect(record.notification).toBeDefined();
 		expect(record.notification!.toolCallId).toBe("tc-42");
 	});
 
 	it("does not create NotificationState when toolCallId is absent", () => {
-		const record = new Subagent({
-			id: "1",
-			type: "general-purpose",
-			description: "test",
-			parentSession: { parentSessionFile: "/sessions/p.jsonl" },
+		const record = makeSubagent({
+			execution: makeStubExecution({ parentSession: { parentSessionFile: "/sessions/p.jsonl" } }),
 		});
 		expect(record.notification).toBeUndefined();
 	});
 
 	it("does not create NotificationState when parentSession is absent", () => {
-		const record = new Subagent({
-			id: "1",
-			type: "general-purpose",
-			description: "test",
-		});
+		const record = makeSubagent();
 		expect(record.notification).toBeUndefined();
 	});
 });
@@ -269,7 +259,10 @@ describe("Subagent — abort", () => {
 /** Create a Subagent for completeRun / failRun tests. */
 function createCompletionAgent(overrides?: { observer?: SubagentLifecycleObserver }) {
 	return {
-		record: makeSubagent({ status: "running", observer: overrides?.observer }),
+		record: makeSubagent({
+			status: "running",
+			execution: makeStubExecution({ observer: overrides?.observer }),
+		}),
 	};
 }
 
@@ -434,15 +427,17 @@ function createRunnableAgent(overrides?: {
 		id: "run-1",
 		type: "general-purpose",
 		description: "run test",
-		createSubagentSession,
-		observer,
-		snapshot: STUB_SNAPSHOT,
-		prompt: "do something",
-		getRunConfig: overrides?.getRunConfig,
-		parentSession: overrides?.parentSession,
-		signal: overrides?.signal,
-		baseCwd: overrides?.baseCwd ?? "/base",
-		getWorkspaceProvider: provider ? () => provider : undefined,
+		execution: {
+			createSubagentSession,
+			observer,
+			snapshot: STUB_SNAPSHOT,
+			prompt: "do something",
+			getRunConfig: overrides?.getRunConfig,
+			parentSession: overrides?.parentSession,
+			signal: overrides?.signal,
+			baseCwd: overrides?.baseCwd ?? "/base",
+			getWorkspaceProvider: provider ? () => provider : undefined,
+		},
 	});
 }
 
@@ -571,11 +566,6 @@ describe("Subagent.run() — error handling", () => {
 		expect(agent.status).toBe("error");
 		expect(agent.error).toBe("creation failed");
 	});
-
-	it("throws when the session factory is missing", async () => {
-		const agent = makeSubagent({ snapshot: STUB_SNAPSHOT, prompt: "go" });
-		await expect(agent.run()).rejects.toThrow(/missing session factory/);
-	});
 });
 
 describe("Subagent.run() — abort signal forwarding", () => {
@@ -617,9 +607,8 @@ function createResumableAgent(overrides?: {
 		id: "resume-1",
 		type: "general-purpose",
 		description: "resume test",
-		status: "completed",
-		result: "first",
-		observer: overrides?.observer ?? {},
+		execution: makeStubExecution({ observer: overrides?.observer ?? {} }),
+		state: new SubagentState({ status: "completed", result: "first" }),
 	});
 	agent.subagentSession = toSubagentSession(stub);
 	return { agent, session, stub };

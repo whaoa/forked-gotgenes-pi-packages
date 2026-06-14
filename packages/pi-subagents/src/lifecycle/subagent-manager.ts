@@ -14,6 +14,7 @@ import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { Subagent, type SubagentLifecycleObserver } from "#src/lifecycle/subagent";
 import type { SubagentSession } from "#src/lifecycle/subagent-session";
+import { SubagentState } from "#src/lifecycle/subagent-state";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 
 import type { RunConfig } from "#src/runtime";
@@ -140,23 +141,25 @@ export class SubagentManager {
       id,
       type,
       description: options.description,
-      status: options.isBackground ? "queued" : "running",
-      startedAt: Date.now(),
       invocation: options.invocation,
-      // Run config
-      snapshot,
-      prompt,
-      model: options.model,
-      maxTurns: options.maxTurns,
-      thinkingLevel: options.thinkingLevel,
-      parentSession: options.parentSession,
-      signal: options.signal,
-      // Shared deps
-      createSubagentSession: this.createSubagentSession,
-      observer: this.buildObserver(options),
-      getRunConfig: this.getRunConfig,
-      baseCwd: this.baseCwd,
-      getWorkspaceProvider: () => this._workspaceProvider,
+      state: new SubagentState({
+        status: options.isBackground ? "queued" : "running",
+        startedAt: Date.now(),
+      }),
+      execution: {
+        createSubagentSession: this.createSubagentSession,
+        snapshot,
+        prompt,
+        baseCwd: this.baseCwd,
+        observer: this.buildObserver(options),
+        getRunConfig: this.getRunConfig,
+        getWorkspaceProvider: () => this._workspaceProvider,
+        model: options.model,
+        maxTurns: options.maxTurns,
+        thinkingLevel: options.thinkingLevel,
+        parentSession: options.parentSession,
+        signal: options.signal,
+      },
     });
     this.agents.set(id, record);
 
