@@ -77,13 +77,16 @@ describe("SubagentManager — Bug 1 race condition (notification.resultConsumed 
       seenConsumed = r.notification?.resultConsumed;
     } } }));
 
-    const id = spawnBg(manager);
+    const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+      description: "test",
+      isBackground: true,
+      parentSession: { toolCallId: "tc-1" },
+    });
     const record = manager.getRecord(id)!;
-    record.notification = new NotificationState("tc-1");
 
     // Simulate the buggy get_subagent_result: await THEN mark consumed
     await record.promise;
-    record.notification.markConsumed(); // too late — onComplete already fired
+    record.notification!.markConsumed(); // too late — onComplete already fired
 
     // onComplete saw resultConsumed as false — would queue a notification (the bug)
     expect(seenConsumed).toBeFalsy();
@@ -95,12 +98,15 @@ describe("SubagentManager — Bug 1 race condition (notification.resultConsumed 
       seenConsumed = r.notification?.resultConsumed;
     } } }));
 
-    const id = spawnBg(manager);
+    const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
+      description: "test",
+      isBackground: true,
+      parentSession: { toolCallId: "tc-1" },
+    });
     const record = manager.getRecord(id)!;
-    record.notification = new NotificationState("tc-1");
 
     // The fix: pre-mark BEFORE awaiting
-    record.notification.markConsumed();
+    record.notification!.markConsumed();
     await record.promise;
 
     expect(seenConsumed).toBe(true);

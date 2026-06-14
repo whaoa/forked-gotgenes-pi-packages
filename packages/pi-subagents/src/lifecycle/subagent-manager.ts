@@ -168,16 +168,12 @@ export class SubagentManager {
     }
 
     if (options.isBackground && !options.bypassQueue) {
-      // Schedule on the limiter — started when a slot frees. The status guard
-      // makes an abort-while-queued task a no-op (Step 3 folds it into start()).
-      record.promise = this.limiter.schedule(() => {
-        if (record.status !== "queued") return Promise.resolve();
-        return record.run();
-      });
+      // Schedule on the limiter — start() guards against abort-while-queued.
+      void this.limiter.schedule(() => record.start());
       return id;
     }
 
-    record.promise = record.run();
+    void record.start();
     return id;
   }
 

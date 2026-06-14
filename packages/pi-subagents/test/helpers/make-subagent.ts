@@ -27,6 +27,8 @@ export interface TestSubagentOptions {
 	description?: string;
 	invocation?: AgentInvocation;
 	execution?: SubagentExecution;
+	/** Shorthand to wire a NotificationState via the constructor path. Ignored when execution is supplied. */
+	toolCallId?: string;
 	/** Passive lifecycle state shorthands. */
 	status?: SubagentStatus;
 	result?: string;
@@ -42,7 +44,7 @@ export interface TestSubagentOptions {
 }
 
 export function createTestSubagent(overrides: TestSubagentOptions = {}): Subagent {
-	const { id, type, description, invocation, execution, toolUses, lifetimeUsage, compactionCount, ...stateOverrides } =
+	const { id, type, description, invocation, execution, toolCallId, toolUses, lifetimeUsage, compactionCount, ...stateOverrides } =
 		overrides;
 	const state = new SubagentState({
 		status: "completed",
@@ -56,7 +58,7 @@ export function createTestSubagent(overrides: TestSubagentOptions = {}): Subagen
 		type: type ?? "general-purpose",
 		description: description ?? "Test task",
 		invocation,
-		execution: execution ?? makeStubExecution(),
+		execution: execution ?? makeStubExecution(toolCallId ? { parentSession: { toolCallId } } : {}),
 		state,
 	});
 	// Apply stat overrides via mutation methods

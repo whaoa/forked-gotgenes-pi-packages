@@ -593,6 +593,49 @@ describe("Subagent.run() — RunConfig threading", () => {
 	});
 });
 
+// ── Subagent.start() ───────────────────────────────────────────────────────────
+
+describe("Subagent.start() — promise encapsulation", () => {
+	it("returns a promise that resolves when run completes", async () => {
+		const agent = createRunnableAgent();
+		const p = agent.start();
+		expect(p).toBeInstanceOf(Promise);
+		await p;
+		expect(agent.status).toBe("completed");
+	});
+
+	it("stores the promise so the getter returns it after start()", () => {
+		const agent = createRunnableAgent();
+		const p = agent.start();
+		expect(agent.promise).toBe(p);
+	});
+
+	it("promise is undefined before start() is called", () => {
+		const agent = createRunnableAgent();
+		expect(agent.promise).toBeUndefined();
+	});
+
+	it("is a no-op when status is stopped (abort-while-queued guard)", async () => {
+		const agent = makeSubagent({ status: "stopped", startedAt: 1, completedAt: 1 });
+		const p = agent.start();
+		await expect(p).resolves.toBeUndefined();
+		expect(agent.status).toBe("stopped");
+	});
+
+	it("is a no-op when status is completed", async () => {
+		const agent = makeSubagent({ status: "completed", result: "done", startedAt: 1, completedAt: 2 });
+		const p = agent.start();
+		await expect(p).resolves.toBeUndefined();
+		expect(agent.status).toBe("completed");
+	});
+
+	it("stores the no-op promise so the getter returns it too", async () => {
+		const agent = makeSubagent({ status: "stopped", startedAt: 1, completedAt: 1 });
+		const p = agent.start();
+		expect(agent.promise).toBe(p);
+	});
+});
+
 // ── Agent.resume() ─────────────────────────────────────────────────────────────
 
 /** Create an Agent with a SubagentSession already attached, ready for resume(). */

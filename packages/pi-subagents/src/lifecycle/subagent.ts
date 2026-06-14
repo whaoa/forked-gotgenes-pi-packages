@@ -107,8 +107,10 @@ export class Subagent {
 
 	/** AbortController for cancelling this agent. Created at construction. */
 	readonly abortController: AbortController;
-	/** Promise for the full agent run (including post-processing). Set by run(). */
-	promise?: Promise<void>;
+	/** Backing store for the run promise. Set by start(). */
+	private _promise?: Promise<void>;
+	/** Awaitable handle to the running promise. Set by start(). */
+	get promise(): Promise<void> | undefined { return this._promise; }
 
 	// Execution machinery — a single mandatory collaborator (no per-field fallbacks).
 	private readonly execution: SubagentExecution;
@@ -118,7 +120,9 @@ export class Subagent {
 	// Phase-specific collaborators — each born complete when their info becomes available
 	/** The born-complete child session — set when the factory returns inside run(). */
 	subagentSession?: SubagentSession;
-	notification?: NotificationState;
+	private _notification?: NotificationState;
+	/** Notification state for background agents — wired from parentSession.toolCallId. */
+	get notification(): NotificationState | undefined { return this._notification; }
 
 	// Steer buffer — messages queued before the session is ready
 	private _pendingSteers: string[] = [];
@@ -190,7 +194,7 @@ export class Subagent {
 		// Notification state — created from parentSession.toolCallId if present
 		const toolCallId = init.execution.parentSession?.toolCallId;
 		if (toolCallId) {
-			this.notification = new NotificationState(toolCallId);
+			this._notification = new NotificationState(toolCallId);
 		}
 	}
 
@@ -262,6 +266,22 @@ export class Subagent {
 		} catch (err) {
 			this.failRun(err);
 		}
+	}
+
+	/**
+	 * Start execution: call run(), store the promise internally, and return it.
+	 *
+	 * Guards against non-active states (e.g. abort-while-queued): if the agent
+	 * is neither queued nor running, the promise resolves immediately (no-op).
+	 * This folds the inline status guard out of SubagentManager's limiter callback.
+	 */
+	start(): Promise<void> {
+		if (this.status !== "queued" && this.status !== "running") {
+			this._promise = Promise.resolve();
+			return this._promise;
+		}
+		this._promise = this.run();
+		return this._promise;
 	}
 
 	/**
