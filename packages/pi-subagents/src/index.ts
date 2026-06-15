@@ -27,9 +27,10 @@ import { createChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import { createSubagentSession, type SubagentSessionDeps } from "#src/lifecycle/create-subagent-session";
 import { buildParentSnapshot } from "#src/lifecycle/parent-snapshot";
-import { SubagentManager, type SubagentManagerObserver } from "#src/lifecycle/subagent-manager";
-import { buildEventData, type NotificationDetails, NotificationManager } from "#src/observation/notification";
+import { SubagentManager } from "#src/lifecycle/subagent-manager";
+import { type NotificationDetails, NotificationManager } from "#src/observation/notification";
 import { createNotificationRenderer } from "#src/observation/renderer";
+import { SubagentEventsObserver } from "#src/observation/subagent-events-observer";
 import { createSubagentRuntime } from "#src/runtime";
 import { publishSubagentsService, unpublishSubagentsService } from "#src/service/service";
 import { SubagentsServiceAdapter } from "#src/service/service-adapter";
@@ -76,61 +77,11 @@ export default function (pi: ExtensionAPI) {
   settings.load();
 
   // Observer: receives agent lifecycle notifications and dispatches events/notifications.
-  const observer: SubagentManagerObserver = {
-    onSubagentStarted(record) {
-      // Emit started event when agent transitions to running (including from queue).
-      pi.events.emit("subagents:started", {
-        id: record.id,
-        type: record.type,
-        description: record.description,
-      });
-    },
-    onSubagentCompleted(record) {
-      // Emit lifecycle event based on terminal status.
-      const isError = record.status === "error" || record.status === "stopped" || record.status === "aborted";
-      const eventData = buildEventData(record);
-      if (isError) {
-        pi.events.emit("subagents:failed", eventData);
-      } else {
-        pi.events.emit("subagents:completed", eventData);
-      }
-
-      // Persist final record for cross-extension history reconstruction.
-      pi.appendEntry("subagents:record", {
-        id: record.id, type: record.type, description: record.description,
-        status: record.status, result: record.result, error: record.error,
-        startedAt: record.startedAt, completedAt: record.completedAt,
-      });
-
-      // Skip notification if result was already consumed via get_subagent_result.
-      if (record.notification?.resultConsumed) {
-        notifications.cleanupCompleted(record.id);
-        return;
-      }
-
-      notifications.sendCompletion(record);
-    },
-    onSubagentCompacted(record, info) {
-      // Emit compacted event when agent's session compacts (preserves count on record).
-      pi.events.emit("subagents:compacted", {
-        id: record.id,
-        type: record.type,
-        description: record.description,
-        reason: info.reason,
-        tokensBefore: info.tokensBefore,
-        compactionCount: record.compactionCount,
-      });
-    },
-    onSubagentCreated(record) {
-      // Emit created event for background agents (before limiter admission).
-      pi.events.emit("subagents:created", {
-        id: record.id,
-        type: record.type,
-        description: record.description,
-        isBackground: true,
-      });
-    },
-  };
+  const observer = new SubagentEventsObserver({
+    emit: (channel, data) => pi.events.emit(channel, data),
+    appendEntry: (customType, data) => pi.appendEntry(customType, data),
+    notifications,
+  });
 
   const subagentSessionDeps: SubagentSessionDeps = {
     io: {
