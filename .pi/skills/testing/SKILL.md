@@ -102,6 +102,9 @@ Run `pnpm run check` (`tsc --noEmit`) for type-only changes.
 - When removing fields from a shared init type, grep for all test files and factory helpers that pass the removed field — esbuild won't reject unknown properties at runtime, so tests silently get wrong default values instead of failing.
 - When a change moves *when* a value or service becomes available (e.g. factory-init → `session_start`), grep all test files for consumers that resolve it — not just the tests you already plan to touch.
   A timing change breaks them at runtime (the full suite), not at typecheck, so `pnpm run check` will not flag them.
+- When extracting a conditional `await` (`if (x) await f()`) into an always-`async` helper, the no-op path gains a microtask boundary it did not have.
+  Tests asserting synchronous ordering (e.g. a factory called in the same tick as `spawn()`) break at runtime, not typecheck.
+  Keep a synchronous guard at the call site (`if (bracket.hasProvider()) await bracket.prepare(…)`) to preserve the fast path.
 - When a TDD plan nests a previously-flat interface (e.g., splitting `Config` into `{ identity, execution }`), grep test factories for `Partial<OldInterface>` spread patterns.
   Top-level `...overrides` does not deep-merge — flat-key overrides like `{ description: "my task" }` silently become no-ops when the field moves into a nested sub-object.
   Either replace each call site with the full nested sub-object or switch to a deep-merge helper.

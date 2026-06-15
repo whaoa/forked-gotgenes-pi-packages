@@ -49,3 +49,56 @@ Pre-completion reviewer returned WARN (2 non-blocking findings; the doc metric r
 - **Pre-completion reviewer WARN findings** (both addressed inline):
   1. `architecture.md` health-metric rows still carried "→ 59 after Step 4" annotations after landing — updated to actual counts (60 files, 8,356 LOC) and the docs commit amended.
   2. `WorkspaceBracket.hasProvider()` TDA trade-off — documented in the `run()` call-site comment; noted here for Phase 18 awareness.
+
+## Stage: Final Retrospective (2026-06-15T02:04:42Z)
+
+### Session summary
+
+Shipped issue #375 (Phase 17 Step 4) cleanly across four stages in one continuous session: planning produced a 4-step plan, TDD implemented it in 4 commits (suite 982 → 994), shipping pushed/verified-CI/closed-the-issue and merged release-please PR #406 (`pi-subagents-v16.2.1`, which actually carried #374's `fix:` — #375's `refactor:`/`docs:` commits trigger no bump).
+The only substantive friction was a single self-identified plan deviation in TDD (a microtask-boundary timing trap), resolved inside the same commit with no rework, reorder, or user correction.
+
+### Observations
+
+#### What went well
+
+- **The cross-step-invariant discipline from the #374 retro paid off a second time.**
+  The #374 process retro added the "Invariants at risk" plan section; the #375 plan used it to list the three prior Phase 17 invariants (at-spawn `promise`, construct-complete, zero external field writes), each already pinned by a named test.
+  All three held through the extraction with a green suite — the regression class that bit #374 did not recur.
+  This is the first time the new section was load-bearing on a *fresh* issue rather than as a post-hoc correction.
+- **Planning corrected the issue's own design sketch instead of implementing it literally.**
+  The issue proposed `RunListeners.attach(unsub, detach)` and "three dispose paths collapse into one"; the plan recognized the two handles attach at different lifecycle moments (so `attach` had to split into `wireSignal`/`attachObserver`/`release`) and that the two dispose sites have genuinely different error-handling semantics (so they stay separate per the structural-duplication heuristic).
+  Treating the issue body as a hypothesis, not a spec, avoided a wrong abstraction.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the plan's Design Overview sketched `const cwd = await this.workspaceBracket.prepare(...)` **unconditionally**, but the original `run()` only awaited inside `if (provider) { ... }`, keeping the no-provider path synchronous up to the factory call.
+  An always-`async` helper adds a microtask boundary even when it returns immediately, so the queued-abort test in `subagent-manager.test.ts` ("abort removes a queued agent without ever running it") failed: it asserts `factory.toHaveBeenCalledOnce()` synchronously, and the factory call had been deferred a tick.
+  The first fix attempt (`if (this.execution.getWorkspaceProvider)`) also failed because `SubagentManager.spawn()` always injects `getWorkspaceProvider: () => this._workspaceProvider` as a function regardless of whether a provider is registered, so the guard was always true.
+  Resolved by adding `WorkspaceBracket.hasProvider()` (a synchronous predicate) and guarding the `await` with it.
+  Impact: ~2 test-run cycles inside TDD step 3, one extra method (`hasProvider`) plus 2 unit tests not in the plan, and a mild Tell-Don't-Ask trade-off the pre-completion reviewer flagged as WARN.
+  Self-identified via the failing test; no commit reorder, no rework beyond the in-commit fix.
+- `other` (minor) — `subagent.ts` first landed at 469 LOC, above the plan's ≤ 450 gate; two trim passes (stale module-level doc comment, redundant field comments) brought it to 448.
+  The trimmed comments were genuinely stale post-extraction, so the trim was legitimate, but the LOC estimate ("≈ 40 lines removed") was optimistic about the structural change alone.
+  Impact: 2 extra edits, no rework.
+
+#### What caused friction (user side)
+
+- None.
+  The four-stage flow ran end-to-end on prompt templates with zero mid-stream user corrections or strategic interventions — the work was clean enough that none were needed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — Planning ran on `anthropic/claude-opus-4-8` (pinned via `plan-issue.md`, appropriate for judgment-heavy design); TDD on `anthropic/claude-sonnet-4-6` (appropriate); the pre-completion reviewer subagent on its frontmatter default; Retro on `anthropic/claude-opus-4-8` (pinned).
+  The **ship stage ran on `opencode-go/deepseek-v4-flash`** — the same weak-model-on-release-management pattern flagged in the #374 retro.
+  It again executed cleanly, including the non-trivial reasoning that PR #406 mapped to #374 not #375 and the `UNSTABLE`/empty-rollup `GITHUB_TOKEN` diagnosis.
+  Second consecutive clean run, so the risk remains theoretical (irreversible ops on a weak model) rather than demonstrated harm.
+- **Escalation-delay tracking** — the microtask friction was not a rabbit hole: the diagnosis moved methodically (failing test → `concurrency-limiter.ts` → `subagent-manager.ts:156` injection point → root cause) across ~2 test-run cycles, under the 5-call flag threshold.
+- **Unused-tool detection** — the friction was exact-symbol tracing (`grep` for `getWorkspaceProvider`), which `grep` handled correctly; no Explore/colgrep dispatch was warranted.
+- **Feedback-loop gap analysis** — verification was incremental throughout: per-file `vitest` after each red/green, `pnpm run check` after the interface-change step, full suite + lint + `fallow dead-code` before the pre-completion review.
+  No end-only-verification gap.
+
+### Changes made
+
+1. `.pi/skills/testing/SKILL.md` — added a bullet under `### Interface and type changes` on the conditional-`await` → always-`async` microtask-boundary trap (sibling to the existing runtime-vs-typecheck timing rule).
+2. `packages/pi-subagents/docs/retro/0375-extract-run-listener-workspace-bracket.md` — added this Final Retrospective stage entry.
+3. Considered but not landed (operator-declined or out of scope): pinning `/ship-issue` to a stronger model (recurrence of the #374 finding, no demonstrated harm this session), a `plan-issue` rule on preserving conditional awaits in extracted-method sketches, and a rule against trimming comments to hit a LOC gate.
