@@ -970,7 +970,7 @@ Priority = Impact × (6 − Risk).
   Fixed by inverting control: `scheduleVia` captures the limiter promise eagerly inside the agent (no external `.promise =` write), restoring the invariant.
   Lesson: a step's acceptance criteria must include the cross-step invariants it could regress, not only its own grep-verifiable outcome.
 
-#### Step 4 — Extract run-listener and workspace-bracket collaborators from Subagent ([#375])
+#### Step 4 — Extract run-listener and workspace-bracket collaborators from Subagent ([#375]) ✅ Complete
 
 - Targets: `src/lifecycle/subagent.ts` (455 LOC after Step 2 extracted SubagentState — still the largest source file).
 - Smell: Category B (oversized class; per-run listener fields declared mid-class) and Category C (state owns its mutations: workspace dispose logic appears in `run()`'s catch, `completeRun`, and `failRun`).
