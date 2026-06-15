@@ -646,7 +646,7 @@ That method — testability friction as a boundary probe, with its limits — is
 | Metric                     | Value                                   |
 | -------------------------- | --------------------------------------- |
 | Health score               | 78/100 (B)                              |
-| Total LOC                  | 8,356 (60 files, as of Phase 17 Step 4) |
+| Total LOC                  | 8,356 (61 files, as of Phase 17 Step 5) |
 | Dead code                  | 0 files, 0 exports                      |
 | Maintainability index      | 90.8 (good)                             |
 | Avg cyclomatic complexity  | 1.4                                     |
@@ -893,7 +893,7 @@ Updated health metrics (fallow, package-wide including tests):
 | Metric                     | Phase 16 baseline              | Current                                       |
 | -------------------------- | ------------------------------ | --------------------------------------------- |
 | Health score               | 78/100 (B)                     | 78/100 (B)                                    |
-| Source LOC                 | 7,778 (57 files)               | 8,356 (60 files, landed Phase 17 Step 4)      |
+| Source LOC                 | 7,778 (57 files)               | 8,356 (61 files, landed Phase 17 Step 5)      |
 | Dead code                  | 0 files, 0 exports             | 0 files, 0 exports                            |
 | Maintainability index      | 90.8 (good)                    | 90.8 (good)                                   |
 | Avg / P90 cyclomatic       | 1.4 / 2                        | 1.4 / 2                                       |
@@ -981,12 +981,13 @@ Priority = Impact × (6 − Risk).
   `subagent.ts`: 488 → 448 LOC.
   Test count: 982 → 994 (+12: 7 RunListeners + 13 WorkspaceBracket − 8 redundant Subagent listener tests).
 
-#### Step 5 — Extract the manager observer from index.ts into a class ([#376])
+#### Step 5 — Extract the manager observer from index.ts into a class ([#376]) ✅ Complete
 
 - Targets: `src/index.ts` (inline `SubagentManagerObserver` literal, ~70 lines), new module under `src/observation/`.
 - Smell: Category B/E — `index.ts` is the dominant churn hotspot (31.3, 91 commits); the literal mixes event emission, record persistence (`appendEntry`), and notification dispatch; principle 9 (state and behavior belong in classes, not closure-captured literals).
 - Change: extract a class (e.g. `SubagentEventsObserver`) constructed with narrow deps (`emit`, `appendEntry`, the `NotificationSystem`).
 - Outcome: `index.ts` < 170 lines; the observer's three concerns unit-tested directly without booting the extension.
+- Landed: `src/observation/subagent-events-observer.ts` (new, 97 LOC); `index.ts` 226 → 177 lines; 60 → 61 source files; 994 → 1009 tests (+15 covering all four observer methods).
 
 #### Step 6 — Split widget delegation out of SubagentRuntime ([#377])
 
