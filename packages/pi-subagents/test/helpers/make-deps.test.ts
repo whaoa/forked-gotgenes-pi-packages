@@ -31,19 +31,21 @@ describe("createToolDeps", () => {
 		});
 	});
 
-	describe("runtime defaults", () => {
-		it("all widget delegation methods are vi.fn stubs", () => {
-			const { runtime } = createToolDeps();
-			runtime.setUICtx({} as any);
-			runtime.ensureTimer();
-			runtime.update();
-			runtime.markFinished("id-1");
-			expect(runtime.setUICtx).toHaveBeenCalledOnce();
-			expect(runtime.ensureTimer).toHaveBeenCalledOnce();
-			expect(runtime.update).toHaveBeenCalledOnce();
-			expect(runtime.markFinished).toHaveBeenCalledWith("id-1");
+	describe("widget defaults", () => {
+		it("all widget methods are vi.fn stubs", () => {
+			const { widget } = createToolDeps();
+			widget.setUICtx({} as any);
+			widget.ensureTimer();
+			widget.update();
+			widget.markFinished("id-1");
+			expect(widget.setUICtx).toHaveBeenCalledOnce();
+			expect(widget.ensureTimer).toHaveBeenCalledOnce();
+			expect(widget.update).toHaveBeenCalledOnce();
+			expect(widget.markFinished).toHaveBeenCalledWith("id-1");
 		});
+	});
 
+	describe("runtime defaults", () => {
 		it("agentActivity is an empty Map on the runtime", () => {
 			const { runtime } = createToolDeps();
 			expect(runtime.agentActivity).toBeInstanceOf(Map);
@@ -100,9 +102,9 @@ describe("createToolDeps", () => {
 			expect(bgManager.getRecord).toBeTypeOf("function");
 		});
 
-		it("runtime satisfies BackgroundWidgetDeps structurally", () => {
-			const { runtime } = createToolDeps();
-			const bgWidget: BackgroundWidgetDeps = runtime;
+		it("widget satisfies BackgroundWidgetDeps structurally", () => {
+			const { widget } = createToolDeps();
+			const bgWidget: BackgroundWidgetDeps = widget;
 			expect(bgWidget.ensureTimer).toBeTypeOf("function");
 			expect(bgWidget.update).toBeTypeOf("function");
 		});
@@ -113,9 +115,9 @@ describe("createToolDeps", () => {
 			expect(fgManager.spawnAndWait).toBeTypeOf("function");
 		});
 
-		it("runtime satisfies ForegroundWidgetDeps structurally", () => {
-			const { runtime } = createToolDeps();
-			const fgWidget: ForegroundWidgetDeps = runtime;
+		it("widget satisfies ForegroundWidgetDeps structurally", () => {
+			const { widget } = createToolDeps();
+			const fgWidget: ForegroundWidgetDeps = widget;
 			expect(fgWidget.ensureTimer).toBeTypeOf("function");
 			expect(fgWidget.markFinished).toBeTypeOf("function");
 		});

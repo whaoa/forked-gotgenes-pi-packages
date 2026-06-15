@@ -41,13 +41,21 @@ export interface AgentToolManager {
 /** Narrow runtime interface — the Agent tool's slice of SubagentRuntime. */
 export interface AgentToolRuntime {
 	readonly agentActivity: AgentActivityAccess;
+	buildSnapshot(inheritContext: boolean): ParentSnapshot;
+	getModelInfo(): ModelInfo;
+	getSessionInfo(): { parentSessionFile: string; parentSessionId: string };
+}
+
+/**
+ * Narrow widget interface the Agent tool drives directly.
+ * Superset of the runner/spawner widget deps plus `setUICtx`.
+ * AgentWidget satisfies it structurally.
+ */
+export interface AgentToolWidget {
 	setUICtx(ctx: UICtx): void;
 	ensureTimer(): void;
 	update(): void;
 	markFinished(id: string): void;
-	buildSnapshot(inheritContext: boolean): ParentSnapshot;
-	getModelInfo(): ModelInfo;
-	getSessionInfo(): { parentSessionFile: string; parentSessionId: string };
 }
 
 /** Narrow settings accessor — only the fields the Agent tool reads. */
@@ -65,6 +73,7 @@ export class AgentTool {
 	constructor(
 		private readonly manager: AgentToolManager,
 		private readonly runtime: AgentToolRuntime,
+		private readonly widget: AgentToolWidget,
 		private readonly settings: AgentToolSettings,
 		private readonly registry: AgentTypeRegistry,
 		private readonly agentDir: string,
@@ -81,7 +90,7 @@ export class AgentTool {
 		ctx: any,
 	) {
 		// Ensure we have UI context for widget rendering
-		this.runtime.setUICtx(ctx.ui as UICtx);
+		this.widget.setUICtx(ctx.ui as UICtx);
 
 		// Reload custom agents so new .pi/agents/*.md files are picked up without restart
 		this.registry.reload();
@@ -131,7 +140,7 @@ export class AgentTool {
 		if (config.execution.runInBackground) {
 			return spawnBackground(
 				this.manager,
-				this.runtime,
+				this.widget,
 				this.runtime.agentActivity,
 				{ config, snapshot, parentSession, settings: this.settings },
 			);
@@ -140,7 +149,7 @@ export class AgentTool {
 		// ---- Foreground execution — stream progress via onUpdate ----
 		return runForeground(
 			this.manager,
-			this.runtime,
+			this.widget,
 			this.runtime.agentActivity,
 			{ config, snapshot, parentSession },
 			signal,

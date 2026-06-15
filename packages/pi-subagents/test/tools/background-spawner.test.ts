@@ -58,30 +58,30 @@ function makeParams(overrides: Partial<BackgroundParams> = {}): BackgroundParams
 
 describe("spawnBackground", () => {
   it("registers an AgentActivityTracker in agentActivity map", () => {
-    const { manager, runtime } = createToolDeps();
-    spawnBackground(manager, runtime, runtime.agentActivity, makeParams());
+    const { manager, runtime, widget } = createToolDeps();
+    spawnBackground(manager, widget, runtime.agentActivity, makeParams());
     expect(runtime.agentActivity.get("agent-1")).toBeInstanceOf(AgentActivityTracker);
   });
 
   it("calls runtime.ensureTimer and runtime.update after spawn", () => {
-    const { manager, runtime } = createToolDeps();
-    spawnBackground(manager, runtime, runtime.agentActivity, makeParams());
-    expect(runtime.ensureTimer).toHaveBeenCalledOnce();
-    expect(runtime.update).toHaveBeenCalledOnce();
+    const { manager, runtime, widget } = createToolDeps();
+    spawnBackground(manager, widget, runtime.agentActivity, makeParams());
+    expect(widget.ensureTimer).toHaveBeenCalledOnce();
+    expect(widget.update).toHaveBeenCalledOnce();
   });
 
   it("passes parentSession.toolCallId to manager.spawn so manager wires NotificationState", () => {
-    const { manager, runtime } = createToolDeps();
-    spawnBackground(manager, runtime, runtime.agentActivity, makeParams({ parentSession: { toolCallId: "tc-99" } }));
+    const { manager, runtime, widget } = createToolDeps();
+    spawnBackground(manager, widget, runtime.agentActivity, makeParams({ parentSession: { toolCallId: "tc-99" } }));
     const spawnOpts = (manager.spawn as ReturnType<typeof vi.fn>).mock.calls[0][3];
     expect(spawnOpts.parentSession?.toolCallId).toBe("tc-99");
   });
 
   it("returns text result with agent ID and description", () => {
-    const { manager, runtime } = createToolDeps();
+    const { manager, runtime, widget } = createToolDeps();
     const result = spawnBackground(
       manager,
-      runtime,
+      widget,
       runtime.agentActivity,
       makeParams({
         config: makeConfig({
@@ -110,14 +110,14 @@ describe("spawnBackground", () => {
         getRecord: vi.fn().mockReturnValue(createTestSubagent({ status: "queued" })),
       },
     });
-    const result = spawnBackground(deps.manager, deps.runtime, deps.runtime.agentActivity, makeParams({ settings: { maxConcurrent: 4 } }));
+    const result = spawnBackground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams({ settings: { maxConcurrent: 4 } }));
     expect(result.content[0].text).toContain("queued");
     expect(result.content[0].text).toContain("max 4 concurrent");
   });
 
   it("mentions 'started' in result when record is running", () => {
-    const { manager, runtime } = createToolDeps();
-    const result = spawnBackground(manager, runtime, runtime.agentActivity, makeParams());
+    const { manager, runtime, widget } = createToolDeps();
+    const result = spawnBackground(manager, widget, runtime.agentActivity, makeParams());
     expect(result.content[0].text).toContain("started");
   });
 
@@ -131,7 +131,7 @@ describe("spawnBackground", () => {
         getRecord: vi.fn().mockReturnValue(record),
       },
     });
-    const result = spawnBackground(deps.manager, deps.runtime, deps.runtime.agentActivity, makeParams());
+    const result = spawnBackground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams());
     expect(result.content[0].text).toContain("/sessions/bg.jsonl");
   });
 
@@ -143,7 +143,7 @@ describe("spawnBackground", () => {
         getRecord: vi.fn(),
       },
     });
-    const result = spawnBackground(deps.manager, deps.runtime, deps.runtime.agentActivity, makeParams());
+    const result = spawnBackground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams());
     expect(result.content[0].text).toContain("spawn failed");
   });
 });

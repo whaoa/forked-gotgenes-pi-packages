@@ -1,7 +1,12 @@
 import { vi } from "vitest";
 import { AgentTypeRegistry } from "#src/config/agent-types";
 import type { ParentSnapshot } from "#src/lifecycle/parent-snapshot";
-import { type AgentToolManager, type AgentToolRuntime, type AgentToolSettings } from "#src/tools/agent-tool";
+import {
+	type AgentToolManager,
+	type AgentToolRuntime,
+	type AgentToolSettings,
+	type AgentToolWidget,
+} from "#src/tools/agent-tool";
 import { AgentActivityTracker } from "#src/ui/agent-activity-tracker";
 import { createTestSubagent } from "./make-subagent";
 import { STUB_SNAPSHOT } from "./stub-ctx";
@@ -11,18 +16,22 @@ const defaultRegistry = new AgentTypeRegistry(() => new Map());
 
 /**
  * Fixture shape returned by `createToolDeps`.
- * Contains the five `AgentTool` constructor params as separate fields so tests
+ * Contains the six `AgentTool` constructor params as separate fields so tests
  * can construct the class directly or use individual pieces for spawner/runner tests.
  */
 export type AgentToolFixture = {
 	manager: AgentToolManager;
 	/**
-	 * Mock runtime satisfying `AgentToolRuntime`.
-	 * Also satisfies `BackgroundWidgetDeps` and `ForegroundWidgetDeps` structurally
-	 * (both use a subset of the runtime's widget delegation methods).
+	 * Mock runtime satisfying `AgentToolRuntime` (context queries + agentActivity).
 	 * `runtime.agentActivity` replaces the old top-level `agentActivity` field.
 	 */
 	runtime: AgentToolRuntime;
+	/**
+	 * Mock widget satisfying `AgentToolWidget`.
+	 * Also satisfies `BackgroundWidgetDeps` and `ForegroundWidgetDeps` structurally
+	 * (both use a subset of these methods).
+	 */
+	widget: AgentToolWidget;
 	settings: AgentToolSettings;
 	registry: AgentTypeRegistry;
 	agentDir: string;
@@ -40,12 +49,15 @@ export type AgentToolFixture = {
 export function createToolDeps(overrides: Partial<AgentToolFixture> = {}): AgentToolFixture {
 	const agentActivity = new Map<string, AgentActivityTracker>();
 
-	const runtime: AgentToolRuntime = {
-		agentActivity,
+	const widget: AgentToolWidget = {
 		setUICtx: vi.fn(),
 		ensureTimer: vi.fn(),
 		update: vi.fn(),
 		markFinished: vi.fn(),
+	};
+
+	const runtime: AgentToolRuntime = {
+		agentActivity,
 		buildSnapshot: vi.fn((_inheritContext: boolean): ParentSnapshot => STUB_SNAPSHOT),
 		getModelInfo: vi.fn(() => ({
 			parentModel: { id: "claude-sonnet", name: "Claude Sonnet" },
@@ -65,6 +77,7 @@ export function createToolDeps(overrides: Partial<AgentToolFixture> = {}): Agent
 			getRecord: vi.fn().mockReturnValue(createTestSubagent()),
 		},
 		runtime,
+		widget,
 		settings: { defaultMaxTurns: undefined as number | undefined, maxConcurrent: 4 },
 		registry: defaultRegistry,
 		agentDir: "/home/user/.pi",

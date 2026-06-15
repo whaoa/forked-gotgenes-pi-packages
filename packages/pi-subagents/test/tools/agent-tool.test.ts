@@ -12,7 +12,7 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
 }
 
 function makeTool(deps: ReturnType<typeof createToolDeps>) {
-	return new AgentTool(deps.manager, deps.runtime, deps.settings, deps.registry, deps.agentDir);
+	return new AgentTool(deps.manager, deps.runtime, deps.widget, deps.settings, deps.registry, deps.agentDir);
 }
 
 async function execute(
@@ -70,7 +70,7 @@ describe("AgentTool", () => {
 			description: "test",
 			subagent_type: "general-purpose",
 		}, ctx);
-		expect(deps.runtime.setUICtx).toHaveBeenCalledWith(ctx.ui);
+		expect(deps.widget.setUICtx).toHaveBeenCalledWith(ctx.ui);
 	});
 });
 
