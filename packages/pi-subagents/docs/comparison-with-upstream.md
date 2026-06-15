@@ -28,8 +28,7 @@ Both extensions provide the same core experience:
 
 - Claude Code-style foreground/background subagents with a live above-editor widget and a conversation viewer.
 - Custom agent types defined in `.pi/agents/<name>.md` with YAML frontmatter (system prompt, model, thinking, tools).
-- Persistent agent memory (project / local / user scopes) with read-only fallback.
-- Skill preloading, fuzzy model selection, context inheritance, mid-run steering, session resume, and graceful turn limits.
+- Fuzzy model selection, context inheritance, mid-run steering, session resume, and graceful turn limits.
 - A `pi.events` lifecycle bus (`subagents:created`, `started`, `completed`, `failed`, `steered`, `compacted`).
 
 ## What upstream has that this fork does not
@@ -41,6 +40,8 @@ It keeps several subsystems built in that this fork deliberately removed or dele
 | ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Tool restrictions       | `disallowed_tools` frontmatter (denylist)         | Delegated — `permission:` via [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system) |
 | Worktree isolation      | Built-in                                          | Delegated — [`@gotgenes/pi-subagents-worktrees`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-subagents-worktrees)               |
+| Persistent agent memory | `memory:` frontmatter (project / local / user)    | Removed                                                                                                                                           |
+| Skill preloading        | `skills:` frontmatter (preload named skills)      | Removed — children always inherit the parent's skills                                                                                             |
 | Scheduling              | Cron / interval / one-shot subagents (`schedule`) | Removed                                                                                                                                           |
 | Cross-extension control | `subagents:rpc:*` event RPC                       | Replaced by a typed service (below)                                                                                                               |
 | Model-scope enforcement | `enabledModels` allowlist validation              | Not included                                                                                                                                      |
