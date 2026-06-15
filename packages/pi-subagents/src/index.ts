@@ -57,13 +57,12 @@ export default function (pi: ExtensionAPI) {
   const runtime = createSubagentRuntime();
 
   // ---- Notification system ----
-  // runtime.widget is assigned after SubagentManager construction; arrow closures
-  // capture `runtime` by reference so they always read the current value.
+  // Owns completion nudges and live-activity cleanup. The widget detects finished
+  // agents itself (AgentWidget.update self-seeds), so NotificationManager has no
+  // widget dependency — keeping the construction graph a cycle-free DAG.
   const notifications = new NotificationManager(
     (msg, opts) => pi.sendMessage(msg, opts),
     runtime.agentActivity,
-    (id) => runtime.markFinished(id),
-    () => runtime.update(),
   );
 
   // Settings: owns all three in-memory values and handles load/save/emit.

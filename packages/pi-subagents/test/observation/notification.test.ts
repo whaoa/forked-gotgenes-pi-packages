@@ -174,13 +174,11 @@ describe("NotificationManager", () => {
     return {
       sendMessage: vi.fn(),
       agentActivity: new Map<string, AgentActivityTracker>(),
-      markFinished: vi.fn(),
-      updateWidget: vi.fn(),
     };
   }
 
   function makeManager(args: ReturnType<typeof makeArgs>) {
-    return new NotificationManager(args.sendMessage, args.agentActivity, args.markFinished, args.updateWidget);
+    return new NotificationManager(args.sendMessage, args.agentActivity);
   }
 
   const baseRecord = createTestSubagent({
@@ -199,14 +197,12 @@ describe("NotificationManager", () => {
     expect(args.sendMessage).not.toHaveBeenCalled();
   });
 
-  it("sendCompletion cleans up activity and widget, then schedules nudge", () => {
+  it("sendCompletion cleans up activity, then schedules nudge", () => {
     const args = makeArgs();
     args.agentActivity.set("agent-1", new AgentActivityTracker());
     const system = makeManager(args);
     system.sendCompletion(baseRecord);
     expect(args.agentActivity.has("agent-1")).toBe(false);
-    expect(args.markFinished).toHaveBeenCalledWith("agent-1");
-    expect(args.updateWidget).toHaveBeenCalled();
     // Nudge fires after hold delay
     vi.advanceTimersByTime(300);
     expect(args.sendMessage).toHaveBeenCalledOnce();
@@ -222,14 +218,12 @@ describe("NotificationManager", () => {
     expect(args.sendMessage).not.toHaveBeenCalled();
   });
 
-  it("cleanupCompleted removes activity and marks finished without nudge", () => {
+  it("cleanupCompleted removes activity without nudge", () => {
     const args = makeArgs();
     args.agentActivity.set("agent-1", new AgentActivityTracker());
     const system = makeManager(args);
     system.cleanupCompleted("agent-1");
     expect(args.agentActivity.has("agent-1")).toBe(false);
-    expect(args.markFinished).toHaveBeenCalledWith("agent-1");
-    expect(args.updateWidget).toHaveBeenCalled();
     vi.advanceTimersByTime(300);
     expect(args.sendMessage).not.toHaveBeenCalled();
   });

@@ -142,8 +142,6 @@ export class NotificationManager implements NotificationSystem {
       opts?: { triggerTurn?: boolean; deliverAs?: "steer" | "followUp" | "nextTurn" },
     ) => void,
     private agentActivity: Map<string, AgentActivityTracker>,
-    private markFinished: (id: string) => void,
-    private updateWidget: () => void,
   ) {}
 
   cancelNudge(key: string): void {
@@ -156,15 +154,11 @@ export class NotificationManager implements NotificationSystem {
 
   sendCompletion(record: Subagent): void {
     this.agentActivity.delete(record.id);
-    this.markFinished(record.id);
     this.scheduleNudge(record.id, () => this.emitIndividualNudge(record));
-    this.updateWidget();
   }
 
   cleanupCompleted(id: string): void {
     this.agentActivity.delete(id);
-    this.markFinished(id);
-    this.updateWidget();
   }
 
   dispose(): void {
