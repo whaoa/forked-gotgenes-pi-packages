@@ -59,6 +59,8 @@ Load this skill when writing, debugging, or planning tests.
 - When a test reveals a pre-existing bug rather than a wrong assumption, use `test.fails` to document the expected behavior and file a GitHub issue.
 - Do not insert no-op statements (`void 0;`, unused locals) in tests just to make an `Edit` tool's `oldText` unique — widen `oldText` with surrounding context instead.
 - When a non-`async` method declared `Promise<T>` must signal a precondition failure, `return Promise.reject(new Error(...))`, not `throw` — a synchronous `throw` escapes `expect(...).rejects.toThrow(...)`, and switching to `async` to fix that trips `@typescript-eslint/require-await` when the body has no `await`.
+- Assert mock calls with `expect(fn).toHaveBeenCalledWith(...)`, not `fn.mock.calls[0]![0]`.
+  A typed `vi.fn<(a: string) => void>()` makes the call tuple non-optional, so the `!` trips `@typescript-eslint/no-unnecessary-type-assertion`.
 
 ## Type checking
 
