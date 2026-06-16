@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/gotgenes/pi-packages/compare/pi-session-tools-v1.0.3...pi-session-tools-v1.1.0) (2026-06-16)
+
+
+### Features
+
+* **pi-session-tools:** add session entry summary helper ([#411](https://github.com/gotgenes/pi-packages/issues/411)) ([4dbae15](https://github.com/gotgenes/pi-packages/commit/4dbae159a5e38d3e5efdd110692537852691b526))
+* **pi-session-tools:** attach summary details to session-read results ([#411](https://github.com/gotgenes/pi-packages/issues/411)) ([4fbec4e](https://github.com/gotgenes/pi-packages/commit/4fbec4ec1eee1829f226b764badd1883e81e3c0a))
+* **pi-session-tools:** render session-read output compactly with Ctrl-O expansion ([#411](https://github.com/gotgenes/pi-packages/issues/411)) ([9292ec1](https://github.com/gotgenes/pi-packages/commit/9292ec1e5d08cf466e387ea48a75aaf3d2cc4169))
+
+
+### Documentation
+
+* **pi-session-tools:** note compact TUI rendering for session-read tools ([#411](https://github.com/gotgenes/pi-packages/issues/411)) ([621d54b](https://github.com/gotgenes/pi-packages/commit/621d54b6bbd5a7bb0d03fb578a11a706dc4ffc06))
+
 ## [1.0.3](https://github.com/gotgenes/pi-packages/compare/pi-session-tools-v1.0.2...pi-session-tools-v1.0.3) (2026-06-12)
 
 

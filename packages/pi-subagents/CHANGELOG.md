@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [16.3.1](https://github.com/gotgenes/pi-packages/compare/pi-subagents-v16.3.0...pi-subagents-v16.3.1) (2026-06-16)
+
+
+### Documentation
+
+* reframe pi-subagents positioning away from "Claude Code-style" ([c8d380d](https://github.com/gotgenes/pi-packages/commit/c8d380d440a4ae29f9173673523337cf667fb3da))
+
 ## [16.3.0](https://github.com/gotgenes/pi-packages/compare/pi-subagents-v16.2.2...pi-subagents-v16.3.0) (2026-06-16)
 
 
