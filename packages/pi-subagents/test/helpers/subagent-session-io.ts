@@ -108,3 +108,41 @@ export function createChildLifecycleMock() {
 
 /** The default agent config, exported for tests that build mutable wrappers around it. */
 export { DEFAULT_AGENT_CONFIG };
+
+export interface FactorySessionOptions {
+	/** Tools active before bindExtensions(). Default ["read"]. */
+	toolsBeforeBind?: string[];
+	/** Tools active after bindExtensions(). Defaults to toolsBeforeBind (no extension registration). */
+	toolsAfterBind?: string[];
+}
+
+/**
+ * Shared mock session for createSubagentSession tests.
+ *
+ * Builds the eight-method session stub that createSubagentSession's IO resolves
+ * (`io.createSession.mockResolvedValue({ session })`). `getActiveToolNames`
+ * returns `toolsBeforeBind` until `bindExtensions()` is awaited, then
+ * `toolsAfterBind` — modelling extension-registered tools joining the active
+ * set during bind. When `toolsAfterBind` is omitted the set is unchanged.
+ *
+ * Return type is deliberately unannotated so vi.fn() stubs retain their
+ * Mock<...> methods (mock.calls, mockResolvedValue, etc.).
+ */
+export function createFactorySession(options: FactorySessionOptions = {}) {
+	const before = options.toolsBeforeBind ?? ["read"];
+	const after = options.toolsAfterBind ?? before;
+	let bound = false;
+	return {
+		messages: [] as unknown[],
+		subscribe: vi.fn(() => () => {}),
+		prompt: vi.fn().mockResolvedValue(undefined),
+		abort: vi.fn(),
+		steer: vi.fn().mockResolvedValue(undefined),
+		dispose: vi.fn(),
+		getActiveToolNames: vi.fn(() => (bound ? after : before)),
+		setActiveToolsByName: vi.fn(),
+		bindExtensions: vi.fn(async () => {
+			bound = true;
+		}),
+	};
+}
