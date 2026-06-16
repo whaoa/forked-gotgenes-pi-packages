@@ -39,6 +39,8 @@ It also reflows what you just wrote (line wrapping, quote style), so an `oldText
 
 A multi-edit `Edit` call is atomic: if one `oldText` fails to match, the whole batch is rejected and nothing is applied.
 After a rejection, re-apply every intended edit (not just the ones you retried) and run `pnpm run check` to confirm none were silently dropped.
+When an edit's `oldText` would span a decorative comment rule (a long run of `─`/`═`), anchor on adjacent unique code lines rather than the rule itself — miscounting the run fails the whole atomic batch.
+If you delete such a block by line number with `sed`, re-read the region afterward to confirm you did not remove an enclosing brace.
 
 ### Multi-session issue lifecycle
 
