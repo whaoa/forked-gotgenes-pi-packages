@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.1.2](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v13.1.1...pi-permission-system-v13.1.2) (2026-06-16)
+
+
+### Documentation
+
+* **pi-permission-system:** clarify external_directory surface in README ([#413](https://github.com/gotgenes/pi-packages/issues/413)) ([c09929b](https://github.com/gotgenes/pi-packages/commit/c09929be209050c1f85e9e01dbb231f99e940f82))
+* **pi-permission-system:** document external_directory allow-list for outside-CWD caches ([#413](https://github.com/gotgenes/pi-packages/issues/413)) ([86b1d87](https://github.com/gotgenes/pi-packages/commit/86b1d87ff92e63c26d3f81ddb41aad7aab085074))
+* **pi-permission-system:** show external_directory allow-list in example config and schema ([#413](https://github.com/gotgenes/pi-packages/issues/413)) ([8178a7e](https://github.com/gotgenes/pi-packages/commit/8178a7ebc3237e188b8e492d5c3a8bfca9b197aa))
+
 ## [13.1.1](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v13.1.0...pi-permission-system-v13.1.1) (2026-06-13)
 
 
