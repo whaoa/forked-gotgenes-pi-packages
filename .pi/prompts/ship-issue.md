@@ -48,6 +48,11 @@ If the plan frames this issue as part of a multi-issue sequence (e.g. "step N of
 If batching: stop here — the push and CI are done; leave the issue open and skip steps 5–6.
 Note the deferral in the final report.
 
+## 4c. Create planned follow-up issues
+
+If the plan or its retro defers work to a follow-up issue ("created at ship time", "deferred to a follow-up"), create it now with `gh issue create` before closing — the shipped issue's close comment should reference its number.
+Skip if the plan names no deferred follow-up.
+
 ## 5. Close the issue
 
 Build the close comment from the commits since the previous release:

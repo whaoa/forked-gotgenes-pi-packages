@@ -46,3 +46,52 @@ Follow-up issue [#415] created for the worktrees migration.
 - The `rollup.dts.config.mjs` array-of-configs approach worked without incident: both bundles (`dist/public.d.ts` and `dist/settings.d.ts`) are self-contained and `verify:public-types` confirmed both probes type-check against the packaged tarball.
 - The `satisfies LayeredSettingsSource<SubagentsSettings>` annotation at the `loadSettings` call site serves double duty: validates the object literal and keeps `LayeredSettingsSource` referenced for fallow dead-code (fallow confirmed: 0 issues).
 - Follow-up issue [#415] created before the TDD stage notes were written (operator requested it during the session); architecture doc updated with the `[#415]` reference and link definition.
+
+## Stage: Final Retrospective (2026-06-16T18:00:00Z)
+
+### Session summary
+
+Shipped issue #380 end-to-end across four stages (plan → TDD → ship) in one session: extracted `loadLayeredSettings<T>` into `src/layered-settings.ts`, published it at the `@gotgenes/pi-subagents/settings` subpath, and adopted it internally in `settings.ts`.
+Released as `pi-subagents-v16.4.0`; CI passed first try; pre-completion reviewer returned PASS.
+Notably clean run — no rework, no failed commits, no rabbit-holes.
+
+### Observations
+
+#### What went well
+
+- The two-stage `ask_user` planning gate worked as designed: it surfaced the binary (extract vs. suppress) neutrally, the operator engaged deeply (asked for explicit for/against before committing), and the answers drove the plan's Goals rather than the issue body.
+  This is the intended use of `ask_user` for an operator-authored issue framed as "weigh two options."
+- Proactive tool-mechanism research paid off: `web_search` + `fetch_content` on the fallow docs during planning revealed that `code-duplication` suppression is **file-scoped only** (no line-level directive), which would have changed Option 2's shape had it been chosen.
+  Checking the tool's real surface before planning around it caught a latent wrong assumption.
+- The plan's honestly-hedged "Outcome caveat" (clone might persist until the worktrees follow-up) resolved favourably — the parametrised helper diverged below fallow's threshold immediately.
+  Hedging a quantitative prediction rather than over-promising left no credibility gap when the better outcome landed.
+- Incremental verification cadence: `pnpm run check` ran right after the interface-adjacent Step 2, vitest ran per-file in each Red/Green, and `build:types` + `verify:public-types` ran inside Step 3 — not deferred to the end.
+  No feedback-loop gaps.
+
+#### What caused friction (agent side)
+
+- `missing-context` (process gap) — the plan's Open Questions flagged the worktrees follow-up issue as "created at ship time," but the `ship-issue` prompt has no step for creating a deferred follow-up.
+  During shipping I went straight to close + release; the operator had to prompt ("What about the follow up issue…") to trigger #415's creation.
+  Impact: one extra user turn, no rework — but the #380 close comment references #415, so the follow-up had to exist before close, making the ordering load-bearing.
+- `instruction-violation` (self-identified, no rework) — the new test used `String(spy.mock.calls[0]![0])`, which the `testing` skill explicitly warns against ("Assert mock calls with `expect(fn).toHaveBeenCalledWith(...)`, not `fn.mock.calls[0]![0]`").
+  ESLint's pre-commit hook auto-stripped the redundant `!`, leaving `spy.mock.calls[0][0]`; tests stayed green.
+  I mirrored the pre-existing pattern in `settings.test.ts` rather than the skill's recommended `toHaveBeenCalledWith(expect.stringMatching(...))`.
+  Impact: none (auto-fixed, matches existing file style); the rule already exists in the skill, so this is a salience note, not a gap.
+
+#### What caused friction (user side)
+
+- None material.
+  The operator's one mid-ship intervention (asking about the follow-up issue) was a good catch that compensated for the prompt gap above, not a correction of a mistake.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the single subagent dispatch (`pre-completion-reviewer`) ran on `anthropic/claude-sonnet-4-6`, appropriate for judgment-heavy review; no mismatch.
+  Parent-session `model_change` entries toggled among `sonnet-4-6`, `deepseek-v4-flash`, and `opus-4-8`, but these are operator model selections, not quality-relevant task assignments.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; no error sequence exceeded one or two tool calls before resolution.
+- **Unused-tool detection** — nothing missed; `web_search`/`fetch_content` were dispatched proactively during planning for the fallow-mechanism question.
+- **Feedback-loop gap analysis** — verification ran incrementally (per-step `check`/vitest, in-step `verify:public-types`), not just at the end.
+  No gap.
+
+### Changes made
+
+1. `.pi/prompts/ship-issue.md` — added `## 4c. Create planned follow-up issues` between the stacked-release check (§4b) and the close step (§5): if the plan or retro defers work to a follow-up issue, create it with `gh issue create` before closing so the close comment can reference its number.
