@@ -360,6 +360,53 @@ When [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-permissio
 No configuration is required.
 When `@gotgenes/pi-permission-system` is not installed, the lifecycle events have no subscriber — a harmless no-op.
 
+## For Extension Authors
+
+This package exposes two public subpath exports for companion extensions to import from the published tarball.
+
+### `@gotgenes/pi-subagents` — cross-extension service contract
+
+Access the subagent service from another extension at runtime:
+
+```typescript
+const { getSubagentsService } = await import("@gotgenes/pi-subagents");
+const svc = getSubagentsService();
+svc?.spawn("Explore", "Check for stale TODOs");
+```
+
+Declare this package as an optional peer dependency.
+See `src/service/service.ts` for the full `SubagentsService` interface and the `WorkspaceProvider` seam.
+
+### `@gotgenes/pi-subagents/settings` — layered config loader
+
+Extensions that store configuration in JSON files can use the shared layered loader, which reads a global file (`<agentDir>/<filename>`) and a project file (`<cwd>/.pi/<filename>`) and merges them — project wins on conflicts, missing files are silent, malformed files warn and fall back:
+
+```typescript
+import { loadLayeredSettings, type LayeredSettingsSource } from "@gotgenes/pi-subagents/settings";
+
+interface MyConfig { enabled?: boolean; limit?: number }
+
+function sanitize(raw: unknown): Partial<MyConfig> {
+  if (!raw || typeof raw !== "object") return {};
+  const r = raw as Record<string, unknown>;
+  const out: Partial<MyConfig> = {};
+  if (typeof r.enabled === "boolean") out.enabled = r.enabled;
+  if (typeof r.limit === "number") out.limit = r.limit;
+  return out;
+}
+
+const config = loadLayeredSettings<MyConfig>({
+  agentDir,          // Pi runtime agent home directory
+  cwd,               // project root — project file lives at <cwd>/.pi/<filename>
+  filename: "my-extension.json",
+  sanitize,
+  warnLabel: "my-extension",  // prefix for the malformed-file stderr warning
+});
+```
+
+`loadLayeredSettings` returns `Partial<T>` (all fields optional); apply your defaults after the call.
+It never throws — all error conditions produce a `console.warn` and return `{}`.
+
 ## Architecture
 
 This extension is a minimal, composable core: it owns agent spawning, execution, and result retrieval, and exposes a typed `SubagentsService` plus lifecycle events that other extensions build on.

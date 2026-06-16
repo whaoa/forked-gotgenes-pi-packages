@@ -6,6 +6,10 @@
     ".": {
       "types": "./dist/public.d.ts",
       "default": "./src/service/service.ts"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "default": "./src/layered-settings.ts"
     }
   },
   "files": [

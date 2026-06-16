@@ -88,14 +88,26 @@ The key phases are:
 Formatting is handled by Biome (`biome check`, `biome format`).
 The repo intentionally does not use Prettier — a top-level `.prettierignore` blocks any harness with project-level write-time Prettier formatting from reformatting files here.
 
+## Public exports
+
+This package publishes two public subpath entries, each with a rolled self-contained `.d.ts`:
+
+| Subpath      | Source                    | Declaration          | Purpose                                                            |
+| ------------ | ------------------------- | -------------------- | ------------------------------------------------------------------ |
+| `.`          | `src/service/service.ts`  | `dist/public.d.ts`   | Cross-extension service contract: spawn/abort/steer/workspace seam |
+| `./settings` | `src/layered-settings.ts` | `dist/settings.d.ts` | Generic layered JSON config loader for `@gotgenes/pi-*` extensions |
+
+Use `loadLayeredSettings<T>({ agentDir, cwd, filename, sanitize, warnLabel })` from `@gotgenes/pi-subagents/settings` to read global + project JSON config with the standard `@gotgenes/pi-*` layering convention.
+See the `## For Extension Authors` section of `README.md` for the full wiring example.
+
 ## Build
 
-This package is otherwise ship-source (Pi runs `./src/index.ts` directly), but it carries the repo's only build step: a type-declaration bundle for the public API surface ([ADR-0003]).
-`pnpm run build:types` runs `rollup -c rollup.dts.config.mjs` (`rollup-plugin-dts`) to roll `src/service/service.ts` into a single self-contained `dist/public.d.ts` — internal `#src/*` types inlined, peer-dep types kept external.
-The bundle is gitignored, regenerated at `prepack`, and shipped via the `package.json` `files` allowlist; `exports["."].types` points at it while `exports["."].default` serves the `.ts` source.
+This package is otherwise ship-source (Pi runs `./src/index.ts` directly), but it carries the repo's only build step: type-declaration bundles for both public entries ([ADR-0003]).
+`pnpm run build:types` runs `rollup -c rollup.dts.config.mjs` (`rollup-plugin-dts`) to produce `dist/public.d.ts` (service entry) and `dist/settings.d.ts` (settings entry) — internal `#src/*` types inlined, peer-dep types kept external.
+The bundles are gitignored, regenerated at `prepack`, and shipped via the `package.json` `files` allowlist.
 Never commit `dist/`.
-`pnpm run verify:public-types` (`scripts/verify-public-types.sh`, also a CI step) packs the tarball and type-checks a throwaway consumer against it — run it after any change to the public surface, the `exports` map, or the rollup config.
-Sibling packages consume this one from the **published** registry release (the repo sets `linkWorkspacePackages: false`), not via a workspace symlink — a symlink resolves `exports.types` to the gitignored, unbuilt `dist/public.d.ts`.
+`pnpm run verify:public-types` (`scripts/verify-public-types.sh`, also a CI step) packs the tarball and type-checks a throwaway consumer against both entries — run it after any change to the public surface, the `exports` map, or the rollup config.
+Sibling packages consume this one from the **published** registry release (the repo sets `linkWorkspacePackages: false`), not via a workspace symlink — a symlink resolves `exports.types` to the gitignored, unbuilt `dist/*.d.ts`.
 See `@gotgenes/pi-subagents-worktrees` for the pattern.
 
 ## Testing
