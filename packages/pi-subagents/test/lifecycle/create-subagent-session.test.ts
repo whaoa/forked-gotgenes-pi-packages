@@ -194,3 +194,72 @@ describe("createSubagentSession — dispose on creation failure", () => {
     expect(session.dispose).toHaveBeenCalledOnce();
   });
 });
+
+describe("createSubagentSession — post-bind recursion guard", () => {
+  // Extension-registered tools join the active set during bindExtensions; a
+  // single post-bind filter pass applies the EXCLUDED_TOOL_NAMES recursion
+  // guard to the full post-bind set. The factory session flips getActiveToolNames
+  // from its before-bind set to its after-bind set once bindExtensions resolves.
+
+  it("calls setActiveToolsByName once, after bindExtensions", async () => {
+    const session = createFactorySession({ toolsBeforeBind: ["read"], toolsAfterBind: ["read", "extension_tool"] });
+    io.createSession.mockResolvedValue({ session });
+
+    await createSubagentSession(
+      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
+    );
+
+    expect(session.setActiveToolsByName).toHaveBeenCalledTimes(1);
+    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0];
+    const setOrder = session.setActiveToolsByName.mock.invocationCallOrder[0];
+    expect(setOrder).toBeGreaterThan(bindOrder);
+  });
+
+  it("includes extension-registered tools in the post-bind set", async () => {
+    const session = createFactorySession({ toolsBeforeBind: ["read"], toolsAfterBind: ["read", "extension_tool"] });
+    io.createSession.mockResolvedValue({ session });
+
+    await createSubagentSession(
+      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
+    );
+
+    const postBindArgs = session.setActiveToolsByName.mock.calls[0][0];
+    expect(postBindArgs).toContain("read");
+    expect(postBindArgs).toContain("extension_tool");
+  });
+
+  it("excludes EXCLUDED_TOOL_NAMES from the post-bind set", async () => {
+    const session = createFactorySession({
+      toolsBeforeBind: ["read"],
+      toolsAfterBind: ["read", "subagent", "get_subagent_result", "steer_subagent", "external"],
+    });
+    io.createSession.mockResolvedValue({ session });
+
+    await createSubagentSession(
+      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
+    );
+
+    const postBindArgs = session.setActiveToolsByName.mock.calls[0][0];
+    expect(postBindArgs).toContain("read");
+    expect(postBindArgs).toContain("external");
+    expect(postBindArgs).not.toContain("subagent");
+    expect(postBindArgs).not.toContain("get_subagent_result");
+    expect(postBindArgs).not.toContain("steer_subagent");
+  });
+
+  it("runs the guard unconditionally even when no extension tools are registered", async () => {
+    const session = createFactorySession();
+    io.createSession.mockResolvedValue({ session });
+
+    await createSubagentSession(
+      { snapshot: STUB_SNAPSHOT, type: "Explore" },
+      createSubagentSessionDeps({ io, exec, registry: mockAgentLookup }),
+    );
+
+    expect(session.setActiveToolsByName).toHaveBeenCalledTimes(1);
+    expect(session.setActiveToolsByName.mock.calls[0][0]).toEqual(["read"]);
+  });
+});
