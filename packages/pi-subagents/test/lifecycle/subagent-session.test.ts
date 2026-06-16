@@ -136,7 +136,7 @@ describe("SubagentSession — runTurnLoop response capture", () => {
 describe("SubagentSession — runTurnLoop turn limits", () => {
   it("steers at the soft limit and aborts after the grace window", async () => {
     const { session, listeners } = createSession("done");
-    programTurns(session, listeners, 3); // steer at maxTurns=2, abort at maxTurns+grace=3
+    programTurns(session, listeners, 3);
     const { sub } = makeSubagentSession(session);
     const result = await sub.runTurnLoop("go", { maxTurns: 2, graceTurns: 1 });
     expect(session.steer).toHaveBeenCalledWith(expect.stringContaining("turn limit"));
@@ -147,7 +147,7 @@ describe("SubagentSession — runTurnLoop turn limits", () => {
 
   it("graceTurns extends the window so a finishing agent is not aborted", async () => {
     const { session, listeners } = createSession("done");
-    programTurns(session, listeners, 3); // 3 turns stay within the grace window (1+3=4)
+    programTurns(session, listeners, 3);
     const { sub } = makeSubagentSession(session);
     const result = await sub.runTurnLoop("go", { maxTurns: 1, graceTurns: 3 });
     expect(result.steered).toBe(true);
@@ -157,7 +157,7 @@ describe("SubagentSession — runTurnLoop turn limits", () => {
 
   it("per-call maxTurns takes precedence over agentMaxTurns and defaultMaxTurns", async () => {
     const { session, listeners } = createSession("done");
-    programTurns(session, listeners, 2); // under per-call maxTurns=3
+    programTurns(session, listeners, 2);
     const { sub } = makeSubagentSession(session, { agentMaxTurns: 1 });
     await sub.runTurnLoop("go", { maxTurns: 3, defaultMaxTurns: 1, graceTurns: 1 });
     expect(session.steer).not.toHaveBeenCalled();
@@ -166,7 +166,7 @@ describe("SubagentSession — runTurnLoop turn limits", () => {
 
   it("falls back to agentMaxTurns when no per-call maxTurns is set", async () => {
     const { session, listeners } = createSession("done");
-    programTurns(session, listeners, 1); // steer at agentMaxTurns=1
+    programTurns(session, listeners, 1);
     const { sub } = makeSubagentSession(session, { agentMaxTurns: 1 });
     const result = await sub.runTurnLoop("go", { defaultMaxTurns: 9 });
     expect(session.steer).toHaveBeenCalledWith(expect.stringContaining("turn limit"));
@@ -175,7 +175,7 @@ describe("SubagentSession — runTurnLoop turn limits", () => {
 
   it("falls back to defaultMaxTurns when neither per-call nor agentMaxTurns is set", async () => {
     const { session, listeners } = createSession("done");
-    programTurns(session, listeners, 1); // steer at defaultMaxTurns=1
+    programTurns(session, listeners, 1);
     const { sub } = makeSubagentSession(session);
     const result = await sub.runTurnLoop("go", { defaultMaxTurns: 1, graceTurns: 5 });
     expect(session.steer).toHaveBeenCalledWith(expect.stringContaining("turn limit"));

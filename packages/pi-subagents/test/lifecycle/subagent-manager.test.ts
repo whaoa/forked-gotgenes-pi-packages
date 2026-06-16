@@ -486,33 +486,33 @@ describe("SubagentManager — queueing and concurrency with injected stubs", () 
   });
 
   it("gives a queued agent an awaitable promise at spawn (before its slot opens)", () => {
-    const arranged = arrangeQueuedPair();
-    manager = arranged.manager;
+    const { manager: mgr, running, queued } = arrangeQueuedPair();
+    manager = mgr;
 
     // A still-queued agent must already expose a settle-on-completion promise,
     // so waitForAll can await it without relying on a re-poll. (Regression
     // guard: #374 made the promise lazy; the limiter handle is captured eagerly.)
-    expect(manager.getRecord(arranged.queued)!.status).toBe("queued");
-    expect(manager.getRecord(arranged.queued)!.promise).toBeInstanceOf(Promise);
+    expect(manager.getRecord(queued)!.status).toBe("queued");
+    expect(manager.getRecord(queued)!.promise).toBeInstanceOf(Promise);
 
-    manager.abort(arranged.running);
-    manager.abort(arranged.queued);
+    manager.abort(running);
+    manager.abort(queued);
   });
 
   it("abort removes a queued agent without ever running it", () => {
-    const arranged = arrangeQueuedPair();
-    manager = arranged.manager;
+    const { manager: mgr, factory, running, queued } = arrangeQueuedPair();
+    manager = mgr;
 
-    expect(manager.getRecord(arranged.queued)!.status).toBe("queued");
+    expect(manager.getRecord(queued)!.status).toBe("queued");
 
     // Abort the queued agent
-    expect(manager.abort(arranged.queued)).toBe(true);
-    expect(manager.getRecord(arranged.queued)!.status).toBe("stopped");
+    expect(manager.abort(queued)).toBe(true);
+    expect(manager.getRecord(queued)!.status).toBe("stopped");
 
     // factory was called once (for the first agent), never for the aborted one
-    expect(arranged.factory).toHaveBeenCalledOnce();
+    expect(factory).toHaveBeenCalledOnce();
 
-    manager.abort(arranged.running);
+    manager.abort(running);
   });
 
   it("onStart fires when agent transitions from queued to running", async () => {
