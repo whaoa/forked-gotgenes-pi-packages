@@ -72,7 +72,25 @@ For per-tool path patterns (`read`, `write`, `edit`, `find`, `grep`, `ls`), patt
 This lets you express rules like "allow reads but deny `.env` files" at the individual tool level.
 When Pi's current working directory is known, relative path inputs also match their cwd-normalized absolute form, so `src/App.jsx` can match both `src/*` and `/workspace/project/*`.
 
+The `external_directory` surface is the CWD-boundary gate: it decides whether reaching **outside** the working tree is allowed, and accepts a pattern map so you can allow specific outside-CWD directories without opening up all external access.
+This is the right surface for silencing repeated prompts on a local cache like `~/.cargo/registry` — allow it here, not on `path`:
+
+```jsonc
+{
+  "permission": {
+    "external_directory": {
+      "*": "ask",
+      "~/.cargo/registry/*": "allow"
+    }
+  }
+}
+```
+
+The trailing `*` is greedy and crosses subdirectory boundaries, so it allows every file beneath the directory; a bare `~/.cargo/registry` matches only the directory entry itself.
+
 Four layers compose with most-restrictive-wins: `path` (cross-cutting) → `external_directory` (CWD boundary) → per-tool patterns → `bash` command patterns.
+Because `ask` is more restrictive than `allow`, a `path` allow cannot loosen an `external_directory: ask` boundary — allow outside-CWD directories on `external_directory`.
+See [docs/configuration.md](docs/configuration.md) for the full recipe.
 
 ## Configuration
 
