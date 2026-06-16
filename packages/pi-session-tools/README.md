@@ -49,6 +49,10 @@ Parameters:
 The output is a human-readable transcript: numbered user/assistant turns, one-line tool call summaries with correlated result status, and metadata events (compaction, model changes).
 Tool result bodies, thinking content, and image data are omitted.
 
+In the TUI the tool row shows a compact summary by default (e.g. `✓ 42 entries — 38 messages, 18 tool calls, 2 compactions`).
+Press `Ctrl-O` to expand to the full transcript.
+The model always receives the full transcript regardless of the TUI state.
+
 ```text
 1. user
 How do I fix the login bug?
