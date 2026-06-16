@@ -890,17 +890,17 @@ The fuller four-domain split — metrics as a projection, result delivery as its
 
 Updated health metrics (fallow, package-wide including tests):
 
-| Metric                     | Phase 16 baseline              | Current                                       |
-| -------------------------- | ------------------------------ | --------------------------------------------- |
-| Health score               | 78/100 (B)                     | 78/100 (B)                                    |
-| Source LOC                 | 7,778 (57 files)               | 8,356 (61 files, landed Phase 17 Step 5)      |
-| Dead code                  | 0 files, 0 exports             | 0 files, 0 exports                            |
-| Maintainability index      | 90.8 (good)                    | 90.8 (good)                                   |
-| Avg / P90 cyclomatic       | 1.4 / 2                        | 1.4 / 2                                       |
-| Production duplication     | 11 lines (1 internal group)    | 34 lines (1 internal + 1 cross-package group) |
-| Test duplication           | 42 groups, 661 lines           | 44 groups, ~750 lines                         |
-| Fallow refactoring targets | 0                              | 0                                             |
-| Top churn hotspot          | `index.ts` 65.0 ▲ accelerating | `index.ts` 31.3 ▼ cooling                     |
+| Metric                     | Phase 16 baseline              | Current                                                            |
+| -------------------------- | ------------------------------ | ------------------------------------------------------------------ |
+| Health score               | 78/100 (B)                     | 78/100 (B)                                                         |
+| Source LOC                 | 7,778 (57 files)               | 8,356 (61 files, landed Phase 17 Step 5)                           |
+| Dead code                  | 0 files, 0 exports             | 0 files, 0 exports                                                 |
+| Maintainability index      | 90.8 (good)                    | 90.8 (good)                                                        |
+| Avg / P90 cyclomatic       | 1.4 / 2                        | 1.4 / 2                                                            |
+| Production duplication     | 11 lines (1 internal group)    | 11 lines (1 internal group; cross-package pair resolved in Step 9) |
+| Test duplication           | 42 groups, 661 lines           | 44 groups, ~750 lines                                              |
+| Fallow refactoring targets | 0                              | 0                                                                  |
+| Top churn hotspot          | `index.ts` 65.0 ▲ accelerating | `index.ts` 31.3 ▼ cooling                                          |
 
 The syntactic metrics are healthy and stable — the remaining debt is structural, mostly invisible to fallow, and concentrated in three places:
 
@@ -1024,13 +1024,16 @@ Priority = Impact × (6 − Risk).
   Package test duplication: 512 → 355 lines; clone groups 32 → 24; duplication 2.49% → 1.73%; test files 63 → 64; test count 1010 → 1015 (+5 `createResolvedSpawnConfig` self-tests).
   Three multi-group families remain: the two lifecycle residuals from Step 7 (`create-subagent-session.test.ts`, `subagent-manager.test.ts`) and `agent-config-editor.test.ts`, whose residual clones are the repeated `await editor.showAgentDetail(...)` **act** plus its `setupDetail` arrange and `ui.select.mock.calls` menu assertion — left inline because wrapping the system-under-test is the wrong abstraction for test code (Step 7 lesson; Sandi Metz: "duplication is far cheaper than the wrong abstraction").
 
-#### Step 9 — Resolve the cross-package settings-loader duplication ([#380])
+#### Step 9 — Resolve the cross-package settings-loader duplication ([#380]) ✅
 
 - Targets: `src/settings.ts:198-211`, `packages/pi-subagents-worktrees/src/config.ts:51-73`.
 - Smell: Category A — 23-line production clone: the layered global/project JSON read-sanitize-warn-merge loader.
-- Change: decide explicitly between (a) exporting a small `loadLayeredSettings` helper from pi-subagents' public surface for worktrees to consume, and (b) documenting the duplication as intentional (separate release cadences, registry-resolved dependency) with a recorded fallow suppression.
-  The issue weighs the public-API cost (type bundle, `verify:public-types`, docs for third-party authors) against living with the flag.
-- Outcome: `pnpm fallow:dupes` no longer reports the pair, via extraction or recorded suppression.
+- Decision: **extract** — `loadLayeredSettings<T>` added to `src/layered-settings.ts` and published via the `@gotgenes/pi-subagents/settings` dedicated subpath export (`dist/settings.d.ts`); `loadSettings` in `settings.ts` delegates to it internally.
+  Option 2 (fallow suppression) was rejected; the public-API cost is accepted as the right long-term tradeoff for a shared convention in the `@gotgenes/pi-*` family.
+  Worktrees migration (swap `config.ts`'s inlined loader for the shared helper) is deferred to a follow-up issue — worktrees resolves pi-subagents from the registry, so it must wait for a published release carrying the helper.
+- Outcome: `pnpm fallow:dupes --skip-local` no longer reports the `settings.ts` ↔ `config.ts` pair.
+  The parametrised helper's token sequence diverged sufficiently that the contiguous identical run dropped below the reporting threshold even before the worktrees migration lands.
+  Definitive semantic elimination completes when worktrees adopts the helper in the follow-up.
 
 ### Step dependencies
 
