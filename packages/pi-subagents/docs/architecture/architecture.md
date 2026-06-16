@@ -1030,7 +1030,7 @@ Priority = Impact × (6 − Risk).
 - Smell: Category A — 23-line production clone: the layered global/project JSON read-sanitize-warn-merge loader.
 - Decision: **extract** — `loadLayeredSettings<T>` added to `src/layered-settings.ts` and published via the `@gotgenes/pi-subagents/settings` dedicated subpath export (`dist/settings.d.ts`); `loadSettings` in `settings.ts` delegates to it internally.
   Option 2 (fallow suppression) was rejected; the public-API cost is accepted as the right long-term tradeoff for a shared convention in the `@gotgenes/pi-*` family.
-  Worktrees migration (swap `config.ts`'s inlined loader for the shared helper) is deferred to a follow-up issue — worktrees resolves pi-subagents from the registry, so it must wait for a published release carrying the helper.
+  Worktrees migration (swap `config.ts`'s inlined loader for the shared helper) is deferred to [#415] — worktrees resolves pi-subagents from the registry, so it must wait for a published release carrying the helper.
 - Outcome: `pnpm fallow:dupes --skip-local` no longer reports the `settings.ts` ↔ `config.ts` pair.
   The parametrised helper's token sequence diverged sufficiently that the contiguous identical run dropped below the reporting threshold even before the worktrees migration lands.
   Definitive semantic elimination completes when worktrees adopts the helper in the follow-up.
@@ -1171,4 +1171,5 @@ The upstream test suite is run periodically as a regression canary for the sessi
 [#380]: https://github.com/gotgenes/pi-packages/issues/380
 [#381]: https://github.com/gotgenes/pi-packages/issues/381
 [#412]: https://github.com/gotgenes/pi-packages/issues/412
+[#415]: https://github.com/gotgenes/pi-packages/issues/415
 [ADR-0002]: ../decisions/0002-extensions-on-a-minimal-core.md
