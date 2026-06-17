@@ -30,3 +30,27 @@ The plan files at `packages/pi-subagents/docs/plans/0421-migrate-activity-reader
 
 [#420]: https://github.com/gotgenes/pi-packages/issues/420
 [#422]: https://github.com/gotgenes/pi-packages/issues/422
+
+## Stage: Implementation — TDD (2026-06-17T17:00:00Z)
+
+### Session summary
+
+All 5 TDD cycles completed in one session.
+The five activity readers (`widget-renderer`, `conversation-viewer`, `agent-menu`, `foreground-runner`, `notification`) were migrated off `AgentActivityTracker` and onto the `Subagent` record getters added in Phase 18 Step 1.
+Test count went from 1058 to 1066 (+8).
+
+### Observations
+
+- **Step 2 (widget)** introduced the `WidgetAgent` → activity-field fold and the `AgentWidget.toWidgetAgent` projection.
+  The accepted behavior change (finished agents now show `⟳N` from the persisted record) landed as `feat:` as planned.
+  `renderWidgetLines` drops `activityMap`; renderer is now a pure function of plain data with no SDK-type reach.
+- **Step 3 (viewer + menu)** was straightforward once `ConversationViewer` dropped `activity?: AgentActivityTracker`; the streaming indicator now reads `this.record.activeTools` / `this.record.responseText` directly.
+  `AgentActivityReader` interface removed; `AgentsMenuHandler` constructor lost one parameter.
+- **Step 4 (buildDetails + foreground runner)** required care around the pre-`onSessionCreated` phase: `streamUpdate` falls back to `recordRef?.turnCount ?? 1`, `execution.effectiveMaxTurns`, empty `Map()`, and `""` before the record reference is assigned.
+  The `AgentTool` resume call site (`buildDetails(base, record)`) was already correct and needed no change.
+- **Step 5 (notifications)** removed `NotificationSystem.cleanupCompleted` entirely (it only deleted a map entry).
+  `SubagentEventsObserver.onSubagentCompleted` now returns early on `resultConsumed` rather than calling the removed method.
+  The `NotificationManager` constructor drops the `agentActivity: Map` argument; `index.ts` needed one arg removed.
+- **Post-commit SKILL.md fix**: the pre-completion reviewer (WARN) flagged that `subagent-events-observer.ts` was missing from the Observation domain table; fixed in a follow-up `docs:` commit.
+- **Pre-completion reviewer**: WARN (non-blocking).
+  Reviewer warning: SKILL.md Observation domain table listed 4 modules and omitted `subagent-events-observer.ts`; corrected before writing these notes.
