@@ -1012,7 +1012,8 @@ Priority = Impact × (6 − Risk).
   Package test duplication: 669 → 512 lines; test files 64 → 63; test count 1005 → 1010 (+5 `createFactorySession` self-tests).
   Two lifecycle clone families remain (`create-subagent-session.test.ts` ~29 lines, `subagent-manager.test.ts` ~23 lines): both are the repeated `await createSubagentSession(...)` / `spawn(...)` **act** with test-specific arrange, intentionally not extracted because hiding the system-under-test behind a helper is the wrong abstraction for test code (Sandi Metz: "duplication is far cheaper than the wrong abstraction").
   Lesson: the original "families ≤ 1" target was a weak signal for _test_ code — an early act-wrapping helper that hit the metric was reverted in favour of the AAA structure above; the metric was relaxed deliberately.
-  The three overlapping session-mock builders this surfaced are tracked separately ([#412]).
+  The three overlapping session-mock builders this surfaced were resolved in [#412] by targeted reuse: `createFactorySession` now spreads the shared `createMockSession` core (inheriting the `messages`/`subscribe`/`emit`/`steer`/`dispose`/`sessionManager` base) and layers only the factory facet on top.
+  `createSubagentSessionStub` was left as-is — it already composes `createMockSession` as its wrapped `.session`, so its overlap is intrinsic delegation glue rather than duplication.
 
 #### Step 8 — Consolidate UI and tools test fixtures ([#379]) ✅ Complete
 
