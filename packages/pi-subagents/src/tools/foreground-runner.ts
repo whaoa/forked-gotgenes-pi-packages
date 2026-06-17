@@ -70,11 +70,15 @@ export async function runForeground(
       ...presentation.detailBase,
       toolUses,
       tokens: recordRef ? formatLifetimeTokens(recordRef) : "",
-      turnCount: fgState.turnCount,
-      maxTurns: fgState.maxTurns,
+      // Read activity off the record; fall back to safe defaults before onSessionCreated fires
+      turnCount: recordRef?.turnCount ?? 1,
+      maxTurns: recordRef?.maxTurns ?? execution.effectiveMaxTurns,
       durationMs: Date.now() - startedAt,
       status: "running",
-      activity: describeActivity(fgState.activeTools, fgState.responseText),
+      activity: describeActivity(
+        recordRef?.activeTools ?? new Map(),
+        recordRef?.responseText ?? "",
+      ),
       spinnerFrame: spinnerFrame % SPINNER.length,
     };
     onUpdate?.({
@@ -136,7 +140,7 @@ export async function runForeground(
   }
 
   const tokenText = formatLifetimeTokens(record);
-  const details = buildDetails(presentation.detailBase, record, fgState, { tokens: tokenText });
+  const details = buildDetails(presentation.detailBase, record, { tokens: tokenText });
 
   const fallbackNote = identity.fellBack
     ? `Note: Unknown agent type "${identity.rawType}" — using general-purpose.\n\n`
