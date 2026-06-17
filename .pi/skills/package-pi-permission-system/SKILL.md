@@ -129,6 +129,8 @@ When a call site needs different defaults from `makeCheckResult`, pass explicit 
 
 When a gate resolves through a new manager/resolver method beyond `checkPermission`/`resolve` (e.g. `checkPathPolicy`/`resolvePathPolicy`), wire it through the same surface dispatcher in `makeHandler` (`handler-fixtures.ts`).
 Otherwise `makeSurfaceCheck` stubs only `checkPermission`, the new method returns its default, and the gate silently passes `allow` — a false green caught only by the full suite, not the edited test file (#393).
+`checkPathPolicy`/`resolvePathPolicy` take an optional trailing `surface` (default `"path"`): the bash path gate passes `"path"`, and both external-directory gates pass `"external_directory"` to match a path's typed and symlink-resolved aliases (#418).
+`makeHandler` threads that `surface` arg into the dispatcher, so `external_directory` overrides apply to tool paths and bash tokens; an inline handler that mocks `permissionManager.checkPermission` directly (not via the session bag) must also mock `checkPathPolicy` to delegate to it, or external-directory checks false-green to `allow`.
 
 - Test permission resolution (allow/deny/ask decisions across tools, bash, MCP, skills, special).
 - Test wildcard matching (bash patterns, skill globs) including over-match and under-match cases.

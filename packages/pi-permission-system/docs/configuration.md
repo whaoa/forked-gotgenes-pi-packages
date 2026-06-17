@@ -442,6 +442,24 @@ Bash commands are also covered: the extension extracts path-like tokens from the
 Quoted strings are stripped first to reduce false positives.
 This is a best-effort heuristic — variable expansion and escaped quotes are not parsed, and relative paths inside subshells are not yet resolved against a per-subshell working directory. (The separate `bash` command-pattern surface does evaluate commands nested inside substitutions and subshells; see that section.) OS device paths (`/dev/null`, `/dev/stdin`, `/dev/stdout`, `/dev/stderr`) are always excluded.
 
+#### Symlinked paths
+
+An `external_directory` pattern matches the path **as the agent references it** and the OS-resolved (symlink-followed) path.
+This matters on macOS, where `/tmp` is a symlink to `/private/tmp`: a rule keyed on `/tmp/*` allows access via `/tmp` even though the access resolves to `/private/tmp`, and a rule keyed on `/private/tmp/*` works too.
+
+```jsonc
+{
+  "permission": {
+    "external_directory": {
+      "*": "ask",
+      "/tmp/*": "allow"
+    }
+  }
+}
+```
+
+The decision of whether a path is outside the working directory always uses the resolved form, so the gate still fires for every outside-CWD access; only which allow/deny/ask pattern matches considers both forms.
+
 #### Pi Infrastructure Read Auto-Allow
 
 Read-only tools (`read`, `find`, `grep`, `ls`) targeting Pi infrastructure directories are automatically allowed without triggering the gate, even when `external_directory` is `ask` or `deny`.
