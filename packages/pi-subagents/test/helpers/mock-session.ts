@@ -14,17 +14,6 @@ export interface MockSession {
 }
 
 /**
- * Shared test fixture: subscribable event bus with spy stubs.
- *
- * This is the shared session-mock core. `createFactorySession`
- * (`subagent-session-io.ts`) spreads it to inherit the
- * `messages`/`subscribe`/`emit`/`steer`/`dispose`/`sessionManager` base, and
- * `createSubagentSessionStub` (below) composes it as the wrapped `.session`.
- *
- * All fields are always present — callers that only need `subscribe`/`emit`
- * can ignore the rest. Pass `overrides` to replace or extend specific fields.
- */
-/**
  * Cast a MockSession to AgentSession for use as a SubagentSession's session.
  *
  * AgentSession is a class with private fields — no plain object satisfies it
@@ -76,6 +65,17 @@ export function toSubagentSession(stub: ReturnType<typeof createSubagentSessionS
 	return stub as unknown as SubagentSession;
 }
 
+/**
+ * Shared test fixture: subscribable event bus with spy stubs.
+ *
+ * This is the shared session-mock core. `createFactorySession`
+ * (`subagent-session-io.ts`) spreads it to inherit the
+ * `messages`/`subscribe`/`emit`/`steer`/`dispose`/`sessionManager` base, and
+ * `createSubagentSessionStub` (above) composes it as the wrapped `.session`.
+ *
+ * All fields are always present — callers that only need `subscribe`/`emit`
+ * can ignore the rest. Pass `overrides` to replace or extend specific fields.
+ */
 export function createMockSession(overrides: Record<string, unknown> = {}): MockSession & Record<string, unknown> {
 	const subscribers = new Set<(event: unknown) => void>();
 
