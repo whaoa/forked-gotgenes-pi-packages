@@ -54,3 +54,52 @@ Test count went from 1058 to 1066 (+8).
 - **Post-commit SKILL.md fix**: the pre-completion reviewer (WARN) flagged that `subagent-events-observer.ts` was missing from the Observation domain table; fixed in a follow-up `docs:` commit.
 - **Pre-completion reviewer**: WARN (non-blocking).
   Reviewer warning: SKILL.md Observation domain table listed 4 modules and omitted `subagent-events-observer.ts`; corrected before writing these notes.
+
+## Stage: Final Retrospective (2026-06-17T18:30:00Z)
+
+### Session summary
+
+Shipped Phase 18 Step 2 across one continuous session (planning, TDD, ship, retro): five activity readers migrated off `AgentActivityTracker` onto `Subagent` record getters, released as `pi-subagents` v16.6.0.
+Execution was clean overall (+8 tests, all deterministic checks green, one-pass CI), but the architecture roadmap's per-step completion marker was missed during TDD and only fixed after the user caught it at ship time.
+
+### Observations
+
+#### What went well
+
+- **`ask_user` design-fork gate during planning paid off downstream.**
+  Resolving the two forks (finished-agent turn-count behavior change; `contextPercent` field-vs-method) up front meant TDD had zero design backtracking — every step landed as planned, including the `feat:`-vs-`refactor:` commit-type split the fork decided.
+- **Lift-and-shift sequencing held.**
+  The prep step (`createTestSubagent` activity shorthands, commit `bcdb81c9`) made the four reader-migration steps mechanical; each shared-signature change (`renderWidgetLines`, `buildDetails`, `NotificationSystem`) landed with all its call sites in one commit, so `pnpm run check` stayed green at every step boundary.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (user-caught) — the architecture roadmap's **per-step** completion marker was not applied during TDD.
+  Step 7 of `/tdd-plan` says "mark that step done (`✅`/`Landed:`) and update the phase status row."
+  I added the `Landed:` line (commit `999e5ecb`) and confirmed the phase status row correctly stayed `In progress`, but did **not** add the `✅` prefix to the step heading or the Mermaid diagram node.
+  The established convention (Step 1 carries `✅` on both its heading and its `S1[...]` diagram node) treats the `✅` markers as the completion signal, with `Landed:` an optional detail line.
+  Impact: the user caught it at ship time ("we didn't check off the step in architecture.md in the phase Steps section"); fixed in commit `47644ff1`, after which ship resumed.
+  Root cause: the prompt phrasing `(✅/Landed:)` reads as either/or, so satisfying `Landed:` felt sufficient.
+- `missing-context` (reviewer gap) — the pre-completion reviewer's roadmap-status check (added in `b8a938d8` for exactly this class of miss) passed the unchecked step.
+  Its report said "Architecture doc has a `Landed:` entry for Step 2; Phase 18 status row correctly remains 'In progress'" — it verified the `Landed:` line and the phase row but never checked the per-step `✅` on the heading and diagram node.
+  Impact: the guard built to catch this exact omission did not, leaving the user as the only backstop.
+- `other` (tool friction) — a multi-edit `Edit` batch on `test/ui/agent-widget.test.ts` (Step 2) was rejected for overlapping `oldText` regions; re-issued as a single non-overlapping edit.
+  Impact: one retry, no rework.
+
+#### What caused friction (user side)
+
+- None substantive.
+  The single user intervention (the architecture step-checkbox catch) was the correct backstop for a gap the automated reviewer should have caught; surfacing it as a redirect rather than a silent fix kept the convention enforced.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the ship stage (CI watch, release-PR merge, issue close) ran on `opencode-go/deepseek-v4-flash`; appropriate for mechanical orchestration, and it executed the `UNSTABLE`-merge `GITHUB_TOKEN` branch correctly.
+  Planning/TDD ran on `anthropic/claude-opus-4-8` / `claude-sonnet-4-6` (judgment-heavy); retro on `claude-opus-4-8`.
+  No quality mismatch — the per-step-checkbox miss occurred during TDD on a high-reasoning model, so it is an instruction-clarity gap, not a model-capability gap.
+- **Feedback-loop gap analysis** — `pnpm run check` ran after each shared-signature step as the plan flagged, and the full suite plus `fallow dead-code` ran before push; verification was incremental, not end-loaded.
+- **Escalation-delay / unused-tool** — no `rabbit-hole` friction; no lens finding.
+
+### Changes made
+
+1. `.pi/prompts/tdd-plan.md` (step 7) — disambiguated roadmap-step completion: `✅` on both the step heading and its Mermaid diagram node; `Landed:` is not a substitute; phase status row flips only when every step is done.
+2. `.pi/prompts/build-plan.md` (step 4) — same disambiguation as tdd-plan.
+3. `.pi/agents/pre-completion-reviewer.md` (roadmap-status check) — reviewer now verifies `✅` on both the step heading and diagram node (not just a `Landed:` line) and checks the phase row against the actual step count.
