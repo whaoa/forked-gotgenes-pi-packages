@@ -25,3 +25,23 @@ Operator-authored, unambiguous proposal matching the architecture roadmap, so th
 - No symbol is removed or renamed, so no `package-pi-subagents` SKILL or architecture-doc prose update is needed; the Phase 18 Step 1 roadmap entry already describes this work.
 
 [#421]: https://github.com/gotgenes/pi-packages/issues/421
+
+## Stage: Implementation — TDD (2026-06-17T13:10:00Z)
+
+### Session summary
+
+Executed all 3 TDD steps from the plan: (1) added `turnCount`/`activeTools`/`responseText` fields plus 5 transition methods to `SubagentState`; (2) extended `record-observer` with 4 new event branches (`tool_execution_start`, `turn_end`, `message_start`, `message_update` text_delta) plus paired `removeActiveTool` on `tool_execution_end`; (3) added 4 read-only getters to `Subagent` (`turnCount`, `activeTools`, `responseText`, `maxTurns`).
+Test count: 1031 → 1058 (+27 across 3 test files).
+Full suite green; type check and lint clean; zero dead code.
+
+### Observations
+
+- The first pre-completion reviewer run returned **FAIL** due to 3 pre-existing `MD051` broken-fragment links in `docs/architecture/history/phase-17-core-consolidation.md` (fragment `#first-principles-refinement-the-deeper-target` was missing `-and-`; correct anchor is `#first-principles-refinement-and-the-deeper-target`).
+  Fixed in a separate `docs:` commit; re-run returned **WARN**.
+- 3 Biome `useTemplate` infos in `packages/pi-permission-system/` are informational only (marked unsafe fix, `biome check --write` skips them) and do not cause a non-zero lint exit.
+- The 3 "vacuously-passing" new observer tests (paired `tool_execution_end` removal, `message_start` reset, non-text_delta ignore) pass before the observer handles the events because the state starts in the default/empty state — they correctly verify absence-of-mutation and fully exercise the code path after the observer is implemented.
+- WARN finding: `package-pi-subagents` SKILL.md `Observation` domain row description ("Session-event stats") is now slightly incomplete for `record-observer` (it also accumulates live-activity fields).
+  Intentionally deferred per the planning-stage decision — no symbol removed, and the description will be updated in Step 2 ([#421]) when the observer's role is fully defined after the reader migration.
+- Pre-completion reviewer verdict: **WARN** (one non-blocking finding, deferred per retro).
+
+[#421]: https://github.com/gotgenes/pi-packages/issues/421
