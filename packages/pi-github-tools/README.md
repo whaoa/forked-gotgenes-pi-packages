@@ -91,7 +91,7 @@ Merge method precedence (highest to lowest):
 
 1. Explicit `method` parameter
 2. `defaultMergeMethod` from [configuration](#configuration)
-3. `"rebase"` (hardcoded fallback)
+3. `"merge"` (hardcoded fallback)
 
 Returns merge confirmation with new HEAD SHA, or a structured error if not mergeable.
 
@@ -145,9 +145,9 @@ Two locations are supported — project config takes precedence over global:
 
 ### Options
 
-| Key                  | Type                                  | Default    | Description                                   |
-| -------------------- | ------------------------------------- | ---------- | --------------------------------------------- |
-| `defaultMergeMethod` | `"rebase"` \| `"squash"` \| `"merge"` | `"rebase"` | Default merge strategy for `release_pr_merge` |
+| Key                  | Type                                  | Default   | Description                                   |
+| -------------------- | ------------------------------------- | --------- | --------------------------------------------- |
+| `defaultMergeMethod` | `"rebase"` \| `"squash"` \| `"merge"` | `"merge"` | Default merge strategy for `release_pr_merge` |
 
 ### Example
 
