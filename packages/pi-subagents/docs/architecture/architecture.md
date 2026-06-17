@@ -954,40 +954,40 @@ The deeper target in the [first-principles refinement](#first-principles-refinem
 Folding the live activity onto the record (the single owner of run state, consistent with Phase 17's `SubagentState`) removes the duplication without inventing the asynchronous-observation seam the `improvement-discovery` skill warns is essential, not structural.
 
 1. **Fold run metrics and live activity onto the core record (pure addition).**
-   Target: `lifecycle/subagent-state.ts`, `observation/record-observer.ts`, `lifecycle/subagent.ts`.
+   ([#420]) Target: `lifecycle/subagent-state.ts`, `observation/record-observer.ts`, `lifecycle/subagent.ts`.
    Extend the single owned run-state value object with `turnCount`, active tools, and response text; have the already-subscribed `record-observer` handle `turn_end`, `tool_execution_start`, `message_start`, `message_update`; expose read-only `turnCount`/`maxTurns`/`activeTools`/`responseText` getters on `Subagent`.
    `AgentActivityTracker` still exists; nothing reads the new getters yet (tidy-first).
    Smell: Category C. Outcome: `Subagent` is the single home for all run state; getters available for migration.
 2. **Migrate every activity reader to the record getters.**
-   Target: `ui/widget-renderer.ts`, `ui/conversation-viewer.ts`, `ui/agent-menu.ts`, `tools/foreground-runner.ts`, `observation/notification.ts`.
+   ([#421]) Target: `ui/widget-renderer.ts`, `ui/conversation-viewer.ts`, `ui/agent-menu.ts`, `tools/foreground-runner.ts`, `observation/notification.ts`.
    Switch each reader from `AgentActivityTracker` to the record getters added in Step 1 (widget-renderer reads activity off `listAgents()`; viewer/menu drop the `activity` param; notification reads `turnCount`/`maxTurns` off the record).
    Smell: Category C (Law of Demeter).
    Outcome: no consumer references `AgentActivityTracker`.
 3. **Delete `AgentActivityTracker` and `ui-observer`; drop the activity map from the runtime and spawn tools.**
-   Target: `ui/agent-activity-tracker.ts` (delete), `ui/ui-observer.ts` (delete), `runtime.ts`, `tools/foreground-runner.ts`, `tools/background-spawner.ts`.
+   ([#422]) Target: `ui/agent-activity-tracker.ts` (delete), `ui/ui-observer.ts` (delete), `runtime.ts`, `tools/foreground-runner.ts`, `tools/background-spawner.ts`.
    The spawn tools stop constructing trackers, subscribing, and populating maps; `SubagentRuntime.agentActivity` is removed.
    Smell: Category A + C. Outcome: −145 LOC, one session subscription per child, runtime holds zero UI state.
 4. **Make the widget self-drive from lifecycle events.**
-   Target: `ui/agent-widget.ts`, `lifecycle/subagent-manager.ts` (observer), `index.ts`.
+   ([#423]) Target: `ui/agent-widget.ts`, `lifecycle/subagent-manager.ts` (observer), `index.ts`.
    The widget starts/stops its timer in response to started/created/completed notifications instead of tool calls; spawn tools no longer call `ensureTimer`/`update`/`markFinished`.
    Smell: Category C (coupling direction).
    Outcome: the widget is a reactive consumer; no inbound calls from core spawn tools.
 5. **Drop the widget and activity-map dependencies from the `subagent` tool.**
-   Target: `tools/agent-tool.ts`, `test/helpers/make-deps.ts`.
+   ([#424]) Target: `tools/agent-tool.ts`, `test/helpers/make-deps.ts`.
    `AgentTool` loses its `widget` and `agentActivity` constructor params (UICtx capture stays in `ToolStartHandler`); `createToolDeps` sheds the widget and map stubs.
    Smell: Category C/D.
    Outcome: the LLM tool depends only on manager/runtime/settings/registry; fixture drops 2 fields.
 6. **Reconcile the public event contract.**
-   Target: `service/service.ts`, this document's lifecycle-events table.
+   ([#425]) Target: `service/service.ts`, this document's lifecycle-events table.
    Remove the vacant `ACTIVITY` channel (or emit a real broadcast for it) and add the emitted `failed`/`compacted`/`created` channels so declared constants match emitted events.
    Smell: Category A/E.
    Outcome: declared channels equal emitted channels; no vacant hook.
 7. **Consolidate residual test clone families.**
-   Target: `test/settings.test.ts` + `test/layered-settings.test.ts`, `test/lifecycle/create-subagent-session.test.ts`, `test/ui/agent-config-editor.test.ts`.
+   ([#426]) Target: `test/settings.test.ts` + `test/layered-settings.test.ts`, `test/lifecycle/create-subagent-session.test.ts`, `test/ui/agent-config-editor.test.ts`.
    Extract shared fixtures for the clone families fallow reports that the spine does not already rewrite.
    Smell: Category D. Outcome: test clone groups drop below 15.
 8. **Reconsider the UI direction (first-principles ADR).**
-   Target: `docs/decisions/`, `ui/`.
+   ([#427]) Target: `docs/decisions/`, `ui/`.
    The spine already made the UI _substitutable_; this step decides its _distribution_, not whether the experiment is possible.
    The goal is **substitutable, not optional**: a human needs some surface, but the specific UI is replaceable — the way Pi ships a default TUI built on the same public API any extension targets.
    The disentangled core stays byte-for-byte identical whether or not a given UI consumer is installed (the composition test), so a replacement UI is a downstream concern even though _some_ UI is not.
@@ -1006,14 +1006,14 @@ Folding the live activity onto the record (the single owner of run state, consis
 
 ```mermaid
 flowchart TB
-    S1["1 — Fold metrics + activity onto record"]
-    S2["2 — Migrate readers to record getters"]
-    S3["3 — Delete tracker + ui-observer, drop activity map"]
-    S4["4 — Widget self-drives on events"]
-    S5["5 — Drop widget dep from subagent tool"]
-    S6["6 — Reconcile public event contract"]
-    S7["7 — Consolidate test clone families"]
-    S8["8 — Reconsider UI direction (ADR)"]
+    S1["1 — Fold metrics + activity onto record (#420)"]
+    S2["2 — Migrate readers to record getters (#421)"]
+    S3["3 — Delete tracker + ui-observer, drop activity map (#422)"]
+    S4["4 — Widget self-drives on events (#423)"]
+    S5["5 — Drop widget dep from subagent tool (#424)"]
+    S6["6 — Reconcile public event contract (#425)"]
+    S7["7 — Consolidate test clone families (#426)"]
+    S8["8 — Reconsider UI direction, ADR (#427)"]
 
     S1 --> S2 --> S3 --> S4 --> S5 --> S8
     S6
@@ -1137,4 +1137,12 @@ The upstream test suite is run periodically as a regression canary for the sessi
 [#381]: https://github.com/gotgenes/pi-packages/issues/381
 [#412]: https://github.com/gotgenes/pi-packages/issues/412
 [#415]: https://github.com/gotgenes/pi-packages/issues/415
+[#420]: https://github.com/gotgenes/pi-packages/issues/420
+[#421]: https://github.com/gotgenes/pi-packages/issues/421
+[#422]: https://github.com/gotgenes/pi-packages/issues/422
+[#423]: https://github.com/gotgenes/pi-packages/issues/423
+[#424]: https://github.com/gotgenes/pi-packages/issues/424
+[#425]: https://github.com/gotgenes/pi-packages/issues/425
+[#426]: https://github.com/gotgenes/pi-packages/issues/426
+[#427]: https://github.com/gotgenes/pi-packages/issues/427
 [ADR-0002]: ../decisions/0002-extensions-on-a-minimal-core.md
