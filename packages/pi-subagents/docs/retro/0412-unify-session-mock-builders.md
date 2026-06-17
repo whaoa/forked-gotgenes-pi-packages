@@ -37,3 +37,44 @@ All deterministic gates green from repo root: `check`, `lint`, `test`, and `pnpm
 - Pre-completion reviewer: **WARN** (no FAILs).
   Reviewer warnings: (1) the `createMockSession` core docstring I added landed orphaned above `toAgentSession` rather than attached to `createMockSession` — fixed in a follow-up `refactor(test):` commit (`5999dcad`) by moving it directly above the declaration; (2) the TDD retro stage was not yet written when the reviewer ran — this entry resolves it.
 - Deviation: one extra cleanup commit beyond the planned two (the docstring-placement fix), landed as `refactor(test):` rather than amended because the `docs:` commit already sat on top of the refactor commit and neither was pushed.
+
+## Stage: Final Retrospective (2026-06-17T00:00:00Z)
+
+### Session summary
+
+Shipped issue #412 across three stages (planning, TDD, ship) in one continuous session with a single deviation: one extra `refactor(test):` cleanup commit for an orphaned docstring the pre-completion reviewer flagged.
+The whole arc was low-friction — the `ask_user` wrong-abstraction gate in planning, the `tsc --noEmit` feasibility probe, and incremental verification all paid off, and CI/release/close ran clean.
+No `pi-subagents` release bumped (a `refactor(test):` change), so only the unrelated `pi-github-tools-v4.1.5` doc release rode along in the release-please PR.
+
+### Observations
+
+#### What went well
+
+- The planning-stage `ask_user` gate did real work: it surfaced the wrong-abstraction risk the issue itself flagged and let the operator pick targeted reuse (B) over the issue's literal composable-factory proposal (A).
+  This is the `ask_user` skill behaving exactly as the `Decide` gate intends for an operator-authored issue.
+- The `tsc --noEmit` throwaway probe in planning (does spreading `...createMockSession()` preserve `Mock<...>` typing?) de-risked the one feasibility unknown before any commit, so the TDD green step landed on the first try with no annotation gymnastics.
+- Verification cadence was incremental, not end-loaded: `pnpm run check` ran right after the TDD green step, the full suite after both steps, then `lint`/`fallow` before push.
+  No feedback-loop gap.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the plan called for a docstring touch-up on `createMockSession`, but the existing `createMockSession` docstring block in `mock-session.ts` was *already orphaned* (sitting above `toAgentSession`, not its own declaration).
+  I enriched the orphaned block instead of noticing it wasn't attached to the symbol it documents.
+  Impact: one extra `refactor(test):` commit (`5999dcad`) to move the block; caught by the pre-completion reviewer, so no escaped defect — reviewer-caught, not user-caught.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's only mid-session input was the planning `ask_user` answer (direction B, working-bus core default), which was strategic judgment, not mechanical oversight.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the one subagent dispatch (`pre-completion-reviewer`) ran on `anthropic/claude-sonnet-4-6`, appropriate for judgment-heavy review; it found a genuine issue (the orphaned docstring), so no quality mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; no error sequence exceeded one tool call.
+- **Unused-tool detection** — no missing-context gap that an Explore/`colgrep` dispatch would have closed; planning already used `grep`/`colgrep` and a `tsc` probe.
+- **Feedback-loop gap analysis** — verification ran incrementally (see "What went well"); no end-loaded check.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-subagents/docs/retro/0412-unify-session-mock-builders.md`.
+   No `AGENTS.md` or `.pi/prompts/` changes — the single friction point was a one-off slip the pre-completion reviewer already caught (weak evidence for a new rule).
