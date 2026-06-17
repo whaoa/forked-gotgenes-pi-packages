@@ -959,7 +959,7 @@ Folding the live activity onto the record (the single owner of run state, consis
    `AgentActivityTracker` still exists; nothing reads the new getters yet (tidy-first).
    Smell: Category C. Outcome: `Subagent` is the single home for all run state; getters available for migration.
    Landed: `SubagentState` owns `turnCount`/`activeTools`/`responseText` plus their transition methods; `record-observer` populates them on a single subscription; `Subagent` exposes the four read-only getters; +27 tests (1031 → 1058).
-2. **Migrate every activity reader to the record getters.**
+2. **✅ Migrate every activity reader to the record getters — complete.**
    ([#421]) Target: `ui/widget-renderer.ts`, `ui/conversation-viewer.ts`, `ui/agent-menu.ts`, `tools/foreground-runner.ts`, `observation/notification.ts`.
    Switch each reader from `AgentActivityTracker` to the record getters added in Step 1 (widget-renderer reads activity off `listAgents()`; viewer/menu drop the `activity` param; notification reads `turnCount`/`maxTurns` off the record).
    Smell: Category C (Law of Demeter).
@@ -1009,7 +1009,7 @@ Folding the live activity onto the record (the single owner of run state, consis
 ```mermaid
 flowchart TB
     S1["1 — Fold metrics + activity onto record (#420) ✅"]
-    S2["2 — Migrate readers to record getters (#421)"]
+    S2["2 — Migrate readers to record getters (#421) ✅"]
     S3["3 — Delete tracker + ui-observer, drop activity map (#422)"]
     S4["4 — Widget self-drives on events (#423)"]
     S5["5 — Drop widget dep from subagent tool (#424)"]
