@@ -31,3 +31,19 @@ The plan corrects the path via a new `getProjectAgentsDir(cwd)` helper in `confi
   Short-term fix is unchanged.
 - Recorded the settled part of this framing in `docs/architecture/architecture.md` at the operator's request: a new design principle 9 ("Single-agent core, multi-agent by extension") plus a framing note annotating the `Agent frontmatter` (`AF`) input in the architecture-overview diagram.
   The forward-looking generic-channel evolution stays in the plan's Open Questions, not the architecture doc.
+
+## Stage: Implementation — TDD (2026-06-17T14:15:00Z)
+
+### Session summary
+
+Completed both TDD steps from the plan in one session.
+Added `getProjectAgentsDir(cwd)` to `src/config-paths.ts`, wired it into `derivePolicyLoaderOptions`, and covered it with a unit test plus two regression tests (path-level and behavior-level).
+Test count went from 2015 to 2018 (+3).
+
+### Observations
+
+- No deviations from the plan; the one-line fix plus helper extraction went exactly as planned.
+- The pre-completion reviewer returned **WARN** (not FAIL) with two stale path references not covered by the plan: `docs/troubleshooting.md:31` (sample `config.resolved` log) and `docs/decisions/0001-project-trust-adoption.md:30` (code comment in ADR-0001).
+  Both were fixed in an additional `docs:` commit before writing these notes.
+- After the WARN fixes, all checks are clean: `pnpm run check`, `pnpm run lint`, `pnpm run test` (2018 pass), `pnpm fallow dead-code` all pass.
+- Pre-completion reviewer verdict: **WARN → resolved** (both stale-path findings addressed; effectively PASS at ship time).
