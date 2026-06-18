@@ -166,18 +166,6 @@ describe("AgentTool — background execution", () => {
 		expect(result.content[0].text).toContain("background");
 	});
 
-	it("registers activity in agentActivity map", async () => {
-		const deps = createToolDeps();
-		deps.manager.getRecord = vi.fn().mockReturnValue(createTestSubagent({ status: "running" }));
-		await execute(deps, {
-			prompt: "do something",
-			description: "bg task",
-			subagent_type: "general-purpose",
-			run_in_background: true,
-		});
-		expect(deps.runtime.agentActivity.get("agent-1")).toBeDefined();
-	});
-
 	it("passes parentSession.toolCallId to manager.spawn so the manager wires NotificationState", async () => {
 		const deps = createToolDeps();
 		deps.manager.getRecord = vi.fn().mockReturnValue(createTestSubagent({ status: "running" }));

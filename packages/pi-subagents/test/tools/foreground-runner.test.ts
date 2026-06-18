@@ -16,8 +16,8 @@ function makeParams(overrides: Partial<ForegroundParams> = {}): ForegroundParams
 }
 
 /**
- * A `spawnAndWait` mock that registers the spawned record via
- * `observer.onSessionCreated` — the activity-map registration path.
+ * A `spawnAndWait` mock that binds the spawned record via
+ * `observer.onSessionCreated` — the recordRef/widget-binding path.
  */
 function spawnAndWaitRegistering(record = createTestSubagent({ result: "done" })) {
 	record.subagentSession = toSubagentSession(createSubagentSessionStub(createMockSession()));
@@ -39,8 +39,8 @@ describe("runForeground", () => {
 	});
 
 	it("returns completion message with tool use count on success", async () => {
-		const { manager, runtime, widget } = createToolDeps();
-		const result = await runForeground(manager, widget, runtime.agentActivity, makeParams(), undefined, undefined);
+		const { manager, widget } = createToolDeps();
+		const result = await runForeground(manager, widget, makeParams(), undefined, undefined);
 		expect(result.content[0].text).toContain("Agent completed");
 		expect(result.content[0].text).toContain("3 tool uses");
 		expect(result.content[0].text).toContain("All done.");
@@ -55,7 +55,7 @@ describe("runForeground", () => {
 				),
 			},
 		});
-		const result = await runForeground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams(), undefined, undefined);
+		const result = await runForeground(deps.manager, deps.widget, makeParams(), undefined, undefined);
 		expect(result.content[0].text).toContain("Agent failed");
 		expect(result.content[0].text).toContain("Context window exceeded");
 	});
@@ -67,16 +67,15 @@ describe("runForeground", () => {
 				spawnAndWait: vi.fn().mockRejectedValue(new Error("runner crashed")),
 			},
 		});
-		const result = await runForeground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams(), undefined, undefined);
+		const result = await runForeground(deps.manager, deps.widget, makeParams(), undefined, undefined);
 		expect(result.content[0].text).toContain("runner crashed");
 	});
 
 	it("includes fallback note when fellBack is true", async () => {
-		const { manager, runtime, widget } = createToolDeps();
+		const { manager, widget } = createToolDeps();
 		const result = await runForeground(
 			manager,
 			widget,
-			runtime.agentActivity,
 			makeParams({
 				config: createResolvedSpawnConfig({ rawType: "unknown-type", fellBack: true, description: "fg task" }),
 			}),
@@ -87,7 +86,7 @@ describe("runForeground", () => {
 	});
 
 	it("calls runtime.ensureTimer and runtime.markFinished after completion", async () => {
-		// spawnAndWait invokes observer.onSessionCreated to register the agent in activity map
+		// spawnAndWait invokes observer.onSessionCreated to bind the record and widget
 		const deps = createToolDeps({
 			manager: {
 				...createToolDeps().manager,
@@ -95,22 +94,9 @@ describe("runForeground", () => {
 			},
 		});
 		const signal = new AbortController().signal;
-		await runForeground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams(), signal, undefined);
+		await runForeground(deps.manager, deps.widget, makeParams(), signal, undefined);
 		expect(deps.widget.ensureTimer).toHaveBeenCalled();
 		expect(deps.widget.markFinished).toHaveBeenCalled();
-	});
-
-	it("registers activity tracker in agentActivity on session creation", async () => {
-		const deps = createToolDeps({
-			manager: {
-				...createToolDeps().manager,
-				spawnAndWait: spawnAndWaitRegistering(),
-			},
-		});
-		await runForeground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams(), undefined, undefined);
-		// Activity is registered during observer.onSessionCreated and removed on cleanup —
-		// markFinished is the evidence that the id was tracked and cleaned up.
-		expect(deps.widget.markFinished).toHaveBeenCalledOnce();
 	});
 
 	it("calls onUpdate with streaming details while running", async () => {
@@ -123,7 +109,7 @@ describe("runForeground", () => {
 			},
 		});
 		const onUpdate = vi.fn();
-		const runPromise = runForeground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams(), undefined, onUpdate);
+		const runPromise = runForeground(deps.manager, deps.widget, makeParams(), undefined, onUpdate);
 
 		// Advance timer to trigger a spinner tick
 		await vi.advanceTimersByTimeAsync(100);
@@ -141,7 +127,7 @@ describe("runForeground", () => {
 			},
 		});
 		const onUpdate = vi.fn();
-		await runForeground(deps.manager, deps.widget, deps.runtime.agentActivity, makeParams(), undefined, onUpdate);
+		await runForeground(deps.manager, deps.widget, makeParams(), undefined, onUpdate);
 
 		onUpdate.mockClear();
 		await vi.advanceTimersByTimeAsync(200);

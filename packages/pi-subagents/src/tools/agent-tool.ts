@@ -141,7 +141,6 @@ export class AgentTool {
 			return spawnBackground(
 				this.manager,
 				this.widget,
-				this.runtime.agentActivity,
 				{ config, snapshot, parentSession, settings: this.settings },
 			);
 		}
@@ -150,7 +149,6 @@ export class AgentTool {
 		return runForeground(
 			this.manager,
 			this.widget,
-			this.runtime.agentActivity,
 			{ config, snapshot, parentSession },
 			signal,
 			onUpdate,
