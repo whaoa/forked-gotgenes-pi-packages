@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadLayeredSettings } from "#src/layered-settings";
+import { captureWarn } from "#test/helpers/capture-warn";
+import { createSettingsDirs, type SettingsDirs } from "#test/helpers/tmp-settings-dirs";
 
 interface TestConfig {
   name?: string;
@@ -19,32 +20,24 @@ function sanitize(raw: unknown): Partial<TestConfig> {
 }
 
 describe("loadLayeredSettings", () => {
-  let agentDir: string;
-  let cwd: string;
-
   const FILENAME = "test-settings.json";
 
-  const globalFile = () => join(agentDir, FILENAME);
-  const projectFile = () => join(cwd, ".pi", FILENAME);
+  let dirs: SettingsDirs;
+  let agentDir: string;
+  let cwd: string;
+  let globalFile: () => string;
+  let projectFile: () => string;
+  let writeGlobal: (obj: unknown) => void;
+  let writeProject: (obj: unknown) => void;
 
   beforeEach(() => {
-    agentDir = mkdtempSync(join(tmpdir(), "pi-layered-global-"));
-    cwd = mkdtempSync(join(tmpdir(), "pi-layered-project-"));
+    dirs = createSettingsDirs(FILENAME);
+    ({ globalDir: agentDir, projectDir: cwd, globalFile, projectFile, writeGlobal, writeProject } = dirs);
   });
 
   afterEach(() => {
-    rmSync(agentDir, { recursive: true, force: true });
-    rmSync(cwd, { recursive: true, force: true });
+    dirs.dispose();
   });
-
-  function writeGlobal(obj: unknown) {
-    writeFileSync(globalFile(), JSON.stringify(obj));
-  }
-
-  function writeProject(obj: unknown) {
-    mkdirSync(join(cwd, ".pi"), { recursive: true });
-    writeFileSync(projectFile(), JSON.stringify(obj));
-  }
 
   function load() {
     return loadLayeredSettings<TestConfig>({ agentDir, cwd, filename: FILENAME, sanitize, warnLabel: "test-pkg" });
@@ -56,13 +49,7 @@ describe("loadLayeredSettings", () => {
     });
 
     it("does not warn when files are simply missing", () => {
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      try {
-        load();
-        expect(spy).not.toHaveBeenCalled();
-      } finally {
-        spy.mockRestore();
-      }
+      expect(captureWarn(() => load())).toEqual([]);
     });
   });
 
@@ -119,64 +106,49 @@ describe("loadLayeredSettings", () => {
   });
 
   describe("malformed files", () => {
-    it("returns {} and warns when global file is malformed JSON", () => {
-      writeFileSync(globalFile(), "not valid {{{{");
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      try {
+    it.each([
+      { layer: "global", writeMalformed: () => writeFileSync(globalFile(), "not valid {{{{") },
+      {
+        layer: "project",
+        writeMalformed: () => {
+          mkdirSync(join(cwd, ".pi"), { recursive: true });
+          writeFileSync(projectFile(), "also invalid {{{");
+        },
+      },
+    ])("returns {} and warns when the $layer file is malformed JSON", ({ writeMalformed }) => {
+      writeMalformed();
+      const warnings = captureWarn(() => {
         expect(load()).toEqual({});
-        expect(spy).toHaveBeenCalledTimes(1);
-        expect(String(spy.mock.calls[0][0])).toMatch(/\[test-pkg\]/);
-        expect(String(spy.mock.calls[0][0])).toMatch(/Ignoring malformed settings/);
-      } finally {
-        spy.mockRestore();
-      }
-    });
-
-    it("returns {} and warns when project file is malformed JSON", () => {
-      mkdirSync(join(cwd, ".pi"), { recursive: true });
-      writeFileSync(projectFile(), "also invalid {{{");
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      try {
-        expect(load()).toEqual({});
-        expect(spy).toHaveBeenCalledTimes(1);
-        expect(String(spy.mock.calls[0][0])).toMatch(/\[test-pkg\]/);
-        expect(String(spy.mock.calls[0][0])).toMatch(/Ignoring malformed settings/);
-      } finally {
-        spy.mockRestore();
-      }
+      });
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toMatch(/\[test-pkg\]/);
+      expect(warnings[0]).toMatch(/Ignoring malformed settings/);
     });
 
     it("warns once per bad file (two malformed files → two warnings)", () => {
       writeFileSync(globalFile(), "bad1");
       mkdirSync(join(cwd, ".pi"), { recursive: true });
       writeFileSync(projectFile(), "bad2");
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      try {
+      const warnings = captureWarn(() => {
         expect(load()).toEqual({});
-        expect(spy).toHaveBeenCalledTimes(2);
-      } finally {
-        spy.mockRestore();
-      }
+      });
+      expect(warnings).toHaveLength(2);
     });
 
     it("uses global when project file is malformed (global is valid)", () => {
       writeGlobal({ name: "global" });
       mkdirSync(join(cwd, ".pi"), { recursive: true });
       writeFileSync(projectFile(), "invalid");
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      try {
+      captureWarn(() => {
         expect(load()).toEqual({ name: "global" });
-      } finally {
-        spy.mockRestore();
-      }
+      });
     });
   });
 
   describe("warnLabel used in warning message", () => {
     it("includes warnLabel in the warning prefix", () => {
       writeFileSync(globalFile(), "bad");
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      try {
+      const warnings = captureWarn(() => {
         loadLayeredSettings<TestConfig>({
           agentDir,
           cwd,
@@ -184,11 +156,9 @@ describe("loadLayeredSettings", () => {
           sanitize,
           warnLabel: "my-custom-pkg",
         });
-        expect(spy).toHaveBeenCalledTimes(1);
-        expect(String(spy.mock.calls[0][0])).toMatch(/\[my-custom-pkg\]/);
-      } finally {
-        spy.mockRestore();
-      }
+      });
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toMatch(/\[my-custom-pkg\]/);
     });
   });
 });
