@@ -42,7 +42,7 @@ describe("spawnBackground", () => {
   });
 
   it("returns text result with agent ID and description", () => {
-    const { manager, runtime, widget } = createToolDeps();
+    const { manager, widget } = createToolDeps();
     const result = spawnBackground(
       manager,
       widget,
