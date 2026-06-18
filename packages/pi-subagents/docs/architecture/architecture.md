@@ -990,10 +990,11 @@ Folding the live activity onto the record (the single owner of run state, consis
    Smell: Category A/E.
    Outcome: declared channels equal emitted channels; no vacant hook.
    Landed: removed `SUBAGENT_EVENTS.ACTIVITY` (breaking) and added `FAILED`/`COMPACTED`/`CREATED`/`STEERED` — `subagents:steered` (from `steer-tool.ts`) was also emitted-but-undeclared, so all four emitted agent-lifecycle channels are now declared; corrected the stale `subagents:completed` payload in the lifecycle-events table to the real `buildEventData` shape; +1 test (1037 → 1038).
-7. **Consolidate residual test clone families.**
+7. **✅ Consolidate residual test clone families — complete.**
    ([#426]) Target: `test/settings.test.ts` + `test/layered-settings.test.ts`, `test/lifecycle/create-subagent-session.test.ts`, `test/ui/agent-config-editor.test.ts`.
    Extract shared fixtures for the clone families fallow reports that the spine does not already rewrite.
    Smell: Category D. Outcome: test clone groups drop below 15.
+   Landed: extracted `test/helpers/tmp-settings-dirs.ts` (global+project tmp-dir fixture) and `test/helpers/capture-warn.ts` (a `console.warn` capture helper), each with a paired self-test; table-drove the `create-subagent-session` post-bind membership cases and the `agent-config-editor` menu + confirm-remove cases into `it.each`; pi-subagents test clone groups dropped from 24 to 14 (below the <15 target); +9 tests (1038 → 1047).
 8. **Reconsider the UI direction (first-principles ADR).**
    ([#427]) Target: `docs/decisions/`, `ui/`.
    The spine already made the UI _substitutable_; this step decides its _distribution_, not whether the experiment is possible.
@@ -1020,7 +1021,7 @@ flowchart TB
     S4["4 — Widget self-drives on events (#423) ✅"]
     S5["5 — Drop widget dep from subagent tool (#424) ✅"]
     S6["6 — Reconcile public event contract (#425) ✅"]
-    S7["7 — Consolidate test clone families (#426)"]
+    S7["7 — Consolidate test clone families (#426) ✅"]
     S8["8 — Reconsider UI direction, ADR (#427)"]
 
     S1 --> S2 --> S3 --> S4 --> S5 --> S8
