@@ -15,9 +15,9 @@ A decision presented early from the plan is far less likely to be reversed than 
 
 1. Locate the plan for this issue: `grep -rl "^issue: $1$" docs/plans packages/*/docs/plans`.
 2. If a plan is found, read its `**Release:**` marker (written by `/plan-issue`):
-   - `mid-batch — defer` → ask the operator **now**: defer the release (batch until the sequence completes), or release anyway?
+   - A marker containing `mid-batch — defer` → ask the operator **now**: defer the release (batch until the sequence completes), or release anyway?
      Record the decision.
-   - `ship independently` or `ship now — batch tail` → record "release now"; note the recommendation in the final report; do **not** ask.
+   - Any other `**Release:**` value (`ship independently` or `ship now — batch "<name>" tail`) → record "release now"; note the recommendation in the final report; do **not** ask.
    - No `**Release:**` marker → record "release now" (default); do **not** ask.
 3. If no plan file is found → record "release now" (default); do **not** ask.
 

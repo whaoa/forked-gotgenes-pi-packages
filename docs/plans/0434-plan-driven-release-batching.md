@@ -25,7 +25,7 @@ The fix threads a structured release-batch concept through three surfaces so the
 
 - Define a grep-able, machine-readable vocabulary for release batches in architecture-doc roadmaps: a per-step `Release:` tag plus a `Release batches` subsection.
 - Teach the architecture-authoring surfaces (`improvement-discovery` skill and `/plan-improvements`) to emit those annotations when drafting a phase's steps.
-- Teach `/plan-issue` to read a phase's batch annotations, locate the current issue's step, and write a prominent `Release Recommendation` section into the plan — one of `ship independently`, `ship now (batch tail)`, or `mid-batch — defer`.
+- Teach `/plan-issue` to read a phase's batch annotations, locate the current issue's step, and write a prominent `Release Recommendation` section into the plan — one of `ship independently`, `ship now — batch tail`, or `mid-batch — defer`.
 - Replace `/ship-issue` step 4b's phrase-matching heuristic with a deterministic read of the plan's `Release Recommendation`, evaluated **early** (before `git pull`/push/CI), that asks the operator **only** when the recommendation is `mid-batch — defer`.
 - Preserve backward compatibility: plans with no `Release Recommendation` default to releasing now with no question; steps with no `Release:` tag default to `ship independently`.
 
