@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [14.0.1](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v14.0.0...pi-permission-system-v14.0.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* **pi-permission-system:** strip shell comment lines from bash commands before matching ([d045591](https://github.com/gotgenes/pi-packages/commit/d0455915d6d4ce50534884639e516a9e1ef38976))
+
 ## [14.0.0](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v13.2.0...pi-permission-system-v14.0.0) (2026-06-17)
 
 
