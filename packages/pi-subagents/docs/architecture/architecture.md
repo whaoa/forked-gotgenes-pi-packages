@@ -13,8 +13,8 @@ This document describes the architecture of the pi-subagents fork: a focused, co
 4. **No time-based scheduling** — cron-style timed dispatch (upstream's `schedule.ts` subsystem) is removed from the core (#52).
    Timed dispatch is a separate concern that any extension can implement by calling `spawn()` on the published API.
    The max-concurrent admission gate is not scheduling in this sense — concurrency management stays in core.
-5. **UI extraction is deferred** — the widget, conversation viewer, and `/agents` command menu stay in the core for now.
-   They are the first candidate for extraction once the API boundary is proven stable.
+5. **UI is an in-core, substitutable consumer** — [ADR-0004](../decisions/0004-reconsider-ui-direction.md) records the per-component decision: the widget shrinks to background agents only, the bespoke conversation viewer is replaced by native session navigation, the `/agents` command is dissolved into focused surfaces, and the surviving UI stays in the core as a reactive consumer (not extracted to a separate package).
+   Extraction remains an available future option because the composition invariant holds — the core is byte-for-byte identical with or without a given UI consumer.
 6. **Snapshot, don't capture** — mutable parent state (ctx, session, model) is read once at spawn time and frozen into a `ParentSnapshot` data object.
    No live references survive past the spawn call.
 7. **Subscribe, don't thread** — observation of agent progress uses direct session-event subscription, not callback parameters threaded through multiple layers.
