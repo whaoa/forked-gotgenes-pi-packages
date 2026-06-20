@@ -28,4 +28,26 @@ The decision survived two `ask_user` rounds: the first chose "retire the sanitiz
 - **Doc nuance:** `docs/architecture/v3-architecture.md` is a superseded design-era snapshot and is intentionally left unupdated; the live `architecture.md` module listing and `docs/configuration.md` hook wording are updated.
   The Phase-5 history line in `architecture.md` mentioning `CacheKeyGate` is past-tense record and stays.
 
+## Stage: Implementation — TDD (2026-06-19T21:00:00Z)
+
+### Session summary
+
+Executed all three planned TDD cycles: (1) `refactor:` dropped the memoization gates (`activeToolsGate`/`promptStateGate`/`CacheKeyGate`/`before-agent-start-cache`) and made `AgentPrepHandler` recompute and return the override every turn; (2) `fix!:` rewrote `sanitizeAvailableToolsSection` to narrow the `Available tools:` section per-bullet instead of deleting it; (3) `docs:` updated `configuration.md`, `architecture.md`, and the package `SKILL.md`.
+Test count went 2033 → 2029 (net `-4`: removed the gate/cache test files and gate-reset assertions, added narrowing, per-turn skill-filter, and byte-stability regressions).
+`check`, root `lint`, full `test`, and `fallow dead-code` all green; pre-completion reviewer returned PASS.
+
+### Observations
+
+- **Documented deviation — `getPolicyCacheStamp` removal.**
+  The removed prompt-state cache key was the sole production consumer of `getPolicyCacheStamp`, so the now-dead public method was removed from `PermissionResolver` and `ScopedPermissionManager` (the manager's internal policy cache uses `loader.getCacheStamp` directly, untouched).
+  Folded into the Step-1 `refactor:` commit with a note; touched `permission-resolver.ts`, `permission-manager.ts`, and their tests/fixtures beyond the plan's listed files.
+  `fallow dead-code` confirmed no orphans.
+- **`extractToolBulletName` accepts colon-optional bullets** (`/^\s*-\s+([A-Za-z0-9_-]+)/`) so both the real Pi format (`- read: …`) and the test helper format (`- read`) classify correctly; non-bullet boilerplate returns `null` and is always kept.
+- **Byte-stability is asserted two ways**: at the sanitizer level (`narrow(full).prompt === narrow(narrowed).prompt` and `narrow(narrowed) === narrowed`) and at the handler level (effective wire prompt identical across the turn-1 full / turn-2 narrowed drift).
+  Both stayed green through Step 2, confirming the cache invariant holds.
+- **Edit-tool friction**: removing the `getPolicyCacheStamp` describe block left an orphaned `})`; the autoformatter surfaced the parse error immediately and a one-line tail fix resolved it.
+  No shipped defect.
+- **Pre-completion reviewer: PASS** (no WARN).
+  Confirmed the Step-2 narrowing does not regress Step-1's per-turn skill-filter invariant (pinned by the `filters a denied skill ... on every turn` test) nor the #385 restrict-only invariant.
+
 [#437]: https://github.com/gotgenes/pi-packages/issues/437
