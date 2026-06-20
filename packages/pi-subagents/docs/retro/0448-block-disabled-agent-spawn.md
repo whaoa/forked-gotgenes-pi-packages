@@ -40,3 +40,36 @@ Test count delta: 1047 → 1051 (+4).
 - The `makeAgentConfig` helper was added to `test/tools/spawn-config.test.ts` (mirroring the pattern in `test/config/agent-types.test.ts`) rather than importing from a shared fixture, since the existing spawn-config test fixture infrastructure didn't need modification.
 - All three plan-enumerated cross-step invariants held green throughout: `resolveAgentConfig` disabled-config behavior, unknown-type fallback, and `getAllTypes` disabled-agent listing.
 - Pre-completion reviewer: **PASS** — all deterministic checks, code design, test artifacts, and cross-step invariants clean.
+
+## Stage: Land — worktree (2026-06-20T17:57:54Z)
+
+### Session summary
+
+Ran `/land-worktree 448` from the root checkout: fast-forward merged the peer branch `issue-448-enabled-false-does-not-prevent-explicitl` onto linear `main`, pushed, verified CI green, closed issue #448, merged the release-please PR, and tore down the worktree.
+Released `pi-subagents-v17.0.1` (the plan marked `Release: ship independently`).
+
+### Observations
+
+#### What went well
+
+- The new `/land-worktree` flow (added in `7cbfea46`) ran cleanly end-to-end on a real issue: ff-merge → push → CI → `issue_close` → release → teardown, with no blockers or rework.
+- The release-please PR returned `MERGEABLE` / `UNSTABLE` with an empty `statusCheckRollup` — the documented `GITHUB_TOKEN` no-checks case.
+  Falling back from `release_pr_merge` to `gh pr merge 449 --rebase` followed by `git pull --ff-only` worked exactly as the prompt anticipates.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (self-identified, in retro) — the prompt's step 6.2 says to check the **full** release-PR body for which packages it bumps **before** merging.
+  I requested `body` in `gh pr view 449 --json body,...` but the `--jq` filter only printed `title`/`state`/`mergeStateStatus`/`statusCheckRollup`, so the body was never actually inspected.
+  I learned the bumped package (`pi-subagents`) only **after** merging, from the `git pull` output.
+  Impact: none this time (a single expected package bumped), but skipping the pre-merge body check means an unexpected sibling-package bump would slip through unnoticed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — no subagents dispatched; the land flow ran entirely on the parent session model.
+  No mismatch.
+- **Escalation-delay tracking** — no rabbit-holes; no error retried more than once.
+- **Feedback-loop gap analysis** — no code changes in the land session, so CI (run on the pushed SHA, conclusion `success`) was the appropriate and only verification gate.
+
+### Changes made
+
+1. `.pi/prompts/land-worktree.md` — added a one-line nudge to step 6.2 to print the release-PR body explicitly with `gh pr view <N> --json body -q .body`, since a `--jq` that drops `body` skips the package-bump check silently.
