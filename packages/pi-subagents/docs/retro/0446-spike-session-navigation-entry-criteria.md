@@ -44,3 +44,56 @@ Four `docs:` commits; pre-completion reviewer returned WARN, whose findings were
 - **Pre-completion reviewer: WARN** (no FAILs) — three architecture.md staleness findings, all addressed in the final `docs:` commit (`74e2374f`).
   No `src/`/`test/` changes; `pnpm run check` + `pnpm run lint` + `pnpm fallow dead-code` all green at baseline and after.
 - Release recommendation unchanged: **ship independently** (`Release: independent`).
+
+## Stage: Final Retrospective (2026-06-20T18:00:00Z)
+
+### Session summary
+
+Planned, built, and shipped the Phase 19 Step 1 spike across three workflow stages, producing the ADR-0004 addendum that answers all four session-navigation entry criteria and unblocks #445.
+The spike did its job — it rejected ADR-0004's literally-named `loadEntriesFromFile` mechanism before Step 4 coded against it — but the build stage committed an incorrect "types/runtime mismatch" characterization that took two user questions and a correction commit to fix.
+Eight `docs:` commits landed; no release (all `docs:`, auto-batched).
+
+### Observations
+
+#### What went well
+
+- **The spike paid for itself, then over-delivered.**
+  It caught that ADR-0004's named candidate (`loadEntriesFromFile`) is not in the SDK's public surface — a finding about the *implementation*, not the harness — before Step 4 started.
+  The operator's three follow-up questions (upgrade?
+  describe-the-mismatch?
+  spike-vs-implementation impact?) then drove the addendum from a thin "use `parseSessionEntries`" note into a complete, link-backed render pipeline (Finding 1: `parseSessionEntries` → `buildSessionContext` → Pi's public entry components / `serializeConversation`).
+  Step 4 now starts from a verified, public-API-only design.
+- **Clean, non-defensive self-correction.**
+  When the operator asked me to substantiate the claim with links (turn 74), running the actual `tsc` probe surfaced my own error; I corrected all three artifacts (addendum, `architecture.md`, retro) in commit `112c4254` without hedging.
+  "Ask the agent to cite/substantiate a claim" proved a high-leverage verification gesture.
+
+#### What caused friction (agent side)
+
+- `wrong-abstraction` (compounded by `missing-context`) — I diagnosed a question about the SDK's *export surface* from a *runtime* symptom.
+  The throwaway vitest harness threw `loadEntriesFromFile is not a function`, and I leapt to the dramatic reading ("declared in `.d.ts` but absent at runtime — a types/runtime mismatch") instead of running `tsc`, which disambiguates instantly (`TS2305: has no exported member`).
+  The symbol is simply not in the public barrel — types and runtime agree.
+  Impact: an incorrect technical claim shipped into three committed artifacts (addendum `7c505b78`, `architecture.md`, the build retro note) and required a 3-file correction commit (`112c4254`) plus two operator questions to surface and fix.
+- `instruction-violation` (user-caught) — the `testing` skill already states "Vitest uses esbuild and does not typecheck; run `pnpm run check`."
+  I never ran `tsc` against the harness or the export claim during the build.
+  Two reasons it slipped: (1) the skill was not loaded — `/build-plan` only loads `testing` "if the plan involves test changes or TDD steps," and a docs-only spike using a throwaway harness does not obviously match; (2) the existing rule is framed for "type-only changes," not for *claims/findings about what a module exports*, so it would not clearly have fired even if loaded.
+- `other` (tooling friction, minor) — getting the `tsc` probe to resolve the package took four attempts (turns 77–80: `npx` blocked → `pnpm exec` → files-on-cmdline tsconfig error → probe-inside-package).
+  Impact: added friction, no rework; not a conceptual rabbit-hole.
+
+#### What caused friction (user side)
+
+- None material — the operator's three interventions were strategic probes (dependency-freshness, claim substantiation, spike-vs-implementation scope) that each improved the artifact.
+  The only "earlier" opportunity is an agent-side gap: I should have self-applied the `tsc` check so the operator did not need to ask "describe the mismatch" to trigger verification.
+
+### Diagnostic details
+
+- **Model-performance correlation** — Planning + Build + the correction work all ran on `anthropic/claude-opus-4-8` (turns 2–104); the mischaracterization therefore occurred on the *strong* model, so the fix is process (run `tsc` on export claims), not model selection.
+  The Ship stage (turns 106–122) ran on `opencode-go/deepseek-v4-flash` — appropriate cost-matching for a mechanical git/CI/close procedure, which it executed cleanly.
+  A transient `anthropic/claude-sonnet-4-6` `model_change` carried no assistant turn (never ran).
+- **Escalation-delay tracking** — no rabbit-hole exceeded five consecutive tool calls on one error; the runtime `is not a function` was resolved in ~2 calls (the issue was the *interpretation*, not a stuck loop).
+- **Unused-tool detection** — for the mischaracterization, `tsc` / `pnpm run check` was available and routine but applied only at baseline (turn 29) and not again until the operator forced it (turns 77–80); it was never run against the harness or the claim.
+- **Feedback-loop gap analysis** — `pnpm run lint` ran after every doc edit (good incremental hygiene), but the *type-check* loop was skipped for precisely the finding that needed it — the harness ran under vitest (no typecheck) and `tsc` was not run on the export claim before committing it.
+
+### Changes made
+
+1. Extended the `testing` skill's `## Type checking` section to cover verifying claims about module exports with `tsc`, not runtime symptoms — `Refs #446`.
+   File: `.pi/skills/testing/SKILL.md`.

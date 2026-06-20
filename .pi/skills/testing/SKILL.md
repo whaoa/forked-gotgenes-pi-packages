@@ -73,6 +73,8 @@ Do not wrap the system-under-test call in a helper to eliminate a duplication-me
 
 Vitest uses esbuild and does not typecheck.
 Run `pnpm run check` (`tsc --noEmit`) for type-only changes.
+Confirm any claim about what a module exports with `tsc`, not a runtime symptom.
+A missing export throws `is not a function` at runtime but surfaces as `TS2305` under `tsc` (e.g. #446, a runtime error misread as a types/runtime mismatch).
 
 ## Running tests
 
