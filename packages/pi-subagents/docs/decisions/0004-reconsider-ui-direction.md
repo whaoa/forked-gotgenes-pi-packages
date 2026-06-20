@@ -126,3 +126,64 @@ The following are open and must be resolved by a Phase 19 spike before committin
   Confirm the final command name/namespace for the extracted settings surface (`/subagents:settings` vs another form) against how sibling packages register namespaced commands.
 
 The agent create/edit surfaces are **not** open questions: both are removed (Decision C).
+
+## Addendum (2026-06-20): Phase 19 entry-criteria answers ([#446])
+
+The Phase 19 Step 1 spike ([#446]) resolved all four entry criteria.
+Evidence comes from the bundled `@earendil-works/pi-coding-agent` SDK surface (`packages/pi-subagents/node_modules/@earendil-works/pi-coding-agent/dist`) and a throwaway vitest harness run against a **real child session JSONL** (a 43-entry subagent session: 1 `session` header carrying a `parentSession` backref, 1 `model_change`, 1 `thinking_level_change`, 40 `message` entries).
+The harness was discarded after observation; no production source changed.
+
+### Finding 0 — `loadEntriesFromFile` is not exported at runtime
+
+The original "Relevant Pi SDK surface" section cited `loadEntriesFromFile` as the read-only alternative to a switch.
+The spike found that, while `loadEntriesFromFile` is **declared** in `core/session-manager.d.ts` and re-listed in the package root `index.d.ts`, the published runtime `dist/index.js` re-export from `./core/session-manager.js` **omits** it — only `parseSessionEntries` is actually exported to a consumer.
+Importing `loadEntriesFromFile` from `@earendil-works/pi-coding-agent` yields `undefined` at runtime (a types/runtime mismatch in the SDK).
+This is not version-specific: the omission is identical in both the pinned `0.79.1` and the latest `0.79.8` (same `index.js` re-export line), so an SDK upgrade does not resolve it — Step 4 should not chase one.
+The viable read-only path is therefore `parseSessionEntries(readFileSync(outputFile, "utf8"))`, which the harness confirmed returns the full `FileEntry[]` transcript with no session switch and no active-session mutation.
+Step 4 ([#445]) should read the file itself and call `parseSessionEntries`, not `loadEntriesFromFile`.
+
+### Criterion 1 — Root-continuity during a session switch: avoid the switch
+
+`switchSession` is a full active-session takeover: it fires `session_before_switch` (cancellable) and then tears the current runtime down via `session_shutdown` (whose `targetSessionFile` field marks a replacement-driven shutdown).
+The root's in-flight turn does **not** survive the takeover — the runtime that owns that turn is invalidated — and a "return to root" would require a second `switchSession(rootSessionFile)` that re-incurs the teardown on the way back.
+Because background agents run precisely while the operator keeps working at root, a true `switchSession` round-trip is hostile to a root with a turn in flight.
+
+**Answer:** do not use `switchSession` for navigation.
+The read-only transcript path (Criterion 2) sidesteps root-continuity entirely — it never touches the active session, so there is no return gesture to get wrong.
+
+### Criterion 2 — View-only vs interactive: read-only
+
+`ReplacedSessionContext` (handed to a `switchSession` `withSession` callback) extends `ExtensionCommandContext` and exposes `sendUserMessage`/`sendMessage`, so a switched-to child session is interactive.
+But operator visibility (concern 3) is framed as "switch in, scroll/read, switch between, exit back to root" — a navigation interaction, not a live steering overlay — and steering already has a home (`steer_subagent` tool / the widget).
+Adding in-session steering would create a second, redundant steering surface.
+
+**Answer:** the viewer is strictly **read-only**, rendered from `parseSessionEntries(readFileSync(record.outputFile))` (Finding 0) without leaving the root session.
+This also resolves Criterion 1 by construction.
+
+### Criterion 3 — Parallel-agent navigation: command-first
+
+With N background agents running, the operator needs a gesture to pick which child to view.
+The background widget (Decision A, [#444]) already represents N parallel agents as a per-agent tree, making it the natural eventual selection surface; a flat command gives a non-widget entry point that lists running background agents and lets the operator pick one keyed on `record.outputFile`.
+
+**Answer:** Step 4 ([#445]) ships a **command** as the primary, unit-testable selection surface (list background agents → pick → render that child's transcript read-only), with a widget gesture as an optional later enhancement.
+"Both" remains the eventual target; command-first is the Step 4 starting point because it does not depend on the widget shrink ([#444]) landing first.
+
+### Criterion 4 — Settings command name: `/subagents-settings`
+
+Sibling packages register flat, hyphenated command names with no `:` namespace: `registerCommand("agents", …)` (this package), `"colgrep-reindex"`, `"permission-system"`.
+A `/subagents:settings` form would be inconsistent with every existing command in the repo, and `/agents-settings` wrongly implies it manages agent definitions (which Decision C removes).
+
+**Answer:** confirm **`/subagents-settings`** (flat, hyphenated) for Step 2 ([#447]).
+Reject the tentative `/subagents:settings` and the `/agents-settings` alternative.
+
+### Net mechanism for Phase 19
+
+- Session navigation (Step 4, [#445]): a read-only transcript rendered from `parseSessionEntries(readFileSync(record.outputFile, "utf8"))`, surfaced through a flat command; no `switchSession`, no `loadEntriesFromFile`.
+- Settings command (Step 2, [#447]): `/subagents-settings`.
+
+This keeps transcript rendering out of the core, adds no inbound call from the UI to the core, and preserves the Phase 18 spine invariants (#422–#425).
+
+[#444]: https://github.com/gotgenes/pi-packages/issues/444
+[#445]: https://github.com/gotgenes/pi-packages/issues/445
+[#446]: https://github.com/gotgenes/pi-packages/issues/446
+[#447]: https://github.com/gotgenes/pi-packages/issues/447
