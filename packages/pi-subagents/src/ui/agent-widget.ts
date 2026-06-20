@@ -148,6 +148,16 @@ export class AgentWidget implements SubagentManagerObserver {
     return age < maxAge;
   }
 
+  /**
+   * Background agents only — the widget's sole audience (ADR-0004 Decision A).
+   * Foreground runs are rendered by the `subagent` tool's inline `onUpdate` stream,
+   * so funneling both `listAgents()` call sites through this accessor applies the
+   * background predicate exactly once at the source.
+   */
+  private listBackgroundAgents(): Subagent[] {
+    return this.manager.listAgents().filter(record => record.invocation?.runInBackground === true);
+  }
+
   /** Project a live Subagent record onto a pure-data WidgetAgent snapshot. */
   private toWidgetAgent(record: Subagent): WidgetAgent {
     return {
@@ -172,7 +182,7 @@ export class AgentWidget implements SubagentManagerObserver {
   /** Delegate rendering to the pure widget-renderer module. */
   private renderWidget(tui: any, theme: Theme): string[] {
     return renderWidgetLines({
-      agents: this.manager.listAgents().map(r => this.toWidgetAgent(r)),
+      agents: this.listBackgroundAgents().map(r => this.toWidgetAgent(r)),
       registry: this.registry,
       spinnerFrame: this.widgetFrame,
       terminalWidth: tui.terminal.columns,
@@ -240,12 +250,12 @@ export class AgentWidget implements SubagentManagerObserver {
   update() {
     if (!this.uiCtx) return;
 
-    const allAgents = this.manager.listAgents();
-    this.seedFinishedAgents(allAgents);
-    const state = assembleWidgetState(allAgents, (id, status) => this.shouldShowFinished(id, status));
+    const backgroundAgents = this.listBackgroundAgents();
+    this.seedFinishedAgents(backgroundAgents);
+    const state = assembleWidgetState(backgroundAgents, (id, status) => this.shouldShowFinished(id, status));
 
     if (!state.hasActive && !state.hasFinished) {
-      this.clearWidget(allAgents);
+      this.clearWidget(backgroundAgents);
       return;
     }
 

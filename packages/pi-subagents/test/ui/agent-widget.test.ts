@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentTypeRegistry } from "#src/config/agent-types";
+import type { Subagent } from "#src/lifecycle/subagent";
 import type { SubagentManager } from "#src/lifecycle/subagent-manager";
 import type { CompactionInfo } from "#src/types";
 import { AgentWidget, assembleWidgetState, type UICtx } from "#src/ui/agent-widget";
@@ -344,5 +345,66 @@ describe("AgentWidget — self-drives from lifecycle notifications", () => {
 		widget.onSubagentCompacted(createTestSubagent({ id: "a1", status: "running" }), COMPACTION);
 
 		expect(typeof lastContent()).toBe("function");
+	});
+});
+
+describe("AgentWidget — background-only filtering", () => {
+	function setup(records: Subagent[]) {
+		const manager = { listAgents: () => records } as unknown as SubagentManager;
+		const registry = new AgentTypeRegistry(() => new Map());
+		const widget = new AgentWidget(manager, registry);
+		const setWidgetCalls: unknown[] = [];
+		let renderFn: ((tui: unknown, theme: unknown) => { render(): string[] }) | undefined;
+		const ui: UICtx = {
+			setStatus: () => {},
+			setWidget: (_key, content) => {
+				setWidgetCalls.push(content);
+				if (typeof content === "function") renderFn = content as typeof renderFn;
+			},
+		};
+		widget.setUICtx(ui);
+		const lastContent = () => setWidgetCalls.at(-1);
+		const renderLines = () => {
+			const stubTui = { terminal: { columns: 200 }, requestRender: () => {} };
+			const stubTheme = { fg: (_: string, t: string) => t, bold: (t: string) => t };
+			return renderFn!(stubTui, stubTheme).render();
+		};
+		return { widget, lastContent, renderLines };
+	}
+
+	it("does not register the widget when only foreground agents exist", () => {
+		const { widget, lastContent } = setup([
+			createTestSubagent({
+				id: "fg1",
+				status: "running",
+				completedAt: undefined,
+				invocation: { runInBackground: false },
+			}),
+		]);
+		widget.update();
+		expect(lastContent()).toBeUndefined();
+	});
+
+	it("renders only background agents when foreground and background agents are mixed", () => {
+		const { widget, renderLines } = setup([
+			createTestSubagent({
+				id: "bg1",
+				status: "running",
+				completedAt: undefined,
+				description: "background task",
+				invocation: { runInBackground: true },
+			}),
+			createTestSubagent({
+				id: "fg1",
+				status: "running",
+				completedAt: undefined,
+				description: "foreground task",
+				invocation: { runInBackground: false },
+			}),
+		]);
+		widget.update();
+		const text = renderLines().join("\n");
+		expect(text).toContain("background task");
+		expect(text).not.toContain("foreground task");
 	});
 });
