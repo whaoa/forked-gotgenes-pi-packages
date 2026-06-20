@@ -16,6 +16,11 @@ export interface AuditLogger {
   warn(message: string): void;
 }
 
+/** Narrow surface the session-shutdown handler depends on. */
+export interface DecisionSummaryWriter {
+  writeSummary(logger: AuditLogger): void;
+}
+
 /**
  * In-process, per-session decision counters.
  *

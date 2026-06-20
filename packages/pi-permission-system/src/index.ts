@@ -165,16 +165,17 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
 
   const resolver = new PermissionResolver(permissionManager, sessionRules);
 
+  const audit = new DecisionAudit();
   const lifecycle = new SessionLifecycleHandler(
     session,
     resolver,
     serviceLifecycle,
     logger,
+    audit,
   );
   const agentPrep = new AgentPrepHandler(session, resolver, toolRegistry);
 
   const reporter = new GateDecisionReporter(logger, pi.events);
-  const audit = new DecisionAudit();
   const gateRunner = new GateRunner(resolver, sessionRules, gateway, reporter);
   const toolCallGatePipeline = new ToolCallGatePipeline(
     resolver,
@@ -206,6 +207,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
       (event, ctx) => gates.handleToolCall(event, ctx),
       reporter,
       audit,
+      logger,
     ),
   );
 }

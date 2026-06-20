@@ -22,6 +22,12 @@ function makeAudit() {
   };
 }
 
+function makeTracer() {
+  return {
+    debug: vi.fn<(event: string, details?: Record<string, unknown>) => void>(),
+  };
+}
+
 function gateReturning(outcome: GateOutcome) {
   return vi
     .fn<(event: unknown, ctx: ExtensionContext) => Promise<GateOutcome>>()
@@ -36,6 +42,7 @@ describe("createFailClosedToolCall", () => {
       gateReturning({ action: "allow" }),
       reporter,
       audit,
+      makeTracer(),
     );
 
     const result = await boundary(makeToolCallEvent("read"), makeCtx());
@@ -53,6 +60,7 @@ describe("createFailClosedToolCall", () => {
       gateReturning({ action: "block", reason: "denied by policy" }),
       reporter,
       audit,
+      makeTracer(),
     );
 
     const result = await boundary(makeToolCallEvent("read"), makeCtx());
@@ -61,13 +69,35 @@ describe("createFailClosedToolCall", () => {
     expect(audit.recordDecision).toHaveBeenCalledWith("block");
   });
 
+  it("writes a per-call decision trace with the tool name and action", async () => {
+    const tracer = makeTracer();
+    const boundary = createFailClosedToolCall(
+      gateReturning({ action: "allow" }),
+      makeReporter(),
+      makeAudit(),
+      tracer,
+    );
+
+    await boundary(makeToolCallEvent("bash"), makeCtx());
+
+    expect(tracer.debug).toHaveBeenCalledWith(
+      "permission.decision",
+      expect.objectContaining({ toolName: "bash", action: "allow" }),
+    );
+  });
+
   it("blocks fail-closed when the gate throws, recording an error and a review-log entry", async () => {
     const audit = makeAudit();
     const reporter = makeReporter();
     const gate = vi
       .fn<(event: unknown, ctx: ExtensionContext) => Promise<GateOutcome>>()
       .mockRejectedValue(new Error("parser init failed"));
-    const boundary = createFailClosedToolCall(gate, reporter, audit);
+    const boundary = createFailClosedToolCall(
+      gate,
+      reporter,
+      audit,
+      makeTracer(),
+    );
 
     const event = makeToolCallEvent("bash", {
       input: { command: "cd /repo && git push" },
@@ -94,7 +124,12 @@ describe("createFailClosedToolCall", () => {
     const gate = vi
       .fn<(event: unknown, ctx: ExtensionContext) => Promise<GateOutcome>>()
       .mockRejectedValue("non-error rejection");
-    const boundary = createFailClosedToolCall(gate, reporter, audit);
+    const boundary = createFailClosedToolCall(
+      gate,
+      reporter,
+      audit,
+      makeTracer(),
+    );
 
     const result = await boundary(undefined, makeCtx());
 

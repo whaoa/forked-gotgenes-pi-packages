@@ -9,6 +9,15 @@ import type { GateOutcome } from "./gates/types";
 type ToolCallResult = { block?: true; reason?: string };
 
 /**
+ * Narrow debug surface for the per-call decision trace. The concrete logger
+ * self-gates on `debugLog`, so the boundary emits unconditionally and the
+ * entry is dropped when the toggle is off (no per-call spam in normal use).
+ */
+export interface DecisionTracer {
+  debug(event: string, details?: Record<string, unknown>): void;
+}
+
+/**
  * The only `tool_call` handler the SDK sees.
  *
  * Guarantees fail-closed: it owns the `try/catch → block` and is the sole place
@@ -30,11 +39,17 @@ export function createFailClosedToolCall(
   gate: (event: unknown, ctx: ExtensionContext) => Promise<GateOutcome>,
   reporter: DecisionReporter,
   audit: DecisionRecorder,
+  tracer: DecisionTracer,
 ): (event: unknown, ctx: ExtensionContext) => Promise<ToolCallResult> {
   return async (event, ctx) => {
     try {
       const outcome = await gate(event, ctx);
       audit.recordDecision(outcome.action);
+      tracer.debug("permission.decision", {
+        toolName: bestEffortToolName(event),
+        action: outcome.action,
+        ...(outcome.action === "block" ? { reason: outcome.reason } : {}),
+      });
       return outcome.action === "block"
         ? { block: true, reason: outcome.reason }
         : {};
