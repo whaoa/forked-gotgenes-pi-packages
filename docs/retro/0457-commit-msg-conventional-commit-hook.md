@@ -25,3 +25,27 @@ Filed as a repo-root plan (`docs/plans/0457-…`) since the change touches only 
 - Scope left free-form (no `scope-enum`), operator-confirmed — catching scope typos is out of scope for the `!`-placement bug and would risk false rejections on no-scope root commits.
 - Flagged `fallow dead-code` as a risk: the new root devDeps are tooling-only (referenced by `prek.toml`/config, not imported by TS), but existing CLI-only root devDeps (biome, rumdl, fallow) are not flagged, so commitlint should follow suit — `.fallowrc.json` `ignoreDependencies` is the fallback.
 - Structured as a build plan (no red→green cycles); correctness is confirmed by piping sample headers through `commitlint` and linting a window of real history (`--from=HEAD~30 --to=HEAD`).
+
+## Stage: Implementation — Build (2026-06-21T20:00:00Z)
+
+### Session summary
+
+Executed all three plan steps (commitlint deps + `.commitlintrc.json`, `prek.toml` wiring, README/AGENTS docs), then extended the hook per operator direction to run commitlint in `--strict` mode so the two warning-level rules block rather than just print.
+The `commit-msg` hook is live and was exercised end-to-end by the session's own commits.
+Pre-completion reviewer returned PASS (before the strict-mode commits); deterministic gates (`lint`, `fallow dead-code`) re-confirmed green afterward.
+
+### Observations
+
+- Deviation: used `@commitlint/cli` / `@commitlint/config-conventional` `^21.0.2` (latest), not the plan's `^19` — the plan's version was a stale lookup.
+- Operator decision mid-build: enforce `--strict` locally so `body-leading-blank` and `footer-leading-blank` block commits (exit 2) instead of warning.
+  Reverted an interim commit that had disabled those warnings — the operator wanted them kept *and* enforced, not silenced.
+  Old commits are grandfathered automatically: the `commit-msg` hook only runs on new commits, so existing non-conforming history is never re-validated.
+- Important gotcha (the hook caught it on its own commit): with `pass_filenames` true, prek appends the commit-message file path to the entry, so `--edit` must be the **last** option.
+  `commitlint --edit --strict <file>` parses `<file>` as an unknown positional and errors; the correct order is `commitlint --strict --edit` so the appended path becomes `--edit`'s value.
+  Direct stdin tests did not surface this — only the real prek invocation (or simulating it by appending a file path) does.
+- AGENTS.md now documents the required blank line before footer tokens (`Refs #N`, `BREAKING CHANGE:`) since `--strict` rejects their absence.
+- CI enforcement was considered and **deferred** by operator choice: a commitlint step in the CI `check` job would gate `release-please` (via `needs: [check]`) and convert a silent mis-version into a loud blocking failure — the strongest backstop — but the local hook is deemed sufficient for now.
+  Recorded as the plan's still-open Open Question.
+- `fallow dead-code` does not flag the new root devDependencies (consistent with existing CLI-only root devDeps); no `.fallowrc.json` change needed.
+- Reviewer verdict: PASS.
+  No `src/`/`test/` changes, so no test-suite or `tsc` run applies.
