@@ -76,10 +76,11 @@ Skip if the plan names no deferred follow-up.
 
 ## 5. Close the issue
 
-Build the close comment from the commits since the previous release:
+Build the close comment from the commits since the shipped package's previous release.
+Derive the previous tag package-scoped (`git tag --list '<pkg>-v*' --sort=-creatordate | head -1`, where `<pkg>` is the shipped package from the issue's plan path), not `git tag --sort=-version:refname | head -1`, which sorts lexically across all package tags and returns an unrelated package.
 
 ```bash
-git log --oneline <previous-tag-or-base>..HEAD
+git log --oneline <pkg-tag>..HEAD
 ```
 
 The comment should include:
@@ -93,7 +94,7 @@ The comment should include:
 
 Then use `issue_close` with issue number `$1` and the summary as the comment.
 
-Then check whether this push shipped work for **other** issues (a stacked refactor/enabler, other `(#M)` commit refs, or sibling `docs/plans/`/`docs/retro/` files in the `<previous-tag-or-base>..HEAD` range).
+Then check whether this push shipped work for **other** issues (a stacked refactor/enabler, other `(#M)` commit refs, or sibling `docs/plans/`/`docs/retro/` files in the `<pkg-tag>..HEAD` range).
 Close each with its own short summary — release-please omits `refactor:` commits from the changelog, so a stacked refactor issue leaves no reminder.
 
 ## 6. Merge release-please PR (if present)

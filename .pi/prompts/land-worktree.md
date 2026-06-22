@@ -44,7 +44,9 @@ The peer worktree shares this repo's `.git`, so the branch ref is visible locall
 
 ## 5. Close the issue
 
-Build the close comment from the commits since the previous release (`git log --oneline <previous-tag-or-base>..HEAD`):
+Build the close comment from the commits since the shipped package's previous release.
+Derive the previous tag package-scoped (`git tag --list '<pkg>-v*' --sort=-creatordate | head -1`, where `<pkg>` is the shipped package from the issue's plan path), not `git tag --sort=-version:refname | head -1`, which sorts lexically across all package tags and returns an unrelated package.
+Then `git log --oneline <pkg-tag>..HEAD`:
 
 - "Implemented in <sha> …" — SHA as plain text (no backticks) so GitHub auto-links it.
 - A short bullet list of feature/breaking commits.
