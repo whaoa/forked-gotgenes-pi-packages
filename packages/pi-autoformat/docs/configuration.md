@@ -426,6 +426,47 @@ When the roots differ, the user-declared order is preserved.
 
 Declaring a `formatters` entry whose key matches a built-in name still works — the user-declared definition wins, providing an escape hatch for custom flags — but the loader emits a single non-fatal config issue so the shadowing is visible.
 
+#### Scoping formatters to subdirectories (monorepos)
+
+In a monorepo, different subprojects often use different formatters, and a tool may be shared across several subprojects.
+File extension alone is not enough to decide which formatter runs — one subproject may use `eslint` while another uses a different tool for the same `.ts` files.
+
+The supported way to express this is the built-in [`treefmt`](#built-in-formatters) dispatcher: scope each formatter with `includes`/`excludes` globs in a `treefmt.toml`, and reference `treefmt` from a single wildcard chain.
+`treefmt` matches each touched file to the formatters whose globs cover it and runs each formatter against only its matching files — many subprojects, many tools, one pass.
+
+```toml
+[formatter.eslint]
+command = "eslint"
+options = ["--fix"]
+includes = ["project/foo/**/*.{js,ts}"]
+
+[formatter.prettier]
+command = "prettier"
+options = ["--write"]
+includes = ["project/bar/**/*.{js,ts}"]
+```
+
+Reference the dispatcher from a wildcard chain so the whole touched batch flows through `treefmt`:
+
+```json
+{
+  "chains": {
+    "*": ["treefmt"]
+  }
+}
+```
+
+Subdirectory scoping lives in `treefmt.toml`, not in `pi-autoformat` config — `pi-autoformat` only references the `treefmt` dispatcher.
+Because scoping is per-formatter glob matching rather than a single per-formatter directory, the same tool name can serve several subprojects, and multiple tools coexist under one config.
+
+Per-subproject local tool config is resolved by the formatters themselves.
+Tools such as `eslint`, `prettier`, and `biome` walk up from each file to find their nearest config, so a subproject-local `.eslintrc` (or equivalent) is picked up automatically from the file paths `treefmt` hands each formatter.
+This follows the same principle as the rest of `pi-autoformat`: trust formatters to discover their own project configs rather than reimplementing config resolution.
+
+This is intentionally not a per-formatter `baseDir` setting.
+A single `baseDir` per formatter could not express one tool (e.g. `eslint`) used by several subprojects without redeclaring the formatter under synthetic names, and `pi-autoformat`'s batch dispatch (all touched files of a chain group are passed to one invocation) conflicts with a single per-formatter working directory when a turn touches multiple subprojects.
+`treefmt`'s per-formatter `includes` plus its own per-formatter execution resolve both cleanly.
+
 ## Merge behavior
 
 Merge order:
