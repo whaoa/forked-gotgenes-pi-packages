@@ -263,6 +263,22 @@ describe("Subagent — session-encapsulation methods", () => {
 			expect(agent.messages).toEqual([{ role: "user", content: "hi" }]);
 		});
 	});
+
+	describe("agentMessages", () => {
+		it("returns empty array when no session", () => {
+			const agent = makeSubagent();
+			expect(agent.agentMessages).toEqual([]);
+		});
+
+		it("delegates to SubagentSession.agentMessages when session is ready", () => {
+			const agent = makeSubagent();
+			const session = createMockSession();
+			session.messages.push({ role: "user", content: "hi" });
+			const stub = createSubagentSessionStub(session);
+			agent.subagentSession = toSubagentSession(stub);
+			expect(agent.agentMessages).toEqual([{ role: "user", content: "hi" }]);
+		});
+	});
 });
 
 describe("Subagent — steer buffer", () => {

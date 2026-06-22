@@ -52,6 +52,7 @@ export function createSubagentSessionStub(
 			contextUsage: { percent: null as number | null },
 		})),
 		get messages(): readonly unknown[] { return session.messages; },
+		get agentMessages(): readonly unknown[] { return session.messages; },
 	};
 }
 

@@ -319,6 +319,13 @@ describe("SubagentSession — delegate methods", () => {
     const { sub } = makeSubagentSession(session);
     expect(sub.messages).toBe(session.messages);
   });
+
+  it("agentMessages returns the underlying session messages typed", () => {
+    const { session } = createSession("X");
+    session.messages.push({ role: "user", content: "hi" });
+    const { sub } = makeSubagentSession(session);
+    expect(sub.agentMessages).toBe(session.messages);
+  });
 });
 
 describe("SubagentSession — dispose", () => {

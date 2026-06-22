@@ -20,7 +20,7 @@ import { WorkspaceBracket } from "#src/lifecycle/workspace-bracket";
 import { NotificationState } from "#src/observation/notification-state";
 import { subscribeSubagentObserver } from "#src/observation/record-observer";
 import type { RunConfig } from "#src/runtime";
-import type { AgentInvocation, CompactionInfo, ParentSessionInfo, SubagentType, ThinkingLevel } from "#src/types";
+import type { AgentInvocation, CompactionInfo, ParentSessionInfo, SessionMessage, SubagentType, ThinkingLevel } from "#src/types";
 
 /** Per-subagent lifecycle observer — created by SubagentManager for each spawn. */
 export interface SubagentLifecycleObserver {
@@ -160,6 +160,11 @@ export class Subagent {
 	/** The session's message history, or an empty array if no session. */
 	get messages(): readonly unknown[] {
 		return this.subagentSession?.messages ?? [];
+	}
+
+	/** The session's message history typed for Pi's session-rendering machinery, or empty if no session. */
+	get agentMessages(): readonly SessionMessage[] {
+		return this.subagentSession?.agentMessages ?? [];
 	}
 
 	constructor(init: SubagentInit) {
