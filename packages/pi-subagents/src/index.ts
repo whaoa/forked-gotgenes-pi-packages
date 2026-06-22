@@ -47,6 +47,7 @@ import { SteerTool } from "#src/tools/steer-tool";
 import { FsAgentFileOps } from "#src/ui/agent-file-ops";
 import { AgentsMenuHandler } from "#src/ui/agent-menu";
 import { AgentWidget } from "#src/ui/agent-widget";
+import { SessionNavigatorHandler } from "#src/ui/session-navigator";
 import { SubagentsSettingsHandler } from "#src/ui/subagents-settings";
 
 export default function (pi: ExtensionAPI) {
@@ -190,6 +191,17 @@ export default function (pi: ExtensionAPI) {
     description: "Configure subagent settings (concurrency, turn limits)",
     handler: async (_args, ctx) => {
       await subagentsSettings.handle({ ui: ctx.ui });
+    },
+  });
+
+  // ---- /subagent-sessions command ----
+
+  const sessionNavigator = new SessionNavigatorHandler();
+
+  pi.registerCommand("subagent-sessions", {
+    description: "View a subagent's session transcript (read-only)",
+    handler: async (_args, ctx) => {
+      await sessionNavigator.handle({ ui: ctx.ui, agents: manager.listAgents(), registry });
     },
   });
 }
