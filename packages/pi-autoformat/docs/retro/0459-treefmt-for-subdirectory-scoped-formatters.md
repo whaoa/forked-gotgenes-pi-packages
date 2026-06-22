@@ -25,3 +25,19 @@ Wrote `packages/pi-autoformat/docs/plans/0459-treefmt-for-subdirectory-scoped-fo
   `docs/configuration.md` is not in the package `exclude-paths`, so the `docs:` commit is tracked but does not bump the version on its own.
 - Next stage is `/build-plan` (docs-only, no TDD cycles).
   Issue close happens during `/ship-issue` with a comment explaining the `treefmt` path and the `baseDir` rejection.
+
+## Stage: Implementation — Build (2026-06-22T00:00:00Z)
+
+### Session summary
+
+Executed the single-step docs-only plan: added a `#### Scoping formatters to subdirectories (monorepos)` subsection to `packages/pi-autoformat/docs/configuration.md`, placed after the existing `#### Built-in formatters` content.
+The subsection documents `treefmt` `includes`/`excludes` globs (with a `treefmt.toml` example and a `"*": ["treefmt"]` wildcard chain), the per-subproject local-config-discovery note, and the rationale for declining a per-formatter `baseDir`.
+Committed as `docs(pi-autoformat): document treefmt for subdirectory-scoped formatters (#459)`.
+
+### Observations
+
+- No deviations from the plan.
+  Single step, single file changed; no schema, loader, executor, README, or test changes were needed (as planned).
+- No `src/`/`test/`/`.ts` files touched, so `pnpm run test` / `pnpm run check` were not required; `pnpm run lint` (`biome` + `eslint` + `rumdl`) passed before and after the edit.
+- Pre-completion reviewer: PASS — deterministic checks all green; doc accuracy verified against the existing built-in `treefmt` description and the wildcard-chain docs; conventional commits valid; forward/reverse documentation consistency PASS; code-design/test/mermaid/architecture sections SKIP (docs-only).
+- Issue #459 has no formal acceptance-criteria section (it uses the feature-request template); close happens at `/ship-issue` with the `treefmt`-path explanation and `baseDir` rationale.
