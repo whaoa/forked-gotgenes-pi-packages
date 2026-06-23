@@ -8,11 +8,9 @@
  *   steer_subagent       — LLM-callable: send a steering message to a running agent
  *
  * Commands:
- *   /agents                 — Interactive agent management menu
  */
 
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -27,7 +25,6 @@ import { InterruptHandler, SessionLifecycleHandler, ToolStartHandler } from "#sr
 import { createChildLifecyclePublisher } from "#src/lifecycle/child-lifecycle";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import { createSubagentSession, type SubagentSessionDeps } from "#src/lifecycle/create-subagent-session";
-import { buildParentSnapshot } from "#src/lifecycle/parent-snapshot";
 import { SubagentManager } from "#src/lifecycle/subagent-manager";
 import { CompositeSubagentObserver } from "#src/observation/composite-subagent-observer";
 import { type NotificationDetails, NotificationManager } from "#src/observation/notification";
@@ -45,8 +42,6 @@ import { SettingsManager } from "#src/settings";
 import { AgentTool } from "#src/tools/agent-tool";
 import { GetResultTool } from "#src/tools/get-result-tool";
 import { SteerTool } from "#src/tools/steer-tool";
-import { FsAgentFileOps } from "#src/ui/agent-file-ops";
-import { AgentsMenuHandler } from "#src/ui/agent-menu";
 import { AgentWidget } from "#src/ui/agent-widget";
 import { SessionNavigatorHandler } from "#src/ui/session-navigator";
 import { SubagentsSettingsHandler } from "#src/ui/subagents-settings";
@@ -161,28 +156,6 @@ export default function (pi: ExtensionAPI) {
   // ---- steer_subagent tool ----
 
   pi.registerTool(new SteerTool(manager, pi.events).toToolDefinition());
-
-  // ---- /agents interactive menu ----
-
-  const agentsMenu = new AgentsMenuHandler(
-    manager,
-    registry,
-    settings,
-    new FsAgentFileOps(),
-    join(getAgentDir(), "agents"),
-    join(process.cwd(), ".pi", "agents"),
-  );
-
-  pi.registerCommand("agents", {
-    description: "Manage agents",
-    handler: async (_args, ctx) => {
-      await agentsMenu.handle({
-        ui: ctx.ui,
-        modelRegistry: ctx.modelRegistry,
-        parentSnapshot: buildParentSnapshot(ctx),
-      });
-    },
-  });
 
   // ---- /subagents:settings command ----
 

@@ -341,14 +341,14 @@ src/
 ├── ui/                             user-facing presentation
 │   ├── agent-widget.ts             above-editor live status widget
 │   ├── widget-renderer.ts          pure rendering for widget
-│   ├── agent-menu.ts               /agents slash command menu
-│   ├── agent-config-editor.ts      agent detail/edit view (AgentConfigEditor class)
-│   ├── agent-creation-wizard.ts    agent creation (AgentCreationWizard class)
-│   ├── conversation-viewer.ts      scrollable session overlay
-│   ├── message-formatters.ts       pure per-message-type formatters (extracted from conversation-viewer)
-│   ├── agent-file-ops.ts           filesystem abstraction
-│   ├── agent-file-writer.ts        overwrite-guard + write + reload + notify helper
-│   └── display.ts                  pure formatters and shared types
+│   ├── agent-config-editor.ts      agent detail/edit view (AgentConfigEditor class) ← removing in #441
+│   ├── agent-creation-wizard.ts    agent creation (AgentCreationWizard class) ← removing in #441
+│   ├── menu-ui.ts                  transient: MenuUI interface (removed with wizard/editor in #441)
+│   ├── agent-file-ops.ts           filesystem abstraction ← removing in #441
+│   ├── agent-file-writer.ts        overwrite-guard + write + reload + notify helper ← removing in #441
+│   ├── display.ts                  pure formatters and shared types
+│   ├── subagents-settings.ts       /subagents:settings command handler
+│   └── session-navigator.ts        /subagents:sessions command handler
 │
 └── handlers/                       event handlers
     ├── index.ts                    barrel re-export
@@ -1055,7 +1055,7 @@ Coverage is in-session evictions (the sweep's only targets); old-session orphan 
 
 `Release: independent`
 
-### Step 5 — Dissolve `/agents` and remove the conversation-viewer subtree ([#442])
+### ✅ Step 5 — Dissolve `/agents` and remove the conversation-viewer subtree ([#442])
 
 Smell: Category A (dead subsystem) plus Category B (oversized) — once Steps 2–4 re-home all four menu responsibilities, the `/agents` command and everything reachable only from `agent-menu.ts` is an unreferenced subtree.
 This is the first of two deletion commits (split by subtree).
@@ -1070,7 +1070,12 @@ Target files:
 Running-agent visibility is now owned by the background widget (Step 3); session navigation replaces the bespoke overlay (Step 4); settings live in `/subagents-settings` (Step 2).
 Deleting the hub in one move avoids any surgical edit to the doomed file and leaves the definition-management leaves orphaned for Step 6.
 
-Outcome: `/agents` dissolved; −767 LOC source (menu hub + viewer + formatters); −812 LOC test; largest test function eliminated; `index.ts` edited once (deregistration), never surgically narrowed.
+Actual approach (vs. original plan): a tidy-first preparatory commit first extracted `MenuUI` from `agent-menu.ts` into a new `src/ui/menu-ui.ts` module, breaking the bidirectional type cycle — the hub imported the wizard/editor classes while the leaves imported back the `MenuUI` type.
+Without the prep commit, deleting either subtree first would have left the other half referencing a deleted module.
+`index.ts` also shed the now-dead `join` (node:path) and `buildParentSnapshot` imports in addition to the two module imports.
+The `menu-ui.ts` module is transient and is removed with the wizard/editor in Step 6.
+
+Outcome: ✅ `/agents` dissolved; −767 LOC source (menu hub + viewer + formatters); −812 LOC test; largest test function eliminated; `index.ts` dewired.
 
 `Release: batch "dissolve-agents"`
 
@@ -1119,7 +1124,7 @@ flowchart LR
     S4["✅ Step 4 - Native session nav slice (#445)"]
     S4a["✅ Step 4a - Renderer to TUI components (#462)"]
     S4b["✅ Step 4b - File-snapshot source (#463)"]
-    S5["Step 5 - Dissolve /agents + viewer (#442)"]
+    S5["✅ Step 5 - Dissolve /agents + viewer (#442)"]
     S6["Step 6 - Remove definition mgmt (#441)"]
     S7["Step 7 - Test clones (#443)"]
 

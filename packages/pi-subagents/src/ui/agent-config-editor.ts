@@ -66,6 +66,8 @@ export class AgentConfigEditor {
     return [this.projectAgentsDir, this.personalAgentsDir];
   }
 
+  // Only caller was agent-menu.ts (deleted in #442); this file is removed in #441.
+  // fallow-ignore-next-line unused-class-member
   async showAgentDetail(ui: MenuUI, name: string): Promise<void> {
     if (this.registry.resolveType(name) == null) {
       ui.notify(`Agent config not found for "${name}".`, "warning");
