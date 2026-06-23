@@ -1036,15 +1036,22 @@ Selection and sourcing are untouched; native navigation now renders at parity, u
 
 `Release: independent`
 
-### Step 4b — File-snapshot source for evicted agents ([#463])
+### ✅ Step 4b — File-snapshot source for evicted agents ([#463])
 
 Smell: Category C (coupling) — the #445 slice sources transcripts live from `manager.listAgents()` only; an agent evicted by the 10-minute cleanup sweep has a persisted session JSONL but no live record, so it is unreachable.
-This step adds the file-snapshot `TranscriptSource` branch (`parseSessionEntries(readFile(outputFile))` → drop the `SessionHeader` → `buildSessionContext(...).messages`) and broadens the candidate set to enumerate evicted agents, behind the same seam; the renderer is untouched.
+This step adds the file-snapshot `TranscriptSource` branch (`parseSessionEntries(readFile(outputFile))` → drop the `SessionHeader` → `buildSessionContext(...).messages`) and broadens the candidate set to evicted agents, behind the same seam; the renderer is untouched.
 
 Independent: this is a new capability the bespoke viewer never had, so it gates nothing and is not a Step 5 prerequisite.
 Best sequenced after Step 4a (shared renderer), but carries no hard dependency.
 
 Outcome: the operator can view a fully-evicted agent's transcript from its persisted session file; the dual-source design recorded in [ADR-0004] Addendum 2 is fully realized.
+
+Landed ([#463]): `fileSnapshotSource(outputFile, readFile)` lands in the pure `session-navigation.ts` (`parseSessionEntries` → drop the `SessionHeader` → `buildSessionContext(...).messages`; a static no-subscribe, no-streaming source).
+The candidate set is broadened via **manager-retained descriptors**, not a directory scan: the persisted child session carries no subagent `type`/`description` (those live only on the in-memory record), so a scan would yield degraded labels and parse every file per open.
+Instead `SubagentManager.cleanup()` stashes a lightweight `EvictedSubagent` descriptor (label fields + `outputFile`, no messages) before disposing a record with a persisted file, exposed via `listEvicted()` and cleared by `clearCompleted()`/`dispose()`.
+`NavigationEntry` became a `live | evicted` discriminated union; the handler selects `liveSource` vs `fileSnapshotSource` by kind inside a `try/catch` (an unreadable file notifies and skips), and `index.ts` injects `readFileSync`.
+Evicted entries carry an `· evicted (snapshot)` label marker.
+Coverage is in-session evictions (the sweep's only targets); old-session orphan files — the ones a scan would surface with degraded labels — are out of scope.
 
 `Release: independent`
 
@@ -1111,7 +1118,7 @@ flowchart LR
     S3["✅ Step 3 - Background widget (#444)"]
     S4["✅ Step 4 - Native session nav slice (#445)"]
     S4a["✅ Step 4a - Renderer to TUI components (#462)"]
-    S4b["Step 4b - File-snapshot source (#463)"]
+    S4b["✅ Step 4b - File-snapshot source (#463)"]
     S5["Step 5 - Dissolve /agents + viewer (#442)"]
     S6["Step 6 - Remove definition mgmt (#441)"]
     S7["Step 7 - Test clones (#443)"]

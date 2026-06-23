@@ -248,7 +248,15 @@ This matches the bespoke viewer's current reach (gated on `record.isSessionReady
 A foreground agent is navigable only _after_ it completes — while it runs, the root turn is blocked on it — whereas a background agent is navigable live.
 The background widget ([#444]) remains the optional secondary selection gesture for background agents; the command is the primary, unit-testable surface.
 
+**Evicted-agent candidate set ([#463]).**
+Step 4b realizes the file-snapshot branch for fully-evicted agents.
+The candidate set is broadened via **manager-retained descriptors**, not a directory scan of the tasks directory: the persisted child session carries no subagent `type`/`description` (those live only on the in-memory record), so a scan yields degraded labels and parses every file per picker open.
+The cleanup sweep instead stashes a lightweight `EvictedSubagent` descriptor (label fields + `outputFile`, no messages) before disposing a record, preserving rich labels and bounded memory.
+This covers in-session evictions — the sweep's only targets, since a fresh manager per session never reloads prior-process subagents.
+The "render from the file snapshot" mechanism for an evicted agent (above) is unchanged; only the candidate-set _enumeration_ is pinned to descriptors.
+
 [#444]: https://github.com/gotgenes/pi-packages/issues/444
 [#445]: https://github.com/gotgenes/pi-packages/issues/445
 [#446]: https://github.com/gotgenes/pi-packages/issues/446
 [#447]: https://github.com/gotgenes/pi-packages/issues/447
+[#463]: https://github.com/gotgenes/pi-packages/issues/463
