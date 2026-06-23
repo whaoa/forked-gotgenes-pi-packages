@@ -248,6 +248,59 @@ describe("SubagentManager — Bug 3 clearCompleted", () => {
   });
 });
 
+describe("SubagentManager — evicted descriptors", () => {
+  let manager: SubagentManager;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    manager.dispose();
+  });
+
+  /** Spawn, await completion, then evict via the 10-minute cleanup sweep. */
+  async function spawnAndEvict(outputFile?: string): Promise<string> {
+    const { factory } = createSessionFactory(createMockSession(), outputFile);
+    ({ manager } = createManager({ createSubagentSession: factory }));
+    const id = spawnBg(manager, "test", "investigate the bug");
+    await manager.getRecord(id)!.promise;
+    const completedAt = manager.getRecord(id)!.completedAt!;
+    vi.spyOn(Date, "now").mockReturnValue(completedAt + 11 * 60_000);
+    (manager as any).cleanup();
+    return id;
+  }
+
+  it("retains a descriptor for an evicted agent with an outputFile", async () => {
+    const id = await spawnAndEvict("/tasks/agent.jsonl");
+
+    expect(manager.listAgents()).toHaveLength(0);
+    const evicted = manager.listEvicted();
+    expect(evicted).toHaveLength(1);
+    expect(evicted[0]).toMatchObject({
+      id,
+      type: "general-purpose",
+      description: "investigate the bug",
+      status: "completed",
+      toolUses: 0,
+      outputFile: "/tasks/agent.jsonl",
+    });
+    expect(typeof evicted[0].startedAt).toBe("number");
+  });
+
+  it("does not retain a descriptor for an evicted agent without an outputFile", async () => {
+    await spawnAndEvict(undefined);
+
+    expect(manager.listAgents()).toHaveLength(0);
+    expect(manager.listEvicted()).toEqual([]);
+  });
+
+  it("clearCompleted empties the evicted descriptors", async () => {
+    await spawnAndEvict("/tasks/agent.jsonl");
+    expect(manager.listEvicted()).toHaveLength(1);
+
+    manager.clearCompleted();
+    expect(manager.listEvicted()).toEqual([]);
+  });
+});
+
 // Eager init removes the optional/required asymmetry that previously required
 // `??=` defaults at the callback sites and `?? 0` / `?? 1` at the read sites.
 describe("SubagentManager — lifetime usage + compaction count are eagerly initialized", () => {
