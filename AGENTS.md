@@ -27,6 +27,7 @@ Run `pnpm fallow dead-code` locally before pushing a new or dependency-changed p
 - Prefer small, reversible changes.
 - Preserve intentional behavior unless there is a clear reason to change it.
 - Ask before removing functionality or changing defaults.
+- To check a GitHub issue/PR's state (including upstream repos), use `gh issue view N --repo owner/repo`, not web search.
 
 ### Tool-injected messages
 
@@ -214,8 +215,10 @@ The note ships to the `BREAKING CHANGE:` footer, the release-please CHANGELOG (u
 Do not put `Closes #N` / `Fixes #N` / `Resolves #N` in commit messages.
 `/ship-issue` posts a curated close comment (implemented-in SHA, behavior summary) via `issue_close`; a commit keyword auto-closes the issue on push and pre-empts that comment, leaving the issue with no summary.
 Reference issues as `(#N)` in the subject or `Refs #N` in the body instead.
-Still separate footer tokens (`Refs #N`, `BREAKING CHANGE:`) from the body with a blank line for readability, but it is no longer enforced: `.commitlintrc.json` sets `footer-leading-blank` to `[0]` because the `conventional-commits-parser` mis-parses a body line containing `#N` (or a `token:` trailer, or a URL `#fragment`) as the footer start, so the rule fired false positives under `--strict` (commitlint #896, still open; #4099, closed without a shipped fix).
+Still separate footer tokens (`Refs #N`, `BREAKING CHANGE:`) from the body with a blank line for readability, but it is no longer enforced — `.commitlintrc.json` sets `footer-leading-blank` to `[0]` because `conventional-commits-parser` misreads a body line containing `#N` as the footer start (Refs #468).
+When a commit-lint or format gate fires a false positive, disable the single offending rule (set it to `[0]`), not the enforcement mode (`--strict`) that gates the others.
 Avoid `git rebase -i` in this environment — `$EDITOR` opens an interactive editor that aborts non-interactively.
 Reorder or fix unpushed commits with `git reset` + re-commit, or set `GIT_SEQUENCE_EDITOR`/`EDITOR=true`.
 After `git reset --soft HEAD~N`, all N commits' changes are staged together — to re-split into separate commits, run `git reset` (mixed) first, then `git add` per commit.
+Staged deletions from `git rm` ride along with the next `git commit` even when you `git add` only unrelated paths — commit with an explicit pathspec (`git commit -- <paths>`) or check `git status` first.
 Before `git commit --amend`, confirm HEAD is your own commit (`git log -1`) — a concurrent session may have committed since yours, and amend rewrites whatever HEAD points at.

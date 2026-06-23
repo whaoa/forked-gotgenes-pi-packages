@@ -52,3 +52,57 @@ Pre-completion reviewer returned PASS.
 - Pre-completion reviewer: PASS — all deterministic checks green; doc-staleness WARNs (Mermaid domain diagram, structural tables, Phase 19 history) are intentional mid-batch deferred work per the plan's Non-Goals, to be resolved at the batch tail [#441].
 
 [#4099]: https://github.com/conventional-changelog/commitlint/issues/4099
+
+## Stage: Final Retrospective (2026-06-23T20:05:13Z)
+
+### Session summary
+
+Shipped Phase 19 Step 5 across plan → build → ship: extracted `MenuUI` to break a bidirectional type cycle, deleted the `/agents` hub plus the conversation-viewer subtree, and dewired `index.ts`.
+The release was correctly deferred at ship time per the `mid-batch — defer` marker (batch tail is [#441]).
+The session's dominant friction was an unplanned commitlint diversion that produced a blunt fix, then a superseding surgical fix, a bad-commit untangle, and a new tracking issue ([#468]).
+
+### Observations
+
+#### What went well
+
+1. The Planning `ask_user` gate caught the hub↔leaf bidirectional type cycle before any code was written and produced a clean tidy-first plan (relocate `MenuUI` first), so the two implementation commits were each green — no broken-commit sequence.
+2. The commitlint claim was verified empirically by running `commitlint` against crafted test messages, not by trusting the closed-issue status — this confirmed [#4099] was closed `COMPLETED` without a shipped fix and that the false positive still fired in `v21.0.2`.
+3. Incremental verification: `pnpm run check`/`lint`/`test`/`fallow dead-code` ran after each implementation step, so the unused-class-member finding surfaced at the right step rather than at the end.
+
+#### What caused friction (agent side)
+
+1. `premature-convergence` — the first commitlint fix (`9b60c943`, remove `--strict`) was blunt: dropping `--strict` silences every warning-level rule, including the load-bearing malformed-`!`-header rejection (Refs #457).
+   The surgical fix (`40189cc4`, disable only `footer-leading-blank`, keep `--strict`) only emerged from a separate branch reconsideration.
+   Impact: one superseded `fix(commitlint):` commit now permanent in pushed history; a #457 regression was avoided only because the blunt fix was reconsidered before the batch released.
+2. `other` (git workflow) — `git rm` pre-stages its deletions, so a later `git add prek.toml AGENTS.md && git commit` for the commitlint fix swept the already-staged `/agents` deletions into the wrong commit.
+   Required `git reset HEAD~1` plus selective re-staging to untangle.
+   Impact: ~4 extra tool calls; caught immediately, no lasting damage.
+3. `missing-context` / unused-tool — determining the upstream commitlint issue state took several rounds of `web_search` + `fetch_content` until the user said "Remember you have access to the `gh` CLI, too"; `gh issue view 4099 --repo conventional-changelog/commitlint` then returned the authoritative state (`CLOSED`/`COMPLETED`, no linked PR) in one call.
+   Impact: several wasted research rounds; user-caught.
+4. `missing-context` (minor) — the plan's risk analysis covered unused *files* (`FsAgentFileOps`, kept live by its test import) but not unused class *methods*; deleting the hub orphaned `showAgentDetail` and `showCreateWizard`, tripping `fallow dead-code`.
+   Impact: low — caught by the gate, resolved with two `fallow-ignore-next-line unused-class-member` suppressions pointing at [#441].
+
+#### What caused friction (user side)
+
+1. The agent reached for `web_search`/`fetch_content` to check a GitHub issue's state instead of `gh`; the user had to point at an available tool.
+   Opportunity: reach for `gh issue view`/`gh pr view` first for GitHub issue/PR state, including upstream repos.
+2. The user supplied the steer toward a surgical fix ("prefer surgical fixes over blunt ones").
+   Opportunity: a standing rule about disabling the single offending rule rather than the enforcement mode could have produced the surgical fix on the first pass.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the `pre-completion-reviewer` subagent ran on `anthropic/claude-sonnet-4-6` (per its agent frontmatter), appropriate for judgment-heavy review; the implementation ran on `claude-opus-4-8`.
+  No quality mismatch.
+  The many `model_change` entries are transient UI cycling (no assistant turn under most), not real reassignments.
+- **Escalation-delay tracking** — the upstream-issue-state investigation ran ~6 consecutive `web_search`/`fetch_content` calls before the `gh` reminder; one `gh issue view` would have resolved it immediately.
+- **Unused-tool detection** — `gh` was available throughout but not used for upstream issue state until prompted.
+- **Feedback-loop gap analysis** — no gap; verification ran incrementally after each step.
+
+[#468]: https://github.com/gotgenes/pi-packages/issues/468
+
+### Changes made
+
+1. `AGENTS.md` (`## Commits`) — tightened the `footer-leading-blank` note from ~62 words to rule + `Refs #468`, dropping the parser-variant list and the two upstream issue numbers (now here and in [#468]).
+2. `AGENTS.md` (`## Commits`) — added a single-rule-vs-mode principle: disable the single offending lint rule (`[0]`), not the `--strict` enforcement mode that gates the others.
+3. `AGENTS.md` (`## Workflow`) — added a bullet to use `gh issue view N --repo owner/repo` for GitHub issue/PR state instead of web search.
+4. `AGENTS.md` (`## Commits`, git mechanics) — added a note that staged `git rm` deletions ride along with the next `git commit` even when only unrelated paths are `git add`ed; commit with an explicit pathspec or check `git status` first.
