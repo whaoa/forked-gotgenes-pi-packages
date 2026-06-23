@@ -1017,7 +1017,7 @@ Step 4 (#445, the slice) is complete and released (`pi-subagents` v17.3.0); the 
 
 `Release: independent` (spike-gated)
 
-### Step 4a — Upgrade native-navigation renderer to Pi TUI components ([#462])
+### ✅ Step 4a — Upgrade native-navigation renderer to Pi TUI components ([#462])
 
 Smell: Category C (coupling) — the #445 slice renders the transcript as `serializeConversation` plain text, while the bespoke `ConversationViewer` it replaces renders richer per-message formatting.
 Until the native renderer reaches parity, the terminal cut (Step 5) cannot delete the bespoke viewer without a fidelity regression.
@@ -1026,6 +1026,13 @@ This step swaps the renderer behind the existing `TranscriptSource` seam (`src/u
 Gates Step 5: per [ADR-0004]'s no-interim-regression invariant, the native navigator must reach rendering parity with the bespoke viewer before Step 5 deletes it.
 
 Outcome: native session navigation renders at parity with the removed `ConversationViewer`; Step 5 can delete the bespoke viewer with no fidelity regression.
+
+Landed ([#462]): the renderer now mounts Pi's per-entry components (`AssistantMessageComponent` / `ToolExecutionComponent` / `BashExecutionComponent` / `UserMessageComponent` / `CompactionSummaryMessageComponent` / `BranchSummaryMessageComponent` / `SkillInvocationMessageComponent`) into a `Container`, mirroring Pi's own `renderSessionContext` mapping.
+The `TranscriptOverlay` caches that `Container` and rebuilds it on source change only (Pi's `rebuildChatFromMessages` path), keeping the lightweight `◍` streaming indicator.
+Tool calls render with their real `ToolDefinition`, resolved through a dependency-safe `getToolDefinition` read accessor on the record (mirroring `agentMessages`) surfaced on the `TranscriptSource` seam — no inbound call into the core.
+The pure `session-navigation.ts` sheds `renderTranscriptLines`/`serializeConversation`; rendering now lives in the SDK/TUI `session-navigator.ts`, which threads `cwd` from the command context.
+`custom`-role messages are skipped (the bespoke viewer never rendered them either).
+Selection and sourcing are untouched; native navigation now renders at parity, unblocking Step 5 for rendering fidelity.
 
 `Release: independent`
 
@@ -1103,7 +1110,7 @@ flowchart LR
     S2["✅ Step 2 - Settings command (#447)"]
     S3["✅ Step 3 - Background widget (#444)"]
     S4["✅ Step 4 - Native session nav slice (#445)"]
-    S4a["Step 4a - Renderer to TUI components (#462)"]
+    S4a["✅ Step 4a - Renderer to TUI components (#462)"]
     S4b["Step 4b - File-snapshot source (#463)"]
     S5["Step 5 - Dissolve /agents + viewer (#442)"]
     S6["Step 6 - Remove definition mgmt (#441)"]
