@@ -81,8 +81,8 @@ flowchart TB
     subgraph ui["UI domain"]
         direction TB
         Widget["agent-widget<br/>(live status)"]
-        ConvViewer["conversation-viewer<br/>(session overlay)"]
-        Menu["agent-menu<br/>(slash command)"]
+        Sessions["session-navigator<br/>(session view)"]
+        Settings["subagents-settings<br/>(settings command)"]
     end
 
     AgentTool --> SubagentManager
@@ -359,7 +359,7 @@ Record statistics (tool uses, token usage, compaction counts) and live activity 
 This is the single per-child session subscription — all run state lives on the `Subagent` record.
 
 The widget reads agent state by polling the records exposed via `SubagentManager.listAgents()` every 80 ms; that poll loop is now started by the manager's lifecycle notifications (the widget subscribes as a `SubagentManagerObserver` fanned out through `CompositeSubagentObserver`), not by inbound calls from the spawn tools.
-The conversation viewer subscribes to session events via `Subagent.subscribeToUpdates()` and reads messages via `Subagent.messages` — no direct `AgentSession` reference (#277).
+The `/subagents:sessions` navigator reads messages via `Subagent.agentMessages` and subscribes to updates via `Subagent.subscribeToUpdates()` — no direct `AgentSession` reference (#277).
 
 ## Cross-extension architecture
 
@@ -369,7 +369,7 @@ flowchart TD
         direction TB
         exports["SubagentsService API<br/>publish / getSubagentsService<br/>SubagentRecord, SubagentStatus"]
         engine["Tools: subagent, get_subagent_result,<br/>steer_subagent<br/>SubagentManager, createSubagentSession, SubagentSession"]
-        ui_int["Internal UI: widget, viewer,<br/>/agents menu"]
+        ui_int["Internal UI: widget, session-navigator,<br/>subagents-settings"]
     end
 
     core -- "Symbol.for on globalThis" --> sched["scheduling extension<br/>(hypothetical)"]
