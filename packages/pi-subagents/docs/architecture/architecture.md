@@ -341,13 +341,9 @@ src/
 ├── ui/                             user-facing presentation
 │   ├── agent-widget.ts             above-editor live status widget
 │   ├── widget-renderer.ts          pure rendering for widget
-│   ├── agent-config-editor.ts      agent detail/edit view (AgentConfigEditor class) ← removing in #441
-│   ├── agent-creation-wizard.ts    agent creation (AgentCreationWizard class) ← removing in #441
-│   ├── menu-ui.ts                  transient: MenuUI interface (removed with wizard/editor in #441)
-│   ├── agent-file-ops.ts           filesystem abstraction ← removing in #441
-│   ├── agent-file-writer.ts        overwrite-guard + write + reload + notify helper ← removing in #441
 │   ├── display.ts                  pure formatters and shared types
 │   ├── subagents-settings.ts       /subagents:settings command handler
+│   ├── session-navigation.ts       pure session-selection and transcript-source logic
 │   └── session-navigator.ts        /subagents:sessions command handler
 │
 └── handlers/                       event handlers
@@ -1079,7 +1075,7 @@ Outcome: ✅ `/agents` dissolved; −767 LOC source (menu hub + viewer + formatt
 
 `Release: batch "dissolve-agents"`
 
-### Step 6 — Remove the orphaned agent-definition management subtree ([#441])
+### ✅ Step 6 — Remove the orphaned agent-definition management subtree ([#441])
 
 Smell: Category A (dead subsystem) — the creation wizard and config editor are removed per ADR-0004 Decision C; after Step 5 deletes their only importer (`agent-menu.ts`), they and their file-ops helpers are pure orphans.
 This is the second deletion commit (split by subtree).
@@ -1095,6 +1091,10 @@ An operator generates a new agent `.md` by asking a Pi session directly (more ca
 These files are orphaned by Step 5, so this is a pure `git rm` with no surviving references and no edit to any doomed file.
 
 Outcome: −546 LOC source (wizard + editor + file-ops + file-writer); −948 LOC test; production duplication → 0 lines; 1 production and 1 test clone group eliminated.
+
+Landed ([#441]): deleted `agent-creation-wizard.ts`, `agent-config-editor.ts`, `agent-file-ops.ts`, `agent-file-writer.ts`, and `menu-ui.ts` (orphaned transient) from `src/ui/`, plus their four test files.
+`test/helpers/ui-stubs.ts` pruned to `makeMenuUI` only (still consumed by `subagents-settings.test.ts`); `makeFileOps`, `makeMenuManager`, and `createTestSubagentConfig` removed with their `ui-stubs.test.ts` describe blocks.
+Production duplication: 0 lines (confirmed by `fallow dupes`); `fallow dead-code`: clean. 16 test clone groups remain — Step 7 consolidation target.
 
 `Release: batch "dissolve-agents"`
 
@@ -1125,7 +1125,7 @@ flowchart LR
     S4a["✅ Step 4a - Renderer to TUI components (#462)"]
     S4b["✅ Step 4b - File-snapshot source (#463)"]
     S5["✅ Step 5 - Dissolve /agents + viewer (#442)"]
-    S6["Step 6 - Remove definition mgmt (#441)"]
+    S6["✅ Step 6 - Remove definition mgmt (#441)"]
     S7["Step 7 - Test clones (#443)"]
 
     S1 --> S4
