@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentTypeRegistry } from "#src/config/agent-types";
 import type { SessionMessage } from "#src/types";
-import { listNavigableAgents, liveSource, type NavigableSubagent, type TranscriptSource } from "#src/ui/session-navigation";
+import { fileSnapshotSource, listNavigableAgents, liveSource, type NavigableSubagent, type TranscriptSource } from "#src/ui/session-navigation";
 
 const registry = new AgentTypeRegistry(() => new Map());
 
@@ -90,5 +90,38 @@ describe("liveSource", () => {
     const record = makeNavigable({ getToolDefinition: vi.fn(() => def) });
     expect(liveSource(record).getToolDefinition("read")).toBe(def);
     expect(record.getToolDefinition).toHaveBeenCalledWith("read");
+  });
+});
+
+describe("fileSnapshotSource", () => {
+  const SESSION_JSONL = [
+    { type: "session", version: 3, id: "s1", timestamp: "2026-06-23T00:00:00Z", cwd: "/proj" },
+    { type: "message", id: "m1", parentId: null, timestamp: "2026-06-23T00:00:01Z", message: { role: "user", content: "do the thing" } },
+    { type: "message", id: "m2", parentId: "m1", timestamp: "2026-06-23T00:00:02Z", message: { role: "assistant", content: [{ type: "text", text: "done" }] } },
+  ]
+    .map((entry) => JSON.stringify(entry))
+    .join("\n");
+
+  it("reads the file, drops the session header, and returns the parsed messages", () => {
+    const readFile = vi.fn(() => SESSION_JSONL);
+    const source = fileSnapshotSource("/tasks/agent.jsonl", readFile);
+    expect(readFile).toHaveBeenCalledWith("/tasks/agent.jsonl");
+    expect(source.getMessages()).toEqual([
+      { role: "user", content: "do the thing" },
+      { role: "assistant", content: [{ type: "text", text: "done" }] },
+    ]);
+  });
+
+  it("is a static snapshot: no subscription, no streaming, no tool definitions", () => {
+    const source = fileSnapshotSource("/tasks/agent.jsonl", () => SESSION_JSONL);
+    expect(source.subscribe(() => {})).toBeUndefined();
+    expect(source.streaming()).toBeUndefined();
+    expect(source.getToolDefinition("read")).toBeUndefined();
+  });
+
+  it("returns an empty transcript for a header-only file", () => {
+    const headerOnly = JSON.stringify({ type: "session", version: 3, id: "s1", timestamp: "2026-06-23T00:00:00Z", cwd: "/proj" });
+    const source = fileSnapshotSource("/tasks/empty.jsonl", () => headerOnly);
+    expect(source.getMessages()).toEqual([]);
   });
 });

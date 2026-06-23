@@ -12,7 +12,7 @@
  * components require a `TUI`, `cwd`, and markdown theme.
  */
 
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { buildSessionContext, parseSessionEntries, type SessionEntry, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { AgentConfigLookup } from "#src/config/agent-types";
 import type { SubagentStatus } from "#src/lifecycle/subagent-state";
 import type { AgentSessionEvent, SessionMessage, SubagentType } from "#src/types";
@@ -69,6 +69,31 @@ export function listNavigableAgents(
   return agents
     .filter((record) => record.isSessionReady())
     .map((record) => ({ record, label: buildLabel(record, registry) }));
+}
+
+/**
+ * Source a transcript from a persisted child-session JSONL snapshot.
+ *
+ * For an agent evicted from the manager's map by the 10-minute cleanup sweep:
+ * the in-memory record (and its message history) is gone, but the session file
+ * survives on disk. Reads the file, drops the `SessionHeader`, and resolves the
+ * message list via Pi's own parser. A static snapshot — no subscription, no
+ * streaming, no live tool registry. `readFile` is injected so this module makes
+ * no `fs` calls.
+ */
+export function fileSnapshotSource(
+  outputFile: string,
+  readFile: (path: string) => string,
+): TranscriptSource {
+  const entries = parseSessionEntries(readFile(outputFile));
+  const sessionEntries = entries.filter((entry): entry is SessionEntry => entry.type !== "session");
+  const { messages } = buildSessionContext(sessionEntries);
+  return {
+    getMessages: () => messages,
+    subscribe: () => undefined,
+    streaming: () => undefined,
+    getToolDefinition: () => undefined,
+  };
 }
 
 /** Source a transcript live from an in-memory record (this slice's only source). */
