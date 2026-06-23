@@ -29,3 +29,21 @@ The central design fork — how evicted agents enter the picker — was resolved
 - **SDK-runtime call kept direct.** `fileSnapshotSource` calls `parseSessionEntries` / `buildSessionContext` directly rather than injecting them — the injected `readFile` already provides the unit-test seam, and there is no `no-restricted-imports` rule.
 - **Transient dead-code risk noted:** `fileSnapshotSource` and `listEvicted()` have no caller until step 3; flagged not to ship before step 3 lands (CI/`fallow` gate the pushed tip).
 - Release: independent (Phase 19 Step 4b roadmap tag).
+
+## Stage: Implementation — TDD (2026-06-23T13:00:00Z)
+
+### Session summary
+
+Executed all 4 plan steps in order: (1) `fileSnapshotSource` in the pure `session-navigation.ts`, (2) manager-retained `EvictedSubagent` descriptors (`cleanup` capture, `listEvicted`, `clearCompleted`/`dispose` clear), (3) the breaking `NavigationEntry` discriminated union + handler dual-source + `index.ts` wiring + all test updates in one commit, (4) architecture/ADR doc updates.
+Test count went from 1088 to 1099 (+11); full suite, `check`, root `lint`, and `fallow dead-code` all green.
+
+### Observations
+
+- **No deviations from the plan.**
+  All steps landed as written; Module-Level Changes matched the touched files exactly.
+- **Exploratory probe paid off.**
+  A disposable script confirmed `buildSessionContext` auto-detects the leaf with no `leafId`, the `type !== "session"` filter drops the header, and empty entries yield `[]` — validating the `fileSnapshotSource` shape before writing the test.
+- **Two ESLint auto-fixes during commit hooks:** a stray `!` non-null assertion in the manager test (step 2) and four `entry?.kind` optional chains on a non-nullish destructured `entry` (`@typescript-eslint/no-unnecessary-condition`, step 3).
+  Both fixed and re-committed; `check` + tests confirmed green after.
+- **Transient dead code** between steps 1–2 and 3 (predicted in the plan) cleared at the step-3 tip; final `fallow dead-code` is clean.
+- **Pre-completion reviewer: PASS** — deterministic checks, code design, test artifacts, Mermaid render, and all three cross-step invariants (no inbound core call, read-only overlay, renderer parity) verified; no follow-ups deferred.
