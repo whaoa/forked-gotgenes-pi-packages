@@ -27,6 +27,7 @@
     }
   },
   "exclude-paths": [
+    "docs/decisions",
     "docs/plans",
     "docs/retro",
     "packages/pi-autoformat/docs/assets",
