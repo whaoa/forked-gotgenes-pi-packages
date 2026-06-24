@@ -204,7 +204,7 @@ Before writing or debugging tests, load the `testing` skill for Vitest mock patt
 
 Use Conventional Commits.
 For a breaking change, place the `!` **after** the scope: `fix(pkg)!:` / `feat(pkg)!:` — never `fix!(pkg):`, which the grammar rejects so release-please drops the commit and skips the major bump (Refs #452).
-A `commit-msg` commitlint hook (wired via `prek`, installed by `pnpm install`) now enforces this deterministically: a malformed header fails locally before it can mis-version a release (Refs #457).
+A `commit-msg` hook runs [`committed`](https://github.com/crate-ci/committed) (wired via `prek`, installed by `pnpm install`) and enforces this deterministically: a malformed header fails locally before it can mis-version a release (Refs #457, #468).
 Commit at meaningful checkpoints without waiting for an explicit reminder.
 Prefer small, reviewable commits that leave the repository in a valid state.
 Do not gate a commit (or any `&&` step) on a check piped through `tail`/`head` — a pipeline's exit status is the filter's, so a failed `pnpm run lint`/`check` is masked and the commit still runs.
@@ -215,8 +215,8 @@ The note ships to the `BREAKING CHANGE:` footer, the release-please CHANGELOG (u
 Do not put `Closes #N` / `Fixes #N` / `Resolves #N` in commit messages.
 `/ship-issue` posts a curated close comment (implemented-in SHA, behavior summary) via `issue_close`; a commit keyword auto-closes the issue on push and pre-empts that comment, leaving the issue with no summary.
 Reference issues as `(#N)` in the subject or `Refs #N` in the body instead.
-Still separate footer tokens (`Refs #N`, `BREAKING CHANGE:`) from the body with a blank line for readability, but it is no longer enforced — `.commitlintrc.json` sets `footer-leading-blank` to `[0]` because `conventional-commits-parser` misreads a body line containing `#N` as the footer start (Refs #468).
-When a commit-lint or format gate fires a false positive, disable the single offending rule (set it to `[0]`), not the enforcement mode (`--strict`) that gates the others.
+Still separate footer tokens (`Refs #N`, `BREAKING CHANGE:`) from the body with a blank line for readability; it is not enforced — `committed` validates only the header grammar and parses a body-line `#N` correctly, so the `conventional-commits-parser` footer false positive that motivated the swap no longer applies (Refs #468).
+When a commit-lint or format gate fires a false positive, disable the single offending check (the specific `committed.toml` field), not the whole gate.
 Avoid `git rebase -i` in this environment — `$EDITOR` opens an interactive editor that aborts non-interactively.
 Reorder or fix unpushed commits with `git reset` + re-commit, or set `GIT_SEQUENCE_EDITOR`/`EDITOR=true`.
 After `git reset --soft HEAD~N`, all N commits' changes are staged together — to re-split into separate commits, run `git reset` (mixed) first, then `git add` per commit.

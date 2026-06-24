@@ -60,7 +60,7 @@ pnpm install
 ```
 
 This installs dependencies and wires the `prek` git hooks automatically via the `prepare` script.
-The hooks include a `pre-commit` stage (Biome, ESLint, rumdl) and a `commit-msg` stage that validates Conventional Commit headers via [commitlint](https://commitlint.js.org/).
+The hooks include a `pre-commit` stage (Biome, ESLint, rumdl) and a `commit-msg` stage that validates Conventional Commit headers via [committed](https://github.com/crate-ci/committed).
 
 ### Commands
 
