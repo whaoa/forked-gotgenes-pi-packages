@@ -490,6 +490,26 @@ The sections above describe the current implementation.
 This section records the organizing concept the package is moving toward — the spine that the elicitation, forwarding, and yolo machinery should collapse into.
 It is a target, not current state: today these concerns are spread across `PromptingGateway`, `PermissionPrompter`, `PermissionForwarder`, and `yolo-mode.ts`.
 
+### Why this is worth doing
+
+The consolidation below ("what it consolidates") justifies the spine on internal grounds — dissolving `canConfirm()`, collapsing the elicitation thicket, moving yolo into the ruleset.
+Those are real but deferrable: the tangle is survivable and only the maintainers see it.
+The stronger reason is external — the spine is the correct model of a real, already-painful relationship: the integration with `@gotgenes/pi-subagents`.
+
+That integration is a genuine cross-package contract ([ADR-0002], the inverted dependency, the process-global `SubagentSessionRegistry`), and it is awkward precisely because it implements the authority recursion *anonymously*.
+It forwards a child's `ask` up to the parent without ever naming the thing it is doing: authority is delegated down the session tree, and escalation is the edge back up.
+The bug history reads like the symptoms of that missing model — each a cross-session-authority question answered ad hoc in a different module:
+
+- [#296] — the per-session event-bus split meant a child never saw its own registration (a cross-session-identity bug).
+- [#298] — a sibling's `disposed` event evicted another sibling's registry entry (a whose-child-is-whose bug).
+- [#302] — the service publish had to be child-gated so a subagent did not clobber the parent's service (a who-holds-authority bug).
+
+None is *caused* by the absence of the spine — they are transport-level (jiti isolation, bus mechanics).
+But all three are cross-session-authority questions with no single owner, because nothing models "which session is whose parent, and who may decide for whom."
+The spine gives that a home and localizes where cross-session correctness must hold.
+And it is what makes the [Resolved direction](#resolved-direction) capabilities — grant-scope selection (approve for root vs. parent vs. requesting subagent), the one-hop canary, yolo inheritance down the tree — expressible at all: each is a subagent-relationship feature that falls out of the model and is barely buildable without it.
+The directory sketch reflects the same conclusion: there is no peer `subagent/` domain, because the subagent machinery *is* the cross-session edge of `authority/`.
+
 ### The spine
 
 Every action resolves against an **authority** — an entity empowered to permit or forbid it.
@@ -721,6 +741,180 @@ src/
 └── types.ts                   Core type definitions (PermissionState, FlatPermissionConfig, etc.)
 ```
 
+## Improvement roadmap — Phase 6: Access-intent extraction (proposed)
+
+Phase 5 cleared the residual state-encapsulation smells; the remaining structural debt is concentrated in the access-intent domain the "Target: the authority model" section names as the one genuinely open piece.
+This phase extracts that domain: it decomposes the 1,143-line `bash-program.ts` god file (the package's #1 churn × complexity hotspot at risk 97), introduces the `AccessPath` value object the [#418] fix seeded, collapses the two external-directory gates that independently acquired the same lexical/canonical conflation bug, and narrows the per-gate resolver surface that produced the [#393] false-green.
+It is the doc's "tractable first slice" toward the authority model — principal identity and cross-session path portability remain deferred follow-ups, not Phase 6 scope.
+
+Phase 6 also seeds the package's first domain directory.
+The `src/` tree is flat (66 top-level modules), and the access-intent work is the natural place to begin domain grouping: the bash engine it decomposes and the `AccessPath` it introduces land in a new `src/access-intent/` directory rather than flat, so the extracted modules reach their final home the first time instead of being moved twice.
+This is a seed, not the whole reorg — see [Directory organization](#directory-organization-forward-looking) for the broader arc.
+
+### Directory organization (forward-looking)
+
+The flat `src/` tree should grow domain subdirectories as the codebase matures.
+The target grouping (executed incrementally, one domain per phase that already touches it — never a big-bang move):
+
+| Domain dir       | Concern                                                                                                                |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `access-intent/` | Turn `(toolName, input)` into what is being accessed — path/bash/MCP extraction, normalization, `AccessPath`           |
+| `rules/`         | The pure decision core — `rule`, `normalize`, `synthesize`, `wildcard-matcher`, `pattern-suggest`, merges, `types`     |
+| `config/`        | Config sources and store — loader, paths, reporter, store, extension config/paths, policy loader                       |
+| `resolution/`    | Manager and session layer — `permission-manager`, `permission-resolver`, `permission-session`, session rules/approvals |
+| `authority/`     | Elicitation and forwarding (the future authority spine) — prompter, gateway, dialog, yolo, forwarding                  |
+| `subagent/`      | Child-session integration — context, registry, lifecycle events                                                        |
+| `service/`       | Cross-extension API — service, lifecycle, events, RPC                                                                  |
+| `presentation/`  | Tool preview and prompt sanitization — formatters, registries, system/skill sanitizers                                 |
+| `audit/`         | Decision recording and logging — audit, reporter, denial messages, session logger                                      |
+| `handlers/`      | Already grouped (unchanged)                                                                                            |
+
+Two principles govern the arc:
+
+1. **No big-bang move.**
+   A phase introduces a domain directory only when it is already rewriting that domain's files, so the move rides along with motivated work (tidy first).
+   `#src/*` aliasing keeps the churn mechanical (a move rewrites only the importing `#src/<file>` sites, with no `../../` fragility, and `tsc` + eslint catch every miss).
+2. **Curated barrels, not sprawl.**
+   Each domain directory may expose a lean `index.ts` barrel as its cross-domain API (so consumers import `#src/access-intent`, not `#src/access-intent/bash/program`), but only at genuine seams — the package already treats barrel re-export sprawl as a smell, and fallow flags any export with no importer.
+
+Phase 6 executes the first increment (`access-intent/`, partially populated by the bash engine and `AccessPath`); the pre-existing path/normalization utilities (`path-utils`, `input-normalizer`, `mcp-targets`, …) migrate into it in a later phase.
+
+### Health metrics
+
+| Metric                                       | Phase 5 close                   | Phase 6 target              |
+| -------------------------------------------- | ------------------------------- | --------------------------- |
+| Health score                                 | 76 (B)                          | ≥ 80 (B+)                   |
+| `bash-program.ts` LOC                        | 1,143                           | ≤ 350 (value-object facade) |
+| `bash-program.ts` risk                       | 97.0                            | < 40                        |
+| `common.ts` fallow target (pri / dependents) | 27.1 / 22                       | dissolved (0 targets)       |
+| External-directory gate duplication          | 2 gates, #418 logic twice       | 1 shared policy check       |
+| `ScopedPermissionResolver` surface           | `resolve` + `resolvePathPolicy` | `resolve(intent)`           |
+| Duplication                                  | 6.9%                            | ≤ 6.5%                      |
+| Dead code                                    | 0%                              | 0%                          |
+
+### Steps
+
+#### 1. Extract the tree-sitter parser and AST node-text resolver from `bash-program.ts`
+
+Lift the lazy tree-sitter-bash parser (`getParser`, the `TSNode` / `TSParser` interfaces) and the quote-aware node-text resolver (`resolveNodeText`, `SKIP_SUBTREE_TYPES`) into their own modules, leaving `bash-program.ts` importing them.
+Pure lift-and-shift, no behavior change.
+
+- Target: `src/handlers/gates/bash-program.ts` lines 18–58 (parser) and 273–333 (`resolveNodeText`) → `src/access-intent/bash/parser.ts` + `src/access-intent/bash/node-text.ts` (seeds the new domain directory).
+- Smell: Category B (god file — 1,143 LOC mixing parser bootstrap, AST traversal, and value-object API).
+- Outcome: ~120 LOC moved out; the parser and node-text resolver are independently testable; `bash-program.ts` drops below ~1,020 LOC.
+- Release: batch "bash-program-decomposition"
+
+#### 2. Extract bash token collection (pattern-first command config) from `bash-program.ts`
+
+Move the pattern-first command table (`PATTERN_FIRST_COMMANDS`, `PatternCommandConfig`), the flag classifier (`classifyPatternCommandFlag`), and the token collectors (`collectPatternCommandTokens`, `collectGenericCommandTokens`, `collectRedirectTokens`, `collectCommandTokens`, `collectPathCandidateTokens`) into a focused `bash-token-collection.ts`.
+This is the single largest cohesive block in the file.
+
+- Target: `src/handlers/gates/bash-program.ts` lines 334–687 → `src/access-intent/bash/token-collection.ts`.
+- Smell: Category B (god file — argument/flag tokenization is a distinct concern from the value-object API).
+- Outcome: ~350 LOC moved out; the per-command flag table is editable without touching the `BashProgram` class; `bash-program.ts` drops below ~670 LOC.
+- Release: batch "bash-program-decomposition"
+
+#### 3. Extract command enumeration and cwd projection; slim `BashProgram` to a value-object facade
+
+Move command enumeration (`collectCommands`, `collectCommandsInto`, subshell / substitution descent) and the effective-working-directory `cd`-fold projection (`collectPathCandidates`, `walkCurrentShellSequence`, `walkPipeline`, `foldCd`, and helpers) into focused modules, then relocate the slimmed `BashProgram` (and `bash-token-classification.ts`) so the whole bash sub-domain lives under `src/access-intent/bash/`, leaving `BashProgram` a thin facade that parses once and exposes typed slices.
+The `cd`-fold logic is the subtlest region (#307, #454) — extract it whole, behavior-preserving, with its tests following it.
+Moving `program.ts` out of `handlers/gates/` sharpens the dependency direction: the gates consume the access-intent engine, not the reverse.
+
+- Target: `src/handlers/gates/bash-program.ts` lines 688–1143 → `src/access-intent/bash/command-enumeration.ts` + `src/access-intent/bash/cwd-projection.ts`; `bash-program.ts` → `src/access-intent/bash/program.ts`; `bash-token-classification.ts` → `src/access-intent/bash/token-classification.ts`.
+- Smell: Category B (god file) + Category E (flat directory — the bash engine becomes the first cohesive domain group).
+- Outcome: `access-intent/bash/program.ts` ≤ 350 LOC (the `BashProgram` class + types only); risk score < 40; the bash sub-domain is co-located; bash gates and tests import from `#src/access-intent/bash/...`.
+- Release: batch "bash-program-decomposition"
+
+#### 4. Introduce the `AccessPath` value object
+
+Replace the raw-string pairing that carries a path's two meanings (lexical as-typed for matching, canonical symlink-resolved for the outside-CWD boundary) with an `AccessPath` value object exposing distinct `matchValues()` and boundary accessors.
+This makes the [#418] conflation — a single `string` silently used for both — a compile-time distinction, and converts `getExternalDirectoryPolicyValues` / `canonicalNormalizePathForComparison` from free helpers into `AccessPath` factories.
+`BashProgram.externalPaths(cwd)` returns `AccessPath[]` instead of lexical strings.
+
+- Target: new `src/access-intent/access-path.ts`; `src/path-utils.ts` (`getExternalDirectoryPolicyValues`, `canonicalNormalizePathForComparison`); `BashProgram.externalPaths`.
+- Smell: Category C (primitive obsession / platform-type threading — one `string` carries a containment value and a match value with no type distinction).
+- Outcome: `AccessPath` type; the lexical/canonical misuse is a compile error; 5 `getExternalDirectoryPolicyValues` call sites route through the value object.
+- Release: batch "access-path-unification"
+
+#### 5. Collapse the two external-directory gates onto one `AccessPath` policy check
+
+`describeExternalDirectoryGate` (single tool path) and `describeBashExternalDirectoryGate` (multi bash path) each independently re-derive aliases, call `resolver.resolvePathPolicy(..., "external_directory")`, and pick the worst uncovered path — and each independently acquired the [#418] bug.
+Route both through one shared external-directory policy check over `AccessPath[]`, so the alias/boundary logic exists once.
+
+- Target: `src/handlers/gates/external-directory.ts`, `src/handlers/gates/bash-external-directory.ts` (both import `AccessPath` from `#src/access-intent/access-path`); new shared helper.
+- Smell: Category A/C (production duplication — the same #418-prone logic in two gates — plus a Law-of-Demeter reach-through into path aliasing).
+- Outcome: one external-directory policy check; both gate factories delegate; the #418 alias logic is single-sourced; ~60 LOC of duplication removed.
+- Release: batch "access-path-unification"
+
+#### 6. Narrow `ScopedPermissionResolver` to a single `resolve(intent)`
+
+Each gate today calls either `resolve(surface, input)` or `resolvePathPolicy(values, ..., surface)`; the surface widens per gate, and a stubbed-but-unrouted method silently passes `allow` (the [#393] false-green).
+Introduce a minimal `AccessIntent` (surface + value-or-`AccessPath` + `agentName`) that each gate emits, and collapse the two resolver entry points into one `resolve(intent)`.
+Scope is the surface narrowing only — `AccessIntent` carries no principal identity, and cross-session path portability stays a deferred follow-up ([#309] tracks the related advisory-path unification).
+
+- Target: `src/permission-resolver.ts` (`ScopedPermissionResolver`), `src/permission-manager.ts` (`checkPermission` / `checkPathPolicy`), all gate descriptor factories.
+- Smell: Category C/D (widening interface per gate + testability false-green from an unrouted stub).
+- Outcome: `ScopedPermissionResolver` exposes one `resolve(intent)`; adding a gate cannot widen the resolver surface; the #393 false-green class is structurally impossible.
+- Release: independent
+
+#### 7. Split the `common.ts` grab-bag
+
+`common.ts` (fallow's #1 refactoring target, pri 27.1, 22 dependents) mixes unrelated concerns: runtime type guards (`toRecord`, `getNonEmptyString`, `normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`, `isPermissionState`, `isDenyWithReason`) and minimal YAML/frontmatter parsing (`parseSimpleYamlMap`, `extractFrontmatter`).
+Split it into a type-guards module and a yaml-frontmatter module so the 22-dependent fan-in stops amplifying every unrelated change.
+
+- Target: `src/common.ts` → `src/value-guards.ts` + `src/yaml-frontmatter.ts`.
+- Smell: Category E (grab-bag — unclear module boundary with high fan-in amplification).
+- Outcome: `common.ts` dissolved; two cohesive modules; the fallow refactoring-targets list drops to zero.
+- Release: independent
+
+#### 8. Extract shared fixtures for the external-directory integration tests
+
+The external-directory test files duplicate setup heavily: `external-directory-integration.test.ts` (21 clone groups, 214 lines), `external-directory-session-dedup.test.ts` (3 groups, 86 lines), and the 880-line arrow in `bash-external-directory.test.ts`.
+Extract a shared fixture into `test/helpers/` once the gates are unified (Phase 6 Step 5), so the fixture targets the single collapsed policy check.
+
+- Target: `test/handlers/external-directory-integration.test.ts`, `test/handlers/external-directory-session-dedup.test.ts`, `test/bash-external-directory.test.ts` → new `test/helpers/external-directory-fixtures.ts`.
+- Smell: Category D (test duplication — the worst clone family after the gate unification).
+- Outcome: external-directory test duplication down by ~300 lines; one fixture per the collapsed gate; package duplication ≤ 6.5%.
+- Release: independent
+
+### Step dependency diagram
+
+```mermaid
+flowchart TD
+    S1["Step 1 — extract parser + node-text"]
+    S2["Step 2 — extract token collection"]
+    S3["Step 3 — extract enumeration + cwd projection (BashProgram facade)"]
+    S4["Step 4 — introduce AccessPath value object"]
+    S5["Step 5 — collapse the two external-directory gates"]
+    S6["Step 6 — narrow resolver to resolve(intent)"]
+    S7["Step 7 — split common.ts grab-bag"]
+    S8["Step 8 — external-directory test fixtures"]
+
+    S1 --> S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S4 --> S6
+    S5 --> S8
+```
+
+Step 7 has no dependencies and runs in parallel with everything.
+
+### Tracks
+
+- **Track A — bash-program decomposition** (Steps 1, 2, 3): a sequential lift-and-shift of the #1 hotspot into focused modules under the new `src/access-intent/bash/` directory; pure structural extraction, no behavior change.
+- **Track B — access-path unification** (Steps 4, 5, 6): the [#418] / [#393] semantic fixes; depends on a settled `bash-program.ts` (Step 3) because Step 4 retypes `BashProgram.externalPaths`.
+- **Track C — independent cleanup** (Steps 7, 8): the `common.ts` split (fully parallel) and the external-directory test-fixture extraction (after Step 5).
+
+The one cross-track coupling is `bash-program.ts`: Track A extracts its helpers and Step 4 retypes its `externalPaths` method, so Track B starts after Step 3 lands to avoid two tracks editing the same file.
+
+### Release batches
+
+- **Batch "bash-program-decomposition":** Steps 1, 2, 3 (ship together; tail = Step 3).
+  Each is a behavior-preserving extraction, batched to release the decomposition once rather than three internal-only patch releases.
+- **Batch "access-path-unification":** Steps 4, 5 (ship together; tail = Step 5).
+  Step 4 alone leaves both the new `AccessPath` type and the old free helpers in place — a transitional state — so it ships with Step 5.
+- Independently releasable: Steps 6, 7, 8.
+
 ## Refactoring history
 
 The architecture above is the product of five completed improvement phases.
@@ -763,11 +957,16 @@ Seven steps ([#362]–[#368]), all closed.
 [#282]: https://github.com/gotgenes/pi-packages/issues/282
 [#285]: https://github.com/gotgenes/pi-packages/issues/285
 [#290]: https://github.com/gotgenes/pi-packages/issues/290
+[#296]: https://github.com/gotgenes/pi-packages/issues/296
+[#298]: https://github.com/gotgenes/pi-packages/issues/298
+[#302]: https://github.com/gotgenes/pi-packages/issues/302
 [#314]: https://github.com/gotgenes/pi-packages/issues/314
 [#331]: https://github.com/gotgenes/pi-packages/issues/331
 [#334]: https://github.com/gotgenes/pi-packages/issues/334
 [#342]: https://github.com/gotgenes/pi-packages/issues/342
 [#362]: https://github.com/gotgenes/pi-packages/issues/362
 [#368]: https://github.com/gotgenes/pi-packages/issues/368
+[#309]: https://github.com/gotgenes/pi-packages/issues/309
 [#393]: https://github.com/gotgenes/pi-packages/issues/393
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
+[ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
