@@ -64,7 +64,7 @@ This change is **not** breaking: it swaps a local developer gate and changes no 
 
 ### Evaluation harness
 
-A reproducible shell harness installs each candidate (whichever of `brew` / `cargo` / `mise` / a prek remote repo is the cleanest per tool) and runs four fixture messages through each, recording the exit code and stderr/stdout:
+A reproducible shell harness installs all three candidates with `brew` (all three ship Homebrew bottles — `convco` 0.6.4, `cocogitto` 7.0.0, `committed` 1.1.11 as of planning) and runs four fixture messages through each, recording the exit code and stderr/stdout:
 
 | Fixture                   | Header                                                                                       | Required verdict |
 | ------------------------- | -------------------------------------------------------------------------------------------- | ---------------- |
@@ -94,7 +94,8 @@ Tie-break for Branch A favours, in order: (1) clean single-pending-message opera
 
 ### Binary distribution (best fit per tool, decided at swap time)
 
-Per the operator's "no preference — best fit per tool" answer, the provisioning mechanism is chosen for whichever tool wins:
+`brew` is the install path for the **evaluation** (above); it is a poor fit for the **gate** itself (not present in a fresh worktree without a step, unpinned, and not guaranteed on every contributor/CI machine).
+So the gate-provisioning mechanism is chosen for whichever tool wins, per the operator's "no preference — best fit per tool" answer:
 
 | Winner      | Provisioning                                   | Rationale                                                                                                       |
 | ----------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -169,7 +170,7 @@ This is a config/docs change with no red→green unit cycles, so it proceeds as 
 The next workflow step is `/build-plan`.
 
 1. **Stand up the harness and run all three candidates.**
-   Create the four fixture messages; install each candidate via the cleanest available mechanism; run every fixture through each tool and record exit codes plus the five-criteria data.
+   Create the four fixture messages; install all three candidates with `brew install convco cocogitto committed`; run every fixture through each tool and record exit codes plus the five-criteria data.
    Verify: every (tool, fixture) verdict is captured; at least the `case1` and `case2-*` exit codes are recorded for all three tools.
    No commit (investigation producing the ADR's evidence).
 
