@@ -8,7 +8,7 @@ import { NotificationState } from "#src/observation/notification-state";
 import type { RunConfig } from "#src/runtime";
 import type { Subagent } from "#src/types";
 import { createBlockingFactory, createSessionFactory } from "#test/helpers/manager-stubs";
-import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
+import { createMockSession, createSubagentSessionStub, emitResumeUsageAndCompaction, toSubagentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
 
 /** Default max concurrent background agents (matches production default). */
@@ -82,6 +82,21 @@ function arrangeQueuedPair() {
   return { manager: mgr, factory, running, queued };
 }
 
+/**
+ * Arrange a manager whose onSubagentCompleted observer records the record's
+ * resultConsumed flag, with one background agent spawned via a tool call.
+ * The act (when markConsumed is called relative to awaiting) stays in each test.
+ */
+function seedResultConsumedObserver() {
+  let seenConsumed: boolean | undefined;
+  const { manager } = createManager({
+    observer: { onSubagentCompleted: (r) => { seenConsumed = r.notification?.resultConsumed; } },
+  });
+  const id = spawnBgWithToolCall(manager, "tc-1");
+  const record = manager.getRecord(id)!;
+  return { manager, record, getSeenConsumed: () => seenConsumed };
+}
+
 describe("SubagentManager — Bug 1 race condition (notification.resultConsumed vs onComplete)", () => {
   let manager: SubagentManager;
 
@@ -90,36 +105,28 @@ describe("SubagentManager — Bug 1 race condition (notification.resultConsumed 
   });
 
   it("reproduces bug: onComplete fires with resultConsumed=false when markConsumed called after await", async () => {
-    let seenConsumed: boolean | undefined;
-    ({ manager } = createManager({ observer: { onSubagentCompleted: (r) => {
-      seenConsumed = r.notification?.resultConsumed;
-    } } }));
-
-    const id = spawnBgWithToolCall(manager, "tc-1");
-    const record = manager.getRecord(id)!;
+    const seeded = seedResultConsumedObserver();
+    manager = seeded.manager;
+    const { record } = seeded;
 
     // Simulate the buggy get_subagent_result: await THEN mark consumed
     await record.promise;
     record.notification!.markConsumed(); // too late — onComplete already fired
 
     // onComplete saw resultConsumed as false — would queue a notification (the bug)
-    expect(seenConsumed).toBeFalsy();
+    expect(seeded.getSeenConsumed()).toBeFalsy();
   });
 
   it("fix: onComplete sees resultConsumed=true when markConsumed called before await", async () => {
-    let seenConsumed: boolean | undefined;
-    ({ manager } = createManager({ observer: { onSubagentCompleted: (r) => {
-      seenConsumed = r.notification?.resultConsumed;
-    } } }));
-
-    const id = spawnBgWithToolCall(manager, "tc-1");
-    const record = manager.getRecord(id)!;
+    const seeded = seedResultConsumedObserver();
+    manager = seeded.manager;
+    const { record } = seeded;
 
     // The fix: pre-mark BEFORE awaiting
     record.notification!.markConsumed();
     await record.promise;
 
-    expect(seenConsumed).toBe(true);
+    expect(seeded.getSeenConsumed()).toBe(true);
   });
 
   it("normal case: onComplete fires with no notification when agent was not spawned via tool", async () => {
@@ -377,8 +384,7 @@ describe("SubagentManager — lifetime usage + compaction count are eagerly init
     stub.resumeTurnLoop.mockImplementation(async () => {
       // Emit events through the session — the record observer subscribed by
       // SubagentManager.resume() will pick them up.
-      session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 70, output: 30, cacheWrite: 5 } } });
-      session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 999 }, reason: "overflow" });
+      emitResumeUsageAndCompaction(session);
       return "second";
     });
     ({ manager } = createManager({ createSubagentSession: factory }));

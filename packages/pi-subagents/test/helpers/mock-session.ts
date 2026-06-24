@@ -15,6 +15,17 @@ export interface MockSession {
 }
 
 /**
+ * Emit the standard resume event pair onto a MockSession: one assistant
+ * message_end carrying usage, then one compaction_end. Shared by the
+ * subagent-manager and subagent resume-observer tests, which assert on these
+ * exact payloads (input:70/output:30/cacheWrite:5, tokensBefore:999).
+ */
+export function emitResumeUsageAndCompaction(session: MockSession): void {
+	session.emit({ type: "message_end", message: { role: "assistant", usage: { input: 70, output: 30, cacheWrite: 5 } } });
+	session.emit({ type: "compaction_end", aborted: false, result: { tokensBefore: 999 }, reason: "overflow" });
+}
+
+/**
  * Cast a MockSession to AgentSession for use as a SubagentSession's session.
  *
  * AgentSession is a class with private fields — no plain object satisfies it
