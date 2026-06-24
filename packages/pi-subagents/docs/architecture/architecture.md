@@ -1098,7 +1098,7 @@ Production duplication: 0 lines (confirmed by `fallow dupes`); `fallow dead-code
 
 `Release: batch "dissolve-agents"`
 
-### Step 7 — Consolidate remaining test clone families ([#443])
+### ✅ Step 7 — Consolidate remaining test clone families ([#443])
 
 Smell: Category D (testability) — 16 clone groups at Phase 18 end; the terminal cut (Steps 5–6) removes ~4 groups; remaining groups are extraction targets.
 Run after the cut so no helper is extracted into a file the cut then deletes.
@@ -1110,7 +1110,10 @@ Target files:
 - `test/lifecycle/concurrency-limiter.test.ts` — extract shared setup for the 10-line clone (lines 21–30 / 148–155).
 - `test/tools/spawn-config.test.ts` — extract a shared fixture for the 9-line clone (lines 22–30 / 35–43).
 
-Outcome: test clone groups ≤ 10 (from 16); `subagent-manager.test.ts` uses shared factory helpers.
+Outcome (landed): test clone groups reduced from 16 to 9 (≤ 10 target met).
+Eight genuine arrange/fixture/helper families were extracted: `makeNavigable` (shared `test/helpers/make-navigable.ts`), `emitResumeUsageAndCompaction` (shared `test/helpers/mock-session.ts`), and local helpers for `makeWidget`, the captured-overlay render (`renderCapturedOverlay`), the `resultConsumed` observer (`seedResultConsumedObserver`), the ready subagent (`makeReadySubagent`), and the prepared bracket (`preparedBracket`).
+The nine residual families are the repeated system-under-test call (`resolveSpawnConfig`, `assembleSessionConfig`, `schedule`, `SessionNavigatorHandler.handle`, `spawnBg`+`await`, `agent.run()`, `execute`), left intact per the testing guardrail — the repeated act is the test subject, not duplication to remove.
+One family the plan pre-classified as captured-overlay boilerplate (`dup:ea0a1bce`) proved to be an act-clone once the boilerplate was extracted, so it joins the residual set rather than being wrapped.
 
 `Release: independent`
 
@@ -1126,7 +1129,7 @@ flowchart LR
     S4b["✅ Step 4b - File-snapshot source (#463)"]
     S5["✅ Step 5 - Dissolve /agents + viewer (#442)"]
     S6["✅ Step 6 - Remove definition mgmt (#441)"]
-    S7["Step 7 - Test clones (#443)"]
+    S7["✅ Step 7 - Test clones (#443)"]
 
     S1 --> S4
     S4 --> S4a
