@@ -28,3 +28,28 @@ The plan embeds four rendered-and-validated Mermaid diagrams: a shared data-flow
 
 [#474]: https://github.com/gotgenes/pi-packages/issues/474
 [#476]: https://github.com/gotgenes/pi-packages/issues/476
+
+## Stage: Planning — design revision (2026-06-25T14:30:00Z)
+
+### Session summary
+
+A Socratic design dialogue with the operator expanded the plan well past the issue's lift-and-shift framing.
+Three decisions landed: (1) `BashProgram` becomes born-ready — `parse(command, cwd: string)` resolves eagerly and the slice methods become parameter-free getters; (2) the `ToolCallContext.cwd` type widening is fixed package-wide; (3) the facade-scope fork resolves to Option B because born-ready leaves no call-time orchestration for the facade to retain.
+The plan and both Mermaid diagrams were rewritten to the decided design; the three A/B/C comparison diagrams were dropped (they described the superseded lazy model and would contradict born-ready during implementation).
+
+### Observations
+
+- **Born-ready insight** — the operator pushed on "why is `cwd` not available at parse time?"
+  then "why pass `cwd` to `parse()` rather than store it?"
+  Resolution: `parse(command, cwd)` is the async factory (constructors can't be async); `cwd` is consumed during birth to produce the resolved arrays, so it is a factory parameter, not a retained field (storing it would be dead state).
+  `PathCandidate` / `EffectiveBase` become fully internal to `cwd-projection.ts` — never on the instance.
+- **`cwd` type widening is a real error** — verified `ExtensionContext.cwd: string` (non-optional; the same SDK interface marks `model` / `signal` as `| undefined`, so `cwd`'s presence is deliberate).
+  The widened `ToolCallContext.cwd: string | undefined` spawned dead `cwd`-undefined branches in **five** gates (`bash-external-directory`, `external-directory`, `skill-read`, `path`, `tool`) plus three obsolete "no CWD" tests.
+  This is a package-wide gate-layer cleanup, orthogonal to the bash relocation but coupled to born-ready at the pipeline seam (`parse` needs a `string`).
+- **Scope decision (`ask_user`)** — operator chose **all-in #475** (relocation + born-ready + full `cwd` fix) over splitting the type fix into a prerequisite issue or deferring born-ready.
+  Recorded as Alternatives considered in the plan.
+- **`BashProgram` is a function masquerading as a class** — acknowledged: under eager resolution the three getters return stored arrays, so the class is close to a data holder.
+  Deliberately **not** collapsed to a function-returning-record here — that reshape is deferred to Step 4 ([#476]), which already retypes `externalPaths` for `AccessPath`.
+- TDD order grew to five cycles: cwd type fix (independent, lands first) → command enumeration → cwd projection + born-ready (largest) → relocation → docs.
+  Still all `refactor:` / `docs:` — no user-facing behavior change, so the batch-tail release caveat (no version bump from refactors) stands.
+- Both rewritten diagrams validated with `mmdc`; `rumdl` clean.
