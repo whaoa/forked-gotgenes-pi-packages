@@ -13,9 +13,8 @@ import { mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
+import { BashProgram } from "#src/access-intent/bash/program";
 import { describeBashExternalDirectoryGate } from "#src/handlers/gates/bash-external-directory";
-import { BashProgram } from "#src/handlers/gates/bash-program";
 import {
   type GateDescriptor,
   isGateBypass,

@@ -1,4 +1,4 @@
-import { BashProgram } from "./bash-program";
+import { BashProgram } from "#src/access-intent/bash/program";
 
 /**
  * Extract paths from a bash command string that resolve outside CWD.

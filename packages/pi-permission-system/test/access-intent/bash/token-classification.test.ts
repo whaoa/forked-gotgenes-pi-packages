@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   classifyTokenAsPathCandidate,
   classifyTokenAsRuleCandidate,
-} from "#src/handlers/gates/bash-token-classification";
+} from "#src/access-intent/bash/token-classification";
 
 // ── Shared rejection behaviour ─────────────────────────────────────────────
 //

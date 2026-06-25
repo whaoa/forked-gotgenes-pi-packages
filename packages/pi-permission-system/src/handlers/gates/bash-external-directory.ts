@@ -1,10 +1,10 @@
+import type { BashProgram } from "#src/access-intent/bash/program";
 import { getNonEmptyString, toRecord } from "#src/common";
 import { getExternalDirectoryPolicyValues } from "#src/path-utils";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { PermissionCheckResult } from "#src/types";
-import type { BashProgram } from "./bash-program";
 import { pickMostRestrictive } from "./candidate-check";
 import type { GateResult } from "./descriptor";
 import { formatBashExternalDirectoryAskPrompt } from "./external-directory-messages";

@@ -5,16 +5,16 @@ import {
 } from "#src/access-intent/bash/node-text";
 import type { TSNode } from "#src/access-intent/bash/parser";
 import {
+  classifyTokenAsPathCandidate,
+  classifyTokenAsRuleCandidate,
+} from "#src/access-intent/bash/token-classification";
+import {
   collectCommandTokens,
   collectPathCandidateTokens,
   collectRedirectTokens,
   extractCommandName,
 } from "#src/access-intent/bash/token-collection";
 import { canonicalizePath } from "#src/canonicalize-path";
-import {
-  classifyTokenAsPathCandidate,
-  classifyTokenAsRuleCandidate,
-} from "#src/handlers/gates/bash-token-classification";
 import {
   getPathPolicyValues,
   isPathWithinDirectory,

@@ -10,9 +10,8 @@
  * full fuzzer (tree-sitter fuzzing is brittle); it pins A3 directly.
  */
 import { describe, expect, it } from "vitest";
-
+import { BashProgram } from "#src/access-intent/bash/program";
 import { resolveBashCommandCheck } from "#src/handlers/gates/bash-command";
-import { BashProgram } from "#src/handlers/gates/bash-program";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { PermissionState } from "#src/types";
 

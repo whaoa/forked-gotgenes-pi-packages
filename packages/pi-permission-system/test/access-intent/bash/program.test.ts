@@ -10,7 +10,7 @@ vi.mock("node:fs", () => ({
   default: { realpathSync },
 }));
 
-import { BashProgram } from "#src/handlers/gates/bash-program";
+import { BashProgram } from "#src/access-intent/bash/program";
 
 describe("BashProgram", () => {
   describe("pathRuleCandidates", () => {

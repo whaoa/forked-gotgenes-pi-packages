@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { BashProgram } from "#src/access-intent/bash/program";
 import { getNonEmptyString, toRecord } from "#src/common";
 import { describeBashExternalDirectoryGate } from "#src/handlers/gates/bash-external-directory";
-import { BashProgram } from "#src/handlers/gates/bash-program";
 import type {
   GateBypass,
   GateDescriptor,

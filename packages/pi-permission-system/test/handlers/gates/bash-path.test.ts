@@ -9,9 +9,9 @@ vi.mock("node:os", () => {
   };
 });
 
+import { BashProgram } from "#src/access-intent/bash/program";
 import { getNonEmptyString, toRecord } from "#src/common";
 import { describeBashPathGate } from "#src/handlers/gates/bash-path";
-import { BashProgram } from "#src/handlers/gates/bash-program";
 import type {
   GateBypass,
   GateDescriptor,

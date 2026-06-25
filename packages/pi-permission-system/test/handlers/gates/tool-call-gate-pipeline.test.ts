@@ -16,7 +16,7 @@ const { mockBashProgramParse } = vi.hoisted(() => ({
   mockBashProgramParse: vi.fn(),
 }));
 
-vi.mock("#src/handlers/gates/bash-program", () => ({
+vi.mock("#src/access-intent/bash/program", () => ({
   BashProgram: { parse: mockBashProgramParse },
 }));
 
