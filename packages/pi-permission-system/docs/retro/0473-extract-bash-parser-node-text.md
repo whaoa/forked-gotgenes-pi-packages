@@ -42,3 +42,57 @@ Completed all three planned TDD cycles: extracted the tree-sitter parser block t
   - Reviewer warnings: (1) Mermaid diagram node `S1` was missing `✅` — the heading carried it but AGENTS.md requires both; fixed by amending the docs commit; (2) `node-text.test.ts` had two Biome `noTemplateCurlyInString` warnings for the intentional literal `"${VAR}"` strings — fixed with a `biome-ignore` comment; both resolved before writing stage notes.
 - `bash-program.ts` LOC fell 98 lines (1,143 → 1,045), slightly more than the plan's ~120 projection because the decorative `// ── AST walker ──` section header was also removed when the walker block emptied.
 - No deviations from the plan's Module-Level Changes list.
+
+## Stage: Final Retrospective (2026-06-25T15:35:54Z)
+
+### Session summary
+
+Shipped Phase 6 Step 1 end-to-end in a single conversation spanning four stages (plan → TDD → ship → retro): a behavior-preserving lift-and-shift of the tree-sitter parser and node-text resolver into `src/access-intent/bash/`, seeding the package's first domain directory.
+`bash-program.ts` dropped 1,143 → 1,045 LOC; +17 tests across 2 new files; CI green; release deferred per the mid-batch marker.
+The execution was clean — the only reviewer findings were two minor doc/test-authoring gaps, both fixed before shipping.
+
+### Observations
+
+#### What went well
+
+- The plan's explicit "import-then-delete" sequencing plus grep-verified dead-import removal made Cycles 1 and 2 mechanical; the autoformatter's `noRedeclare` / `noUnusedImports` checks acted as an immediate correctness gate the moment the old block lingered.
+- The plan's Test Impact Analysis correctly predicted the testability win: neither new module pulls in `#src/canonicalize-path`, so `node-text.test.ts` runs in isolation without the canonicalize mock that any `bash-program.ts` importer needs (retro 0345).
+- The pre-completion reviewer caught the Mermaid `✅` gap that both planning and implementation missed — the fresh-context backstop worked exactly as designed.
+- Verification was incremental throughout: `pnpm run check` + per-file `vitest` after each cycle, then full suite + lint + `fallow dead-code` before the reviewer.
+  No end-only verification gap.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (reviewer-caught) — the plan's Cycle 3 said "append `✓ complete` to the roadmap Step 1 heading line," missing the Mermaid diagram node and using the wrong marker (`✓ complete` vs `✅`).
+  Root cause: the `package-pi-permission-system` skill (line 21) says "append `✓ complete` to the step line," which is inconsistent with `tdd-plan.md` step 7 ("prefix `✅` on both the step heading and its Mermaid diagram node"); planning followed the skill.
+  Impact: one extra fix + a commit amend; no rework beyond that.
+- `other` (edit construction) — the first Cycle 3 architecture-doc edit batch failed with "edits overlap" because it tried to flip the `bash-token-classification.ts` tree connector (`├──`→`└──`) unnecessarily alongside the `bash-program.ts` description edit.
+  Impact: one rejected batch + one re-read; corrected by dropping the spurious connector change.
+- `other` (tool mechanics) — the Cycle 2 import-then-delete two-step surfaced intermediate `noRedeclare` / `noUnusedImports` errors after the import was added but before the old definitions were removed.
+  Anticipated and handled, but it generated error noise mid-cycle.
+  Impact: a few extra tool calls; inherent to how `pi-autoformat` runs after each `Edit`.
+- `missing-context` (minor) — planning used the wrong absolute path (`/Users/chris/development/pi/pi-permission-system/...`, dropping `pi-packages/packages/`) for one `read`, hitting an external-directory denial; self-corrected on the next call.
+  Impact: one wasted tool call.
+- `other` (markdown-conventions) — the plan was first drafted with a bracketed `[#473]` self-reference (violating MD052/MD053); self-caught, but the corrective edit batch failed to match on the first try and took ~3 grep/read calls to reapply.
+  Impact: ~4 extra tool calls, no content rework.
+
+#### What caused friction (user side)
+
+- None.
+  The two user interjections ("Continue." and "Are we ready for ship-issue?") were lightweight oversight checkpoints, not corrections; the flow was largely autonomous and no earlier-context opportunity was missed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — Planning ran on `claude-opus-4-8` (judgment-appropriate), TDD on `claude-sonnet-4-6` (implementation-appropriate), and Ship on `opencode-go/deepseek-v4-flash`.
+  The ship stage's stacked-release analysis (release-please `exclude-paths` + component-mapping reasoning) is judgment-heavy; the flash model spent 7 exploratory `grep` calls on `release-please-config.json` reaching a correct but meandering conclusion (the defer decision and stacked-release note were both accurate).
+  Mild mismatch — a stronger model would have been more direct — but no rework resulted.
+- **Escalation-delay tracking** — no `rabbit-hole`; no sequence exceeded 5 consecutive tool calls on the same error.
+  The longest single-task run was the ship stacked-release investigation (7 grep calls), which was exploration, not stuck-on-an-error.
+- **Unused-tool detection** — no `missing-context` friction warranted a subagent; the touched code was small and already understood from planning.
+- **Feedback-loop gap analysis** — none; verification was incremental after every cycle, not deferred to the end.
+
+### Changes made
+
+1. `.pi/skills/package-pi-permission-system/SKILL.md` — de-duplicated the roadmap-completion instruction: removed the stale `✓ complete`-on-the-step-line restatement and pointed it at the canonical completion-marker convention in the implementation prompts (`✅` on both the step heading and its Mermaid diagram node), keeping only the package-specific "mark during shipping, do not defer" nuance.
+   Root cause of the original reviewer WARN: the skill's wording conflicted with `tdd-plan.md` step 7, and planning followed the skill.
+2. `packages/pi-permission-system/docs/retro/0473-extract-bash-parser-node-text.md` — added this Final Retrospective stage entry.
