@@ -43,3 +43,51 @@ The tie-break selected `committed`; wired it as a `prek` remote-repo `commit-msg
 - The `mise` `[tools]` distribution path the plan listed for `cocogitto`/`convco` was not needed, since `committed` won.
 - Pre-completion reviewer: **PASS** — ready for `/ship-issue`.
   No WARN findings (the 3 `useTemplate` biome infos in pi-permission-system are pre-existing and unrelated).
+
+## Stage: Final Retrospective (2026-06-25T02:00:00Z)
+
+### Session summary
+
+Shipped the `commitlint` → `committed` swap, but the first CI push failed on the `release-please` job with `Bad credentials`.
+Diagnosed it as secondary rate-limiting from release-please walking the default 500-commit history every run, then fixed it by pinning an auto-advanced `last-release-sha` baseline (`release-please-config.json` + a `ci.yml` write-back step), dropping the walk to ~29 commits.
+Closed #468 once CI went green (the swap releases nothing — root paths only).
+
+### Observations
+
+#### What went well
+
+- The `ask_user` gate before implementing the deep-walk fix surfaced the `commit-search-depth`-vs-`last-release-sha` choice and let the user's domain knowledge redirect to the adaptive solution **before** any code was committed — the gate did its job, catching a wrong-shaped fix pre-implementation.
+- Infra changes were verified empirically: CI run `28140425763` showed the walk drop 500 → 29 commits with no `Bad credentials`, and the jq SHA extraction was validated locally plus `actionlint` before the write-back commit landed.
+- The diagnosis was linear and efficient (run logs → secret metadata → run history → per-component tag depths → release-please config research), no flailing.
+
+#### What caused friction (agent side)
+
+1. `missing-context` (user-caught, indirectly) — the write-back step was first written against `steps.release.outputs.sha`, which is **empty in this repo**: all components live at non-root paths, so release-please emits only path-prefixed `<path>--sha`, no top-level `sha`.
+   The `[ -z "$RELEASE_SHA" ]` guard would have made the write-back a silent, permanent no-op.
+   It surfaced only because the user asked how rebase-merge affects the SHA, which prompted reading the action's output contract — a check that belonged **before** authoring the step.
+   Impact: required fix commit `56d21ea5`; would have shipped a silent no-op otherwise.
+2. `premature-convergence` (mild) — first leaned toward `commit-search-depth` (a fixed constant) as the simple fix; it is the wrong shape for a high-volume, release-batching monorepo, where the walk counts **total** repo commits (~40/day), not per-package.
+   Reframed to the adaptive `last-release-sha` only after the user's two probing questions.
+   Impact: extra conversational rounds, no rework — the `ask_user` gate caught it before implementation.
+
+#### What caused friction (user side)
+
+- The PAT-switch context arrived during diagnosis rather than at ship time; volunteered promptly when relevant, so minimal impact and not really actionable.
+- The user's domain knowledge (rebase-merge of the release PR, total commit volume, release batching) drove the correct solution shape through **redirecting questions** rather than corrections — the high-value bidirectional pattern.
+  The rebase-merge question in particular caught the latent `<path>--sha` bug before it merged.
+
+### Diagnostic details
+
+- **Unused-tool** — for the `missing-context` bug, `fetch_content` (or `curl`) could have confirmed the release-please output contract before authoring the step; it was available and was ultimately what found the answer, just reactively.
+- **Feedback-loop gap** — strong overall (CI-verified the read-side fix; `actionlint` + local jq test before the write-back commit), with one gap: commit `8a16681d` landed before the action's output contract was verified, which the `missing-context` finding covers.
+- **Escalation-delay** — no sequences over 5 consecutive tool calls on one error.
+- **Model-performance** — no subagents this session (the `pre-completion-reviewer` ran in the Build session); nothing notable.
+
+### Deferred follow-up
+
+- Migrating release-please auth from the fine-grained PAT to a GitHub App token (`actions/create-github-app-token`) — optional hygiene (no token expiry, higher secondary-rate-limit headroom), explicitly deferred by the operator since the deep-walk fix removed the failure trigger.
+  File an issue if/when the PAT expiry becomes a maintenance burden.
+
+### Changes made
+
+1. `AGENTS.md` — added a 3-sentence note after the rebase-merge release guidance documenting the `last-release-sha` baseline + `ci.yml` write-back (do-not-remove), and the path-prefixed `<path>--sha` output gotcha (no top-level `sha` in this non-root-component monorepo).
