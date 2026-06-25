@@ -53,3 +53,23 @@ The plan and both Mermaid diagrams were rewritten to the decided design; the thr
 - TDD order grew to five cycles: cwd type fix (independent, lands first) → command enumeration → cwd projection + born-ready (largest) → relocation → docs.
   Still all `refactor:` / `docs:` — no user-facing behavior change, so the batch-tail release caveat (no version bump from refactors) stands.
 - Both rewritten diagrams validated with `mmdc`; `rumdl` clean.
+
+## Stage: Implementation — TDD (2026-06-25T17:40:00Z)
+
+### Session summary
+
+Completed all five planned TDD cycles in one session: (1) narrowed `ToolCallContext.cwd` to `string` and removed five dead `cwd`-undefined gate branches plus two obsolete tests; (2) extracted `command-enumeration.ts` with `BashCommand` and `collectCommands`; (3) extracted `cwd-projection.ts` with the full `cd`-fold walk and born-ready projection functions, rewrote `BashProgram` with `parse(command, cwd)` and parameter-free getters, updated all callers and tests; (4) relocated `bash-program.ts` → `access-intent/bash/program.ts` and `bash-token-classification.ts` → `access-intent/bash/token-classification.ts`, repointed six source files and seven test files, deleted old locations; (5) updated `docs/architecture/architecture.md` with the new layout entries, `✅` Step 3 markers, Track A completion, and corrected health metrics.
+Test count moved from 2107 (baseline) → 2105 (Step 1: −2 dead tests) → 2104 (Steps 2–3: −1 no-cwd test) and held at 2104 through Steps 4–5.
+Pre-completion reviewer: PASS.
+
+### Observations
+
+- **No red phase**: every cycle was behavior-preserving; the suite stayed green throughout.
+  The only "failures" were type errors caught by `tsc` that guided the consumer update scope (four extra test files needed `parse(cmd, cwd)` beyond what the plan listed).
+- **Deviation — extra consumer test files**: the plan listed `bash-program.test.ts`, `bash-external-directory.test.ts`, `bash-path.test.ts`, `bash-command-metamorphic.test.ts`, `tool-call-gate-pipeline.test.ts`, and `external-directory-symlink-acceptance.test.ts` for the born-ready `parse(cmd, cwd)` update.
+  `tsc` after Step 3 also surfaced `test/handlers/gates/bash-path.test.ts` and `test/handlers/gates/bash-external-directory.test.ts` parse-helper locals — both corrected in the same commit.
+- **Deviation — `vi.mock` path**: the pipeline test's `vi.mock("#src/handlers/gates/bash-program", …)` assertion needed updating after the relocation (Step 4) — caught as a live test failure (the mock silently stopped intercepting), corrected immediately.
+- **Step 3 was the largest**: the `bash-program.test.ts` rewrite touching ~90 call sites (`parse(cmd)` → `parse(cmd, cwd)`, `.externalPaths(cwd)` / `.pathRuleCandidates(cwd)` → parameter-free) was done as a full `Write` per AGENTS.md guidance; no logic changed, only call-site shape.
+- **Biome `noRedeclare` / `noUnusedVariables` fires**: when `collectCommands` was imported from the new module but the old local definition was still present, Biome's pre-commit hook caught both as errors — exactly the correctness gate the plan predicted.
+- **`program.ts` born-ready LOC**: 102 (plan estimated ~110); `cwd-projection.ts`: 493 (plan estimated ~420 — the difference is the projection functions' dedup and loop bodies plus fuller doc comments).
+- Pre-completion reviewer: PASS — all categories clean; noted `cwd-projection.ts` at 493 LOC is intentional (Option B encapsulation); no WARNs.
