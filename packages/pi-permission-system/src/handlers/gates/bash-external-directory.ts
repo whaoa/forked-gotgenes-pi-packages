@@ -24,7 +24,7 @@ export function describeBashExternalDirectoryGate(
   bashProgram: BashProgram | null,
   resolver: ScopedPermissionResolver,
 ): GateResult {
-  if (tcc.toolName !== "bash" || !tcc.cwd) return null;
+  if (tcc.toolName !== "bash") return null;
 
   const command = getNonEmptyString(toRecord(tcc.input).command);
   if (!command) return null;

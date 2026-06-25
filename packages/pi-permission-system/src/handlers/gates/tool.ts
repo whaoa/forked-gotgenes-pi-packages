@@ -28,7 +28,7 @@ function deriveSuggestionValue(
   if (tcc.toolName === "mcp") return check.target ?? "mcp";
   const path = getPathBearingToolPath(tcc.toolName, tcc.input);
   if (path === null) return "*";
-  return tcc.cwd ? normalizePathForComparison(path, tcc.cwd) : path;
+  return normalizePathForComparison(path, tcc.cwd);
 }
 
 /**

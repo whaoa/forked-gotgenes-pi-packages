@@ -28,8 +28,6 @@ export function describeExternalDirectoryGate(
   resolver: ScopedPermissionResolver,
   extractors?: ToolAccessExtractorLookup,
 ): GateResult {
-  if (!tcc.cwd) return null;
-
   const externalDirectoryPath = getToolInputPath(
     tcc.toolName,
     tcc.input,

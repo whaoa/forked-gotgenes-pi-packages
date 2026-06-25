@@ -9,5 +9,5 @@ export interface ToolCallContext {
   agentName: string | null;
   input: unknown;
   toolCallId: string;
-  cwd: string | undefined;
+  cwd: string;
 }

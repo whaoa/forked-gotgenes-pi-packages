@@ -37,9 +37,7 @@ export function describePathGate(
 
   // Resolve to the canonical (cwd-anchored, absolute) path so the approval
   // pattern matches the policy values a later call produces.
-  const approvalPath = tcc.cwd
-    ? normalizePathForComparison(filePath, tcc.cwd)
-    : filePath;
+  const approvalPath = normalizePathForComparison(filePath, tcc.cwd);
   const pattern = deriveApprovalPattern(approvalPath);
 
   const descriptor: GateDescriptor = {

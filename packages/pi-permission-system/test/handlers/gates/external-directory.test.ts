@@ -43,11 +43,6 @@ function gateUnderTest(
 // ── tests ────────────────────��────────────────────────────────────��────────
 
 describe("describeExternalDirectoryGate", () => {
-  it("returns null when no CWD", () => {
-    const result = gateUnderTest(makeTcc({ cwd: undefined }), ["/test/agent"]);
-    expect(result).toBeNull();
-  });
-
   it("returns null when tool is not path-bearing", () => {
     const result = gateUnderTest(
       makeTcc({ toolName: "bash", input: { command: "ls" } }),

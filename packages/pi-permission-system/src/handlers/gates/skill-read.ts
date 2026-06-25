@@ -29,10 +29,6 @@ export function describeSkillReadGate(
     return null;
   }
 
-  if (tcc.cwd === undefined) {
-    return null;
-  }
-
   const normalizedReadPath = normalizePathForComparison(path, tcc.cwd);
   const matchedSkill = findSkillPathMatch(
     normalizedReadPath,

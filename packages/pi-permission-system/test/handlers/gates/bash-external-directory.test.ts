@@ -68,14 +68,6 @@ describe("describeBashExternalDirectoryGate", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null when no CWD", async () => {
-    const result = await describeGate(
-      makeTcc({ cwd: undefined }),
-      makeResolver(makeCheckResult("ask")),
-    );
-    expect(result).toBeNull();
-  });
-
   it("returns null when command has no external paths", async () => {
     const result = await describeGate(
       makeTcc({ input: { command: "ls -la" } }),
