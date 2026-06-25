@@ -665,6 +665,10 @@ src/
 ├── session-approval-recorder.ts `SessionApprovalRecorder` interface - records a granted session-scoped approval into the session ruleset; implemented by `SessionRules` (#323, #341)
 │
 ├── permission-session.ts     `PermissionSession` class - state/lifecycle owner: owns context lifecycle, session-rule lifecycle (`reset`/`shutdown`/`reload`), skill entries, agent-name resolution, the config gateway, the Tell-Don't-Ask gate inputs, and `notify(message)` (Tell-Don't-Ask UI warn over the owned context, no-op before activation — dissolves the `index.ts` forward-reference cycle, #363); `implements ToolCallGateInputs` (the pipeline's input contract); the resolve role moved to `PermissionResolver` (#340), the recorder role to `SessionRules`, and the three fig-leaf handler role interfaces (`GateHandlerSession` / `AgentPrepSession` / `SessionLifecycleSession`) were retired — handlers depend on the concrete class + `PermissionResolver` (#341)
+├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473)
+│   └── bash/
+│       ├── parser.ts       Lazy tree-sitter-bash parser: `TSNode` interface (exported), `TSParser` interface (private), `initParser` (private), `getParser = memoizeAsyncWithRetry(initParser)` (exported); dropped from `bash-program.ts` (#473)
+│       └── node-text.ts    Quote-aware AST node-text resolver: `resolveNodeText` (pure; handles `word`, `raw_string`, `string`, `concatenation`, expansions, default fallback), `SKIP_SUBTREE_TYPES` (heredoc/comment sentinel set); dropped from `bash-program.ts` (#473)
 ├── handlers/                 Handler classes with narrow constructor injection
 │   ├── index.ts              Barrel re-exports
 │   ├── lifecycle.ts          SessionLifecycleHandler (session: `PermissionSession` + resolver: `PermissionResolver` (getConfigIssues) + serviceLifecycle: `ServiceLifecycle` + audit: `DecisionSummaryWriter`); writes the decision-audit summary on `session_shutdown` (#341, #320, #452)
@@ -686,7 +690,7 @@ src/
 │       ├── bash-path.ts      describeBashPathGate - pure descriptor/bypass factory for bash path rules over the injected `BashProgram` (`pathRuleCandidates(cwd)`); evaluates each token's cd-aware policy values via `resolver.resolvePathPolicy` and selects the worst uncovered token via `pickMostRestrictive`, keeping the raw token for prompts/logs/approvals (#393)
 │       ├── candidate-check.ts `pickMostRestrictive` - pure deny > ask > allow selection over PermissionCheckResults (first-wins on ties); shared by the bash gates
 │       ├── bash-token-classification.ts Pure token classifiers - `classifyTokenAsPathCandidate` (strict: `/`, `~/`, `..`) and `classifyTokenAsRuleCandidate` (broader: also dot-files and relative paths); shared `rejectNonPathToken` predicate
-│       ├── bash-program.ts   `BashProgram` value object - parses a bash command once (tree-sitter-bash) and exposes typed slices (`pathRuleCandidates(cwd)`, cwd-projecting `externalPaths(cwd)`, `commands(): BashCommand[]`); `commands()` splits the chain AND descends into command/process substitutions and subshells, emitting each nested command as an additional `BashCommand` tagged with its execution `context` (never-weaker, #306); `externalPaths(cwd)` projects a running effective working directory across a sequence of current-shell `cd`s, scoping subshells (frame stack) / pipelines / backgrounded commands, persisting brace-group `cd`s, and folding a leading current-shell `cd` across a redirect-then-pipe that tree-sitter-bash mis-groups as the pipeline's first stage (#454), conservatively flags relative paths after a non-literal `cd` (#307, retiring the single `leadingCdTarget`), and returns each path in its lexical (typed) form while using the canonical form for the boundary decision and dedup identity (#418); `pathRuleCandidates(cwd)` pairs each rule-candidate token with cd-aware policy values (absolute + project-relative + raw), keeping only the literal form after a non-literal `cd` (#393); owns the AST walker and `cd`-fold projection; classifiers imported from `bash-token-classification.ts`
+│       ├── bash-program.ts   `BashProgram` value object - parses a bash command once (tree-sitter-bash) and exposes typed slices (`pathRuleCandidates(cwd)`, cwd-projecting `externalPaths(cwd)`, `commands(): BashCommand[]`); `commands()` splits the chain AND descends into command/process substitutions and subshells, emitting each nested command as an additional `BashCommand` tagged with its execution `context` (never-weaker, #306); `externalPaths(cwd)` projects a running effective working directory across a sequence of current-shell `cd`s, scoping subshells (frame stack) / pipelines / backgrounded commands, persisting brace-group `cd`s, and folding a leading current-shell `cd` across a redirect-then-pipe that tree-sitter-bash mis-groups as the pipeline's first stage (#454), conservatively flags relative paths after a non-literal `cd` (#307, retiring the single `leadingCdTarget`), and returns each path in its lexical (typed) form while using the canonical form for the boundary decision and dedup identity (#418); `pathRuleCandidates(cwd)` pairs each rule-candidate token with cd-aware policy values (absolute + project-relative + raw), keeping only the literal form after a non-literal `cd` (#393); parser imported from `access-intent/bash/parser.ts`; node-text resolver and `SKIP_SUBTREE_TYPES` imported from `access-intent/bash/node-text.ts`; owns the `cd`-fold projection; classifiers imported from `bash-token-classification.ts`
 │       ├── bash-path-extractor.ts Thin facade (`extractExternalPathsFromBashCommand`) over `BashProgram`
 │       ├── bash-command.ts   `resolveBashCommandCheck` - pure combiner over caller-supplied `BashCommand[]` units (the handler decomposes via `BashProgram.commands()`), checks each unit on the `bash` surface, tags the winning result with the offending command's execution `context` (#306), selects via `pickMostRestrictive`; when empty, resolves the whole command only for a trivially-empty command (empty / whitespace / comment-only) and otherwise fails closed to a synthetic `ask` with the `<unparseable-bash-command>` sentinel (#301, #452)
 │       ├── path.ts           describePathGate - pure descriptor factory for cross-cutting path rules
@@ -709,7 +713,7 @@ src/
 ├── extension-config.ts       Runtime knobs (debugLog, yoloMode, etc.)
 │
 ├── permission-merge.ts        Deep-shallow merge for flat permission configs
-├── async-cache.ts             `memoizeAsyncWithRetry` - memoizes an async factory but drops a rejected result so the next call retries; used by `bash-program.ts` for resilient tree-sitter parser init (#452)
+├── async-cache.ts             `memoizeAsyncWithRetry` - memoizes an async factory but drops a rejected result so the next call retries; used by `access-intent/bash/parser.ts` for resilient tree-sitter parser init (#452)
 ├── canonicalize-path.ts       Best-effort symlink resolution via `realpathSync` — walks up to longest existing ancestor and re-appends non-existent tail; ENOENT/ENOTDIR safe, EACCES/ELOOP fall back to lexical form
 ├── path-utils.ts              Path normalization, within-directory (case-insensitive on Windows via `path.relative`), outside-CWD (canonical), safe-system-path, path-bearing-tool, Pi infrastructure read; `canonicalNormalizePathForComparison` for containment decisions only (never pattern matching); `getExternalDirectoryPolicyValues` unions the lexical and canonical aliases for external_directory pattern matching (#418)
 ├── node-modules-discovery.ts  Global node_modules resolution (walk-up + npm root -g fallback)
@@ -794,7 +798,7 @@ Phase 6 executes the first increment (`access-intent/`, partially populated by t
 
 ### Steps
 
-#### 1. Extract the tree-sitter parser and AST node-text resolver from `bash-program.ts` ([#473])
+#### 1. ✅ Extract the tree-sitter parser and AST node-text resolver from `bash-program.ts` ([#473])
 
 Lift the lazy tree-sitter-bash parser (`getParser`, the `TSNode` / `TSParser` interfaces) and the quote-aware node-text resolver (`resolveNodeText`, `SKIP_SUBTREE_TYPES`) into their own modules, leaving `bash-program.ts` importing them.
 Pure lift-and-shift, no behavior change.
@@ -881,7 +885,7 @@ Extract a shared fixture into `test/helpers/` once the gates are unified (Phase 
 
 ```mermaid
 flowchart TD
-    S1["Step 1 (#473) — extract parser + node-text"]
+    S1["✅ Step 1 (#473) — extract parser + node-text"]
     S2["Step 2 (#474) — extract token collection"]
     S3["Step 3 (#475) — extract enumeration + cwd projection (BashProgram facade)"]
     S4["Step 4 (#476) — introduce AccessPath value object"]

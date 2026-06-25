@@ -108,6 +108,7 @@ describe("resolveNodeText", () => {
     });
 
     it("returns text as-is for expansion", () => {
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional literal — testing that expansion node text is returned verbatim
       expect(resolveNodeText(makeNode("expansion", "${VAR}"))).toBe("${VAR}");
     });
   });
