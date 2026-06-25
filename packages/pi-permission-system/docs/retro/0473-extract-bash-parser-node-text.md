@@ -24,3 +24,21 @@ Pure lift-and-shift, non-breaking; the plan seeds the package's first domain dir
   Flagged for the Step 3 ship decision: `refactor` is `hidden`/non-bumping under `release-please-config.json`, so the all-`refactor:` batch "bash-program-decomposition" produces no release unless Step 3 carries a `feat:`/`fix:` commit.
 - Release marker: mid-batch — defer (batch "bash-program-decomposition", tail = Step 3 [#475]).
 - Skipped the `ask-user` gate: operator's own issue, unambiguous proposal with exact line targets and target paths.
+
+## Stage: Implementation — TDD (2026-06-25T11:23:00Z)
+
+### Session summary
+
+Completed all three planned TDD cycles: extracted the tree-sitter parser block to `src/access-intent/bash/parser.ts` (Cycle 1), extracted the node-text resolver and `SKIP_SUBTREE_TYPES` to `src/access-intent/bash/node-text.ts` (Cycle 2), and updated `docs/architecture/architecture.md` plus `.pi/skills/package-pi-permission-system/SKILL.md` (Cycle 3).
+`bash-program.ts` dropped from 1,143 → 1,045 LOC; test count rose from 2,069 (98 files) to 2,086 (100 files) with 17 new tests across 2 new files.
+
+### Observations
+
+- Cycle 1 removed the `createRequire` and `memoizeAsyncWithRetry` imports from `bash-program.ts` in the same commit — confirmed dead by prior grep; the autoformatter's `noUnusedImports` check validated the removal immediately.
+- The import-then-delete order (add new import, autoformat fires `noRedeclare`, then remove old definitions) was the correct two-step sequence given how `pi-autoformat` runs after each edit; the intermediate lint error from `noRedeclare` resolved cleanly once the old block was removed.
+- Autoformatter reordered the new imports in `bash-program.ts` alphabetically (`node-text` before `parser`), which is fine — both use the `#src/access-intent/bash/` alias.
+- `SKIP_SUBTREE_TYPES` in `node-text.ts` was reformatted from a single-line `new Set([...])` to a multi-line form by the autoformatter; content preserved, no behavior change.
+- Pre-completion reviewer: WARN (non-blocking).
+  - Reviewer warnings: (1) Mermaid diagram node `S1` was missing `✅` — the heading carried it but AGENTS.md requires both; fixed by amending the docs commit; (2) `node-text.test.ts` had two Biome `noTemplateCurlyInString` warnings for the intentional literal `"${VAR}"` strings — fixed with a `biome-ignore` comment; both resolved before writing stage notes.
+- `bash-program.ts` LOC fell 98 lines (1,143 → 1,045), slightly more than the plan's ~120 projection because the decorative `// ── AST walker ──` section header was also removed when the walker block emptied.
+- No deviations from the plan's Module-Level Changes list.
