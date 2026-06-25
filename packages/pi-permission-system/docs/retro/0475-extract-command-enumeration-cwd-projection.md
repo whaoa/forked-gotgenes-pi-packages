@@ -73,3 +73,72 @@ Pre-completion reviewer: PASS.
 - **Biome `noRedeclare` / `noUnusedVariables` fires**: when `collectCommands` was imported from the new module but the old local definition was still present, Biome's pre-commit hook caught both as errors — exactly the correctness gate the plan predicted.
 - **`program.ts` born-ready LOC**: 102 (plan estimated ~110); `cwd-projection.ts`: 493 (plan estimated ~420 — the difference is the projection functions' dedup and loop bodies plus fuller doc comments).
 - Pre-completion reviewer: PASS — all categories clean; noted `cwd-projection.ts` at 493 LOC is intentional (Option B encapsulation); no WARNs.
+
+## Stage: Ship (2026-06-25T18:10:00Z)
+
+### Session summary
+
+Shipped the `bash-program-decomposition` batch tail: pushed six commits, CI green, closed #475 plus the two stacked predecessors (#473, #474) with curated implemented-in comments, and merged release-please PR #483 (rebase) to cut `pi-permission-system-v16.0.2`.
+Correctly identified that every #475 commit is inert for release purposes (all `refactor:` or `docs:` on `exclude-paths`), so the version bump came from the one releasable commit already in the unreleased range — the #473 `docs(pi-permission-system):` architecture entry that predated `docs/architecture` joining `exclude-paths`.
+
+### Observations
+
+- **Inert-batch analysis held**: the plan's batch-tail caveat ("all `refactor:` → no bump") matched reality exactly; the 16.0.2 patch was driven by a stranded #473 docs commit, not by #475's work.
+  The ship flow surfaced this rather than forcing a fake `fix:`.
+- **Release-changelog wrinkle (config-timing, not agent friction)**: 16.0.2's changelog lists only the #473 architecture entry because `packages/pi-permission-system/docs/architecture` was added to `exclude-paths` after #473's commit landed but before #474/#475's architecture commits — so the later (richer) doc commits are inert while the earliest one still drove the release.
+  Harmless; the decomposition is internal-only and has no user-facing changelog story anyway.
+- **`ci_watch` tool quirk**: the first `ci_watch` returned `aborted: cancelled by user` at 105 s without any user action; a re-run with a longer timeout streamed progress and reported `success`.
+  Transient tool artifact, no agent rework.
+- **CI write-back working as designed**: `ab93e61d chore: advance release-please last-release-sha baseline [skip ci]` landed automatically after the release (Refs #468) — the baseline auto-advance, not a manual step.
+
+## Stage: Final Retrospective (2026-06-25T18:25:00Z)
+
+### Session summary
+
+Phase 6 Step 3 ran the full multi-session lifecycle (plan → design revision → TDD → ship → retro) and shipped clean: the bash engine now lives entirely under `src/access-intent/bash/`, `BashProgram` is a 102-LOC born-ready facade, and a latent `ToolCallContext.cwd` type-widening bug (five dead gate branches) was found and fixed along the way.
+Released as `pi-permission-system-v16.0.2`, completing the `bash-program-decomposition` batch (#473, #474, #475).
+
+### Observations
+
+#### What went well
+
+- **The planning `ask_user` gate did real design work, not just direction confirmation** — it surfaced the facade-scope fork (A/B/C), and the ensuing Socratic dialogue expanded the change to born-ready construction *and* uncovered a latent type-widening defect (`ToolCallContext.cwd: string | undefined` vs the SDK's non-optional `ExtensionContext.cwd: string`) with five dead branches across unrelated gates.
+  A planning gate finding and fixing a real bug orthogonal to the issue's stated scope is the standout of this arc.
+- **Born-ready emerged from operator pushback, not a correction** — "why is `cwd` not available at parse time?"
+  then "why store it rather than pass it to `parse()`?"
+  reframed the value object cleanly: `cwd` is a factory parameter consumed at birth, not a retained field (storing it would be dead state); `PathCandidate` / `EffectiveBase` never reach the instance.
+- **Cross-session retro bridging worked end to end** — each stage's notes (planning → revision → TDD) carried decisions forward, so no ground was re-litigated; the design-revision stage's born-ready spec drove the five-cycle TDD order without rediscovery.
+- **`tsc`-guided, behavior-preserving TDD** — the born-ready signature change is a type-level break, so `tsc` enumerated every stale call site immediately; verification ran incrementally (check + full suite per cycle), and the suite stayed green throughout with zero rework.
+  Pre-completion reviewer PASS, ship clean.
+
+#### What caused friction (agent side)
+
+- `missing-context` (minor) — the plan's Module-Level Changes listed six test files for the born-ready `parse(cmd, cwd)` update but missed two gate-test parse-helper locals (`describeGate` wrappers in `bash-path.test.ts` / `bash-external-directory.test.ts`) and the pipeline `vi.mock` factory path.
+  Impact: none beyond same-commit fixes — `tsc` and one live test failure caught all of them inside the commits that introduced the change; no follow-up commits, no rework.
+  The type-level break made the feedback loop authoritative.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's interventions were strategic redirects (the born-ready and cwd-widening questions), which functioned as the design gate working as intended — the opposite of mechanical oversight.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatch, `pre-completion-reviewer`, ran on its frontmatter default (`anthropic/claude-sonnet-4-6`), appropriate for the judgment-heavy review (29 tool uses, 217 s); no mismatch.
+  Session-level `model_change` entries are dominated by transient menu selections with no attributed turns and were not over-counted.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the lone retry (`ci_watch`) was a one-shot tool re-run, not a stuck approach.
+- **Feedback-loop gap analysis** — no gap: `pnpm run check` + full suite ran after every TDD cycle, and `lint` + `fallow dead-code` after the relocation and again pre-push.
+
+### Candidate rules considered and rejected
+
+Two durable-rule candidates were considered and rejected as over-fitting a clean, self-correcting session (mirroring #474's retro discipline):
+
+1. A `code-design` "born-ready construction / a parameter consumed at birth is not a field" heuristic — the operator drove this successfully via dialogue, and the pattern is already implicit in the skill's DIP and output-argument guidance; codifying it on one data point risks premature abstraction.
+2. A `plan-issue` / `design-review` "scan for type-widening against SDK contracts" prompt rule — the existing SDK-contract-verification guidance already covers it; the win here was the dialogue, not a checklist gap.
+
+Recorded here rather than promoted.
+
+### Changes made
+
+1. Appended the Ship and Final Retrospective stage entries to `packages/pi-permission-system/docs/retro/0475-extract-command-enumeration-cwd-projection.md` (this file).
+2. No prompt or `AGENTS.md` changes — the operator confirmed retro-only; both candidate rules were considered and rejected as over-fitting a clean session (recorded above).
