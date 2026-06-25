@@ -1,5 +1,6 @@
 import { basename, isAbsolute, join, resolve } from "node:path";
 import {
+  ARG_NODE_TYPES,
   resolveNodeText,
   SKIP_SUBTREE_TYPES,
 } from "#src/access-intent/bash/node-text";
@@ -334,14 +335,6 @@ const PATTERN_FIRST_COMMANDS: ReadonlyMap<string, PatternCommandConfig> =
       },
     ],
   ]);
-
-/** Node types that represent argument values in the AST. */
-const ARG_NODE_TYPES = new Set([
-  "word",
-  "concatenation",
-  "string",
-  "raw_string",
-]);
 
 /**
  * Extract the command name from a `command` node.

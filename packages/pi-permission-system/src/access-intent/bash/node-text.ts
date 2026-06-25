@@ -11,6 +11,17 @@ export const SKIP_SUBTREE_TYPES = new Set([
 ]);
 
 /**
+ * Node types that represent argument values in the AST
+ * (word, concatenation, single-quoted string, double-quoted string).
+ */
+export const ARG_NODE_TYPES = new Set([
+  "word",
+  "concatenation",
+  "string",
+  "raw_string",
+]);
+
+/**
  * Resolve the "shell value" of an argument node — the string the shell
  * would pass to the command after quote removal.
  *
