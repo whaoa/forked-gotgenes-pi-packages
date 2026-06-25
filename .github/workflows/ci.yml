@@ -58,12 +58,45 @@ jobs:
       releases_created: ${{ steps.release.outputs.releases_created }}
       releases: ${{ toJSON(steps.release.outputs) }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
       - uses: googleapis/release-please-action@v5
         id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # Advance the commit-search baseline so future runs only walk commits since
+      # the latest release, instead of the default 500. Keeps the per-run API
+      # burst small (avoids the secondary-rate-limit "Bad credentials" failures)
+      # and the run fast in this high-volume monorepo. Runs only when a release
+      # was just cut; [skip ci] prevents the write-back commit from re-triggering.
+      - name: Advance release-please last-release-sha baseline
+        if: steps.release.outputs.releases_created == 'true'
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_SHA:-}" ]; then
+            echo "No release sha in outputs; leaving baseline unchanged."
+            exit 0
+          fi
+          tmp=$(mktemp)
+          jq --arg sha "$RELEASE_SHA" '.["last-release-sha"] = $sha' release-please-config.json > "$tmp"
+          mv "$tmp" release-please-config.json
+          if git diff --quiet -- release-please-config.json; then
+            echo "last-release-sha already at $RELEASE_SHA."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release-please-config.json
+          git commit -m "chore: advance release-please last-release-sha baseline [skip ci]"
+          git push origin HEAD:main
 
   publish:
     needs: release-please
