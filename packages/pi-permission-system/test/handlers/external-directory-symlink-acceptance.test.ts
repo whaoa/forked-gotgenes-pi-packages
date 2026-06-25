@@ -138,7 +138,7 @@ describe("external_directory symlink acceptance (#418)", () => {
         toolCallId: "tc-2",
         cwd,
       };
-      const program = await BashProgram.parse(command);
+      const program = await BashProgram.parse(command, cwd);
       const result = describeBashExternalDirectoryGate(tcc, program, resolver);
       // All external paths are covered by the allow → bypass, no prompt.
       expect(isGateBypass(result)).toBe(true);

@@ -66,7 +66,7 @@ export class ToolCallGatePipeline {
     const command = getNonEmptyString(toRecord(tcc.input).command);
     const bashProgram =
       tcc.toolName === "bash" && command
-        ? await BashProgram.parse(command)
+        ? await BashProgram.parse(command, tcc.cwd)
         : null;
 
     const formatter = new ToolPreviewFormatter(

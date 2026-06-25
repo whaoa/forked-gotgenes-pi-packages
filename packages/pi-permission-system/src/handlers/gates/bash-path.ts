@@ -36,7 +36,7 @@ export function describeBashPathGate(
 
   if (!bashProgram) return null;
 
-  const candidates = bashProgram.pathRuleCandidates(tcc.cwd);
+  const candidates = bashProgram.pathRuleCandidates();
   if (candidates.length === 0) return null;
   const tokens = candidates.map(({ token }) => token);
 

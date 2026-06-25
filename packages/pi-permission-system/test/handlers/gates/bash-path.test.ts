@@ -44,7 +44,7 @@ async function describeGate(
   const command = getNonEmptyString(toRecord(tcc.input).command);
   const bashProgram =
     tcc.toolName === "bash" && command
-      ? await BashProgram.parse(command)
+      ? await BashProgram.parse(command, tcc.cwd)
       : null;
   return describeBashPathGate(tcc, bashProgram, resolver);
 }

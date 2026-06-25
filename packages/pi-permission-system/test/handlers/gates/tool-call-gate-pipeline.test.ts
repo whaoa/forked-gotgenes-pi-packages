@@ -169,7 +169,10 @@ describe("ToolCallGatePipeline", () => {
       );
 
       expect(mockBashProgramParse).toHaveBeenCalledTimes(1);
-      expect(mockBashProgramParse).toHaveBeenCalledWith("echo hello");
+      expect(mockBashProgramParse).toHaveBeenCalledWith(
+        "echo hello",
+        "/test/project",
+      );
     });
 
     it("does not parse BashProgram when the bash command is empty", async () => {

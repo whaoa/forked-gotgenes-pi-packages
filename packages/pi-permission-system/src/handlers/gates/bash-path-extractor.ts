@@ -11,5 +11,5 @@ export async function extractExternalPathsFromBashCommand(
   command: string,
   cwd: string,
 ): Promise<string[]> {
-  return (await BashProgram.parse(command)).externalPaths(cwd);
+  return (await BashProgram.parse(command, cwd)).externalPaths();
 }

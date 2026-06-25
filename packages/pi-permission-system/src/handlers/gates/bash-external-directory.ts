@@ -31,7 +31,7 @@ export function describeBashExternalDirectoryGate(
 
   if (!bashProgram) return null;
 
-  const externalPaths = bashProgram.externalPaths(tcc.cwd);
+  const externalPaths = bashProgram.externalPaths();
   if (externalPaths.length === 0) return null;
 
   // Collect paths whose resolved state is not already "allow".

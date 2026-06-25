@@ -47,7 +47,7 @@ async function decide(
   command: string,
   resolver: ScopedPermissionResolver,
 ): Promise<PermissionState> {
-  const program = await BashProgram.parse(command);
+  const program = await BashProgram.parse(command, "/cwd");
   return resolveBashCommandCheck(
     command,
     program.commands(),
