@@ -75,14 +75,31 @@ jobs:
       # burst small (avoids the secondary-rate-limit "Bad credentials" failures)
       # and the run fast in this high-volume monorepo. Runs only when a release
       # was just cut; [skip ci] prevents the write-back commit from re-triggering.
+      #
+      # SHA source: components live at non-root paths, so the action emits no
+      # top-level `sha` output — only path-prefixed `<path>--sha`. Every component
+      # in one release PR is tagged at the same commit, so any released path's
+      # `--sha` is the release commit. Under a rebase-merge that is the rebased
+      # commit on main (release-please reads the PR's merge_commit_sha, which
+      # GitHub sets to the rebased tip), so it is always an ancestor of future
+      # HEADs. github.sha is a belt-and-suspenders fallback.
       - name: Advance release-please last-release-sha baseline
         if: steps.release.outputs.releases_created == 'true'
         env:
-          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          OUTPUTS: ${{ toJSON(steps.release.outputs) }}
+          FALLBACK_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [ -z "${RELEASE_SHA:-}" ]; then
-            echo "No release sha in outputs; leaving baseline unchanged."
+          RELEASE_SHA=$(printf '%s' "$OUTPUTS" | jq -r '
+            to_entries
+            | map(select(.key | endswith("--sha")))
+            | map(.value | select(type == "string" and (. | length) == 40))
+            | (.[0] // empty)')
+          if [ -z "$RELEASE_SHA" ]; then
+            RELEASE_SHA="$FALLBACK_SHA"
+          fi
+          if [ -z "$RELEASE_SHA" ]; then
+            echo "Could not determine release sha; leaving baseline unchanged."
             exit 0
           fi
           tmp=$(mktemp)
