@@ -47,3 +47,50 @@ Completed all three planned TDD cycles: moved `ARG_NODE_TYPES` to `node-text.ts`
   The architecture doc outcome line still reads "drops below ~670 LOC" — reviewer WARN, non-blocking, left for Step 3's doc pass.
 - Test file path deviation: plan named `test/token-collection.test.ts` but actual placement is `test/access-intent/bash/token-collection.test.ts` (mirrors the `src/access-intent/bash/` structure and is consistent with Step 1's placement of `node-text.test.ts`); reviewer WARN, non-blocking.
 - Pre-completion reviewer: PASS (2 non-blocking WARNs above).
+
+## Stage: Final Retrospective (2026-06-25T13:10:00Z)
+
+### Session summary
+
+Shipped Phase 6 Step 2 end-to-end in a single conversation (plan → TDD → ship → retro): a behavior-preserving lift-and-shift of the bash token collectors into `src/access-intent/bash/token-collection.ts` and `ARG_NODE_TYPES` into `node-text.ts`.
+`bash-program.ts` dropped 1,045 → 695 LOC; +21 tests across 1 new file; CI green; release deferred per the mid-batch marker (batch tail = Step 3 [#475]).
+Execution was clean — the only deviations were a self-corrected test assumption (caught by the TDD red phase) and two non-blocking reviewer WARNs.
+
+### Observations
+
+#### What went well
+
+- The `ask_user` design gate during planning surfaced the shared-symbol placement question (`extractCommandName` / `ARG_NODE_TYPES`) before any code was written.
+  A three-round dialogue with the operator replaced the agent's initial mechanical-similarity instinct (rename `extractCommandName` → `resolveCommandName` to mirror `resolveNodeText`, co-locate both shared symbols) with a layer-driven split: grammar mechanic (`ARG_NODE_TYPES`) → `node-text.ts`, bash-domain query (`extractCommandName`) → `token-collection.ts`.
+  The gate working pre-implementation meant the better design cost only dialogue, not rework.
+- Incremental verification was exemplary: green baseline first, then `pnpm run check` + full suite after each cycle, red-then-green within Cycle 2, and full suite + check + lint + `fallow dead-code` after Cycle 3.
+- The plan's "import-then-delete" sequencing plus a `sed` line-range deletion for the 348-line block worked cleanly; Biome `noRedeclare` / `noUnusedImports` fired as the immediate correctness gate exactly as the plan predicted.
+
+#### What caused friction (agent side)
+
+- `missing-context` (self-identified) — the planning stage's Test Impact Analysis asserted `extractCommandName` returns `undefined` for a variable-expansion command name without tracing it through `resolveNodeText`; the actual return is the node text (`"$(which sed)"`).
+  The wrong assumption propagated into the Cycle 2 test and surfaced as a red failure.
+  Impact: one test-assertion correction before commit; no commit rework — the TDD red phase caught it as designed.
+- `scope-drift` (trivial) — the plan named the new test `test/token-collection.test.ts`; correct mirrored placement is `test/access-intent/bash/token-collection.test.ts`.
+  Impact: none (the right placement was obvious and consistent with Step 1's `node-text.test.ts`); non-blocking reviewer WARN.
+- Stale doc figure — the architecture doc Step 2 `Outcome:` line still reads "≤ 670 LOC" against the actual 695.
+  Impact: deferred to Step 3's doc pass; non-blocking reviewer WARN.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's two `ask_user` pushbacks were strategic design steering (the gate working as intended), not corrections of a mistake.
+  Opportunity, not criticism: the layering heuristic the operator articulated — *place a symbol by the question it answers (domain vs grammar), not by how it is implemented* — is a reusable design lens, but this is a single data point and the gate already captured it cheaply.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatch, `pre-completion-reviewer`, ran on `anthropic/claude-sonnet-4-6` (its frontmatter default), appropriate for judgment-heavy review; it caught both the LOC discrepancy and the test-path deviation.
+  No mismatch.
+- **Escalation-delay tracking** — no rabbit-holes; the wrong test assumption resolved in one iteration (run → red → fix).
+- **Feedback-loop gap analysis** — verification ran incrementally after every cycle, not only at the end; no gap.
+
+### Changes made
+
+1. Added this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0474-extract-bash-token-collection.md`.
+2. No prompt or `AGENTS.md` changes — the operator confirmed retro-only.
+   Two candidate rules (a `testing`-skill assertion-tracing rule and a `code-design` layering heuristic) were considered and rejected as over-fitting a clean, self-correcting session; recorded here rather than promoted.
