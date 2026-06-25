@@ -1,4 +1,4 @@
-import type { BashCommand } from "#src/handlers/gates/bash-program";
+import type { BashCommand } from "#src/access-intent/bash/command-enumeration";
 import { pickMostRestrictive } from "#src/handlers/gates/candidate-check";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { PermissionCheckResult } from "#src/types";
