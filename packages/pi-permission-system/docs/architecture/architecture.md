@@ -619,7 +619,7 @@ These were the open decisions; they are now settled.
 **Access-intent extraction** is the one genuinely open piece, and the foundation for the path surface of the decisions above.
 The package's center of mass is not the decision engine (tiny, pure) but turning `(toolName, input)` into "what is being accessed" — bash decomposition, MCP target derivation, path extraction, external-directory detection.
 This is a distinct domain (access intent) that gates should *emit* and a single `resolve(intent)` should answer, so adding a gate cannot widen the resolver surface.
-The [#393] false-green (a stubbed-but-unrouted resolver method silently passing `allow`) is the probe pointing at it: the resolver surface today is `resolve` + `resolvePathPolicy` + `checkPermission` + `checkPathPolicy`, widening per gate.
+The [#393] false-green (a stubbed-but-unrouted resolver method silently passing `allow`) was the probe pointing at it: the resolver surface was `resolve` + `resolvePathPolicy`, widening per gate, until Phase 6 Step 6 ([#478]) collapsed it to one `resolve(intent)`.
 [#418] is a second probe, from the access-path side: both external-directory gates matched config patterns against the symlink-resolved path because a single `string` carries a path that is simultaneously a containment value (canonical, for the outside-CWD boundary) and a match value (lexical, as the user typed it), with no type distinction — so the canonical form leaked into matching and defeated a configured `/tmp/*` allow.
 The same conflation lived in `BashProgram.externalPaths(): string[]`, which returned only the canonical form and so lost the typed value the matcher needed.
 The fix's `getExternalDirectoryPolicyValues` helper (the union of lexical aliases and the canonical path) was the embryo of the access-path: `AccessPath` ([#476]) now holds both forms behind distinct `matchValues()` and boundary accessors, making the misuse a compile error; `BashProgram.externalPaths()` now returns `AccessPath[]` and one external-directory policy check can replace the two parallel gates that independently acquired this bug.
@@ -653,11 +653,11 @@ src/
 ├── session-rules.ts          Session approval store (Ruleset wrapper); `implements SessionApprovalRecorder` — `recordSessionApproval(approval)` fan-out delegates to per-pattern `approve()`; injected directly into `GateRunner` as the recorder role (#341)
 ├── policy-loader.ts          PolicyLoader interface + FilePolicyLoader (file I/O, mtime caching)
 ├── scope-merge.ts            Cross-scope permission merge + origin-map bookkeeping
-├── permission-manager.ts     Scope loading + rule composition + checkPermission(); delegates I/O to PolicyLoader
+├── permission-manager.ts     Scope loading + rule composition + `check(intent)` (single resolution entry point, #478); delegates I/O to PolicyLoader
 ├── permission-gate.ts        Pure deny/ask/allow gate (injected IO)
 ├── permission-prompter.ts    Yolo-mode, review logging, UI/forwarding branch; PromptPermissionDetails type
 ├── permission-dialog.ts      Dialog options (once / session / deny)
-├── permission-resolver.ts    `ScopedPermissionResolver` interface - narrow `{ resolve }` role the gate factories / runner / pipeline depend on; `PermissionResolver` concrete class - holds `ScopedPermissionManager` + `SessionRules`, owns `resolve` / `checkPermission` / `getToolPermission` / `getConfigIssues`; extracted from `PermissionSession` (#340); the query methods (`getToolPermission` / `getConfigIssues`) are now consumed by `AgentPrepHandler` / `SessionLifecycleHandler` (#341)
+├── permission-resolver.ts    `ScopedPermissionResolver` interface - the single `{ resolve(intent) }` role the gate factories / runner / pipeline depend on (#478); `PermissionResolver` concrete class - holds `ScopedPermissionManager` + `SessionRules`, owns `resolve(intent)` (unwraps an `access-path` `AccessIntent` via `matchValues()` before calling `manager.check`) / raw `checkPermission` (implements `SkillPermissionChecker`, no session rules) / `getToolPermission` / `getConfigIssues`; extracted from `PermissionSession` (#340); the query methods (`getToolPermission` / `getConfigIssues`) are now consumed by `AgentPrepHandler` / `SessionLifecycleHandler` (#341)
 ├── decision-reporter.ts      `DecisionReporter` interface + `GateDecisionReporter` class - owns `SessionLogger` and event bus; writes review-log entries and emits decision events (#322)
 ├── decision-audit.ts         `DecisionRecorder` / `DecisionSummaryWriter` / `AuditLogger` interfaces + `DecisionAudit` class - per-session decision counters (`recordDecision` / `recordError`); `writeSummary` emits a `permission.session_summary` debug line on shutdown and warns on a `toolCalls != allowed + blocked + errors` invariant violation (#452)
 ├── gate-prompter.ts          `GatePrompter` interface - `canConfirm()` + `prompt(details)`; the prompting role `GateRunner` needs, bound to context by the implementor (#323)
@@ -665,7 +665,8 @@ src/
 ├── session-approval-recorder.ts `SessionApprovalRecorder` interface - records a granted session-scoped approval into the session ruleset; implemented by `SessionRules` (#323, #341)
 │
 ├── permission-session.ts     `PermissionSession` class - state/lifecycle owner: owns context lifecycle, session-rule lifecycle (`reset`/`shutdown`/`reload`), skill entries, agent-name resolution, the config gateway, the Tell-Don't-Ask gate inputs, and `notify(message)` (Tell-Don't-Ask UI warn over the owned context, no-op before activation — dissolves the `index.ts` forward-reference cycle, #363); `implements ToolCallGateInputs` (the pipeline's input contract); the resolve role moved to `PermissionResolver` (#340), the recorder role to `SessionRules`, and the three fig-leaf handler role interfaces (`GateHandlerSession` / `AgentPrepSession` / `SessionLifecycleSession`) were retired — handlers depend on the concrete class + `PermissionResolver` (#341)
-├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473); bash sub-domain completed by Phase 6 Step 3 (#475); `AccessPath` value object added by Phase 6 Step 4 (#476)
+├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473); bash sub-domain completed by Phase 6 Step 3 (#475); `AccessPath` value object added by Phase 6 Step 4 (#476); `AccessIntent` union added by Phase 6 Step 6 (#478)
+│   ├── access-intent.ts     `AccessIntent` discriminated union each gate emits: `tool` (raw input the manager normalizes), `path-values` (precomputed `string[]` for bash-path), `access-path` (an `AccessPath` for the external-directory gates); `ResolvedAccessIntent` (`tool | path-values`) is what the manager consumes after the resolver unwraps `access-path` via `matchValues()`, keeping the manager string-based (#478)
 │   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form); `forExternalDirectory(pathValue, cwd)` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison`; type-distinct accessors make the lexical/canonical conflation a compile error (#476)
 │   └── bash/
 │       ├── parser.ts           Lazy tree-sitter-bash parser: `TSNode` interface (exported), `TSParser` interface (private), `initParser` (private), `getParser = memoizeAsyncWithRetry(initParser)` (exported); dropped from `bash-program.ts` (#473)
@@ -692,9 +693,9 @@ src/
 │       ├── skill-input.ts    describeSkillInputGate - pure descriptor factory for the skill-input gate; takes a pre-computed check result so the runner reuses the caller's check (#326)
 │       ├── external-directory.ts describeExternalDirectoryGate - pure descriptor/bypass factory; builds an `AccessPath`, delegates the policy resolution to `resolveExternalDirectoryPolicy` (external-directory-policy.ts), and uses `accessPath.boundaryValue()` for the outside-CWD boundary and infra-read checks (#418, #476, #477)
 │       ├── external-directory-messages.ts External-directory ask-prompt formatting (denial messages moved to denial-messages.ts)
-│       ├── external-directory-policy.ts Shared external-directory policy check single-sourcing the #418 alias logic for both gates: `resolveExternalDirectoryPolicy(path, resolver, agentName)` resolves one `AccessPath` on the `external_directory` surface via `matchValues()`; `selectUncoveredExternalPaths(paths, resolver, agentName)` resolves a set, keeps the not-allowed entries, and selects the worst via `pickMostRestrictive` (#477)
+│       ├── external-directory-policy.ts Shared external-directory policy check single-sourcing the #418 alias logic for both gates: `resolveExternalDirectoryPolicy(path, resolver, agentName)` emits an `access-path` `AccessIntent` (the resolver unwraps it via `matchValues()`) on the `external_directory` surface; `selectUncoveredExternalPaths(paths, resolver, agentName)` resolves a set, keeps the not-allowed entries, and selects the worst via `pickMostRestrictive` (#477, #478)
 │       ├── bash-external-directory.ts describeBashExternalDirectoryGate - pure descriptor/bypass factory over the injected `BashProgram` (`externalPaths()`); delegates the per-path alias matching and worst-uncovered selection to `selectUncoveredExternalPaths` (external-directory-policy.ts) (#418, #477)
-│       ├── bash-path.ts      describeBashPathGate - pure descriptor/bypass factory for bash path rules over the injected `BashProgram` (`pathRuleCandidates()`); evaluates each token's cd-aware policy values via `resolver.resolvePathPolicy` and selects the worst uncovered token via `pickMostRestrictive`, keeping the raw token for prompts/logs/approvals (#393)
+│       ├── bash-path.ts      describeBashPathGate - pure descriptor/bypass factory for bash path rules over the injected `BashProgram` (`pathRuleCandidates()`); evaluates each token's cd-aware policy values by emitting a `path-values` `AccessIntent` to `resolver.resolve` and selects the worst uncovered token via `pickMostRestrictive`, keeping the raw token for prompts/logs/approvals (#393, #478)
 │       ├── candidate-check.ts `pickMostRestrictive` - pure deny > ask > allow selection over PermissionCheckResults (first-wins on ties); shared by the bash gates and the external-directory policy helper (external-directory-policy.ts)
 │       ├── bash-path-extractor.ts Thin facade (`extractExternalPathsFromBashCommand`) over `BashProgram`
 │       ├── bash-command.ts   `resolveBashCommandCheck` - pure combiner over caller-supplied `BashCommand[]` units (the handler decomposes via `BashProgram.commands()`), checks each unit on the `bash` surface, tags the winning result with the offending command's execution `context` (#306), selects via `pickMostRestrictive`; when empty, resolves the whole command only for a trivially-empty command (empty / whitespace / comment-only) and otherwise fails closed to a synthetic `ask` with the `<unparseable-bash-command>` sentinel (#301, #452)
@@ -797,7 +798,7 @@ Phase 6 executes the first increment (`access-intent/`, partially populated by t
 | `program.ts` risk (was `bash-program.ts`)    | 97.0                            | < 40                                     |
 | `common.ts` fallow target (pri / dependents) | 27.1 / 22                       | dissolved (0 targets)                    |
 | External-directory gate duplication          | 2 gates, #418 logic twice       | 1 shared policy check                    |
-| `ScopedPermissionResolver` surface           | `resolve` + `resolvePathPolicy` | `resolve(intent)`                        |
+| `ScopedPermissionResolver` surface           | `resolve` + `resolvePathPolicy` | `resolve(intent)` — **done ✅**          |
 | Duplication                                  | 6.9%                            | ≤ 6.5%                                   |
 | Dead code                                    | 0%                              | 0%                                       |
 
@@ -856,16 +857,19 @@ Route both through one shared external-directory policy check over `AccessPath[]
 - Outcome: one external-directory policy check; both gate factories delegate; the #418 alias logic is single-sourced; ~60 LOC of duplication removed.
 - Release: batch "access-path-unification"
 
-#### 6. Narrow `ScopedPermissionResolver` to a single `resolve(intent)` ([#478])
+#### ✅ 6. Narrow `ScopedPermissionResolver` to a single `resolve(intent)` ([#478])
 
-Each gate today calls either `resolve(surface, input)` or `resolvePathPolicy(values, ..., surface)`; the surface widens per gate, and a stubbed-but-unrouted method silently passes `allow` (the [#393] false-green).
-Introduce a minimal `AccessIntent` (surface + value-or-`AccessPath` + `agentName`) that each gate emits, and collapse the two resolver entry points into one `resolve(intent)`.
+Each gate called either `resolve(surface, input)` or `resolvePathPolicy(values, ..., surface)`; the surface widened per gate, and a stubbed-but-unrouted method silently passed `allow` (the [#393] false-green).
+Introduced a minimal `AccessIntent` (a three-variant discriminated union — `tool | path-values | access-path`) that each gate emits, and collapsed the two resolver entry points into one `resolve(intent)`.
+The `access-path` variant lets `AccessPath` flow into the resolver, which unwraps it via `matchValues()` before handing a string-based `ResolvedAccessIntent` to the manager's single `check(intent)`; the low-level manager never imports the value object.
 Scope is the surface narrowing only — `AccessIntent` carries no principal identity, and cross-session path portability stays a deferred follow-up ([#309] tracks the related advisory-path unification).
+The broader "every path becomes an `AccessPath`" direction and the open question of whether the `path` surface should also match the canonical form are tracked in [#487] / [#486].
 
-- Target: `src/permission-resolver.ts` (`ScopedPermissionResolver`), `src/permission-manager.ts` (`checkPermission` / `checkPathPolicy`), all gate descriptor factories.
+- Target: `src/access-intent/access-intent.ts` (new `AccessIntent` union); `src/permission-resolver.ts` (`ScopedPermissionResolver`); `src/permission-manager.ts` (`checkPermission` + `checkPathPolicy` → `check`); all gate descriptor factories.
 - Smell: Category C/D (widening interface per gate + testability false-green from an unrouted stub).
-- Outcome: `ScopedPermissionResolver` exposes one `resolve(intent)`; adding a gate cannot widen the resolver surface; the #393 false-green class is structurally impossible.
+- Outcome: `ScopedPermissionResolver` exposes one `resolve(intent)` and `ScopedPermissionManager` one `check(intent)`; adding a gate cannot widen the resolver surface; the #393 false-green class is structurally impossible (no second method to forget).
 - Release: independent
+- Landed: three-variant `AccessIntent` union; resolver unwraps `access-path` via `matchValues()`, manager stays string-based; `PermissionResolver implements SkillPermissionChecker` for the raw no-session-rules path; follow-ups [#486] / [#487] filed.
 
 #### 7. Split the `common.ts` grab-bag ([#479])
 
@@ -896,7 +900,7 @@ flowchart TD
     S3["✅ Step 3 (#475) — extract enumeration + cwd projection (BashProgram facade)"]
     S4["✅ Step 4 (#476) — introduce AccessPath value object"]
     S5["✅ Step 5 (#477) — collapse the two external-directory gates"]
-    S6["Step 6 (#478) — narrow resolver to resolve(intent)"]
+    S6["✅ Step 6 (#478) — narrow resolver to resolve(intent)"]
     S7["Step 7 (#479) — split common.ts grab-bag"]
     S8["Step 8 (#480) — external-directory test fixtures"]
 

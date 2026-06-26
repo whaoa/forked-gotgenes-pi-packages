@@ -4,7 +4,7 @@
  * `makeHandler` builds a real PermissionSession + PermissionResolver and wires
  * them into the handler and pipelines exactly as `index.ts` does.
  * Call-site overrides for permission results flow through
- * `permissionManager.checkPermission`; session state overrides are applied
+ * `permissionManager.check`; session state overrides are applied
  * via vi.spyOn on the real session instance.
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
