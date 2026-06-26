@@ -51,7 +51,7 @@ type FileCacheEntry<TValue> = {
 type ResolvedPermissions = {
   /**
    * Fully composed ruleset: synthesized defaults → baseline → config.
-   * Session rules are appended at call-time inside checkPermission().
+   * Session rules are appended at call-time inside check().
    */
   composedRules: Ruleset;
 };
@@ -238,9 +238,8 @@ export class PermissionManager implements ScopedPermissionManager {
   /**
    * Unified resolution entry point — dispatches on intent kind.
    *
-   * `"tool"` → normalizes raw input through `normalizeInput` (same as
-   * `checkPermission`).  `"path-values"` → evaluates precomputed values
-   * directly (same as `checkPathPolicy`).
+   * `"tool"` → normalizes raw input through `normalizeInput`.
+   * `"path-values"` → evaluates the precomputed values directly.
    */
   check(
     intent: ResolvedAccessIntent,
@@ -281,51 +280,14 @@ export class PermissionManager implements ScopedPermissionManager {
       fullRules,
     );
   }
-
-  /**
-   * Backward-compat thin wrapper over `check` for the test suite.
-   *
-   * Not on `ScopedPermissionManager` — removed from the interface in #478.
-   * Will be removed once `permission-manager-unified.test.ts` migrates to
-   * `check(intent)` directly.
-   */
-  checkPermission(
-    toolName: string,
-    input: unknown,
-    agentName?: string,
-    sessionRules?: Ruleset,
-  ): PermissionCheckResult {
-    return this.check(
-      { kind: "tool", surface: toolName, input, agentName },
-      sessionRules,
-    );
-  }
-
-  /**
-   * Backward-compat thin wrapper over `check` for the test suite.
-   *
-   * Not on `ScopedPermissionManager` — removed from the interface in #478.
-   * Will be removed once `permission-manager-unified.test.ts` migrates.
-   */
-  checkPathPolicy(
-    values: readonly string[],
-    agentName?: string,
-    sessionRules?: Ruleset,
-    surface = "path",
-  ): PermissionCheckResult {
-    return this.check(
-      { kind: "path-values", surface, values, agentName },
-      sessionRules,
-    );
-  }
 }
 
 /**
  * Evaluate a normalized surface/values triple and shape the result.
  *
  * Path surfaces use {@link evaluateAnyValue} (last-match-wins across equivalent
- * aliases); every other surface keeps {@link evaluateFirst}. Shared by
- * `checkPermission` and `checkPathPolicy`.
+ * aliases); every other surface keeps {@link evaluateFirst}. Shared by the
+ * `"tool"` and `"path-values"` branches of {@link PermissionManager.check}.
  */
 function buildCheckResult(
   surface: string,
@@ -379,7 +341,7 @@ function derivePolicyLoaderOptions(
  * Map a matched rule + tool name to the correct PermissionCheckResult.source.
  *
  * Mirrors the source-derivation logic from the former per-branch
- * checkPermission() implementation:
+ * permission-check implementation:
  *
  * - session          → "session" (always, all surfaces)
  * - mcp + default    → "default"

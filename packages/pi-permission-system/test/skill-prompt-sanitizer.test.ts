@@ -1,13 +1,26 @@
 import { resolve } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { PermissionManager } from "#src/permission-manager";
+import type { ScopedPermissionManager } from "#src/permission-manager";
 import {
   findSkillPathMatch,
   parseAllSkillPromptSections,
   resolveSkillPromptEntries,
+  type SkillPermissionChecker,
 } from "#src/skill-prompt-sanitizer";
 import type { PermissionCheckResult } from "#src/types";
 import { createManager } from "#test/helpers/manager-harness";
+
+/**
+ * Adapt a real `PermissionManager` to the raw `SkillPermissionChecker`
+ * contract, mirroring how `PermissionResolver.checkPermission` delegates to
+ * `manager.check` with a tool intent (#478).
+ */
+function asChecker(manager: ScopedPermissionManager): SkillPermissionChecker {
+  return {
+    checkPermission: (surface, input, agentName) =>
+      manager.check({ kind: "tool", surface, input, agentName }),
+  };
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -20,16 +33,16 @@ const CWD = "/projects/my-app";
 function makeManager(
   defaultState: "allow" | "deny" | "ask" = "allow",
   overrides: Record<string, "allow" | "deny" | "ask"> = {},
-): PermissionManager {
+): SkillPermissionChecker {
   return {
     checkPermission: vi.fn(
-      (_surface: string, input: { name?: string }): PermissionCheckResult => {
-        const name = input.name ?? "";
+      (_surface: string, input: unknown): PermissionCheckResult => {
+        const name = (input as { name?: string }).name ?? "";
         const state = overrides[name] ?? defaultState;
         return { toolName: "skill", state, source: "tool", origin: "builtin" };
       },
     ),
-  } as unknown as PermissionManager;
+  };
 }
 
 function skillBlock(
@@ -312,7 +325,12 @@ test("REGRESSION: resolveSkillPromptEntries sanitizes every available_skills blo
       "System prompt end",
     ].join("\n");
 
-    const result = resolveSkillPromptEntries(prompt, manager, null, "/cwd");
+    const result = resolveSkillPromptEntries(
+      prompt,
+      asChecker(manager),
+      null,
+      "/cwd",
+    );
 
     expect(result.prompt).not.toContain("denied-skill");
     expect(result.prompt).toContain("visible-skill");
@@ -354,7 +372,12 @@ test("REGRESSION: resolveSkillPromptEntries keeps only visible skills available 
       "System prompt end",
     ].join("\n");
 
-    const result = resolveSkillPromptEntries(prompt, manager, null, "/cwd");
+    const result = resolveSkillPromptEntries(
+      prompt,
+      asChecker(manager),
+      null,
+      "/cwd",
+    );
     const visiblePath = resolve("/cwd", "./skills/visible/file.ts");
     const blockedPath = resolve("/cwd", "./skills/blocked/file.ts");
     const matchedVisibleSkill = findSkillPathMatch(
