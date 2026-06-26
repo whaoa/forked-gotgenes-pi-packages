@@ -25,5 +25,20 @@ Confirmed the issue is the release-batch tail — it ships now alongside Step 4'
 - **Behavior-preserving, so no gate-test rewrites** — existing gate and integration tests stay green unchanged; only a new `external-directory-policy.test.ts` is added.
   Verified no README or package-SKILL symbol references break (both reference user-facing behavior, not the gate internals).
 
+## Stage: Implementation — TDD (2026-06-26T15:25:00Z)
+
+### Session summary
+
+Executed the two-step plan: collapsed the duplicated `external_directory` policy logic into a new `external-directory-policy.ts` (`resolveExternalDirectoryPolicy` + `selectUncoveredExternalPaths`), rewired both gates to delegate, and removed the bash gate's three orphaned imports (step 1, atomic `refactor` commit); then updated `architecture.md` tree entries and applied the Step 5 ✅ markers (step 2, `docs` commit).
+Behavior-preserving — test count rose 2111 → 2116 (the 5 new helper unit tests); all existing gate and integration tests stayed green unchanged.
+
+### Observations
+
+- **No deviations from the plan** — the design, the two-step TDD order, and the atomic-commit prediction (`fallow dead-code` forces the helper to land with both consumers) all held exactly.
+- **Orphaned-import removal landed cleanly** — the plan's explicit enumeration of `AccessPath`, `PermissionCheckResult`, and `pickMostRestrictive` meant the multi-edit removed all three in the same commit; `grep` confirmed none survived.
+- **Architecture narrative left intentionally** — updated the concrete module tree entries (the state-claim risk that caused a #476 WARN) plus the `candidate-check.ts` caller note; left the phase-intent/design-rationale prose (lines 625, 756, 799) untouched since they describe phase scope and the AccessPath design insight, not current code state.
+- **Pre-completion reviewer: PASS** — all deterministic checks green (`check`, `lint` exit 0, 2116 tests, `fallow dead-code` clean); all four cross-step invariants (#418 alias matching, #393 worst-uncovered, #476 accessor split, #382 win32 boundary) confirmed preserved and additionally lower-sourced by the new helper tests.
+  No WARN findings.
+
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
 [#476]: https://github.com/gotgenes/pi-packages/issues/476
