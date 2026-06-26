@@ -144,12 +144,18 @@ describe("describeExternalDirectoryGate", () => {
       undefined,
       resolver,
     );
-    expect(resolver.resolvePathPolicy).toHaveBeenCalledWith(
-      ["/outside/project/file.ts"],
-      undefined,
-      "external_directory",
+    expect(resolver.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "access-path",
+        surface: "external_directory",
+        agentName: undefined,
+      }),
     );
-    expect(resolver.resolve).not.toHaveBeenCalled();
+    const intent = resolver.resolve.mock.calls[0][0];
+    expect(intent.kind).toBe("access-path");
+    if (intent.kind === "access-path") {
+      expect(intent.path.matchValues()).toEqual(["/outside/project/file.ts"]);
+    }
   });
 
   it("sessionApproval uses deriveApprovalPattern", () => {

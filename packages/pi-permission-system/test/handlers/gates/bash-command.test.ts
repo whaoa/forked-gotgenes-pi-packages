@@ -30,17 +30,18 @@ describe("resolveBashCommandCheck", () => {
 
     expect(result.state).toBe("allow");
     expect(resolver.resolve).toHaveBeenCalledTimes(1);
-    expect(resolver.resolve).toHaveBeenCalledWith(
-      "bash",
-      { command: "npm install pkg" },
-      undefined,
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "bash",
+      input: { command: "npm install pkg" },
+      agentName: undefined,
+    });
   });
 
   it("denies the chain when any sub-command is denied, reporting that command's pattern", () => {
     const resolver = makeResolver();
-    resolver.resolve.mockImplementation((_surface, input) => {
-      const command = (input as { command: string }).command;
+    resolver.resolve.mockImplementation((intent) => {
+      const command = (intent as { input: { command: string } }).input.command;
       return command.startsWith("npm")
         ? bashResult("deny", command, "npm *")
         : bashResult("allow", command, "cd *");
@@ -60,8 +61,8 @@ describe("resolveBashCommandCheck", () => {
 
   it("asks when a sub-command asks and none denies", () => {
     const resolver = makeResolver();
-    resolver.resolve.mockImplementation((_surface, input) => {
-      const command = (input as { command: string }).command;
+    resolver.resolve.mockImplementation((intent) => {
+      const command = (intent as { input: { command: string } }).input.command;
       return command.startsWith("git")
         ? bashResult("ask", command, "git *")
         : bashResult("allow", command, "cd *");
@@ -81,8 +82,8 @@ describe("resolveBashCommandCheck", () => {
 
   it("returns the first allow result when every sub-command is allowed", () => {
     const resolver = makeResolver();
-    resolver.resolve.mockImplementation((_surface, input) => {
-      const command = (input as { command: string }).command;
+    resolver.resolve.mockImplementation((intent) => {
+      const command = (intent as { input: { command: string } }).input.command;
       return bashResult("allow", command, `${command} *`);
     });
 
@@ -109,11 +110,12 @@ describe("resolveBashCommandCheck", () => {
 
     expect(result.state).toBe("allow");
     expect(resolver.resolve).toHaveBeenCalledTimes(1);
-    expect(resolver.resolve).toHaveBeenCalledWith(
-      "bash",
-      { command: "# just a comment" },
-      undefined,
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "bash",
+      input: { command: "# just a comment" },
+      agentName: undefined,
+    });
   });
 
   it("falls back to the whole command for an empty/whitespace-only command", () => {
@@ -144,17 +146,18 @@ describe("resolveBashCommandCheck", () => {
 
     resolveBashCommandCheck("npm i", [{ text: "npm i" }], "agent-x", resolver);
 
-    expect(resolver.resolve).toHaveBeenCalledWith(
-      "bash",
-      { command: "npm i" },
-      "agent-x",
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "bash",
+      input: { command: "npm i" },
+      agentName: "agent-x",
+    });
   });
 
   it("tags the winning result with the offending command's execution context", () => {
     const resolver = makeResolver();
-    resolver.resolve.mockImplementation((_surface, input) => {
-      const command = (input as { command: string }).command;
+    resolver.resolve.mockImplementation((intent) => {
+      const command = (intent as { input: { command: string } }).input.command;
       return command.startsWith("rm")
         ? bashResult("deny", command, "rm *")
         : bashResult("allow", command, "echo *");

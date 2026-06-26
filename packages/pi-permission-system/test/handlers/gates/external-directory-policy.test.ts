@@ -30,11 +30,12 @@ describe("resolveExternalDirectoryPolicy", () => {
 
     const result = resolveExternalDirectoryPolicy(path, resolver, undefined);
 
-    expect(resolver.resolvePathPolicy).toHaveBeenCalledWith(
-      path.matchValues(),
-      undefined,
-      "external_directory",
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "access-path",
+      surface: "external_directory",
+      path,
+      agentName: undefined,
+    });
     expect(result).toEqual(makeCheckResult("ask"));
   });
 
@@ -44,11 +45,12 @@ describe("resolveExternalDirectoryPolicy", () => {
 
     resolveExternalDirectoryPolicy(path, resolver, "reviewer");
 
-    expect(resolver.resolvePathPolicy).toHaveBeenCalledWith(
-      path.matchValues(),
-      "reviewer",
-      "external_directory",
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "access-path",
+      surface: "external_directory",
+      path,
+      agentName: "reviewer",
+    });
   });
 });
 
@@ -74,12 +76,17 @@ describe("selectUncoveredExternalPaths", () => {
     const allowed = AccessPath.forExternalDirectory("/outside/ok.ts", cwd);
     const asked = AccessPath.forExternalDirectory("/outside/ask.ts", cwd);
     const resolver = makeResolver();
-    resolver.resolvePathPolicy.mockImplementation(
-      (values: readonly string[]) =>
-        values.includes("/outside/ok.ts")
-          ? makeCheckResult("allow")
-          : makeCheckResult("ask"),
-    );
+    resolver.resolve.mockImplementation((intent) => {
+      const values =
+        intent.kind === "access-path"
+          ? intent.path.matchValues()
+          : intent.kind === "path-values"
+            ? intent.values
+            : [];
+      return values.includes("/outside/ok.ts")
+        ? makeCheckResult("allow")
+        : makeCheckResult("ask");
+    });
 
     const { uncovered } = selectUncoveredExternalPaths(
       [allowed, asked],
@@ -94,12 +101,17 @@ describe("selectUncoveredExternalPaths", () => {
     const asked = AccessPath.forExternalDirectory("/outside/ask.ts", cwd);
     const denied = AccessPath.forExternalDirectory("/outside/deny.ts", cwd);
     const resolver = makeResolver();
-    resolver.resolvePathPolicy.mockImplementation(
-      (values: readonly string[]) =>
-        values.includes("/outside/deny.ts")
-          ? makeCheckResult("deny")
-          : makeCheckResult("ask"),
-    );
+    resolver.resolve.mockImplementation((intent) => {
+      const values =
+        intent.kind === "access-path"
+          ? intent.path.matchValues()
+          : intent.kind === "path-values"
+            ? intent.values
+            : [];
+      return values.includes("/outside/deny.ts")
+        ? makeCheckResult("deny")
+        : makeCheckResult("ask");
+    });
 
     const { worstCheck } = selectUncoveredExternalPaths(
       [asked, denied],

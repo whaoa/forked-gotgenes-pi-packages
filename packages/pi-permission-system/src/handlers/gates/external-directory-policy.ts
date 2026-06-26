@@ -19,10 +19,10 @@ export interface UncoveredExternalPaths {
 /**
  * Resolve one external path's policy on the `external_directory` surface.
  *
- * Matches against the typed and symlink-resolved aliases
- * ({@link AccessPath.matchValues}) so a config pattern on either form applies
- * (#418). This is the single source for the alias-derivation plus
- * surface-tagged resolve that the two external-directory gates previously
+ * Emits an `access-path` {@link AccessIntent}; the resolver unwraps it via
+ * {@link AccessPath.matchValues} so a config pattern on either the typed or
+ * symlink-resolved alias applies (#418). This is the single source for the
+ * external-directory resolve that the two external-directory gates previously
  * duplicated.
  */
 export function resolveExternalDirectoryPolicy(
@@ -30,11 +30,12 @@ export function resolveExternalDirectoryPolicy(
   resolver: ScopedPermissionResolver,
   agentName: string | undefined,
 ): PermissionCheckResult {
-  return resolver.resolvePathPolicy(
-    path.matchValues(),
+  return resolver.resolve({
+    kind: "access-path",
+    surface: "external_directory",
+    path,
     agentName,
-    "external_directory",
-  );
+  });
 }
 
 /**

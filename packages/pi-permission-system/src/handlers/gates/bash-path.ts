@@ -51,10 +51,12 @@ export function describeBashPathGate(
   let allSessionCovered = true;
 
   for (const { token, policyValues } of candidates) {
-    const check = resolver.resolvePathPolicy(
-      policyValues,
-      tcc.agentName ?? undefined,
-    );
+    const check = resolver.resolve({
+      kind: "path-values",
+      surface: "path",
+      values: policyValues,
+      agentName: tcc.agentName ?? undefined,
+    });
 
     // No explicit path rule matched — only the universal default fired.
     // Treat this token as unrestricted to preserve backward compatibility

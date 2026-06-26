@@ -77,11 +77,12 @@ export class GateRunner {
         origin: "builtin",
       };
     } else {
-      check = this.resolver.resolve(
-        descriptor.surface,
-        descriptor.input,
-        agentName ?? undefined,
-      );
+      check = this.resolver.resolve({
+        kind: "tool",
+        surface: descriptor.surface,
+        input: descriptor.input,
+        agentName: agentName ?? undefined,
+      });
     }
 
     // 2. Session-hit fast path

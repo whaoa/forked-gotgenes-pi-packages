@@ -102,11 +102,12 @@ export class ToolCallGatePipeline {
                 tcc.agentName ?? undefined,
                 this.resolver,
               )
-            : this.resolver.resolve(
-                tcc.toolName,
-                tcc.input,
-                tcc.agentName ?? undefined,
-              );
+            : this.resolver.resolve({
+                kind: "tool",
+                surface: tcc.toolName,
+                input: tcc.input,
+                agentName: tcc.agentName ?? undefined,
+              });
         const toolDescriptor = describeToolGate(tcc, toolCheck, formatter);
         toolDescriptor.preCheck = toolCheck;
         return toolDescriptor;

@@ -22,11 +22,12 @@ export function describePathGate(
   const filePath = getToolInputPath(tcc.toolName, tcc.input, extractors);
   if (!filePath) return null;
 
-  const check = resolver.resolve(
-    "path",
-    { path: filePath },
-    tcc.agentName ?? undefined,
-  );
+  const check = resolver.resolve({
+    kind: "tool",
+    surface: "path",
+    input: { path: filePath },
+    agentName: tcc.agentName ?? undefined,
+  });
 
   if (check.state === "allow") return null;
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
+import { AccessPath } from "#src/access-intent/access-path";
 import type { ScopedPermissionManager } from "#src/permission-manager";
 import { PermissionResolver } from "#src/permission-resolver";
 import type { Ruleset } from "#src/rule";
@@ -47,11 +48,16 @@ beforeEach(() => {
 });
 
 describe("PermissionResolver", () => {
-  describe("resolve", () => {
-    it("forwards surface, input, and agentName as a tool intent with session ruleset", () => {
+  describe("resolve — tool intent", () => {
+    it("forwards a tool intent with the empty session ruleset", () => {
       const { resolver, permissionManager } = makeResolver();
 
-      resolver.resolve("bash", { command: "ls" }, "agent-x");
+      resolver.resolve({
+        kind: "tool",
+        surface: "bash",
+        input: { command: "ls" },
+        agentName: "agent-x",
+      });
 
       expect(permissionManager.check).toHaveBeenCalledWith(
         {
@@ -64,32 +70,19 @@ describe("PermissionResolver", () => {
       );
     });
 
-    it("defaults agentName to undefined when omitted", () => {
-      const { resolver, permissionManager } = makeResolver();
-
-      resolver.resolve("read", { path: ".env" });
-
-      expect(permissionManager.check).toHaveBeenCalledWith(
-        {
-          kind: "tool",
-          surface: "read",
-          input: { path: ".env" },
-          agentName: undefined,
-        },
-        [],
-      );
-    });
-
     it("applies a recorded session approval on the next resolve", () => {
       const pm = makePermissionManager();
       const sessionRules = new SessionRules();
       const { resolver } = makeResolver(pm, sessionRules);
 
-      // Record an approval directly into the shared SessionRules instance.
       sessionRules.recordSessionApproval(
         SessionApproval.single("bash", "git *"),
       );
-      resolver.resolve("bash", { command: "git status" });
+      resolver.resolve({
+        kind: "tool",
+        surface: "bash",
+        input: { command: "git status" },
+      });
 
       const passedRules = vi.mocked(pm.check).mock.calls[0][1];
       expect(passedRules).toHaveLength(1);
@@ -111,7 +104,11 @@ describe("PermissionResolver", () => {
       });
       const { resolver } = makeResolver(pm);
 
-      const result = resolver.resolve("bash", { command: "rm -rf /" });
+      const result = resolver.resolve({
+        kind: "tool",
+        surface: "bash",
+        input: { command: "rm -rf /" },
+      });
 
       expect(result).toEqual({
         state: "deny",
@@ -123,33 +120,22 @@ describe("PermissionResolver", () => {
     });
   });
 
-  describe("resolvePathPolicy", () => {
-    it("forwards values and agentName as a path-values intent with session ruleset", () => {
+  describe("resolve — path-values intent", () => {
+    it("forwards a path-values intent with the current session ruleset", () => {
       const { resolver, permissionManager } = makeResolver();
 
-      resolver.resolvePathPolicy(["/proj/src/a.ts", "src/a.ts"], "agent-x");
+      resolver.resolve({
+        kind: "path-values",
+        surface: "path",
+        values: ["/proj/src/a.ts", "src/a.ts"],
+        agentName: "agent-x",
+      });
 
       expect(permissionManager.check).toHaveBeenCalledWith(
         {
           kind: "path-values",
           surface: "path",
           values: ["/proj/src/a.ts", "src/a.ts"],
-          agentName: "agent-x",
-        },
-        [],
-      );
-    });
-
-    it("forwards an explicit surface in the path-values intent", () => {
-      const { resolver, permissionManager } = makeResolver();
-
-      resolver.resolvePathPolicy(["/tmp/x"], "agent-x", "external_directory");
-
-      expect(permissionManager.check).toHaveBeenCalledWith(
-        {
-          kind: "path-values",
-          surface: "external_directory",
-          values: ["/tmp/x"],
           agentName: "agent-x",
         },
         [],
@@ -164,7 +150,11 @@ describe("PermissionResolver", () => {
       sessionRules.recordSessionApproval(
         SessionApproval.single("path", "src/*"),
       );
-      resolver.resolvePathPolicy(["src/a.ts"]);
+      resolver.resolve({
+        kind: "path-values",
+        surface: "path",
+        values: ["src/a.ts"],
+      });
 
       const passedRules = vi.mocked(pm.check).mock.calls[0][1];
       expect(passedRules).toHaveLength(1);
@@ -174,32 +164,62 @@ describe("PermissionResolver", () => {
         action: "allow",
       });
     });
+  });
 
-    it("returns the manager's check result", () => {
+  describe("resolve — access-path intent", () => {
+    it("unwraps the AccessPath via matchValues() into a path-values intent", () => {
+      const { resolver, permissionManager } = makeResolver();
+      const accessPath = AccessPath.forExternalDirectory(
+        "/tmp/x",
+        "/workspace",
+      );
+
+      resolver.resolve({
+        kind: "access-path",
+        surface: "external_directory",
+        path: accessPath,
+        agentName: "agent-x",
+      });
+
+      expect(permissionManager.check).toHaveBeenCalledWith(
+        {
+          kind: "path-values",
+          surface: "external_directory",
+          values: accessPath.matchValues(),
+          agentName: "agent-x",
+        },
+        [],
+      );
+    });
+
+    it("returns the manager's check result for an access-path intent", () => {
       const pm = makePermissionManager();
       vi.mocked(pm.check).mockReturnValue({
         state: "deny",
-        toolName: "path",
+        toolName: "external_directory",
         source: "special",
         origin: "global",
-        matchedPattern: "src/*",
+        matchedPattern: "/tmp/*",
       });
       const { resolver } = makeResolver(pm);
+      const accessPath = AccessPath.forExternalDirectory(
+        "/tmp/x",
+        "/workspace",
+      );
 
-      const result = resolver.resolvePathPolicy(["src/a.ts"]);
-
-      expect(result).toEqual({
-        state: "deny",
-        toolName: "path",
-        source: "special",
-        origin: "global",
-        matchedPattern: "src/*",
+      const result = resolver.resolve({
+        kind: "access-path",
+        surface: "external_directory",
+        path: accessPath,
       });
+
+      expect(result.state).toBe("deny");
+      expect(result.matchedPattern).toBe("/tmp/*");
     });
   });
 
   describe("checkPermission (raw, off-interface)", () => {
-    it("delegates to manager.check as a tool intent", () => {
+    it("delegates to manager.check as a tool intent without session rules", () => {
       const { resolver, permissionManager } = makeResolver();
 
       resolver.checkPermission("bash", { command: "ls" }, "agent-1");

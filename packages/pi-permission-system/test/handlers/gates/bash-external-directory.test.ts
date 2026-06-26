@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { AccessIntent } from "#src/access-intent/access-intent";
 import { BashProgram } from "#src/access-intent/bash/program";
 import { getNonEmptyString, toRecord } from "#src/common";
 import { describeBashExternalDirectoryGate } from "#src/handlers/gates/bash-external-directory";
@@ -40,6 +41,13 @@ function makeCheckResult(
   };
 }
 
+/** Extract the policy match values a resolve(intent) call carries. */
+function intentValues(intent: AccessIntent): readonly string[] {
+  if (intent.kind === "access-path") return intent.path.matchValues();
+  if (intent.kind === "path-values") return intent.values;
+  return [];
+}
+
 /**
  * Mirror the handler's parse-once derivation: parse the bash command into a
  * shared `BashProgram` and inject it, exactly as `permission-gate-handler.ts`
@@ -76,18 +84,19 @@ describe("describeBashExternalDirectoryGate", () => {
     expect(result).toBeNull();
   });
 
-  it("resolves each external path on the external_directory surface via resolvePathPolicy (#418)", async () => {
+  it("resolves each external path on the external_directory surface via an access-path intent (#418)", async () => {
     const resolver = makeResolver(makeCheckResult("ask"));
     await describeGate(
       makeTcc({ input: { command: "cat /outside/a.ts" } }),
       resolver,
     );
-    expect(resolver.resolvePathPolicy).toHaveBeenCalledWith(
-      ["/outside/a.ts"],
-      undefined,
-      "external_directory",
-    );
-    expect(resolver.resolve).not.toHaveBeenCalled();
+    const intent = resolver.resolve.mock.calls[0][0];
+    expect(intent).toMatchObject({
+      kind: "access-path",
+      surface: "external_directory",
+      agentName: undefined,
+    });
+    expect(intentValues(intent)).toEqual(["/outside/a.ts"]);
   });
 
   it("returns GateBypass when all external paths are session-covered", async () => {
@@ -122,11 +131,10 @@ describe("describeBashExternalDirectoryGate", () => {
     // not just session-level allow. This was the bug: source !== "session"
     // kept config-allowed paths in the uncovered set.
     const resolver = makeResolver();
-    resolver.resolvePathPolicy.mockImplementation(
-      (values: readonly string[]) =>
-        values.length > 0
-          ? makeCheckResult("allow", { source: "special" })
-          : makeCheckResult("ask"),
+    resolver.resolve.mockImplementation((intent) =>
+      intentValues(intent).length > 0
+        ? makeCheckResult("allow", { source: "special" })
+        : makeCheckResult("ask"),
     );
     const result = await describeGate(makeTcc(), resolver);
     expect(result).not.toBeNull();
@@ -138,11 +146,10 @@ describe("describeBashExternalDirectoryGate", () => {
     // silently downgrading a config-level deny to ask. After the fix, the
     // descriptor's preCheck is derived from the actual path check result.
     const resolver = makeResolver();
-    resolver.resolvePathPolicy.mockImplementation(
-      (values: readonly string[]) =>
-        values.length > 0
-          ? makeCheckResult("deny", { source: "special" })
-          : makeCheckResult("ask"),
+    resolver.resolve.mockImplementation((intent) =>
+      intentValues(intent).length > 0
+        ? makeCheckResult("deny", { source: "special" })
+        : makeCheckResult("ask"),
     );
     const result = await describeGate(makeTcc(), resolver);
     expect(isGateDescriptor(result)).toBe(true);
@@ -199,11 +206,10 @@ describe("describeBashExternalDirectoryGate", () => {
   it("config-allowed path is excluded; remaining ask path produces a descriptor", async () => {
     // One path config-allowed, one config-ask → descriptor with only the ask path.
     const resolver = makeResolver();
-    resolver.resolvePathPolicy.mockImplementation(
-      (values: readonly string[]) =>
-        values.includes("/outside/a.ts")
-          ? makeCheckResult("allow", { source: "special" })
-          : makeCheckResult("ask"),
+    resolver.resolve.mockImplementation((intent) =>
+      intentValues(intent).includes("/outside/a.ts")
+        ? makeCheckResult("allow", { source: "special" })
+        : makeCheckResult("ask"),
     );
     const result = await describeGate(
       makeTcc({ input: { command: "diff /outside/a.ts /outside/b.ts" } }),
@@ -220,11 +226,10 @@ describe("describeBashExternalDirectoryGate", () => {
   it("config-denied path makes worstCheck deny even when another path is ask", async () => {
     // One path config-denied, one config-ask → descriptor with preCheck.state === "deny".
     const resolver = makeResolver();
-    resolver.resolvePathPolicy.mockImplementation(
-      (values: readonly string[]) =>
-        values.includes("/outside/a.ts")
-          ? makeCheckResult("deny", { source: "special" })
-          : makeCheckResult("ask"),
+    resolver.resolve.mockImplementation((intent) =>
+      intentValues(intent).includes("/outside/a.ts")
+        ? makeCheckResult("deny", { source: "special" })
+        : makeCheckResult("ask"),
     );
     const result = await describeGate(
       makeTcc({ input: { command: "diff /outside/a.ts /outside/b.ts" } }),
@@ -241,11 +246,10 @@ describe("describeBashExternalDirectoryGate", () => {
 
   it("only includes uncovered paths when some are session-covered", async () => {
     const resolver = makeResolver();
-    resolver.resolvePathPolicy.mockImplementation(
-      (values: readonly string[]) =>
-        values.includes("/outside/a.ts")
-          ? makeCheckResult("allow", { source: "session" })
-          : makeCheckResult("ask"),
+    resolver.resolve.mockImplementation((intent) =>
+      intentValues(intent).includes("/outside/a.ts")
+        ? makeCheckResult("allow", { source: "session" })
+        : makeCheckResult("ask"),
     );
     const result = await describeGate(
       makeTcc({ input: { command: "diff /outside/a.ts /outside/b.ts" } }),

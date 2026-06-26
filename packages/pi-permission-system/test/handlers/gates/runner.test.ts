@@ -215,7 +215,12 @@ describe("GateRunner — descriptor path", () => {
     const { runner, deps } = makeGateRunner();
     const result = await runner.run(makeDescriptor(), "test-agent", "tc-1");
     expect(result).toEqual({ action: "allow" });
-    expect(deps.resolve).toHaveBeenCalledWith("read", {}, "test-agent");
+    expect(deps.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "read",
+      input: {},
+      agentName: "test-agent",
+    });
     expect(deps.reporter.emitDecision).toHaveBeenCalledWith(
       expect.objectContaining({
         agentName: "test-agent",

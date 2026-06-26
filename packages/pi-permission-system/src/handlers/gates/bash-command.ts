@@ -38,7 +38,12 @@ export function resolveBashCommandCheck(
 ): PermissionCheckResult {
   if (commands.length === 0) {
     if (isTriviallyEmptyCommand(command)) {
-      return resolver.resolve("bash", { command }, agentName);
+      return resolver.resolve({
+        kind: "tool",
+        surface: "bash",
+        input: { command },
+        agentName,
+      });
     }
     return {
       state: "ask",
@@ -51,12 +56,22 @@ export function resolveBashCommandCheck(
   }
 
   const results = commands.map((cmd) => {
-    const result = resolver.resolve("bash", { command: cmd.text }, agentName);
+    const result = resolver.resolve({
+      kind: "tool",
+      surface: "bash",
+      input: { command: cmd.text },
+      agentName,
+    });
     return cmd.context ? { ...result, commandContext: cmd.context } : result;
   });
   return (
     pickMostRestrictive(results) ??
-    resolver.resolve("bash", { command }, agentName)
+    resolver.resolve({
+      kind: "tool",
+      surface: "bash",
+      input: { command },
+      agentName,
+    })
   );
 }
 

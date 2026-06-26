@@ -228,14 +228,16 @@ describe("describeBashPathGate", () => {
       resolver,
     )) as GateDescriptor;
 
-    expect(resolver.resolvePathPolicy).toHaveBeenCalledWith(
-      [
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "path-values",
+      surface: "path",
+      values: [
         "/test/project/nested/src/file.txt",
         "nested/src/file.txt",
         "src/file.txt",
       ],
-      undefined,
-    );
+      agentName: undefined,
+    });
     // The raw token drives the prompt, denial context, and session approval.
     expect(result.denialContext).toMatchObject({ pathValue: "src/file.txt" });
     expect(result.decision.value).toBe("src/file.txt");
@@ -253,10 +255,12 @@ describe("describeBashPathGate", () => {
       resolver,
     );
 
-    expect(resolver.resolvePathPolicy).toHaveBeenCalledWith(
-      ["src/foo.ts"],
-      undefined,
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "path-values",
+      surface: "path",
+      values: ["src/foo.ts"],
+      agentName: undefined,
+    });
   });
 
   it("binds a current-directory token's session approval to the cwd subtree", async () => {

@@ -198,8 +198,8 @@ describe("ToolCallGatePipeline", () => {
     // block can only come from the path gate seeing the extracted path.
     function pathDenyingResolver() {
       const resolver = makeResolver();
-      resolver.resolve.mockImplementation((surface) =>
-        surface === "path"
+      resolver.resolve.mockImplementation((intent) =>
+        intent.surface === "path"
           ? makeCheckResult({ state: "deny", matchedPattern: "*" })
           : makeCheckResult(),
       );

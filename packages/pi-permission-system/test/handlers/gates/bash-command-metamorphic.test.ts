@@ -32,13 +32,15 @@ function makeKeyedResolver(
   rules: { match: string; state: PermissionState }[],
 ): ScopedPermissionResolver {
   return {
-    resolve: (_surface: string, input: { command?: string }) => {
-      const command = input.command ?? "";
+    resolve: (intent) => {
+      const command =
+        intent.kind === "tool"
+          ? ((intent.input as { command?: string }).command ?? "")
+          : "";
       const rule = rules.find((r) => command.includes(r.match));
       const state: PermissionState = rule?.state ?? "allow";
       return makeCheckResult({ state, source: "bash", command });
     },
-    resolvePathPolicy: () => makeCheckResult(),
   };
 }
 

@@ -26,10 +26,7 @@ import {
   PERMISSIONS_RPC_CHECK_CHANNEL,
   PERMISSIONS_RPC_PROMPT_CHANNEL,
 } from "./permission-events";
-import type {
-  PermissionManager,
-  ScopedPermissionManager,
-} from "./permission-manager";
+import type { ScopedPermissionManager } from "./permission-manager";
 import { buildRpcUiPrompt } from "./permission-ui-prompt";
 import type { ReviewLogger } from "./session-logger";
 import type { SessionRules } from "./session-rules";

@@ -155,11 +155,12 @@ describe("describePathGate", () => {
   it("resolves the path surface with the file path and agent name", () => {
     const resolver = makeResolver(makeCheckResult({ state: "allow" }));
     describePathGate(makeTcc({ agentName: "my-agent" }), resolver);
-    expect(resolver.resolve).toHaveBeenCalledWith(
-      "path",
-      { path: ".env" },
-      "my-agent",
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "path",
+      input: { path: ".env" },
+      agentName: "my-agent",
+    });
   });
 });
 
@@ -187,11 +188,12 @@ describe("describePathGate — home-relative paths", () => {
       toolName: "read",
       pathValue: "~/.ssh/config",
     });
-    expect(resolver.resolve).toHaveBeenCalledWith(
-      "path",
-      { path: "~/.ssh/config" },
-      undefined,
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "path",
+      input: { path: "~/.ssh/config" },
+      agentName: undefined,
+    });
   });
 
   it("passes raw $HOME/... path to resolver and builds descriptor on deny", () => {
@@ -243,11 +245,12 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
       resolver,
     );
     expect(isGateDescriptor(result)).toBe(true);
-    expect(resolver.resolve).toHaveBeenCalledWith(
-      "path",
-      { path: ".env" },
-      undefined,
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "path",
+      input: { path: ".env" },
+      agentName: undefined,
+    });
   });
 
   it("gates an MCP tool via arguments.path", () => {
@@ -259,11 +262,12 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
       resolver,
     );
     expect(isGateDescriptor(result)).toBe(true);
-    expect(resolver.resolve).toHaveBeenCalledWith(
-      "path",
-      { path: ".env" },
-      undefined,
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "path",
+      input: { path: ".env" },
+      agentName: undefined,
+    });
   });
 
   it("uses a registered extractor's path for a custom-shaped tool", () => {
@@ -275,11 +279,12 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
       resolver,
       extractorLookup("ffgrep", "target"),
     );
-    expect(resolver.resolve).toHaveBeenCalledWith(
-      "path",
-      { path: "/etc/passwd" },
-      undefined,
-    );
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "path",
+      input: { path: "/etc/passwd" },
+      agentName: undefined,
+    });
   });
 
   it("returns null for an extension tool without a path", () => {

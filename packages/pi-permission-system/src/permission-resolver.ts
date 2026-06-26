@@ -1,34 +1,42 @@
+import type {
+  AccessIntent,
+  ResolvedAccessIntent,
+} from "./access-intent/access-intent";
 import type { ScopedPermissionManager } from "./permission-manager";
 import type { Rule } from "./rule";
 import type { SessionRules } from "./session-rules";
+import type { SkillPermissionChecker } from "./skill-prompt-sanitizer";
 import type { PermissionCheckResult, PermissionState } from "./types";
 
 /**
- * Resolves the effective permission for a surface/input, applying the current
- * session rules internally.
+ * Answers an {@link AccessIntent} a gate emits, applying the current session
+ * rules internally.
  *
- * Collapses the `checkPermission` + `getSessionRuleset` relay that every gate
- * previously threaded by hand: the ruleset was only ever fetched to be passed
- * straight back into `checkPermission`, so the two are one operation.
+ * A single `resolve(intent)` entry point means adding a gate cannot widen the
+ * resolver surface, and a test fixture cannot stub one resolution method and
+ * forget another (the #393 false-green class) — #478.
  */
 export interface ScopedPermissionResolver {
-  resolve(
-    surface: string,
-    input: unknown,
-    agentName?: string,
-  ): PermissionCheckResult;
-  /**
-   * Resolve a path-shaped surface against a caller-supplied set of equivalent
-   * policy values, applying the current session rules. Used by the bash path
-   * gate (`path`) and the external-directory gates (`external_directory`),
-   * which compute equivalent path aliases per token. `surface` defaults to
-   * `path`.
-   */
-  resolvePathPolicy(
-    values: readonly string[],
-    agentName?: string,
-    surface?: string,
-  ): PermissionCheckResult;
+  resolve(intent: AccessIntent): PermissionCheckResult;
+}
+
+/**
+ * Reduce a gate-emitted {@link AccessIntent} to the string-based
+ * {@link ResolvedAccessIntent} the manager consumes.
+ *
+ * Tell-Don't-Ask: the resolver asks an `AccessPath` for its `matchValues()`,
+ * so the low-level manager never imports the value object.
+ */
+function toResolvedIntent(intent: AccessIntent): ResolvedAccessIntent {
+  if (intent.kind === "access-path") {
+    return {
+      kind: "path-values",
+      surface: intent.surface,
+      values: intent.path.matchValues(),
+      agentName: intent.agentName,
+    };
+  }
+  return intent;
 }
 
 /**
@@ -41,40 +49,22 @@ export interface ScopedPermissionResolver {
  * - `permissionManager` — the narrow session-scoped permission-checking interface
  * - `sessionRules` — narrowed to `getRuleset` (ISP: the resolver only reads, never records)
  */
-export class PermissionResolver implements ScopedPermissionResolver {
+export class PermissionResolver
+  implements ScopedPermissionResolver, SkillPermissionChecker
+{
   constructor(
     private readonly permissionManager: ScopedPermissionManager,
     private readonly sessionRules: Pick<SessionRules, "getRuleset">,
   ) {}
 
   /**
-   * Resolve the effective permission for a surface/input, applying the current
-   * session rules. Composes `manager.check` with `getRuleset()` so callers
-   * never thread the ruleset by hand.
+   * Answer a gate-emitted access intent, composing the current session ruleset
+   * so callers never thread it by hand. Unwraps the `access-path` variant via
+   * `matchValues()` before handing a string-based intent to the manager.
    */
-  resolve(
-    surface: string,
-    input: unknown,
-    agentName?: string,
-  ): PermissionCheckResult {
+  resolve(intent: AccessIntent): PermissionCheckResult {
     return this.permissionManager.check(
-      { kind: "tool", surface, input, agentName },
-      this.sessionRules.getRuleset(),
-    );
-  }
-
-  /**
-   * Resolve a path-shaped surface (`path` or `external_directory`) for
-   * precomputed policy values, composing the current session ruleset so callers
-   * never thread it by hand. `surface` defaults to `path`.
-   */
-  resolvePathPolicy(
-    values: readonly string[],
-    agentName?: string,
-    surface = "path",
-  ): PermissionCheckResult {
-    return this.permissionManager.check(
-      { kind: "path-values", surface, values, agentName },
+      toResolvedIntent(intent),
       this.sessionRules.getRuleset(),
     );
   }
