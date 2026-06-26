@@ -2,8 +2,6 @@ import type {
   ExtensionContext,
   InputEventResult,
 } from "@earendil-works/pi-coding-agent";
-
-import { toRecord } from "#src/common";
 import {
   formatMissingToolNameReason,
   formatUnknownToolReason,
@@ -14,6 +12,7 @@ import {
   getToolNameFromValue,
   type ToolRegistry,
 } from "#src/tool-registry";
+import { toRecord } from "#src/value-guards";
 import type { GateRunner } from "./gates/runner";
 import type {
   GateNotifier,

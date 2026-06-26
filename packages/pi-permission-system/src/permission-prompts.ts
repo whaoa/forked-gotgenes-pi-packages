@@ -1,8 +1,8 @@
-import { getNonEmptyString, toRecord } from "./common";
 import { matchQualifier } from "./denial-messages";
 import type { SkillPromptEntry } from "./skill-prompt-sanitizer";
 import type { ToolPreviewFormatter } from "./tool-preview-formatter";
 import type { PermissionCheckResult } from "./types";
+import { getNonEmptyString, toRecord } from "./value-guards";
 
 // NOTE: formatDenyReason, formatUserDeniedReason, and
 // formatPermissionHardStopHint have been moved to denial-messages.ts.

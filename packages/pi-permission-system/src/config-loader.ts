@@ -1,13 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { normalize } from "node:path";
 import {
-  isDenyWithReason,
-  isPermissionState,
-  normalizeOptionalPositiveInt,
-  normalizeOptionalStringArray,
-  toRecord,
-} from "./common";
-import {
   getGlobalConfigPath,
   getLegacyExtensionConfigPath,
   getLegacyGlobalPolicyPath,
@@ -16,6 +9,13 @@ import {
 } from "./config-paths";
 import { mergeFlatPermissions } from "./permission-merge";
 import type { FlatPermissionConfig, PatternValue } from "./types";
+import {
+  isDenyWithReason,
+  isPermissionState,
+  normalizeOptionalPositiveInt,
+  normalizeOptionalStringArray,
+  toRecord,
+} from "./value-guards";
 
 /**
  * Unified config shape combining runtime knobs and flat permission policy.

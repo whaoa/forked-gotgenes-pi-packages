@@ -747,7 +747,8 @@ src/
 ├── logging.ts                 JSONL review/debug log writer
 ├── status.ts                  Footer status bar integration
 ├── yolo-mode.ts               Auto-approve logic
-├── common.ts                  Shared parsing utilities
+├── value-guards.ts            Runtime type guards (`toRecord`, `getNonEmptyString`, `normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`, `isPermissionState`, `isDenyWithReason`)
+├── yaml-frontmatter.ts        Minimal YAML/frontmatter parsing (`parseSimpleYamlMap`, `extractFrontmatter`)
 └── types.ts                   Core type definitions (PermissionState, FlatPermissionConfig, etc.)
 ```
 

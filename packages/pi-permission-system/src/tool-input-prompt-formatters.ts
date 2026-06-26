@@ -1,5 +1,5 @@
-import { getNonEmptyString, toRecord } from "./common";
 import { countTextLines, formatCount } from "./tool-input-preview";
+import { getNonEmptyString, toRecord } from "./value-guards";
 
 export function getPromptPath(input: Record<string, unknown>): string | null {
   return getNonEmptyString(input.path) ?? getNonEmptyString(input.file_path);

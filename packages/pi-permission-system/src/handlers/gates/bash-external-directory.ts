@@ -1,8 +1,8 @@
 import type { BashProgram } from "#src/access-intent/bash/program";
-import { getNonEmptyString, toRecord } from "#src/common";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
+import { getNonEmptyString, toRecord } from "#src/value-guards";
 import type { GateResult } from "./descriptor";
 import { formatBashExternalDirectoryAskPrompt } from "./external-directory-messages";
 import { selectUncoveredExternalPaths } from "./external-directory-policy";

@@ -1,6 +1,5 @@
 import { join } from "node:path";
 import type { ResolvedAccessIntent } from "./access-intent/access-intent";
-import { isPermissionState } from "./common";
 import {
   getGlobalConfigPath,
   getProjectAgentsDir,
@@ -28,6 +27,7 @@ import type {
   PermissionCheckResult,
   PermissionState,
 } from "./types";
+import { isPermissionState } from "./value-guards";
 
 const BUILT_IN_TOOL_PERMISSION_NAMES = new Set([
   "bash",

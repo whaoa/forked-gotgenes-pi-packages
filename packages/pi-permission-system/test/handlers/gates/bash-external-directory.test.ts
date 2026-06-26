@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccessIntent } from "#src/access-intent/access-intent";
 import { BashProgram } from "#src/access-intent/bash/program";
-import { getNonEmptyString, toRecord } from "#src/common";
 import { describeBashExternalDirectoryGate } from "#src/handlers/gates/bash-external-directory";
 import type {
   GateBypass,
@@ -12,6 +11,7 @@ import { isGateBypass, isGateDescriptor } from "#src/handlers/gates/descriptor";
 import type { ToolCallContext } from "#src/handlers/gates/types";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { PermissionCheckResult } from "#src/types";
+import { getNonEmptyString, toRecord } from "#src/value-guards";
 
 import { makeResolver } from "#test/helpers/gate-fixtures";
 

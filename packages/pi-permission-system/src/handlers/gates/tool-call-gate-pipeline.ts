@@ -1,5 +1,4 @@
 import { BashProgram } from "#src/access-intent/bash/program";
-import { getNonEmptyString, toRecord } from "#src/common";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
@@ -8,6 +7,7 @@ import {
   ToolPreviewFormatter,
   type ToolPreviewFormatterOptions,
 } from "#src/tool-preview-formatter";
+import { getNonEmptyString, toRecord } from "#src/value-guards";
 import { resolveBashCommandCheck } from "./bash-command";
 import { describeBashExternalDirectoryGate } from "./bash-external-directory";
 import { describeBashPathGate } from "./bash-path";

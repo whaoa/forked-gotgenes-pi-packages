@@ -8,9 +8,9 @@ import {
 } from "node:path";
 
 import { canonicalizePath } from "./canonicalize-path";
-import { getNonEmptyString, toRecord } from "./common";
 import { expandHomePath } from "./expand-home";
 import type { ToolAccessExtractorLookup } from "./tool-access-extractor-registry";
+import { getNonEmptyString, toRecord } from "./value-guards";
 import { wildcardMatch } from "./wildcard-matcher";
 
 export function normalizePathForComparison(

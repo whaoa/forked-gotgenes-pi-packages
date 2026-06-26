@@ -1,4 +1,4 @@
-import { getNonEmptyString, toRecord } from "./common";
+import { getNonEmptyString, toRecord } from "./value-guards";
 
 /**
  * An ordered accumulator that owns the uniqueness invariant.

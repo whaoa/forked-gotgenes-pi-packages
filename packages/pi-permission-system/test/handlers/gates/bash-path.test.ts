@@ -10,7 +10,6 @@ vi.mock("node:os", () => {
 });
 
 import { BashProgram } from "#src/access-intent/bash/program";
-import { getNonEmptyString, toRecord } from "#src/common";
 import { describeBashPathGate } from "#src/handlers/gates/bash-path";
 import type {
   GateBypass,
@@ -20,6 +19,7 @@ import type {
 import { isGateBypass, isGateDescriptor } from "#src/handlers/gates/descriptor";
 import type { ToolCallContext } from "#src/handlers/gates/types";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
+import { getNonEmptyString, toRecord } from "#src/value-guards";
 
 import {
   makeGateCheckResult as makeCheckResult,

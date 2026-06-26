@@ -1,8 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-
-import { toRecord } from "#src/common";
 import type { DecisionRecorder } from "#src/decision-audit";
 import type { DecisionReporter } from "#src/decision-reporter";
+import { toRecord } from "#src/value-guards";
 import type { GateOutcome } from "./gates/types";
 
 /** The SDK-facing result shape for a `tool_call` handler. */

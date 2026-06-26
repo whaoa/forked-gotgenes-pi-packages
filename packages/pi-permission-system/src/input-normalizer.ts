@@ -1,7 +1,7 @@
 import { stripBashCommentLines } from "./bash-arity";
-import { getNonEmptyString, toRecord } from "./common";
 import { createMcpPermissionTargets } from "./mcp-targets";
 import { getPathPolicyValues, PATH_BEARING_TOOLS } from "./path-utils";
+import { getNonEmptyString, toRecord } from "./value-guards";
 
 /**
  * Construct a surface-appropriate input object from a raw value string.

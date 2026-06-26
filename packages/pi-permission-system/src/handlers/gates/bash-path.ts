@@ -1,9 +1,9 @@
 import type { BashProgram } from "#src/access-intent/bash/program";
-import { getNonEmptyString, toRecord } from "#src/common";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { PermissionCheckResult } from "#src/types";
+import { getNonEmptyString, toRecord } from "#src/value-guards";
 import { pickMostRestrictive } from "./candidate-check";
 import type { GateResult } from "./descriptor";
 import { formatPathAskPrompt } from "./path";

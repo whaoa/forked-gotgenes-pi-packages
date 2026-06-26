@@ -5,7 +5,6 @@ import {
   getActiveAgentNameFromSystemPrompt,
   type SessionEntryView,
 } from "#src/active-agent";
-import { toRecord } from "#src/common";
 import type { ConfigReader } from "#src/config-store";
 import type {
   PermissionDecisionUi,
@@ -31,6 +30,7 @@ import { buildForwardedUiPrompt } from "#src/permission-ui-prompt";
 import type { DebugReviewLogger } from "#src/session-logger";
 import { isSubagentExecutionContext } from "#src/subagent-context";
 import type { SubagentSessionRegistry } from "#src/subagent-registry";
+import { toRecord } from "#src/value-guards";
 import { shouldAutoApprovePermissionState } from "#src/yolo-mode";
 
 import {

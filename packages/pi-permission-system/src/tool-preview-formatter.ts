@@ -1,4 +1,3 @@
-import { getNonEmptyString, toRecord } from "./common";
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ToolInputFormatterLookup } from "./tool-input-formatter-registry";
 import {
@@ -15,6 +14,7 @@ import {
   getPromptPath,
 } from "./tool-input-prompt-formatters";
 import type { PermissionCheckResult } from "./types";
+import { getNonEmptyString, toRecord } from "./value-guards";
 
 export interface ToolPreviewFormatterOptions {
   toolInputPreviewMaxLength: number;
