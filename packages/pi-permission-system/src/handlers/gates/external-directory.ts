@@ -1,6 +1,5 @@
+import { AccessPath } from "#src/access-intent/access-path";
 import {
-  canonicalNormalizePathForComparison,
-  getExternalDirectoryPolicyValues,
   getToolInputPath,
   isPathOutsideWorkingDirectory,
   isPiInfrastructureRead,
@@ -42,10 +41,11 @@ export function describeExternalDirectoryGate(
   // The boundary decision (above) and the infrastructure-read containment
   // check (below) use the canonical, symlink-resolved path; pattern matching
   // uses the typed and resolved aliases (#418).
-  const canonicalExtPath = canonicalNormalizePathForComparison(
+  const accessPath = AccessPath.forExternalDirectory(
     externalDirectoryPath,
     tcc.cwd,
   );
+  const canonicalExtPath = accessPath.boundaryValue();
 
   // ── Pi infrastructure read bypass ──────────────────────────────────────
   if (
@@ -87,7 +87,7 @@ export function describeExternalDirectoryGate(
   // external_directory surface, so a config pattern on either form applies
   // (#418). The runner consumes this preCheck and skips its own resolve.
   const preCheck = resolver.resolvePathPolicy(
-    getExternalDirectoryPolicyValues(externalDirectoryPath, tcc.cwd),
+    accessPath.matchValues(),
     tcc.agentName ?? undefined,
     "external_directory",
   );
