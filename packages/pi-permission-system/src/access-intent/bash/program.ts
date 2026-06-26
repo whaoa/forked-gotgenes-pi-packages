@@ -1,3 +1,4 @@
+import type { AccessPath } from "#src/access-intent/access-path";
 import {
   type BashCommand,
   collectCommands,
@@ -25,7 +26,7 @@ export type { BashCommand, BashPathRuleCandidate };
 export class BashProgram {
   private constructor(
     private readonly commandUnits: readonly BashCommand[],
-    private readonly resolvedExternalPaths: readonly string[],
+    private readonly resolvedExternalPaths: readonly AccessPath[],
     private readonly resolvedRuleCandidates: readonly BashPathRuleCandidate[],
   ) {}
 
@@ -73,16 +74,15 @@ export class BashProgram {
   }
 
   /**
-   * Deduplicated paths that resolve outside `cwd`, in their lexical (as-typed,
-   * normalized but not symlink-resolved) form.
+   * Deduplicated paths that resolve outside `cwd`, as {@link AccessPath} value
+   * objects holding both the lexical (as-typed) and canonical (symlink-resolved)
+   * forms behind distinct accessors.
    *
    * Resolved eagerly at parse time against the `cwd` supplied to `parse()`.
-   * The outside-`cwd` decision and the dedup identity use the canonical
-   * (symlink-resolved) form, but the returned value is the lexical form so
-   * `external_directory` config patterns match the path as the user typed it
-   * (#418); the gate re-derives the canonical alias for matching.
+   * Use `.matchValues()` for `external_directory` pattern matching and
+   * `.boundaryValue()` for containment checks; `.value()` for display and logs.
    */
-  externalPaths(): string[] {
+  externalPaths(): AccessPath[] {
     return [...this.resolvedExternalPaths];
   }
 

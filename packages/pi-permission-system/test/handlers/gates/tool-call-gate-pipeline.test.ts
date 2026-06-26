@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { AccessPath } from "#src/access-intent/access-path";
 import { ToolCallGatePipeline } from "#src/handlers/gates/tool-call-gate-pipeline";
 
 import {
@@ -24,7 +25,7 @@ function makeMockBashProgram() {
   return {
     commands: vi.fn<() => []>(() => []),
     pathRuleCandidates: vi.fn<() => []>(() => []),
-    externalPaths: vi.fn<() => []>(() => []),
+    externalPaths: vi.fn<() => AccessPath[]>(() => []),
   };
 }
 

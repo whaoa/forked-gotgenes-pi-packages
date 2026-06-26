@@ -1,6 +1,6 @@
+import type { AccessPath } from "#src/access-intent/access-path";
 import type { BashProgram } from "#src/access-intent/bash/program";
 import { getNonEmptyString, toRecord } from "#src/common";
-import { getExternalDirectoryPolicyValues } from "#src/path-utils";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
@@ -38,7 +38,7 @@ export function describeBashExternalDirectoryGate(
   // Checking state (not source) ensures config-level allow rules (source: "special")
   // suppress the prompt just as session-level allow rules (source: "session") do.
   const uncoveredEntries: Array<{
-    path: string;
+    path: AccessPath;
     check: PermissionCheckResult;
   }> = [];
   for (const p of externalPaths) {
@@ -46,7 +46,7 @@ export function describeBashExternalDirectoryGate(
     // the external_directory surface, so a config pattern on either form
     // applies (#418).
     const check = resolver.resolvePathPolicy(
-      getExternalDirectoryPolicyValues(p, tcc.cwd),
+      p.matchValues(),
       tcc.agentName ?? undefined,
       "external_directory",
     );
@@ -54,7 +54,7 @@ export function describeBashExternalDirectoryGate(
       uncoveredEntries.push({ path: p, check });
     }
   }
-  const uncoveredPaths = uncoveredEntries.map(({ path }) => path);
+  const uncoveredPaths = uncoveredEntries.map(({ path }) => path.value());
 
   if (uncoveredPaths.length === 0) {
     return {
@@ -67,7 +67,7 @@ export function describeBashExternalDirectoryGate(
           toolName: tcc.toolName,
           agentName: tcc.agentName,
           command,
-          externalPaths,
+          externalPaths: externalPaths.map((p) => p.value()),
           resolution: "session_approved",
         },
       },

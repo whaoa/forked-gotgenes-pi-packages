@@ -1,4 +1,5 @@
 import { isAbsolute, join, resolve } from "node:path";
+import { AccessPath } from "#src/access-intent/access-path";
 import {
   ARG_NODE_TYPES,
   SKIP_SUBTREE_TYPES,
@@ -409,11 +410,11 @@ function getPolicyValuesForRuleCandidate(
 export function projectExternalPaths(
   candidates: readonly PathCandidate[],
   cwd: string,
-): string[] {
+): AccessPath[] {
   const normalizedCwd = canonicalizePath(normalizePathForComparison(cwd, cwd));
 
   const seen = new Set<string>();
-  const externalPaths: string[] = [];
+  const externalPaths: AccessPath[] = [];
 
   for (const { token, base } of candidates) {
     const candidate = classifyTokenAsPathCandidate(token);
@@ -432,7 +433,9 @@ export function projectExternalPaths(
         !seen.has(canonical)
       ) {
         seen.add(canonical);
-        externalPaths.push(lexical);
+        // The factory recomputes the canonical via canonicalNormalizePathForComparison
+        // (win32-lowercased, #382) rather than reusing the raw canonicalizePath output.
+        externalPaths.push(AccessPath.forExternalDirectory(lexical, cwd));
       }
       continue;
     }
@@ -452,7 +455,9 @@ export function projectExternalPaths(
       !seen.has(canonical)
     ) {
       seen.add(canonical);
-      externalPaths.push(lexical);
+      // The factory recomputes the canonical via canonicalNormalizePathForComparison
+      // (win32-lowercased, #382) rather than reusing the raw canonicalizePath output.
+      externalPaths.push(AccessPath.forExternalDirectory(lexical, cwd));
     }
   }
 

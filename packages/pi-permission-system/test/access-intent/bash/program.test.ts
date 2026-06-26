@@ -70,7 +70,9 @@ describe("BashProgram", () => {
     it("returns absolute paths resolving outside cwd", async () => {
       const program = await BashProgram.parse("cat /etc/hosts", cwd);
       // Subset matcher: the path is normalized before comparison.
-      expect(program.externalPaths()).toContain("/etc/hosts");
+      expect(program.externalPaths().map((p) => p.value())).toContain(
+        "/etc/hosts",
+      );
     });
 
     it("excludes paths within cwd", async () => {
@@ -95,7 +97,9 @@ describe("BashProgram", () => {
           "cd nested/deep && cd .. && cat ../../etc/passwd",
           cwd,
         );
-        expect(program.externalPaths()).toContain("/projects/etc/passwd");
+        expect(program.externalPaths().map((p) => p.value())).toContain(
+          "/projects/etc/passwd",
+        );
       });
 
       it("folds a cd that is not the first command", async () => {
@@ -112,13 +116,17 @@ describe("BashProgram", () => {
         // `cd a &` runs in a subshell, so it must not update the running
         // directory; ../b resolves against cwd and escapes.
         const program = await BashProgram.parse("cd a & cat ../b", cwd);
-        expect(program.externalPaths()).toContain("/projects/b");
+        expect(program.externalPaths().map((p) => p.value())).toContain(
+          "/projects/b",
+        );
       });
 
       it("does not fold a cd inside a pipeline", async () => {
         // Pipeline members run in subshells; the cd must not leak.
         const program = await BashProgram.parse("cd nested | cat ../b", cwd);
-        expect(program.externalPaths()).toContain("/projects/b");
+        expect(program.externalPaths().map((p) => p.value())).toContain(
+          "/projects/b",
+        );
       });
 
       it("folds a cd inside a subshell for paths within that subshell", async () => {
@@ -130,7 +138,9 @@ describe("BashProgram", () => {
       it("does not leak a subshell cd to following commands", async () => {
         // The subshell cd resets on exit, so ../y resolves against cwd.
         const program = await BashProgram.parse("( cd sub ) && cat ../y", cwd);
-        expect(program.externalPaths()).toContain("/projects/y");
+        expect(program.externalPaths().map((p) => p.value())).toContain(
+          "/projects/y",
+        );
       });
 
       it("persists a cd inside a brace group to later commands in the group", async () => {
@@ -152,14 +162,18 @@ describe("BashProgram", () => {
           "echo $(cd q && cat ../r)",
           cwd,
         );
-        expect(program.externalPaths()).toContain("/projects/r");
+        expect(program.externalPaths().map((p) => p.value())).toContain(
+          "/projects/r",
+        );
       });
 
       it("flags relative paths conservatively after a non-literal cd", async () => {
         // cd "$DIR" makes the effective dir unknowable; ../x could be anywhere,
         // so it is flagged (least-privilege).
         const program = await BashProgram.parse('cd "$DIR" && cat ../x', cwd);
-        expect(program.externalPaths()).toContain("/projects/x");
+        expect(program.externalPaths().map((p) => p.value())).toContain(
+          "/projects/x",
+        );
       });
 
       it("flags even a within-cwd relative path after a non-literal cd", async () => {
@@ -169,7 +183,7 @@ describe("BashProgram", () => {
           'cd "$DIR" && cat src/../within.txt',
           cwd,
         );
-        expect(program.externalPaths()).toContain(
+        expect(program.externalPaths().map((p) => p.value())).toContain(
           "/projects/my-app/within.txt",
         );
       });
@@ -186,7 +200,9 @@ describe("BashProgram", () => {
 
       it("treats `cd -` as an unknown effective directory", async () => {
         const program = await BashProgram.parse("cd - && cat ../x", cwd);
-        expect(program.externalPaths()).toContain("/projects/x");
+        expect(program.externalPaths().map((p) => p.value())).toContain(
+          "/projects/x",
+        );
       });
 
       it("recovers a known base when a later cd is absolute", async () => {
@@ -233,7 +249,9 @@ describe("BashProgram", () => {
           "cd a && cd b 2>&1 | tail ; cat ../../x",
           cwd,
         );
-        expect(program.externalPaths()).toContain("/projects/x");
+        expect(program.externalPaths().map((p) => p.value())).toContain(
+          "/projects/x",
+        );
       });
 
       it("resolves a downstream pipe stage against the folded base", async () => {
@@ -262,7 +280,7 @@ describe("BashProgram", () => {
         "cat /projects/my-app/link/hosts",
         cwd,
       );
-      const external = program.externalPaths();
+      const external = program.externalPaths().map((p) => p.value());
       expect(external).toContain("/projects/my-app/link/hosts");
       expect(external).not.toContain("/etc/hosts");
     });
@@ -426,7 +444,7 @@ describe("BashProgram", () => {
       ".env",
       "/etc/hosts",
     ]);
-    const external = program.externalPaths();
+    const external = program.externalPaths().map((p) => p.value());
     expect(external).toContain("/etc/hosts");
     expect(external).not.toContain(".env");
   });
