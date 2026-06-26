@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, test } from "vitest";
+import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import {
   getGlobalConfigPath,
   getProjectAgentsDir,
@@ -3361,6 +3362,187 @@ describe("checkPathPolicy", () => {
       expect(result.toolName).toBe("path");
       expect(result.state).toBe("allow");
       expect(result.matchedPattern).toBe("*");
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// check(intent) — unified entry point (Step 1 of #478)
+// ---------------------------------------------------------------------------
+
+describe("check — tool intent", () => {
+  it("resolves a tool call on the bash surface", () => {
+    const { manager, cleanup } = makeManagerWithConfig({
+      bash: { "*": "allow", "git push": "deny" },
+    });
+    try {
+      const intent: ResolvedAccessIntent = {
+        kind: "tool",
+        surface: "bash",
+        input: { command: "git push" },
+      };
+      const result = manager.check(intent);
+      expect(result.state).toBe("deny");
+      expect(result.toolName).toBe("bash");
+      expect(result.source).toBe("bash");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("resolves a tool call on the read surface", () => {
+    const { manager, cleanup } = makeManagerWithConfig({ read: "deny" });
+    try {
+      const intent: ResolvedAccessIntent = {
+        kind: "tool",
+        surface: "read",
+        input: { path: "/some/file.txt" },
+      };
+      const result = manager.check(intent);
+      expect(result.state).toBe("deny");
+      expect(result.toolName).toBe("read");
+      expect(result.source).toBe("tool");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("applies session rules via the tool intent", () => {
+    const { manager, cleanup } = makeManagerWithConfig({
+      bash: { "*": "deny" },
+    });
+    try {
+      const sessionRules: Ruleset = [sessionAllow("bash", "echo *")];
+      const intent: ResolvedAccessIntent = {
+        kind: "tool",
+        surface: "bash",
+        input: { command: "echo hello" },
+      };
+      const result = manager.check(intent, sessionRules);
+      expect(result.state).toBe("allow");
+      expect(result.source).toBe("session");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("threads agentName through the tool intent", () => {
+    const { manager, cleanup } = createManager(
+      { permission: { bash: "deny" } },
+      {
+        "agent-a": `---\nname: agent-a\npermission:\n  bash: allow\n---\n`,
+      },
+    );
+    try {
+      const intent: ResolvedAccessIntent = {
+        kind: "tool",
+        surface: "bash",
+        input: { command: "echo hi" },
+        agentName: "agent-a",
+      };
+      const result = manager.check(intent);
+      expect(result.state).toBe("allow");
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("check — path-values intent", () => {
+  const cwd = "/workspace/project";
+
+  it("evaluates precomputed policy values against the path surface", () => {
+    const { manager, cleanup } = makeManagerWithConfig({
+      path: { "*": "ask", [`${cwd}/*`]: "allow" },
+    });
+    try {
+      const intent: ResolvedAccessIntent = {
+        kind: "path-values",
+        surface: "path",
+        values: [`${cwd}/src/App.jsx`, "src/App.jsx"],
+      };
+      const result = manager.check(intent);
+      expect(result.state).toBe("allow");
+      expect(result.matchedPattern).toBe(`${cwd}/*`);
+      expect(result.source).toBe("special");
+      expect(result.toolName).toBe("path");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("evaluates against the external_directory surface", () => {
+    const { manager, cleanup } = makeManagerWithConfig({
+      external_directory: { "*": "ask", "/tmp/*": "allow" },
+    });
+    try {
+      const intent: ResolvedAccessIntent = {
+        kind: "path-values",
+        surface: "external_directory",
+        values: ["/tmp/x"],
+      };
+      const result = manager.check(intent);
+      expect(result.state).toBe("allow");
+      expect(result.matchedPattern).toBe("/tmp/*");
+      expect(result.source).toBe("special");
+      expect(result.toolName).toBe("external_directory");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("falls back to the catch-all for an empty value list", () => {
+    const { manager, cleanup } = makeManagerWithConfig({
+      path: { "*": "deny" },
+    });
+    try {
+      const intent: ResolvedAccessIntent = {
+        kind: "path-values",
+        surface: "path",
+        values: [],
+      };
+      const result = manager.check(intent);
+      expect(result.state).toBe("deny");
+      expect(result.matchedPattern).toBe("*");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("applies session rules via the path-values intent", () => {
+    const { manager, cleanup } = makeManagerWithConfig({
+      path: { "*": "ask", "src/*": "deny" },
+    });
+    try {
+      const sessionRules: Ruleset = [sessionAllow("path", "src/*")];
+      const intent: ResolvedAccessIntent = {
+        kind: "path-values",
+        surface: "path",
+        values: ["src/App.jsx"],
+      };
+      const result = manager.check(intent, sessionRules);
+      expect(result.state).toBe("allow");
+      expect(result.source).toBe("session");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("last-match-wins across the provided aliases", () => {
+    const { manager, cleanup } = makeManagerWithConfig({
+      path: { "*": "ask", [`${cwd}/*`]: "allow", "src/*": "deny" },
+    });
+    try {
+      const intent: ResolvedAccessIntent = {
+        kind: "path-values",
+        surface: "path",
+        values: [`${cwd}/src/App.jsx`, "src/App.jsx"],
+      };
+      const result = manager.check(intent);
+      expect(result.state).toBe("deny");
+      expect(result.matchedPattern).toBe("src/*");
     } finally {
       cleanup();
     }

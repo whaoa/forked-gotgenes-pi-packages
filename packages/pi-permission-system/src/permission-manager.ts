@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { ResolvedAccessIntent } from "./access-intent/access-intent";
 import { isPermissionState } from "./common";
 import {
   getGlobalConfigPath,
@@ -62,6 +63,17 @@ type ResolvedPermissions = {
  */
 export interface ScopedPermissionManager {
   configureForCwd(cwd: string | undefined | null): void;
+  /**
+   * Unified resolution entry point (Phase 6 Step 6, #478).
+   *
+   * Replaces `checkPermission` + `checkPathPolicy` with a single dispatched
+   * call, making it structurally impossible to stub one method and forget the
+   * other (the #393 false-green class).
+   */
+  check(
+    intent: ResolvedAccessIntent,
+    sessionRules?: Ruleset,
+  ): PermissionCheckResult;
   checkPermission(
     toolName: string,
     input: unknown,
@@ -241,6 +253,53 @@ export class PermissionManager implements ScopedPermissionManager {
 
     // Tool-name surfaces (read, write, etc. and extension tools).
     return evaluate(normalizedToolName, "*", composedRules).action;
+  }
+
+  /**
+   * Unified resolution entry point — dispatches on intent kind.
+   *
+   * `"tool"` → normalizes raw input through `normalizeInput` (same as
+   * `checkPermission`).  `"path-values"` → evaluates precomputed values
+   * directly (same as `checkPathPolicy`).
+   */
+  check(
+    intent: ResolvedAccessIntent,
+    sessionRules?: Ruleset,
+  ): PermissionCheckResult {
+    const { composedRules } = this.resolvePermissions(intent.agentName);
+    const fullRules: Ruleset = sessionRules?.length
+      ? [...composedRules, ...sessionRules]
+      : composedRules;
+
+    if (intent.kind === "path-values") {
+      const lookupValues =
+        intent.values.length > 0 ? [...intent.values] : ["*"];
+      return buildCheckResult(
+        intent.surface,
+        lookupValues,
+        {},
+        intent.surface,
+        intent.surface,
+        fullRules,
+      );
+    }
+
+    // kind === "tool"
+    const toolName = intent.surface.trim();
+    const { surface, values, resultExtras } = normalizeInput(
+      toolName,
+      intent.input,
+      this.loader.getConfiguredMcpServerNames(),
+      this.currentCwd,
+    );
+    return buildCheckResult(
+      surface,
+      values,
+      resultExtras,
+      toolName,
+      intent.surface,
+      fullRules,
+    );
   }
 
   checkPermission(

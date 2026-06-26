@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import type { ScopedPermissionManager } from "#src/permission-manager";
 import { PermissionResolver } from "#src/permission-resolver";
 import type { Ruleset } from "#src/rule";
@@ -15,6 +16,19 @@ function makePermissionManager() {
           toolName: string,
           input: unknown,
           agentName?: string,
+          sessionRules?: Ruleset,
+        ) => PermissionCheckResult
+      >()
+      .mockReturnValue({
+        state: "allow",
+        toolName: "read",
+        source: "tool",
+        origin: "builtin",
+      }),
+    check: vi
+      .fn<
+        (
+          intent: ResolvedAccessIntent,
           sessionRules?: Ruleset,
         ) => PermissionCheckResult
       >()

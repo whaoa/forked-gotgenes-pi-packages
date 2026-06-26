@@ -10,6 +10,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 
+import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import { GateDecisionReporter } from "#src/decision-reporter";
 import type { GatePrompter } from "#src/gate-prompter";
 import { GateRunner } from "#src/handlers/gates/runner";
@@ -253,6 +254,27 @@ export function makeHandler(overrides?: {
           agentName,
           sessionRules,
         ),
+    );
+    // Also route the new unified check(intent) through the same dispatcher
+    // so makeSurfaceCheck/makeBashCommandCheck overrides apply to all gate
+    // paths (including the unified path once gates migrate in Step 3+).
+    vi.mocked(permissionManager.check).mockImplementation(
+      (intent: ResolvedAccessIntent, sessionRules) => {
+        if (intent.kind === "path-values") {
+          return surfaceCheck(
+            intent.surface,
+            { path: intent.values[0] ?? "*" },
+            intent.agentName,
+            sessionRules,
+          );
+        }
+        return surfaceCheck(
+          intent.surface,
+          intent.input,
+          intent.agentName,
+          sessionRules,
+        );
+      },
     );
   }
   if (so?.getActiveSkillEntries) {

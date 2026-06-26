@@ -13,6 +13,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 
+import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import type { SessionConfigStore } from "#src/config-store";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import type { ExtensionPaths } from "#src/extension-paths";
@@ -87,6 +88,19 @@ export function makeForwarding(): ForwardingController {
 export function makeFakePermissionManager() {
   return {
     configureForCwd: vi.fn<(cwd: string | undefined | null) => void>(),
+    check: vi
+      .fn<
+        (
+          intent: ResolvedAccessIntent,
+          sessionRules?: Ruleset,
+        ) => PermissionCheckResult
+      >()
+      .mockReturnValue({
+        state: "allow",
+        toolName: "read",
+        source: "tool",
+        origin: "builtin",
+      }),
     checkPermission: vi
       .fn<
         (
