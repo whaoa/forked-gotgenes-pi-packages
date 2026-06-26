@@ -26,7 +26,10 @@ import {
   PERMISSIONS_RPC_CHECK_CHANNEL,
   PERMISSIONS_RPC_PROMPT_CHANNEL,
 } from "./permission-events";
-import type { PermissionManager } from "./permission-manager";
+import type {
+  PermissionManager,
+  ScopedPermissionManager,
+} from "./permission-manager";
 import { buildRpcUiPrompt } from "./permission-ui-prompt";
 import type { ReviewLogger } from "./session-logger";
 import type { SessionRules } from "./session-rules";
@@ -34,7 +37,7 @@ import type { SessionRules } from "./session-rules";
 /** Dependencies injected into the RPC handler registry. */
 export interface PermissionRpcDeps {
   /** The shared PermissionManager instance. */
-  permissionManager: Pick<PermissionManager, "checkPermission">;
+  permissionManager: Pick<ScopedPermissionManager, "check">;
   /** The shared SessionRules instance. */
   sessionRules: Pick<SessionRules, "getRuleset">;
   /**
@@ -109,10 +112,8 @@ function handleCheckRpc(
 
     const input = buildInputForSurface(surface, value);
     const sessionRules = deps.sessionRules.getRuleset();
-    const result = deps.permissionManager.checkPermission(
-      surface,
-      input,
-      agentName ?? undefined,
+    const result = deps.permissionManager.check(
+      { kind: "tool", surface, input, agentName: agentName ?? undefined },
       sessionRules,
     );
 

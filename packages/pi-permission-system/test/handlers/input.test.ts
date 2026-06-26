@@ -67,7 +67,7 @@ describe("handleInput", () => {
   it("does not check permissions for non-skill input", async () => {
     const { handler, permissionManager } = makeHandler();
     await handler.handleInput(makeInputEvent("just a message"), makeCtx());
-    expect(permissionManager.checkPermission).not.toHaveBeenCalled();
+    expect(permissionManager.check).not.toHaveBeenCalled();
   });
 
   it("returns continue when skill is allowed", async () => {

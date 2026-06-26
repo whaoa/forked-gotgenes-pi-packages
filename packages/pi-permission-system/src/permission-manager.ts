@@ -66,33 +66,13 @@ export interface ScopedPermissionManager {
   /**
    * Unified resolution entry point (Phase 6 Step 6, #478).
    *
-   * Replaces `checkPermission` + `checkPathPolicy` with a single dispatched
-   * call, making it structurally impossible to stub one method and forget the
-   * other (the #393 false-green class).
+   * Replaces the former `checkPermission` + `checkPathPolicy` method pair with
+   * a single dispatched call, making it structurally impossible to stub one
+   * method and forget the other (the #393 false-green class).
    */
   check(
     intent: ResolvedAccessIntent,
     sessionRules?: Ruleset,
-  ): PermissionCheckResult;
-  checkPermission(
-    toolName: string,
-    input: unknown,
-    agentName?: string,
-    sessionRules?: Ruleset,
-  ): PermissionCheckResult;
-  /**
-   * Evaluate a path-shaped surface (`path` or `external_directory`) against a
-   * caller-supplied set of equivalent policy values (e.g. bash tokens already
-   * resolved against a preceding literal `cd`, or a path's typed and
-   * symlink-resolved aliases). The values are trusted because they are computed
-   * internally, never read from a field on raw tool input. `surface` defaults
-   * to `path`.
-   */
-  checkPathPolicy(
-    values: readonly string[],
-    agentName?: string,
-    sessionRules?: Ruleset,
-    surface?: string,
   ): PermissionCheckResult;
   getToolPermission(toolName: string, agentName?: string): PermissionState;
   getConfigIssues(agentName?: string): string[];
@@ -302,57 +282,40 @@ export class PermissionManager implements ScopedPermissionManager {
     );
   }
 
+  /**
+   * Backward-compat thin wrapper over `check` for the test suite.
+   *
+   * Not on `ScopedPermissionManager` — removed from the interface in #478.
+   * Will be removed once `permission-manager-unified.test.ts` migrates to
+   * `check(intent)` directly.
+   */
   checkPermission(
     toolName: string,
     input: unknown,
     agentName?: string,
     sessionRules?: Ruleset,
   ): PermissionCheckResult {
-    const { composedRules } = this.resolvePermissions(agentName);
-    const normalizedToolName = toolName.trim();
-
-    // Append session rules at the end (highest priority) so evaluate() handles
-    // them via last-match-wins — no separate per-branch pre-check needed.
-    const fullRules: Ruleset = sessionRules?.length
-      ? [...composedRules, ...sessionRules]
-      : composedRules;
-
-    const { surface, values, resultExtras } = normalizeInput(
-      normalizedToolName,
-      input,
-      this.loader.getConfiguredMcpServerNames(),
-      this.currentCwd,
-    );
-
-    return buildCheckResult(
-      surface,
-      values,
-      resultExtras,
-      normalizedToolName,
-      toolName,
-      fullRules,
+    return this.check(
+      { kind: "tool", surface: toolName, input, agentName },
+      sessionRules,
     );
   }
 
+  /**
+   * Backward-compat thin wrapper over `check` for the test suite.
+   *
+   * Not on `ScopedPermissionManager` — removed from the interface in #478.
+   * Will be removed once `permission-manager-unified.test.ts` migrates.
+   */
   checkPathPolicy(
     values: readonly string[],
     agentName?: string,
     sessionRules?: Ruleset,
     surface = "path",
   ): PermissionCheckResult {
-    const { composedRules } = this.resolvePermissions(agentName);
-    const fullRules: Ruleset = sessionRules?.length
-      ? [...composedRules, ...sessionRules]
-      : composedRules;
-
-    const lookupValues = values.length > 0 ? [...values] : ["*"];
-    return buildCheckResult(
-      surface,
-      lookupValues,
-      {},
-      surface,
-      surface,
-      fullRules,
+    return this.check(
+      { kind: "path-values", surface, values, agentName },
+      sessionRules,
     );
   }
 }

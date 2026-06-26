@@ -49,10 +49,8 @@ function makeSetup(opts?: {
       opts.toolPermission,
     );
   }
-  // Default checkPermission returns allow (for skill-prompt sanitizer)
-  vi.mocked(permissionManager.checkPermission).mockReturnValue(
-    makeCheckResult(),
-  );
+  // Default check returns allow (for skill-prompt sanitizer via resolver.checkPermission)
+  vi.mocked(permissionManager.check).mockReturnValue(makeCheckResult());
   const toolRegistry = makeToolRegistry(opts?.toolRegistry);
   const handler = new AgentPrepHandler(session, resolver, toolRegistry);
   return {
@@ -195,11 +193,10 @@ describe("AgentPrepHandler.handle", () => {
       "</available_skills>",
     ].join("\n");
     const { handler, permissionManager } = makeSetup();
-    vi.mocked(permissionManager.checkPermission).mockImplementation(
-      (surface) =>
-        surface === "skill"
-          ? makeCheckResult({ state: "deny" })
-          : makeCheckResult(),
+    vi.mocked(permissionManager.check).mockImplementation((intent) =>
+      intent.surface === "skill"
+        ? makeCheckResult({ state: "deny" })
+        : makeCheckResult(),
     );
 
     const first = await handler.handle(makeEvent(systemPrompt), makeCtx());

@@ -37,7 +37,7 @@ function makeDeps(
 ): PermissionRpcDeps {
   return {
     permissionManager: {
-      checkPermission: vi.fn().mockReturnValue(makeCheckResult("allow")),
+      check: vi.fn().mockReturnValue(makeCheckResult("allow")),
     },
     sessionRules: { getRuleset: vi.fn().mockReturnValue([]) },
     session: { getRuntimeContext: vi.fn().mockReturnValue(null) },
@@ -74,7 +74,7 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
     const bus = createEventBus();
     const deps = makeDeps({
       permissionManager: {
-        checkPermission: vi.fn().mockReturnValue(makeCheckResult("allow")),
+        check: vi.fn().mockReturnValue(makeCheckResult("allow")),
       },
     });
     registerPermissionRpcHandlers(bus, deps);
@@ -101,7 +101,7 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
     const bus = createEventBus();
     const deps = makeDeps({
       permissionManager: {
-        checkPermission: vi.fn().mockReturnValue(
+        check: vi.fn().mockReturnValue(
           makeCheckResult("deny", {
             origin: "project",
             matchedPattern: "rm *",
@@ -132,7 +132,7 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
     const bus = createEventBus();
     const deps = makeDeps({
       permissionManager: {
-        checkPermission: vi
+        check: vi
           .fn()
           .mockReturnValue(
             makeCheckResult("ask", { matchedPattern: undefined }),
@@ -157,11 +157,11 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
     }
   });
 
-  it("passes agentName to checkPermission when provided", async () => {
-    const checkPermission = vi.fn().mockReturnValue(makeCheckResult("allow"));
+  it("passes agentName to check when provided", async () => {
+    const check = vi.fn().mockReturnValue(makeCheckResult("allow"));
     const bus = createEventBus();
     const deps = makeDeps({
-      permissionManager: { checkPermission },
+      permissionManager: { check },
     });
     registerPermissionRpcHandlers(bus, deps);
 
@@ -177,10 +177,12 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
     });
     await replyPromise;
 
-    expect(checkPermission).toHaveBeenCalledWith(
-      "bash",
-      expect.anything(),
-      "Worker",
+    expect(check).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "tool",
+        surface: "bash",
+        agentName: "Worker",
+      }),
       expect.anything(),
     );
   });
@@ -194,10 +196,10 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
         origin: "session" as const,
       },
     ];
-    const checkPermission = vi.fn().mockReturnValue(makeCheckResult("allow"));
+    const check = vi.fn().mockReturnValue(makeCheckResult("allow"));
     const bus = createEventBus();
     const deps = makeDeps({
-      permissionManager: { checkPermission },
+      permissionManager: { check },
       sessionRules: { getRuleset: vi.fn().mockReturnValue(sessionRules) },
     });
     registerPermissionRpcHandlers(bus, deps);
@@ -213,10 +215,12 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
     });
     await replyPromise;
 
-    expect(checkPermission).toHaveBeenCalledWith(
-      "bash",
-      expect.anything(),
-      undefined,
+    expect(check).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "tool",
+        surface: "bash",
+        agentName: undefined,
+      }),
       sessionRules,
     );
   });
@@ -243,10 +247,10 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
   });
 
   it("unsubCheck stops the handler from firing", async () => {
-    const checkPermission = vi.fn().mockReturnValue(makeCheckResult("allow"));
+    const check = vi.fn().mockReturnValue(makeCheckResult("allow"));
     const bus = createEventBus();
     const deps = makeDeps({
-      permissionManager: { checkPermission },
+      permissionManager: { check },
     });
     const handles = registerPermissionRpcHandlers(bus, deps);
     handles.unsubCheck();
@@ -258,7 +262,7 @@ describe("registerPermissionRpcHandlers — permissions:rpc:check", () => {
 
     // Give async handlers a chance to fire
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(checkPermission).not.toHaveBeenCalled();
+    expect(check).not.toHaveBeenCalled();
   });
 });
 

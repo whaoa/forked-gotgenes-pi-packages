@@ -49,7 +49,7 @@ export class PermissionResolver implements ScopedPermissionResolver {
 
   /**
    * Resolve the effective permission for a surface/input, applying the current
-   * session rules. Composes `checkPermission` with `getRuleset()` so callers
+   * session rules. Composes `manager.check` with `getRuleset()` so callers
    * never thread the ruleset by hand.
    */
   resolve(
@@ -57,10 +57,8 @@ export class PermissionResolver implements ScopedPermissionResolver {
     input: unknown,
     agentName?: string,
   ): PermissionCheckResult {
-    return this.checkPermission(
-      surface,
-      input,
-      agentName,
+    return this.permissionManager.check(
+      { kind: "tool", surface, input, agentName },
       this.sessionRules.getRuleset(),
     );
   }
@@ -68,33 +66,33 @@ export class PermissionResolver implements ScopedPermissionResolver {
   /**
    * Resolve a path-shaped surface (`path` or `external_directory`) for
    * precomputed policy values, composing the current session ruleset so callers
-   * never thread it by hand. `surface` defaults to `path`; the external-directory
-   * gates pass `external_directory` so a path's typed and symlink-resolved
-   * aliases match against the `external_directory` rules.
+   * never thread it by hand. `surface` defaults to `path`.
    */
   resolvePathPolicy(
     values: readonly string[],
     agentName?: string,
     surface = "path",
   ): PermissionCheckResult {
-    return this.permissionManager.checkPathPolicy(
-      values,
-      agentName,
+    return this.permissionManager.check(
+      { kind: "path-values", surface, values, agentName },
       this.sessionRules.getRuleset(),
-      surface,
     );
   }
 
+  /**
+   * Raw permission check without session rules — the no-session-rules path
+   * consumed by `SkillInputGateInputs` / `SkillPermissionChecker`.
+   *
+   * Not on `ScopedPermissionResolver` (ISP: gates do not use this).
+   */
   checkPermission(
     surface: string,
     input: unknown,
     agentName?: string,
     sessionRules?: Rule[],
   ): PermissionCheckResult {
-    return this.permissionManager.checkPermission(
-      surface,
-      input,
-      agentName,
+    return this.permissionManager.check(
+      { kind: "tool", surface, input, agentName },
       sessionRules,
     );
   }

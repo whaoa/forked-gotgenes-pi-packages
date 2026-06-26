@@ -96,7 +96,7 @@ describe("checkPermission", () => {
     expect(mockBuildInputForSurface).toHaveBeenCalledWith("read", undefined);
   });
 
-  it("calls permissionManager.checkPermission with surface, built input, agentName, and current ruleset", () => {
+  it("calls permissionManager.check with a tool intent, built input, agentName, and current ruleset", () => {
     const ruleset: Ruleset = [
       { surface: "bash", pattern: "*", action: "allow", origin: "global" },
     ];
@@ -106,19 +106,22 @@ describe("checkPermission", () => {
       sessionRules: makeSessionRules(ruleset),
     });
     service.checkPermission("bash", "echo hi", "my-agent");
-    expect(permissionManager.checkPermission).toHaveBeenCalledWith(
-      "bash",
-      builtInput,
-      "my-agent",
+    expect(permissionManager.check).toHaveBeenCalledWith(
+      {
+        kind: "tool",
+        surface: "bash",
+        input: builtInput,
+        agentName: "my-agent",
+      },
       ruleset,
     );
     void sessionRules; // used indirectly
   });
 
-  it("returns the result from permissionManager.checkPermission", () => {
+  it("returns the result from permissionManager.check", () => {
     const expected = makeCheckResult({ state: "deny", toolName: "bash" });
     const { service, permissionManager } = makeService();
-    vi.mocked(permissionManager.checkPermission).mockReturnValue(expected);
+    vi.mocked(permissionManager.check).mockReturnValue(expected);
     const result = service.checkPermission("bash", "rm -rf /");
     expect(result).toBe(expected);
   });

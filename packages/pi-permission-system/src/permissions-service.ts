@@ -32,10 +32,8 @@ export class LocalPermissionsService implements PermissionsService {
     agentName?: string,
   ): ReturnType<PermissionsService["checkPermission"]> {
     const input = buildInputForSurface(surface, value);
-    return this.permissionManager.checkPermission(
-      surface,
-      input,
-      agentName,
+    return this.permissionManager.check(
+      { kind: "tool", surface, input, agentName },
       this.sessionRules.getRuleset(),
     );
   }

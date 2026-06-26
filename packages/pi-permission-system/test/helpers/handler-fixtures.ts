@@ -239,25 +239,9 @@ export function makeHandler(overrides?: {
   const so = overrides?.session;
   const surfaceCheck = so?.checkPermission;
   if (surfaceCheck) {
-    vi.mocked(permissionManager.checkPermission).mockImplementation(
-      surfaceCheck,
-    );
-    // The bash path and external-directory gates resolve through
-    // checkPathPolicy; route it through the same surface dispatcher (threading
-    // the real surface) so `path` / `external_directory` overrides apply to
-    // bash tokens and tool paths alike (#418).
-    vi.mocked(permissionManager.checkPathPolicy).mockImplementation(
-      (values, agentName, sessionRules, surface = "path") =>
-        surfaceCheck(
-          surface,
-          { path: values[0] ?? "*" },
-          agentName,
-          sessionRules,
-        ),
-    );
-    // Also route the new unified check(intent) through the same dispatcher
-    // so makeSurfaceCheck/makeBashCommandCheck overrides apply to all gate
-    // paths (including the unified path once gates migrate in Step 3+).
+    // Route the unified check(intent) through the surface dispatcher so
+    // makeSurfaceCheck / makeBashCommandCheck overrides apply to all gate
+    // paths via the single manager entry point (#478).
     vi.mocked(permissionManager.check).mockImplementation(
       (intent: ResolvedAccessIntent, sessionRules) => {
         if (intent.kind === "path-values") {

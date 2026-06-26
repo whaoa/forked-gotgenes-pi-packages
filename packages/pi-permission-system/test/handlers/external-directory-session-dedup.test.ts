@@ -41,7 +41,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
  * Build a fully wired PermissionGateHandler for external-directory dedup
  * tests.
  *
- * `permissionManager.checkPermission` is configured so that:
+ * `permissionManager.check` is configured so that:
  * - `external_directory` surface returns "ask" on first call
  * - On subsequent calls it checks the shared `sessionRules` store; if a
  *   matching rule was recorded by the runner, it returns "allow" with
@@ -56,14 +56,16 @@ function makeDeduplicatingHandler(prompter?: GatePrompter): {
     makeRealSession();
   const { resolver } = makeRealResolver(permissionManager, sessionRules);
 
-  // Configure checkPermission to simulate config-level "ask" for external_directory
-  // but return "allow/session" when a session rule has been recorded.
-  vi.mocked(permissionManager.checkPermission).mockImplementation(
-    (surface, input, _agentName, rules): PermissionCheckResult => {
-      if (surface === "external_directory") {
-        const record = (input ?? {}) as Record<string, unknown>;
-        const pathValue = typeof record.path === "string" ? record.path : null;
+  // Unified check(intent) mock: "ask" for external_directory unless a session
+  // rule covers it; "allow" for everything else.
+  vi.mocked(permissionManager.check).mockImplementation(
+    (intent, rules): PermissionCheckResult => {
+      const { surface } = intent;
+      // Derive a representative path value from whichever intent kind arrived.
+      const pathValue =
+        intent.kind === "path-values" ? (intent.values[0] ?? null) : null;
 
+      if (surface === "external_directory") {
         if (pathValue && rules && rules.length > 0) {
           const match = rules.findLast(
             (r) =>
@@ -80,7 +82,6 @@ function makeDeduplicatingHandler(prompter?: GatePrompter): {
             };
           }
         }
-
         return {
           state: "ask",
           toolName: surface,
@@ -96,19 +97,6 @@ function makeDeduplicatingHandler(prompter?: GatePrompter): {
         origin: "builtin",
       };
     },
-  );
-
-  // The external-directory gates resolve through checkPathPolicy (#418); route
-  // it through the same configured checkPermission so session-approval dedup
-  // applies to the typed path alias.
-  vi.mocked(permissionManager.checkPathPolicy).mockImplementation(
-    (values, agentName, rules, surface = "path") =>
-      permissionManager.checkPermission(
-        surface,
-        { path: values[0] ?? "*" },
-        agentName,
-        rules,
-      ),
   );
 
   const events = makeEvents();
@@ -325,13 +313,13 @@ describe("session shutdown clears external-directory approvals", () => {
       makeRealSession();
     const { resolver } = makeRealResolver(permissionManager, sessionRules);
 
-    // external_directory=ask; session-covered paths return allow/session.
-    vi.mocked(permissionManager.checkPermission).mockImplementation(
-      (surface, input, _agentName, rules): PermissionCheckResult => {
+    // Unified check(intent): "ask" for external_directory unless session-covered.
+    vi.mocked(permissionManager.check).mockImplementation(
+      (intent, rules): PermissionCheckResult => {
+        const { surface } = intent;
+        const pathValue =
+          intent.kind === "path-values" ? (intent.values[0] ?? null) : null;
         if (surface === "external_directory") {
-          const record = (input ?? {}) as Record<string, unknown>;
-          const pathValue =
-            typeof record.path === "string" ? record.path : null;
           if (pathValue && rules && rules.length > 0) {
             const match = rules.findLast(
               (r) =>
@@ -362,18 +350,6 @@ describe("session shutdown clears external-directory approvals", () => {
           origin: "builtin",
         };
       },
-    );
-
-    // The external-directory tool gate resolves through checkPathPolicy (#418);
-    // route it through the same configured checkPermission.
-    vi.mocked(permissionManager.checkPathPolicy).mockImplementation(
-      (values, agentName, rules, surface = "path") =>
-        permissionManager.checkPermission(
-          surface,
-          { path: values[0] ?? "*" },
-          agentName,
-          rules,
-        ),
     );
 
     const events = makeEvents();

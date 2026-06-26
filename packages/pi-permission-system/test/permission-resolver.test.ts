@@ -10,21 +10,6 @@ import type { PermissionCheckResult, PermissionState } from "#src/types";
 function makePermissionManager() {
   return {
     configureForCwd: vi.fn<(cwd: string | undefined | null) => void>(),
-    checkPermission: vi
-      .fn<
-        (
-          toolName: string,
-          input: unknown,
-          agentName?: string,
-          sessionRules?: Ruleset,
-        ) => PermissionCheckResult
-      >()
-      .mockReturnValue({
-        state: "allow",
-        toolName: "read",
-        source: "tool",
-        origin: "builtin",
-      }),
     check: vi
       .fn<
         (
@@ -36,20 +21,6 @@ function makePermissionManager() {
         state: "allow",
         toolName: "read",
         source: "tool",
-        origin: "builtin",
-      }),
-    checkPathPolicy: vi
-      .fn<
-        (
-          values: readonly string[],
-          agentName?: string,
-          sessionRules?: Ruleset,
-        ) => PermissionCheckResult
-      >()
-      .mockReturnValue({
-        state: "allow",
-        toolName: "path",
-        source: "special",
         origin: "builtin",
       }),
     getToolPermission: vi
@@ -77,15 +48,18 @@ beforeEach(() => {
 
 describe("PermissionResolver", () => {
   describe("resolve", () => {
-    it("forwards surface, input, and agentName, applying the empty session ruleset", () => {
+    it("forwards surface, input, and agentName as a tool intent with session ruleset", () => {
       const { resolver, permissionManager } = makeResolver();
 
       resolver.resolve("bash", { command: "ls" }, "agent-x");
 
-      expect(permissionManager.checkPermission).toHaveBeenCalledWith(
-        "bash",
-        { command: "ls" },
-        "agent-x",
+      expect(permissionManager.check).toHaveBeenCalledWith(
+        {
+          kind: "tool",
+          surface: "bash",
+          input: { command: "ls" },
+          agentName: "agent-x",
+        },
         [],
       );
     });
@@ -95,10 +69,13 @@ describe("PermissionResolver", () => {
 
       resolver.resolve("read", { path: ".env" });
 
-      expect(permissionManager.checkPermission).toHaveBeenCalledWith(
-        "read",
-        { path: ".env" },
-        undefined,
+      expect(permissionManager.check).toHaveBeenCalledWith(
+        {
+          kind: "tool",
+          surface: "read",
+          input: { path: ".env" },
+          agentName: undefined,
+        },
         [],
       );
     });
@@ -114,7 +91,7 @@ describe("PermissionResolver", () => {
       );
       resolver.resolve("bash", { command: "git status" });
 
-      const passedRules = vi.mocked(pm.checkPermission).mock.calls[0][3];
+      const passedRules = vi.mocked(pm.check).mock.calls[0][1];
       expect(passedRules).toHaveLength(1);
       expect(passedRules?.[0]).toMatchObject({
         surface: "bash",
@@ -123,9 +100,9 @@ describe("PermissionResolver", () => {
       });
     });
 
-    it("returns the PermissionManager's check result", () => {
+    it("returns the manager's check result", () => {
       const pm = makePermissionManager();
-      vi.mocked(pm.checkPermission).mockReturnValue({
+      vi.mocked(pm.check).mockReturnValue({
         state: "deny",
         toolName: "bash",
         source: "bash",
@@ -147,29 +124,35 @@ describe("PermissionResolver", () => {
   });
 
   describe("resolvePathPolicy", () => {
-    it("forwards values and agentName with the current session ruleset", () => {
+    it("forwards values and agentName as a path-values intent with session ruleset", () => {
       const { resolver, permissionManager } = makeResolver();
 
       resolver.resolvePathPolicy(["/proj/src/a.ts", "src/a.ts"], "agent-x");
 
-      expect(permissionManager.checkPathPolicy).toHaveBeenCalledWith(
-        ["/proj/src/a.ts", "src/a.ts"],
-        "agent-x",
+      expect(permissionManager.check).toHaveBeenCalledWith(
+        {
+          kind: "path-values",
+          surface: "path",
+          values: ["/proj/src/a.ts", "src/a.ts"],
+          agentName: "agent-x",
+        },
         [],
-        "path",
       );
     });
 
-    it("forwards an explicit surface to checkPathPolicy", () => {
+    it("forwards an explicit surface in the path-values intent", () => {
       const { resolver, permissionManager } = makeResolver();
 
       resolver.resolvePathPolicy(["/tmp/x"], "agent-x", "external_directory");
 
-      expect(permissionManager.checkPathPolicy).toHaveBeenCalledWith(
-        ["/tmp/x"],
-        "agent-x",
+      expect(permissionManager.check).toHaveBeenCalledWith(
+        {
+          kind: "path-values",
+          surface: "external_directory",
+          values: ["/tmp/x"],
+          agentName: "agent-x",
+        },
         [],
-        "external_directory",
       );
     });
 
@@ -183,7 +166,7 @@ describe("PermissionResolver", () => {
       );
       resolver.resolvePathPolicy(["src/a.ts"]);
 
-      const passedRules = vi.mocked(pm.checkPathPolicy).mock.calls[0][2];
+      const passedRules = vi.mocked(pm.check).mock.calls[0][1];
       expect(passedRules).toHaveLength(1);
       expect(passedRules?.[0]).toMatchObject({
         surface: "path",
@@ -192,9 +175,9 @@ describe("PermissionResolver", () => {
       });
     });
 
-    it("returns the PermissionManager's check result", () => {
+    it("returns the manager's check result", () => {
       const pm = makePermissionManager();
-      vi.mocked(pm.checkPathPolicy).mockReturnValue({
+      vi.mocked(pm.check).mockReturnValue({
         state: "deny",
         toolName: "path",
         source: "special",
@@ -215,21 +198,24 @@ describe("PermissionResolver", () => {
     });
   });
 
-  describe("checkPermission", () => {
-    it("delegates to permissionManager.checkPermission with the given args", () => {
+  describe("checkPermission (raw, off-interface)", () => {
+    it("delegates to manager.check as a tool intent", () => {
       const { resolver, permissionManager } = makeResolver();
 
       resolver.checkPermission("bash", { command: "ls" }, "agent-1");
 
-      expect(permissionManager.checkPermission).toHaveBeenCalledWith(
-        "bash",
-        { command: "ls" },
-        "agent-1",
+      expect(permissionManager.check).toHaveBeenCalledWith(
+        {
+          kind: "tool",
+          surface: "bash",
+          input: { command: "ls" },
+          agentName: "agent-1",
+        },
         undefined,
       );
     });
 
-    it("passes optional sessionRules through when supplied", () => {
+    it("passes optional sessionRules as the second arg to check", () => {
       const { resolver, permissionManager } = makeResolver();
       const extraRules: Ruleset = [
         { surface: "bash", pattern: "*", action: "allow", origin: "session" },
@@ -242,10 +228,13 @@ describe("PermissionResolver", () => {
         extraRules,
       );
 
-      expect(permissionManager.checkPermission).toHaveBeenCalledWith(
-        "bash",
-        { command: "ls" },
-        undefined,
+      expect(permissionManager.check).toHaveBeenCalledWith(
+        {
+          kind: "tool",
+          surface: "bash",
+          input: { command: "ls" },
+          agentName: undefined,
+        },
         extraRules,
       );
     });

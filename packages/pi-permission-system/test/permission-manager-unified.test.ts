@@ -1584,7 +1584,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
     });
     const scoped: ScopedPermissionManager = manager;
     expect(typeof scoped.configureForCwd).toBe("function");
-    expect(typeof scoped.checkPermission).toBe("function");
+    expect(typeof scoped.check).toBe("function");
     expect(typeof scoped.getToolPermission).toBe("function");
     expect(typeof scoped.getConfigIssues).toBe("function");
   });
