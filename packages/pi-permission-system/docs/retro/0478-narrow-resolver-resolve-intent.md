@@ -38,6 +38,32 @@ Filed two follow-up issues surfaced during the design discussion: [#486] (should
   `architecture.md` carries the resolver surface in a health-metric row, the access-intent directory listing, and per-module narrative descriptions (`bash-path.ts`, `external-directory-policy.ts`); the package `SKILL.md` carries the [#393] / [#418] fixture-wiring notes that become obsolete (single method).
   Both are listed as doc updates.
 
+## Stage: Implementation — TDD (2026-06-26T23:15:00Z)
+
+### Session summary
+
+Implemented Phase 6 Step 6 across six commits: added `ScopedPermissionManager.check(intent)` alongside the old pair, routed all manager callers through it (keeping thin class wrappers temporarily), removed `checkPermission`/`checkPathPolicy` from the interface, narrowed `ScopedPermissionResolver` to one `resolve(intent: AccessIntent)`, dropped the manager class wrappers, and updated docs.
+Net test delta: +9 manager `check` cases in step 1, then a net −1 from consolidating the redundant `resolve`/`resolvePathPolicy` resolver tests into intent-variant cases (2125 → 2124 total).
+Final state: 103 test files, 2124 tests green; `tsc`, root `lint`, and `fallow dead-code` all clean.
+
+### Observations
+
+- **Steps 3-4 collapsed into one atomic resolver-narrowing commit**, as the plan's TDD Order explicitly permitted.
+  Surveying the gate tests showed `runner.test.ts` (35 resolve refs) mostly uses the `resolveResult` fixture param (return-value config, unaffected by the signature change) — only one assertion checked call args.
+  The atomic narrowing was clearly less total churn than lift-and-shift's add-then-rename pass.
+- **Step 2 split into two commits.**
+  To avoid rewriting the 3500-line `permission-manager-unified.test.ts` (184 `checkPermission` + 6 `checkPathPolicy` call sites) in the interface-removal commit, I kept `checkPermission`/`checkPathPolicy` as thin class-only wrappers over `check` (off the interface — the false-green guarantee holds on the interface), then removed them in a follow-up `refactor` commit that migrated the test file via two local intent-building adapters (`checkTool` / `checkPathValues`).
+  A `sed` prefix-replacement (`manager.checkPermission(` → `checkTool(manager, `) made the 190-site migration safe and mechanical.
+- **`PermissionResolver implements SkillPermissionChecker`** (not in the plan's exact wording) resolved a fallow finding: once `resolve` stopped calling `this.checkPermission` internally, the raw `checkPermission` was only reachable via two structural interfaces (skill-input gate, skill-prompt sanitizer) that fallow can't trace.
+  Declaring the documented contract is the fallow-skill-preferred fix over suppression; it also made `PermissionManager` no longer satisfy `SkillPermissionChecker` (it lost `checkPermission`), so two sanitizer tests gained a small `asChecker` adapter.
+- **Fixture simplification killed the #393 false-green structurally.**
+  `makeFakePermissionManager` went from `checkPermission` + `checkPathPolicy` stubs to a single `check`; `makeHandler` routes the surface-check override onto that one method via an intent→(surface, input) adapter.
+  There is no second method a fixture can stub-but-forget.
+- **Pre-completion reviewer: WARN** (no FAILs).
+  Two non-blocking findings.
+  Fixed #1 (Track B in `architecture.md` now marked ✅ complete since Steps 4-6 all landed, following the Track A convention).
+  Left #2: the reviewer noted `SkillPermissionChecker` lives in `skill-prompt-sanitizer.ts` (its role-defining consumer) rather than co-located with its sole implementor `permission-resolver.ts`; the `type`-only import is benign (no cycle) and the fallow rationale justifies the current placement — relocating the interface is out of scope.
+
 [#393]: https://github.com/gotgenes/pi-packages/issues/393
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
 [#486]: https://github.com/gotgenes/pi-packages/issues/486
