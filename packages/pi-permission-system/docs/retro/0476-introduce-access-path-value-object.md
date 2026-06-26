@@ -28,3 +28,19 @@ Three TDD steps, behavior-preserving, release deferred to the batch tail (Step 5
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
 [#475]: https://github.com/gotgenes/pi-packages/issues/475
 [#477]: https://github.com/gotgenes/pi-packages/issues/477
+
+## Stage: Implementation — TDD (2026-06-26T14:00:00Z)
+
+### Session summary
+
+All three TDD steps completed: introduced `AccessPath` value object and wired the single-tool gate (step 1); retypecd `BashProgram.externalPaths()` to `AccessPath[]`, routed the bash gate, and removed `getExternalDirectoryPolicyValues` in one atomic commit (step 2); updated `architecture.md` (step 3).
+Test count rose from 2104 to 2111 (+7 net: 10 new `access-path.test.ts` tests minus the 3 migrated `getExternalDirectoryPolicyValues` cases).
+Pre-completion reviewer returned **WARN** with two stale `architecture.md` entries; both fixed before writing this note.
+
+### Observations
+
+- **`pi-autoformat` reflowed `path-utils.test.ts`** after the describe-block removal, causing the orphaned `getExternalDirectoryPolicyValues` import to survive a first edit attempt — required a second targeted `Edit` to remove it after re-reading the file.
+- **Atomic step 2 constraint held exactly as planned**: `tsc` coupling (`externalPaths(): string[]` → `AccessPath[]` cascade) and `fallow dead-code` coupling (`getExternalDirectoryPolicyValues` removal tied to its last consumer) forced all five production-file edits and four test-file adaptations into a single commit — no opportunity to split further.
+- **WARN findings**: reviewer flagged two `architecture.md` stale references — (1) the `path-utils.ts` tree-listing still mentioned `getExternalDirectoryPolicyValues` after the step 3 docs commit; (2) the "Remaining design work" narrative described the `externalPaths(): string[]` conflation in present tense after it was resolved.
+  Both fixed by amending the docs commit before writing this note.
+- **Pre-completion reviewer verdict**: WARN (fixed inline — no unresolved findings at close).
