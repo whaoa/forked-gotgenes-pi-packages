@@ -916,7 +916,7 @@ Step 7 has no dependencies and runs in parallel with everything.
 ### Tracks
 
 - **Track A — bash-program decomposition** (Steps 1, 2, 3): ✅ complete — all three steps landed; the bash engine lives in `src/access-intent/bash/` and `BashProgram` is born-ready (102 LOC facade).
-- **Track B — access-path unification** (Steps 4, 5, 6): the [#418] / [#393] semantic fixes; depends on a settled `program.ts` (Step 3, now landed).
+- **Track B — access-path unification** (Steps 4, 5, 6): ✅ complete — all three steps landed; the [#418] / [#393] semantic fixes shipped, `AccessPath` exists, the two external-directory gates are collapsed, and the resolver is narrowed to one `resolve(intent)`.
 - **Track C — independent cleanup** (Steps 7, 8): the `common.ts` split (fully parallel) and the external-directory test-fixture extraction (after Step 5).
 
 ### Release batches
