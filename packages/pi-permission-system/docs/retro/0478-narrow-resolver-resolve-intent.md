@@ -64,6 +64,60 @@ Final state: 103 test files, 2124 tests green; `tsc`, root `lint`, and `fallow d
   Fixed #1 (Track B in `architecture.md` now marked ✅ complete since Steps 4-6 all landed, following the Track A convention).
   Left #2: the reviewer noted `SkillPermissionChecker` lives in `skill-prompt-sanitizer.ts` (its role-defining consumer) rather than co-located with its sole implementor `permission-resolver.ts`; the `type`-only import is benign (no cycle) and the fallow rationale justifies the current placement — relocating the interface is out of scope.
 
+## Stage: Final Retrospective (2026-06-26T23:31:26Z)
+
+### Session summary
+
+Shipped Phase 6 Step 6 end-to-end in a single conversation spanning plan → TDD → ship → retro: a behavior-preserving narrowing of `ScopedPermissionResolver` to one `resolve(intent)` and `ScopedPermissionManager` to one `check(intent)`, released as `pi-permission-system-v16.2.0`.
+The run was notably clean — no rework loops, no user-caught instruction violations, and every friction point was self-corrected within one or two tool calls.
+
+### Observations
+
+#### What went well
+
+1. **Evidence-based design dialogue (planning).**
+   The operator probed the `AccessIntent` shape across several `ask_user` rounds ("why prevent `AccessPath` from flowing?", "what is a plain path?").
+   Each answer was grounded in the actual code — reading `getPathPolicyValues` vs `AccessPath.matchValues()` to show the `path` surface matches lexical aliases only while `external_directory` adds the canonical alias ([#418]).
+   That investigation produced a better design (the three-variant union) than the issue's original "value-or-`AccessPath`" hypothesis, and the agent self-corrected an overstatement ("specifically designed to ignore" → "today matches lexical-only, changing it is out of scope").
+2. **Lift-and-shift under a hard constraint.**
+   The 3,500-line `permission-manager-unified.test.ts` had 184 `manager.checkPermission` + 6 `manager.checkPathPolicy` direct call sites.
+   Rather than rewriting each into an intent literal, the migration introduced two test-local adapters (`checkTool` / `checkPathValues`) and bulk-replaced the call prefix with `sed` (`manager.checkPermission(` → `checkTool(manager, `), then removed the production wrappers — safe, mechanical, and it kept the production class free of test-only methods.
+3. **Clean release-please nuance handling (ship).**
+   The release PR was `UNSTABLE` with a `check` still `IN_PROGRESS`; the flow correctly polled `statusCheckRollup` until the check passed before merging, instead of falling back to `gh pr merge` mid-run — exactly the prompt's distinction between "no checks ran" and "check still running."
+
+#### What caused friction (agent side)
+
+1. `missing-context` — the Step 1 Red test called `createManagerWithProject({ agentName, globalPermission, agentPermission })`, but the helper's real signature is `(config, agentFiles, options)`.
+   Caught on the first `vitest run` (one failing test) and rewritten to the agent-file frontmatter form.
+   Impact: ~2 tool calls, no rework beyond the one test.
+2. `other` (emergent) — narrowing made `PermissionResolver.checkPermission` reachable only via two structural interfaces, so `fallow dead-code` flagged it once `resolve` stopped calling it internally.
+   Resolved with `implements SkillPermissionChecker` (which then required a small `asChecker` adapter in two sanitizer tests, since `PermissionManager` no longer satisfies that contract).
+   This exact pattern is already documented in the `fallow` skill (gotcha #6: declare `implements` over suppression), so the resolution matched existing guidance.
+   Impact: added friction but no rework.
+3. `other` (mechanical) — the `sed` transform left `permission-manager-unified.test.ts` unformatted; `pnpm run lint` flagged it pre-commit and `biome check --write` fixed it.
+   Impact: trivial; the existing lint gate caught it before commit.
+
+#### What caused friction (user side)
+
+1. The first design `ask_user` offered "values-only vs `AccessPath`-variant" without leading with the underlying data — the per-surface match-set difference (`path` = lexical only; `external_directory` = lexical ∪ canonical) that ultimately decided the choice.
+   The operator had to probe across follow-ups to surface it.
+   Opportunity, not criticism: when a design fork hinges on a concrete data distinction the agent can compute, leading the first question with that distinction (a two-line match-set comparison) may collapse several elaboration rounds into one.
+   The rounds were still productive — operator-driven elaboration on materially new questions, not question-spew.
+
+### Diagnostic details
+
+- **Feedback-loop gap analysis** — no gap.
+  Verification ran incrementally: `pnpm run check` after every interface-changing step, the affected test file after each Red/Green, and the full suite + `lint` + `fallow dead-code` before each interface-removal commit.
+  Notably, the resolver narrowing passed `tsc` while 9 `toHaveBeenCalledWith` positional-mock assertions still failed at runtime — the full `vitest run` (not `tsc`) was the necessary backstop, and it was run before committing.
+  This is already covered by the `testing` skill ("run the full suite before committing" when shared helpers change).
+- **Escalation-delay tracking** — no `rabbit-hole` points; no error sequence exceeded ~2 consecutive tool calls.
+- **Model-performance / unused-tool** — the pre-completion-reviewer subagent ran on its configured model for fresh-context review (appropriate, judgment-heavy); no mechanical work was mis-routed to an expensive model, and no `rabbit-hole`/`missing-context` point had an unused tool that would have helped.
+
+### Changes made
+
+1. Added this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0478-narrow-resolver-resolve-intent.md`.
+   No prompt or `AGENTS.md` changes: the one proposal (a test-local-adapter + bulk-rename tactic for the `testing` skill) was declined by the operator, and the fallow `implements` pattern is already covered by the `fallow` skill's gotcha #6.
+
 [#393]: https://github.com/gotgenes/pi-packages/issues/393
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
 [#486]: https://github.com/gotgenes/pi-packages/issues/486
