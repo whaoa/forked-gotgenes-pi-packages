@@ -1,13 +1,11 @@
-import type { AccessPath } from "#src/access-intent/access-path";
 import type { BashProgram } from "#src/access-intent/bash/program";
 import { getNonEmptyString, toRecord } from "#src/common";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
-import type { PermissionCheckResult } from "#src/types";
-import { pickMostRestrictive } from "./candidate-check";
 import type { GateResult } from "./descriptor";
 import { formatBashExternalDirectoryAskPrompt } from "./external-directory-messages";
+import { selectUncoveredExternalPaths } from "./external-directory-policy";
 import type { ToolCallContext } from "./types";
 
 /**
@@ -34,26 +32,16 @@ export function describeBashExternalDirectoryGate(
   const externalPaths = bashProgram.externalPaths();
   if (externalPaths.length === 0) return null;
 
-  // Collect paths whose resolved state is not already "allow".
-  // Checking state (not source) ensures config-level allow rules (source: "special")
-  // suppress the prompt just as session-level allow rules (source: "session") do.
-  const uncoveredEntries: Array<{
-    path: AccessPath;
-    check: PermissionCheckResult;
-  }> = [];
-  for (const p of externalPaths) {
-    // Match each path against both its typed and symlink-resolved aliases on
-    // the external_directory surface, so a config pattern on either form
-    // applies (#418).
-    const check = resolver.resolvePathPolicy(
-      p.matchValues(),
+  // Resolve every external path on the external_directory surface and keep the
+  // ones not already allowed (config-level allows suppress the prompt just as
+  // session-level allows do); the shared helper single-sources the #418 alias
+  // matching and the worst-uncovered selection.
+  const { uncovered: uncoveredEntries, worstCheck } =
+    selectUncoveredExternalPaths(
+      externalPaths,
+      resolver,
       tcc.agentName ?? undefined,
-      "external_directory",
     );
-    if (check.state !== "allow") {
-      uncoveredEntries.push({ path: p, check });
-    }
-  }
   const uncoveredPaths = uncoveredEntries.map(({ path }) => path.value());
 
   if (uncoveredPaths.length === 0) {
@@ -74,12 +62,10 @@ export function describeBashExternalDirectoryGate(
     };
   }
 
-  // Use the most restrictive check among uncovered paths as the pre-check result.
-  // This ensures a config-level "deny" rule is not downgraded to "ask" by the
-  // generic "*" catch-all that the old path-less checkPermission call returned.
-  const worstCheck =
-    pickMostRestrictive(uncoveredEntries.map(({ check }) => check)) ??
-    uncoveredEntries[0].check;
+  // After the early bypass, at least one path is uncovered, so worstCheck is
+  // defined; the fallback keeps TypeScript happy across the early return. A
+  // config-level "deny" is preserved (not downgraded to the catch-all "ask").
+  const preCheck = worstCheck ?? uncoveredEntries[0].check;
 
   const bashExtMessage = formatBashExternalDirectoryAskPrompt(
     command,
@@ -122,6 +108,6 @@ export function describeBashExternalDirectoryGate(
       surface: "external_directory",
       value: command,
     },
-    preCheck: worstCheck,
+    preCheck,
   };
 }

@@ -11,6 +11,7 @@ import { deriveApprovalPattern } from "#src/session-rules";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
 import type { GateResult } from "./descriptor";
 import { formatExternalDirectoryAskPrompt } from "./external-directory-messages";
+import { resolveExternalDirectoryPolicy } from "./external-directory-policy";
 import type { ToolCallContext } from "./types";
 
 /**
@@ -83,13 +84,11 @@ export function describeExternalDirectoryGate(
     tcc.agentName ?? undefined,
   );
 
-  // Match against both the typed and symlink-resolved aliases on the
-  // external_directory surface, so a config pattern on either form applies
-  // (#418). The runner consumes this preCheck and skips its own resolve.
-  const preCheck = resolver.resolvePathPolicy(
-    accessPath.matchValues(),
+  // The runner consumes this preCheck and skips its own resolve.
+  const preCheck = resolveExternalDirectoryPolicy(
+    accessPath,
+    resolver,
     tcc.agentName ?? undefined,
-    "external_directory",
   );
   const pattern = deriveApprovalPattern(
     normalizePathForComparison(externalDirectoryPath, tcc.cwd),
