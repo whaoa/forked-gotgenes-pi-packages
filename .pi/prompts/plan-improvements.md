@@ -69,13 +69,27 @@ Read the largest test files and `test/helpers/`: module-level `vi.mock`, wide `a
 Do not accept the architecture doc's self-justification for a smell at face value; verify the claim against the code and tests.
 When the analysis touches handler wiring or shared interfaces, load the `design-review` skill before writing the plan.
 
-### Step 5: Apply the smell taxonomy
+### Step 5: Assess file and directory organization against the domain
+
+Run `ls packages/$1/src` and look at the shape of the tree, not just the contents of files.
+A flat `src/` with many top-level modules (20+) is a Category E smell ("Flat directory" in the `improvement-discovery` taxonomy): navigation degrades, and the absence of grouping hides which files form a cohesive feature or domain concept.
+Watch for a module that will not sit still in any obvious group — that usually means the organizing concept has not been named yet, and the reorg should wait on (or motivate) the work that names it.
+
+When a regrouping opportunity exists, prefer to **introduce or grow a domain directory in a phase that is already rewriting or extracting those files** (tidy-first), so the touched modules reach their final home the first time instead of being moved twice.
+Do **not** propose a big-bang move of the whole tree — it is unreviewable and collides with every in-flight branch.
+The `#src/*` / `#test/*` import aliases keep moves mechanical (a move rewrites only the importing `#src/<file>` sites, with no `../../` fragility, and `tsc` + eslint catch every miss).
+A domain directory may expose a lean `index.ts` barrel as its cross-domain API, but only at genuine seams — this repo treats barrel re-export sprawl as a smell and fallow flags any export with no importer.
+
+Reorg scope is preference-sensitive (churn vs. coherence), so when the opportunity is larger than the files the phase already touches, use `ask_user` to decide how much to fold in.
+When the full reorg exceeds the current phase, record a **forward-looking directory sketch** (the target domain directories + these principles) in the architecture doc and seed only the first domain now — see the pi-permission-system Phase 6 "Directory organization" section for the pattern.
+
+### Step 6: Apply the smell taxonomy
 
 For each finding, classify it using the taxonomy from the `improvement-discovery` skill (Category A–E).
 Score each on Impact (1–5) and Risk (1–5).
 Compute Priority = Impact × (6 − Risk).
 
-### Step 6: Propose the phase plan
+### Step 7: Propose the phase plan
 
 Group findings into issue-sized steps (max 9 per phase).
 Identify dependency ordering and parallel tracks.
@@ -89,7 +103,7 @@ The section should include:
 1. A summary of findings (updated health metrics table).
 2. Numbered steps with:
    - Title
-   - Target files/functions
+   - Target files/functions — when a step extracts or moves code and a domain directory applies (Step 5), name the destination path (e.g. `src/<domain>/<file>.ts`) so directory placement rides along with the change rather than landing flat and being moved later.
    - Smell category addressed
    - Expected measurable outcome
    - A `Release:` tag on its own line — `Release: independent` or `Release: batch "<batch-name>"` (see the `improvement-discovery` skill's Output format).
