@@ -50,7 +50,7 @@ The relevant code lives in `src/access-intent/bash/`:
 - `program.ts` — `BashProgram.parse(command, cwd)` parses once and exposes `commands(): BashCommand[]`.
 - `parser.ts` — the minimal `TSNode` interface (a subset of web-tree-sitter's `SyntaxNode`); it does not currently expose `startIndex`.
 - `handlers/gates/bash-command.ts` — `resolveBashCommandCheck(command, commands, agentName, resolver)` resolves each unit on the `bash` surface and combines them with `pickMostRestrictive` (`deny > ask > allow`).
-  It already synthesizes an `ask` with the `<unparseable-bash-command>` sentinel for a non-empty command that parses to zero units (`[#452]`).
+  It already synthesizes an `ask` with the `<unparseable-bash-command>` sentinel for a non-empty command that parses to zero units ([#452]).
 
 Constraints from the package skill / AGENTS:
 
@@ -127,7 +127,7 @@ With Part 1, an env-prefixed wrapper (`AWS_PROFILE=x bash -c "…"`) is first st
 ### Structural review
 
 This is additive and localized.
-`BashCommand` is a small immutable value type (not a shared dependency bag); adding an optional field follows the same extension pattern as `context` (`[#306]`).
+`BashCommand` is a small immutable value type (not a shared dependency bag); adding an optional field follows the same extension pattern as `context` ([#306]).
 Enumeration (`command-enumeration.ts`) owns the structural facts (stripped text, opaque flag); resolution (`bash-command.ts`) owns the decision policy (the `ask` floor) — a clean separation with no new collaborator and no cross-layer wiring.
 The opaque detection reads only the `command` node's own children, the same shallow walk the existing token collectors use.
 
@@ -163,11 +163,11 @@ A grep for the affected symbols (`makeUnit`, `BashCommand`, `commands()`) confir
 
 ## Invariants at risk
 
-- **`[#452]` fail-closed:** a non-empty command parsing to zero units still resolves to `ask` (`<unparseable-bash-command>`), and an empty/whitespace/comment-only command still resolves normally.
+- **[#452] fail-closed:** a non-empty command parsing to zero units still resolves to `ask` (`<unparseable-bash-command>`), and an empty/whitespace/comment-only command still resolves normally.
   Pinned by the existing fail-closed tests in `bash-command.test.ts`; the floor adds a sibling sentinel and does not touch the empty-units branch.
-- **`[#306]` never-weaker nested enumeration:** the enclosing command and each nested command are still emitted; adding the `opaque` flag and the `ask` floor can only tighten.
+- **[#306] never-weaker nested enumeration:** the enclosing command and each nested command are still emitted; adding the `opaque` flag and the `ask` floor can only tighten.
   Pinned by `bash-command-metamorphic.test.ts` (cd-prefix never-weaker) and the substitution/subshell cases in `program.test.ts`.
-- **`[#393]` no spurious widening:** the floor only narrows (`allow` → `ask`); it never relaxes a `deny`/`ask`.
+- **[#393] no spurious widening:** the floor only narrows (`allow` → `ask`); it never relaxes a `deny`/`ask`.
   Pinned by the new deny-still-wins floor test.
 
 ## TDD Order

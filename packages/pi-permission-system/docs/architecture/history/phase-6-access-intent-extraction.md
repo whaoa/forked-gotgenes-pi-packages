@@ -8,7 +8,7 @@ It was the doc's "tractable first slice" toward the authority model — principa
 
 Phase 6 also seeded the package's first domain directory.
 The `src/` tree was flat (66 top-level modules), and the access-intent work was the natural place to begin domain grouping: the bash engine it decomposed and the `AccessPath` it introduced landed in a new `src/access-intent/` directory rather than flat, so the extracted modules reached their final home the first time instead of being moved twice.
-This was a seed, not the whole reorg — see [Directory organization (forward-looking)](../architecture.md#directory-organization-forward-looking) for the broader arc.
+This was a seed, not the whole reorg — see [Module structure](../architecture.md#module-structure) for the broader arc.
 
 ## Findings summary
 
