@@ -353,6 +353,8 @@ Extension and MCP path tools are gated by default — no registration needed —
 The path gate runs before the external-directory and tool gates.
 If it denies, the command is blocked without reaching subsequent gates — no wasted prompts.
 
+Path patterns match both the path **as the agent references it** and its canonical (symlink-resolved) form, so a deny on a sensitive spelling cannot be evaded through a symlink alias (see Symlinked paths below).
+
 For bash commands, the extension extracts path-candidate tokens from the command (dot-files like `.env`, relative paths like `src/foo.ts`, and absolute paths) and evaluates each against the path rules.
 The most restrictive result across all tokens determines the outcome.
 When the current working directory is known, relative bash tokens are matched with cwd-normalized policy values, resolved against the effective directory after literal `cd` commands; a token after a non-literal `cd` (e.g. `cd "$DIR"`) stays conservative and matches only its literal form.
@@ -464,7 +466,7 @@ This is a best-effort heuristic — variable expansion and escaped quotes are no
 
 #### Symlinked paths
 
-An `external_directory` pattern matches the path **as the agent references it** and the OS-resolved (symlink-followed) path.
+A `path` or `external_directory` pattern matches the path **as the agent references it** and the OS-resolved (symlink-followed) path.
 This matters on macOS, where `/tmp` is a symlink to `/private/tmp`: a rule keyed on `/tmp/*` allows access via `/tmp` even though the access resolves to `/private/tmp`, and a rule keyed on `/private/tmp/*` works too.
 
 ```jsonc
@@ -478,7 +480,8 @@ This matters on macOS, where `/tmp` is a symlink to `/private/tmp`: a rule keyed
 }
 ```
 
-The decision of whether a path is outside the working directory always uses the resolved form, so the gate still fires for every outside-CWD access; only which allow/deny/ask pattern matches considers both forms.
+The same dual-form matching protects the `path` surface: a `path` deny on `~/.ssh/*` or `*.env` also catches a symlink whose resolved target matches the pattern, so a sensitive file cannot be reached through an aliasing symlink.
+For `external_directory`, the decision of whether a path is outside the working directory always uses the resolved form, so the gate still fires for every outside-CWD access; only which allow/deny/ask pattern matches considers both forms.
 
 #### Pi Infrastructure Read Auto-Allow
 
