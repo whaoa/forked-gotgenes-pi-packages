@@ -902,8 +902,8 @@ flowchart TD
     S4["✅ Step 4 (#476) — introduce AccessPath value object"]
     S5["✅ Step 5 (#477) — collapse the two external-directory gates"]
     S6["✅ Step 6 (#478) — narrow resolver to resolve(intent)"]
-    S7["Step 7 (#479) — split common.ts grab-bag"]
-    S8["Step 8 (#480) — external-directory test fixtures"]
+    S7["✅ Step 7 (#479) — split common.ts grab-bag"]
+    S8["✅ Step 8 (#480) — external-directory test fixtures"]
 
     S1 --> S2 --> S3
     S3 --> S4
@@ -918,7 +918,7 @@ Step 7 has no dependencies and runs in parallel with everything.
 
 - **Track A — bash-program decomposition** (Steps 1, 2, 3): ✅ complete — all three steps landed; the bash engine lives in `src/access-intent/bash/` and `BashProgram` is born-ready (102 LOC facade).
 - **Track B — access-path unification** (Steps 4, 5, 6): ✅ complete — all three steps landed; the [#418] / [#393] semantic fixes shipped, `AccessPath` exists, the two external-directory gates are collapsed, and the resolver is narrowed to one `resolve(intent)`.
-- **Track C — independent cleanup** (Steps 7, 8): the `common.ts` split (fully parallel) and the external-directory test-fixture extraction (after Step 5).
+- **Track C — independent cleanup** (Steps 7, 8): ✅ complete — the `common.ts` split landed at [#479] and the external-directory test fixtures landed at [#480].
 
 ### Release batches
 
