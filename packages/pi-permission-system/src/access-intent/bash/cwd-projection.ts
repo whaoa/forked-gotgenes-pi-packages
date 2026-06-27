@@ -435,7 +435,7 @@ export function projectExternalPaths(
         seen.add(canonical);
         // The factory recomputes the canonical via canonicalNormalizePathForComparison
         // (win32-lowercased, #382) rather than reusing the raw canonicalizePath output.
-        externalPaths.push(AccessPath.forExternalDirectory(lexical, cwd));
+        externalPaths.push(AccessPath.forPath(lexical, { cwd }));
       }
       continue;
     }
@@ -457,7 +457,7 @@ export function projectExternalPaths(
       seen.add(canonical);
       // The factory recomputes the canonical via canonicalNormalizePathForComparison
       // (win32-lowercased, #382) rather than reusing the raw canonicalizePath output.
-      externalPaths.push(AccessPath.forExternalDirectory(lexical, cwd));
+      externalPaths.push(AccessPath.forPath(lexical, { cwd }));
     }
   }
 

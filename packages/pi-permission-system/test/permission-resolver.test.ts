@@ -169,10 +169,7 @@ describe("PermissionResolver", () => {
   describe("resolve — access-path intent", () => {
     it("unwraps the AccessPath via matchValues() into a path-values intent", () => {
       const { resolver, permissionManager } = makeResolver();
-      const accessPath = AccessPath.forExternalDirectory(
-        "/tmp/x",
-        "/workspace",
-      );
+      const accessPath = AccessPath.forPath("/tmp/x", { cwd: "/workspace" });
 
       resolver.resolve({
         kind: "access-path",
@@ -202,10 +199,7 @@ describe("PermissionResolver", () => {
         matchedPattern: "/tmp/*",
       });
       const { resolver } = makeResolver(pm);
-      const accessPath = AccessPath.forExternalDirectory(
-        "/tmp/x",
-        "/workspace",
-      );
+      const accessPath = AccessPath.forPath("/tmp/x", { cwd: "/workspace" });
 
       const result = resolver.resolve({
         kind: "access-path",

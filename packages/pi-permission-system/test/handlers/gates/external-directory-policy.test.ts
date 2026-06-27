@@ -25,7 +25,7 @@ function makeCheckResult(
 
 describe("resolveExternalDirectoryPolicy", () => {
   it("resolves the path's match aliases on the external_directory surface (#418)", () => {
-    const path = AccessPath.forExternalDirectory("/outside/a.ts", cwd);
+    const path = AccessPath.forPath("/outside/a.ts", { cwd });
     const resolver = makeResolver(makeCheckResult("ask"));
 
     const result = resolveExternalDirectoryPolicy(path, resolver, undefined);
@@ -40,7 +40,7 @@ describe("resolveExternalDirectoryPolicy", () => {
   });
 
   it("threads the agent name through to the resolver", () => {
-    const path = AccessPath.forExternalDirectory("/outside/a.ts", cwd);
+    const path = AccessPath.forPath("/outside/a.ts", { cwd });
     const resolver = makeResolver(makeCheckResult("allow"));
 
     resolveExternalDirectoryPolicy(path, resolver, "reviewer");
@@ -57,8 +57,8 @@ describe("resolveExternalDirectoryPolicy", () => {
 describe("selectUncoveredExternalPaths", () => {
   it("returns no uncovered paths when every path resolves to allow", () => {
     const paths = [
-      AccessPath.forExternalDirectory("/outside/a.ts", cwd),
-      AccessPath.forExternalDirectory("/outside/b.ts", cwd),
+      AccessPath.forPath("/outside/a.ts", { cwd }),
+      AccessPath.forPath("/outside/b.ts", { cwd }),
     ];
     const resolver = makeResolver(makeCheckResult("allow"));
 
@@ -73,8 +73,8 @@ describe("selectUncoveredExternalPaths", () => {
   });
 
   it("collects only paths whose resolved state is not allow", () => {
-    const allowed = AccessPath.forExternalDirectory("/outside/ok.ts", cwd);
-    const asked = AccessPath.forExternalDirectory("/outside/ask.ts", cwd);
+    const allowed = AccessPath.forPath("/outside/ok.ts", { cwd });
+    const asked = AccessPath.forPath("/outside/ask.ts", { cwd });
     const resolver = makeResolver();
     resolver.resolve.mockImplementation((intent) => {
       const values =
@@ -98,8 +98,8 @@ describe("selectUncoveredExternalPaths", () => {
   });
 
   it("returns the most restrictive uncovered check as worstCheck (deny > ask)", () => {
-    const asked = AccessPath.forExternalDirectory("/outside/ask.ts", cwd);
-    const denied = AccessPath.forExternalDirectory("/outside/deny.ts", cwd);
+    const asked = AccessPath.forPath("/outside/ask.ts", { cwd });
+    const denied = AccessPath.forPath("/outside/deny.ts", { cwd });
     const resolver = makeResolver();
     resolver.resolve.mockImplementation((intent) => {
       const values =
