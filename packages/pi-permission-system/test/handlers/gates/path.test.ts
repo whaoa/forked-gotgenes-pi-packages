@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock node:fs so realpathSync (used by canonicalizePath) is controllable.
+// Default implementation is identity — lexical tests are unaffected.
+const realpathSync = vi.hoisted(() =>
+  vi.fn<(path: string) => string>((p) => p),
+);
+vi.mock("node:fs", () => ({
+  realpathSync,
+  default: { realpathSync },
+}));
+
+import { AccessPath } from "#src/access-intent/access-path";
 import type { GateDescriptor } from "#src/handlers/gates/descriptor";
 import { isGateDescriptor } from "#src/handlers/gates/descriptor";
 import { describePathGate } from "#src/handlers/gates/path";
@@ -27,6 +38,11 @@ function makeTcc(overrides: Partial<ToolCallContext> = {}): ToolCallContext {
 // ── tests ──────────────────────────────────────────────────────────────────
 
 describe("describePathGate", () => {
+  beforeEach(() => {
+    realpathSync.mockReset();
+    realpathSync.mockImplementation((p: string) => p);
+  });
+
   it("returns null for non-path-bearing tools", () => {
     const resolver = makeResolver();
     const result = describePathGate(
@@ -152,15 +168,30 @@ describe("describePathGate", () => {
     expect(result.decision.value).toBe(".env");
   });
 
-  it("resolves the path surface with the file path and agent name", () => {
+  it("resolves the path surface with an access-path intent and agent name", () => {
     const resolver = makeResolver(makeCheckResult({ state: "allow" }));
     describePathGate(makeTcc({ agentName: "my-agent" }), resolver);
     expect(resolver.resolve).toHaveBeenCalledWith({
-      kind: "tool",
+      kind: "access-path",
       surface: "path",
-      input: { path: ".env" },
+      path: AccessPath.forPath(".env", { cwd: "/test/project" }),
       agentName: "my-agent",
     });
+  });
+
+  it("emits an access-path whose matchValues include the symlink-resolved form (#486)", () => {
+    // /test/project/.env is a symlink to /vault/secret.env.
+    realpathSync.mockImplementation((p: string) =>
+      p === "/test/project/.env" ? "/vault/secret.env" : p,
+    );
+    const resolver = makeResolver(makeCheckResult({ state: "allow" }));
+    describePathGate(makeTcc(), resolver);
+
+    const intent = resolver.resolve.mock.lastCall?.[0];
+    expect(intent?.kind).toBe("access-path");
+    expect(intent?.kind === "access-path" && intent.path.matchValues()).toEqual(
+      ["/test/project/.env", ".env", "/vault/secret.env"],
+    );
   });
 });
 
@@ -189,9 +220,9 @@ describe("describePathGate — home-relative paths", () => {
       pathValue: "~/.ssh/config",
     });
     expect(resolver.resolve).toHaveBeenCalledWith({
-      kind: "tool",
+      kind: "access-path",
       surface: "path",
-      input: { path: "~/.ssh/config" },
+      path: AccessPath.forPath("~/.ssh/config", { cwd: "/test/project" }),
       agentName: undefined,
     });
   });
@@ -246,9 +277,9 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     );
     expect(isGateDescriptor(result)).toBe(true);
     expect(resolver.resolve).toHaveBeenCalledWith({
-      kind: "tool",
+      kind: "access-path",
       surface: "path",
-      input: { path: ".env" },
+      path: AccessPath.forPath(".env", { cwd: "/test/project" }),
       agentName: undefined,
     });
   });
@@ -263,9 +294,9 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     );
     expect(isGateDescriptor(result)).toBe(true);
     expect(resolver.resolve).toHaveBeenCalledWith({
-      kind: "tool",
+      kind: "access-path",
       surface: "path",
-      input: { path: ".env" },
+      path: AccessPath.forPath(".env", { cwd: "/test/project" }),
       agentName: undefined,
     });
   });
@@ -280,9 +311,9 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
       extractorLookup("ffgrep", "target"),
     );
     expect(resolver.resolve).toHaveBeenCalledWith({
-      kind: "tool",
+      kind: "access-path",
       surface: "path",
-      input: { path: "/etc/passwd" },
+      path: AccessPath.forPath("/etc/passwd", { cwd: "/test/project" }),
       agentName: undefined,
     });
   });

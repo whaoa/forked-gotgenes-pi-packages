@@ -1,4 +1,5 @@
-import { getToolInputPath, normalizePathForComparison } from "#src/path-utils";
+import { AccessPath } from "#src/access-intent/access-path";
+import { getToolInputPath } from "#src/path-utils";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
@@ -22,10 +23,14 @@ export function describePathGate(
   const filePath = getToolInputPath(tcc.toolName, tcc.input, extractors);
   if (!filePath) return null;
 
+  // Emit an access-path intent so the resolver matches the lexical aliases
+  // *and* the canonical (symlink-resolved) form, the same set
+  // `external_directory` matches (#418, #486).
+  const accessPath = AccessPath.forPath(filePath, { cwd: tcc.cwd });
   const check = resolver.resolve({
-    kind: "tool",
+    kind: "access-path",
     surface: "path",
-    input: { path: filePath },
+    path: accessPath,
     agentName: tcc.agentName ?? undefined,
   });
 
@@ -36,10 +41,9 @@ export function describePathGate(
   // "path" key should not trigger path-level prompts (#58).
   if (check.matchedPattern === undefined) return null;
 
-  // Resolve to the canonical (cwd-anchored, absolute) path so the approval
-  // pattern matches the policy values a later call produces.
-  const approvalPath = normalizePathForComparison(filePath, tcc.cwd);
-  const pattern = deriveApprovalPattern(approvalPath);
+  // Derive the approval pattern from the lexical absolute form so it matches
+  // the policy values a later call produces.
+  const pattern = deriveApprovalPattern(accessPath.value());
 
   const descriptor: GateDescriptor = {
     surface: "path",
