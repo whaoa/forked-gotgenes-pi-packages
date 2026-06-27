@@ -39,3 +39,45 @@ Pre-completion reviewer returned PASS.
 - Import style was preserved per-file: `src/` siblings kept relative `./value-guards` / `./yaml-frontmatter`; `src/handlers/`, `src/forwarded-permissions/`, and `test/` used the `#src/` alias — consistent with the existing mixed style that passes lint (the ESLint rule only flags `../` parent imports, not same-directory `./` ones).
 - The `afterEach(vi.restoreAllMocks)` block from `test/common.test.ts` was dropped in both new test files as intended — neither test file uses mocks or spies.
 - Pre-completion reviewer: PASS (all deterministic checks green, architecture.md updated, Mermaid diagrams valid, no dead code).
+
+## Stage: Final Retrospective (2026-06-27T00:10:01Z)
+
+### Session summary
+
+Shipped #479 across three clean stages (Planning, TDD, Ship): the `common.ts` grab-bag was split into `value-guards.ts` and `yaml-frontmatter.ts`, all 22 dependents repointed, tests split, and the change landed on `main` with green CI.
+The issue is closed; the work auto-batches into the next `pi-permission-system` release because the sole source-touching commit is a `refactor:` (a `hidden: true` changelog type).
+
+### Observations
+
+#### What went well
+
+- The plan's single-atomic-step framing matched reality exactly: the `refactor:` commit touched 26 files and `tsc` caught every repoint, so there was no mid-step breakage and no follow-up fixup commits.
+- The TDD stage front-loaded verification correctly for an atomic refactor — `pnpm run check` immediately after the edit batch, then a `grep -rn "common" src test` to confirm zero stray import references, then the full suite, lint, and `fallow dead-code`.
+  No feedback-loop gap.
+- The Ship stage diagnosed the missing release-please PR correctly and without rework: after the `release_pr_find` timeout it inspected `release-please-config.json` `changelog-sections`, found `refactor:` is `hidden: true`, and concluded the work auto-batches — matching the ship prompt's step 4b.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the Planning stage asserted, as rationale for the `**Release:** ship independently` marker, that "`refactor:` commits trigger a patch release in this repo's release-please config (e.g. #477 released on a refactor-only commit)."
+  This is false: `refactor:` is a `hidden: true` changelog section and does not cut a release on its own.
+  The cited evidence was misread — v16.1.0 was triggered by #476's `feat: introduce AccessPath value object` (`c00d5c58`), and #477's refactor merely rode along in the same uncut batch.
+  Impact: no rework — the `ship independently` decision was correct regardless (the marker governs batching policy, not commit-type release mechanics), and the Ship stage handled the no-PR case gracefully via step 4b.
+  The only cost was a wrong sentence in the plan's rationale and a brief ship-time expectation mismatch (one `release_pr_find` 125s timeout that was expected behavior, not a failure).
+  Self-identified (caught at ship time by the same operator-agent).
+
+#### What caused friction (user side)
+
+- None — the issue was operator-authored, unambiguous, and required no mid-session redirection.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatch was the `pre-completion-reviewer` (TDD stage), which runs on its frontmatter model (`anthropic/claude-sonnet-4-6`), appropriate for judgment-heavy review.
+  No mismatch.
+  Session-level `model_change` entries were mostly transient selections with no attributable assistant turn, so they were not over-counted.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the longest single wait was the deterministic `release_pr_find` backoff (7 retries / 125s), which is expected polling, not a stuck loop.
+- **Feedback-loop gap analysis** — verification ran incrementally and appropriately for a single atomic step; no end-only verification gap.
+
+### Changes made
+
+1. `AGENTS.md` — appended a sentence to the line-61 release-batching paragraph: hidden changelog-type commits (`refactor:`/`style:`/`test:`/`build:`/`ci:`) do not cut a release on their own and auto-batch into the next `feat:`/`fix:`/unhidden-`docs:` release, so a refactor-only plan's `Release Recommendation` rationale must not claim it will cut a release (Refs #479).
+2. `packages/pi-permission-system/docs/retro/0479-split-common-grab-bag.md` — added this Final Retrospective stage entry.
