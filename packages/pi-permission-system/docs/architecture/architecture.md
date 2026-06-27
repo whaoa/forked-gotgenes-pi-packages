@@ -752,6 +752,111 @@ src/
 └── types.ts                   Core type definitions (PermissionState, FlatPermissionConfig, etc.)
 ```
 
+## Improvement roadmap — Phase 7: AccessPath as the universal internal path representation
+
+Phase 7 finishes the direction opened by [#487]: make `AccessPath` the one internal representation for every concrete path the system handles.
+Phase 6 introduced `AccessPath` for the `external_directory` surface; follow-on [#486] brought the `path` surface and the bash-path tokens to lexical ∪ canonical parity and collapsed the gate-emitted `path-values` variant.
+Two ad-hoc path-derivation paths remain: the per-tool path-bearing gate (`read`/`write`/`edit`/`grep`/`find`/`ls`) and the service/RPC policy-query path both normalize lexically only, so a per-tool rule (`read: deny *.env`) is still symlink-evadable while the cross-cutting `path` rule is not.
+Phase 7 routes both onto `AccessPath` (closing the asymmetry, a breaking change), retires the now-dead lexical-only normalization, consolidates the `path-utils.ts` derivation hub behind the value object, and formalizes the resolver-internal `path-values` boundary.
+
+This is a direction-driven phase: [#487] sets the framing, and the discovery confirmed the residual surface rather than proposing an unrelated health sweep.
+
+### Findings
+
+Health score 76 (B); no dead code; duplication 6.6% overall (3.6% in tests); maintainability 91.2.
+The single relevant structural signal is `path-utils.ts` — an accelerating churn hotspot (266 churn over 6 months, 13 fan-in, ▲), the ad-hoc path-derivation grab-bag the [#487] vision exists to consolidate.
+
+| Metric                            | Before                                        | Target after Phase 7                                 |
+| --------------------------------- | --------------------------------------------- | ---------------------------------------------------- |
+| `path-utils.ts` fan-in            | 13 (one grab-bag)                             | distributed across cohesive `access-intent/` modules |
+| Lexical-only path normalizers     | 2 (per-tool gate, service/RPC)                | 0 (single `AccessPath` derivation)                   |
+| Symlink-resistant path surfaces   | `path`, `external_directory`, bash            | all path surfaces incl. per-tool and RPC             |
+| Emitted/internal path-value forms | `access-path` emitted, `path-values` internal | `path-values` boundary decided and documented        |
+
+The residual ad-hoc path handling (the "re-derive their representations ad hoc" [#487] names):
+
+- Per-tool path-bearing gate: `ToolCallGatePipeline` emits `kind: "tool"` → `normalizeInput` → `normalizePathSurfaceValues` → `getPathPolicyValues` (lexical only).
+- Service/RPC queries: `permissions-service.ts` / `permission-event-rpc.ts` build `buildInputForSurface` + a lexical `tool` intent, so external policy queries for `path` / `external_directory` match lexical only.
+- `path-utils.ts`: the loose `getPathPolicyValues` / `normalizePathForComparison` / `normalizePathPolicyLiteral` derivations that `AccessPath` should own.
+- `path-values`: survives as the manager's deliberate string boundary (the manager stays string-based and never imports `AccessPath`).
+
+### Steps
+
+1. **Migrate the per-tool path-bearing tool gate onto `AccessPath` (canonical parity).**
+   Target: `src/handlers/gates/tool-call-gate-pipeline.ts` (build `AccessPath.forPath` and emit `kind: "access-path"` with `surface: toolName` for path-bearing tools, keeping non-path tools on the `tool` intent), `src/handlers/gates/tool.ts` (derive the session-approval value from `accessPath.value()`).
+   The resolver already unwraps `access-path` → `path-values` and the manager's path-value branch already routes `PATH_BEARING_TOOLS` through `evaluateAnyValue`, so the only behavior change is the canonical alias joining the match set — mechanically parallel to [#486].
+   Smell: Category C (coupling / match asymmetry).
+   Outcome: `read`/`write`/`edit`/`grep`/`find`/`ls` per-tool rules match lexical ∪ canonical (symlink-resistant); **breaking**.
+   Release: batch "symlink-resistant-path-matching"
+
+2. **Migrate the service/RPC path queries onto `AccessPath` (canonical parity).**
+   Target: `src/permissions-service.ts`, `src/permission-event-rpc.ts`, `src/input-normalizer.ts` (`buildInputForSurface`).
+   For `path` / `external_directory` / path-bearing surface queries, build an `AccessPath` and resolve an `access-path` intent instead of a lexical `tool` intent; non-path surfaces keep the existing path.
+   Smell: Category C (coupling / match asymmetry).
+   Outcome: external policy queries match the same lexical ∪ canonical set the gates do; **breaking** for external consumers.
+   Release: batch "symlink-resistant-path-matching"
+
+3. **Retire `input-normalizer`'s path normalization.**
+   Target: `src/input-normalizer.ts` (remove `normalizePathSurfaceValues`, the special-surface branch, and the `PATH_BEARING_TOOLS` branch from `normalizeInput`), `src/permission-manager.ts` (the `tool` branch no longer normalizes paths).
+   After Steps 1 and 2, these branches have no callers and `getPathPolicyValues` is consumed only by `AccessPath`.
+   Smell: Category A (dead / redundant code).
+   Outcome: `normalizeInput` handles only bash / skill / mcp / extension surfaces; a single `AccessPath` path-derivation entry remains.
+   Release: batch "symlink-resistant-path-matching"
+
+4. **Consolidate path derivation behind `AccessPath`: dissolve the `path-utils.ts` grab-bag.**
+   Target: relocate the lexical/canonical/policy-value derivation (`normalizePathForComparison`, `canonicalNormalizePathForComparison`, `getPathPolicyValues`, `normalizePathPolicyLiteral`, and the two private absolute/relative helpers) into the `access-intent/` domain as `AccessPath`'s backing (e.g. `src/access-intent/path-normalization.ts`); keep containment (`isPathWithinDirectory`, `isPathOutsideWorkingDirectory`), infra-read (`isPiInfrastructureRead`), tool-input extraction (`getToolInputPath`, `getPathBearingToolPath`), safe-system paths, and the surface/tool sets in focused modules.
+   Smell: Category B / E (god module, accelerating churn hotspot).
+   Outcome: `path-utils.ts` dissolved into cohesive modules; path derivation owned by the access-intent domain; non-breaking.
+   Release: independent
+
+5. **Decide and formalize the `path-values` boundary.**
+   Target: `src/access-intent/access-intent.ts`, `src/permission-resolver.ts`, `src/permission-manager.ts`.
+   With the resolver the sole `path-values` producer after Steps 1 and 2, decide between formalizing `path-values` as the manager's intentional string seam (document why the manager stays string-based) and moving the `matchValues()` unwrap into the manager (the manager imports `AccessPath`, dropping the string-boundary invariant).
+   This is the [#487] "collapse the `path-values` variant" item, resolved as an explicit decision rather than a pre-committed mechanical change.
+   Smell: Category C (clarify boundary).
+   Outcome: the `path-values` boundary is intentional and documented (an architecture note or ADR); non-breaking.
+   Release: independent
+
+### Step dependency diagram
+
+```mermaid
+flowchart TD
+    S1["Step 1<br/>Per-tool gate to AccessPath<br/>(breaking)"]
+    S2["Step 2<br/>Service/RPC to AccessPath<br/>(breaking)"]
+    S3["Step 3<br/>Retire input-normalizer path normalization"]
+    S4["Step 4<br/>Dissolve path-utils grab-bag"]
+    S5["Step 5<br/>Decide path-values boundary"]
+
+    S1 --> S3
+    S2 --> S3
+    S3 --> S4
+    S1 --> S5
+    S2 --> S5
+```
+
+### Parallel tracks
+
+- **Track A — access-side canonical parity:** Steps 1 and 2 proceed in parallel (different consumers), both feed Step 3 (dead-code removal), and both unblock Step 5 (the boundary decision).
+- **Track B — structural consolidation:** Step 4 follows Step 3 (fewer loose `path-utils.ts` consumers makes the relocation mechanical) and is otherwise independent.
+
+### Release batches
+
+- **Batch "symlink-resistant-path-matching":** Steps 1, 2, 3 (ship together; tail = Step 3).
+  Steps 1 and 2 are breaking parity changes and Step 3 is their cleanup — they form one coherent "paths now match symlink-resistantly on every surface" major-bump release.
+- Independently releasable: Step 4 (a refactor that auto-batches into the next release), Step 5 (a decision / docs change).
+
+### Non-goals
+
+- **Config patterns onto `AccessPath`.**
+  Patterns are matched as pure regex (`*` compiles to `.*` with the dotall flag and crosses path segments — `wildcard-matcher.ts`), so a glob is a matching *mode*, not a *value* with a canonical form.
+  The symlink protection [#487] wants is delivered on the access side: an accessed path's `matchValues()` carries both its lexical "source" and canonical "target", and a rule fires on either — so a rule on the symlink path or on the real file both match.
+  The only uncovered case is a glob pattern whose directory *prefix* is a symlink (e.g. `~/linkdir/*` accessed via the real target): not closable on the pattern side, because `*` crossing segments leaves no reliable resolvable-prefix decomposition.
+  Documented guidance: key glob rules on the real location, not a symlink-dir alias.
+- **Canonicalizing concrete symlink patterns at rule-load.**
+  Feasible only for fully-concrete (non-glob) patterns and a narrow case; evaluated and dropped (the high-value protective patterns are globs, which this cannot help).
+- **Principal identity and cross-session path portability.**
+  Still deferred (the broader access-intent design work), out of Phase 7 scope.
+
 ## Improvement roadmap — Phase 6: Access-intent extraction (complete)
 
 Phase 6 extracted the access-intent domain across eight steps: it decomposed the 1,143-line `bash-program.ts` god file into focused modules under `src/access-intent/bash/`, introduced the `AccessPath` value object that makes the [#418] lexical/canonical conflation a compile-time error, collapsed the two external-directory gates onto a single shared policy check, narrowed `ScopedPermissionResolver` to one `resolve(intent)` entry point (eliminating the [#393] false-green class), dissolved the `common.ts` grab-bag, and extracted a shared external-directory test fixture.
