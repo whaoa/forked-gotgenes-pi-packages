@@ -75,6 +75,9 @@ const NESTED_EXECUTION_CONTEXTS = new Map<string, BashCommandContext>([
  *
  * The enclosing command/subshell is always still emitted whole, so adding the
  * nested units can only ever produce a more-restrictive decision, never weaker.
+ *
+ * Each emitted command unit has any leading `variable_assignment` prefix
+ * stripped (so an env-var prefix cannot defeat a command-pattern rule).
  */
 export function collectCommands(node: TSNode): BashCommand[] {
   const out: BashCommand[] = [];
@@ -93,7 +96,7 @@ function collectCommandsInto(
   if (COMMAND_ENUM_SKIP.has(node.type)) return;
 
   if (node.type === "command") {
-    out.push(makeUnit(node.text, context));
+    out.push(makeUnit(commandUnitText(node), context));
     // A command's text already contains any substitution; descend its subtree
     // to ALSO emit the inner commands of command/process substitutions.
     collectSubstitutionCommands(node, out);
@@ -121,6 +124,27 @@ function makeUnit(
   context: BashCommandContext | undefined,
 ): BashCommand {
   return context ? { text, context } : { text };
+}
+
+/**
+ * The command-pattern text of a `command` node, with any leading
+ * `variable_assignment` prefix stripped.
+ *
+ * An env-var prefix (`AWS_PROFILE=prod aws …`, `PGPASSWORD=…`) is part of the
+ * `command` node's text but must not defeat a rule that gates the underlying
+ * command, so matching targets the text from the first non-assignment child
+ * (the `command_name`) onward, sliced verbatim to preserve spacing. A pure
+ * assignment (`FOO=bar`, no `command_name`) runs no command and is returned
+ * unchanged.
+ */
+function commandUnitText(node: TSNode): string {
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (child && child.isNamed && child.type !== "variable_assignment") {
+      return node.text.slice(child.startIndex - node.startIndex);
+    }
+  }
+  return node.text;
 }
 
 function descendCommandChildren(

@@ -8,6 +8,8 @@ import { memoizeAsyncWithRetry } from "#src/async-cache";
 export interface TSNode {
   readonly type: string;
   readonly text: string;
+  /** Absolute byte offset of this node's start in the parsed source. */
+  readonly startIndex: number;
   readonly childCount: number;
   /** False for anonymous tokens (operators, delimiters); true for named nodes. */
   readonly isNamed: boolean;

@@ -435,6 +435,37 @@ describe("BashProgram", () => {
       expect((await BashProgram.parse("", cwd)).commands()).toEqual([]);
       expect((await BashProgram.parse("   ", cwd)).commands()).toEqual([]);
     });
+
+    it("strips a leading env-var assignment prefix", async () => {
+      const program = await BashProgram.parse(
+        "AWS_PROFILE=prod aws ec2 terminate-instances --instance-ids i-1",
+        cwd,
+      );
+      expect(program.commands()).toEqual([
+        { text: "aws ec2 terminate-instances --instance-ids i-1" },
+      ]);
+    });
+
+    it("strips multiple leading env-var assignments", async () => {
+      const program = await BashProgram.parse("A=1 B=2 aws s3 ls", cwd);
+      expect(program.commands()).toEqual([{ text: "aws s3 ls" }]);
+    });
+
+    it("strips the env-var prefix of each command in a chain", async () => {
+      const program = await BashProgram.parse(
+        "X=1 aws sts get-caller-identity && ls",
+        cwd,
+      );
+      expect(program.commands()).toEqual([
+        { text: "aws sts get-caller-identity" },
+        { text: "ls" },
+      ]);
+    });
+
+    it("keeps a pure assignment with no command unchanged", async () => {
+      const program = await BashProgram.parse("FOO=bar", cwd);
+      expect(program.commands()).toEqual([{ text: "FOO=bar" }]);
+    });
   });
 
   it("derives both slices from a single parse", async () => {

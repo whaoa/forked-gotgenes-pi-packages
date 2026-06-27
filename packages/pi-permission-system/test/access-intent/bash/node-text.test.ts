@@ -10,6 +10,7 @@ function makeNode(type: string, text: string, children: TSNode[] = []): TSNode {
   return {
     type,
     text,
+    startIndex: 0,
     childCount: children.length,
     isNamed: true,
     child: (i) => children[i] ?? null,
