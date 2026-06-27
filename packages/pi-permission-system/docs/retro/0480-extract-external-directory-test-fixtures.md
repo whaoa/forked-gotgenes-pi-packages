@@ -29,3 +29,24 @@ The plan is a behavior-preserving `test:`-only refactor across two lift-and-shif
 
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
 [#478]: https://github.com/gotgenes/pi-packages/issues/478
+
+## Stage: Implementation — TDD (2026-06-26T21:30:00Z)
+
+### Session summary
+
+Completed all three TDD steps in a single session across two lift-and-shift commits.
+Created `test/helpers/external-directory-fixtures.ts` and migrated both handler-pipeline test files onto it, dissolving the 43-line wiring duplicate in the session-dedup file's inline shutdown test.
+Package duplication dropped from 7.1% to exactly 6.5% — the roadmap Step 8 target.
+
+### Observations
+
+- **Duplication hit exactly 6.5%** — the two major clone families (21 groups/214 lines and 3 groups/74 lines) no longer appear as top-level families in `pnpm fallow dupes`.
+  Residual clones (17 groups/133 lines in the integration file; 2 groups/14 lines in the dedup file) are the test-act repetitions the `testing` skill says not to wrap.
+- **`pi-autoformat` converted `makeEvents` to `type makeEvents`** in the first fixture write (correctly: only used in a type position at that point).
+  Adding `makeDedupWiring` in Step 2 reintroduced a value-position use of `makeEvents`, so the import had to be changed back to a value import.
+  The `Edit` approach for the Step 2 update handled this cleanly in the imports edit.
+- **`makeSessionApprovingPrompter` kept private** — not exported, since File 2 never uses it directly; `makeDedupWiring` builds the default prompter internally.
+  This avoids a fallow dead-export flag while keeping the approval semantics encapsulated.
+- **Event-shape preservation** — File 2 uses `toolName:` (not `name:`) in event literals; the new `makeExtDirToolEvent` / `makeExtDirBashEvent` builders match that shape exactly so `getToolNameFromValue` behavior is unchanged.
+- **Pre-completion reviewer verdict: WARN** (non-blocking).
+  All WARN items are `architecture.md` roadmap markers (`✅` on Step 7 + Step 8 headings and Mermaid nodes, Track C flip to `✅ complete`, Step 8 `Target:` description update to remove the scoped-out `bash-external-directory.test.ts`) — all explicitly deferred to ship time per the plan.
