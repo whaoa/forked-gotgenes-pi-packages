@@ -466,6 +466,42 @@ describe("BashProgram", () => {
       const program = await BashProgram.parse("FOO=bar", cwd);
       expect(program.commands()).toEqual([{ text: "FOO=bar" }]);
     });
+
+    describe("opaque-payload wrappers", () => {
+      it.each([
+        ['bash -c "rm -rf /"', 'bash -c "rm -rf /"'],
+        ['sh -c "rm -rf /"', 'sh -c "rm -rf /"'],
+        ['dash -c "rm -rf /"', 'dash -c "rm -rf /"'],
+        ['zsh -c "rm -rf /"', 'zsh -c "rm -rf /"'],
+        ['ksh -c "rm -rf /"', 'ksh -c "rm -rf /"'],
+        ['eval "rm -rf /"', 'eval "rm -rf /"'],
+        ['/bin/bash -c "rm -rf /"', '/bin/bash -c "rm -rf /"'],
+        ['bash -ec "rm -rf /"', 'bash -ec "rm -rf /"'],
+      ])("flags %s as opaque", async (command, text) => {
+        const program = await BashProgram.parse(command, cwd);
+        expect(program.commands()).toEqual([{ text, opaque: true }]);
+      });
+
+      it("flags an env-prefixed wrapper as opaque after stripping the prefix", async () => {
+        const program = await BashProgram.parse(
+          'AWS_PROFILE=prod bash -c "rm -rf /"',
+          cwd,
+        );
+        expect(program.commands()).toEqual([
+          { text: 'bash -c "rm -rf /"', opaque: true },
+        ]);
+      });
+
+      it.each([
+        "bash script.sh",
+        "bash",
+        "ls -la",
+        "grep -c foo file",
+      ])("does not flag %s as opaque", async (command) => {
+        const program = await BashProgram.parse(command, cwd);
+        expect(program.commands()).toEqual([{ text: command }]);
+      });
+    });
   });
 
   it("derives both slices from a single parse", async () => {

@@ -19,6 +19,12 @@ import type { PermissionCheckResult } from "#src/types";
  * `commandContext` (set only for a nested command), so the prompt,
  * session-approval suggestion, and decision event scope to that command.
  *
+ * An opaque-payload wrapper unit (`bash -c`/`eval`, flagged `opaque` by the
+ * enumerator) has its inner program hidden behind a quoted argument, so an
+ * `allow` is floored up to a synthetic `ask` (the `<opaque-bash-wrapper>`
+ * pattern) to keep it from riding a permissive rule; an explicit `deny`/`ask`
+ * on the wrapper is left untouched (`deny > ask > allow`).
+ *
  * When `commands` is empty there are two cases. A trivially-empty command (an
  * empty, whitespace-only, or comment-only line) has genuinely nothing to gate,
  * so the whole `command` is resolved as before. A non-empty command that parsed
@@ -56,12 +62,20 @@ export function resolveBashCommandCheck(
   }
 
   const results = commands.map((cmd) => {
-    const result = resolver.resolve({
+    const base = resolver.resolve({
       kind: "tool",
       surface: "bash",
       input: { command: cmd.text },
       agentName,
     });
+    const result =
+      cmd.opaque && base.state === "allow"
+        ? {
+            ...base,
+            state: "ask" as const,
+            matchedPattern: "<opaque-bash-wrapper>",
+          }
+        : base;
     return cmd.context ? { ...result, commandContext: cmd.context } : result;
   });
   return (

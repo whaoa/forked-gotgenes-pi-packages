@@ -18,6 +18,12 @@ export interface BashCommand {
    * for a current-shell (top-level) command.
    */
   readonly context?: BashCommandContext;
+  /**
+   * True when this is an opaque-payload wrapper (`bash -c`/`eval`) whose inner
+   * program is not re-parsed; its decision is floored to at least `ask` so it
+   * cannot ride a permissive `allow`.
+   */
+  readonly opaque?: boolean;
 }
 
 // ── Command enumeration ──────────────────────────────────────────────────────
@@ -96,7 +102,9 @@ function collectCommandsInto(
   if (COMMAND_ENUM_SKIP.has(node.type)) return;
 
   if (node.type === "command") {
-    out.push(makeUnit(commandUnitText(node), context));
+    out.push(
+      makeUnit(commandUnitText(node), context, isOpaqueWrapperCommand(node)),
+    );
     // A command's text already contains any substitution; descend its subtree
     // to ALSO emit the inner commands of command/process substitutions.
     collectSubstitutionCommands(node, out);
@@ -122,8 +130,53 @@ function collectCommandsInto(
 function makeUnit(
   text: string,
   context: BashCommandContext | undefined,
+  opaque = false,
 ): BashCommand {
-  return context ? { text, context } : { text };
+  const unit: BashCommand = context ? { text, context } : { text };
+  return opaque ? { ...unit, opaque } : unit;
+}
+
+/**
+ * Shell command names whose `-c` flag introduces an opaque inline program.
+ */
+const SHELL_WRAPPER_NAMES = new Set(["bash", "sh", "dash", "zsh", "ksh"]);
+
+/**
+ * True when a `command` node is an opaque-payload wrapper: a shell
+ * (`bash`/`sh`/`dash`/`zsh`/`ksh`) invoked with a `-c` flag, or `eval`. Its
+ * inner program is a quoted argument the enumerator does not re-parse, so the
+ * wrapper's decision is later floored to at least `ask`.
+ *
+ * The command name is matched on its basename (so `/bin/bash -c …` counts), and
+ * a `-c` flag is recognized within a short-flag cluster (`-c`, `-ec`, `-xc`).
+ * A leading `variable_assignment` prefix is skipped, matching `commandUnitText`.
+ */
+function isOpaqueWrapperCommand(node: TSNode): boolean {
+  let commandName: string | undefined;
+  let sawShortFlagC = false;
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (!child?.isNamed) continue;
+    if (child.type === "variable_assignment") continue;
+    if (commandName === undefined) {
+      commandName = basename(child.text);
+      continue;
+    }
+    const text = child.text;
+    if (text === "--") break;
+    if (text.startsWith("-") && !text.startsWith("--") && text.includes("c")) {
+      sawShortFlagC = true;
+    }
+  }
+  if (commandName === undefined) return false;
+  if (commandName === "eval") return true;
+  return SHELL_WRAPPER_NAMES.has(commandName) && sawShortFlagC;
+}
+
+/** The final path segment of a command name (`/bin/bash` → `bash`). */
+function basename(name: string): string {
+  const slash = name.lastIndexOf("/");
+  return slash === -1 ? name : name.slice(slash + 1);
 }
 
 /**
