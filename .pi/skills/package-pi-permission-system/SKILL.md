@@ -175,6 +175,8 @@ The gate fails closed (#452).
 Every `tool_call` goes through `createFailClosedToolCall` (`src/handlers/tool-call-boundary.ts`), the only `pi.on("tool_call")` target and the sole place an internal `GateOutcome` is translated to the SDK result shape.
 A thrown gate is blocked (not allowed) and recorded as a `permission_request.blocked` review entry with `resolution: "gate_error"` — the SDK's `emitToolCall` does not catch a throwing handler, so this boundary must absorb it.
 An unparseable bash command (a non-empty command that parses to zero command units) resolves to `ask` with the `<unparseable-bash-command>` sentinel `matchedPattern`, instead of falling through to a permissive top-level `*`.
+An opaque-payload wrapper (`bash`/`sh`/`dash`/`zsh`/`ksh -c`, or `eval`) is flagged `opaque` by the command enumerator and floored from `allow` to `ask` with the sibling `<opaque-bash-wrapper>` sentinel — so `bash -c "…"` prompts even under a permissive `bash *: allow` (an explicit `deny` still wins).
+The enumerator also strips a leading `variable_assignment` prefix from each command unit so an env-var prefix (`AWS_PROFILE=prod aws …`) cannot defeat a command-pattern rule (#481).
 With `debugLog` on, the boundary writes one `permission.decision` trace per call and a `permission.session_summary` line on shutdown (via `DecisionAudit`); a `toolCalls != allowed + blocked + errors` mismatch logs a warning — a re-opened silent path.
 
 ## Notes for Agents
