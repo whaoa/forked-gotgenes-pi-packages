@@ -46,5 +46,49 @@ Pre-completion reviewer returned PASS.
 - Pre-completion reviewer: PASS.
   Reviewer warnings (addressed in a follow-up `docs:` commit, not deferred): the README "Fails closed" bullet and the `package-pi-permission-system` skill Debugging section named only `<unparseable-bash-command>` and now also mention the sibling `<opaque-bash-wrapper>` sentinel.
 
+## Stage: Final Retrospective (2026-06-27T03:00:00Z)
+
+### Session summary
+
+Shipped #481 end-to-end across planning, TDD, and ship stages: two `fix:` commits closing the env-var-prefix and opaque-wrapper bash-gate bypasses, released as `pi-permission-system-v16.2.1`.
+The pipeline ran cleanly — third-party direction gate honored in planning, pre-completion reviewer PASS, CI green, release-please PR merged by rebase.
+The only rework was a baseline-cleanup commit at the start of TDD to fix markdown-lint failures the planning stage introduced into its own plan file.
+
+### Observations
+
+#### What went well
+
+- The two-`ask_user` planning gate for a third-party issue worked as intended: the first call settled scope + commit classification, and when the operator answered a scoping question with a counter-question ("don't we punt opaque payloads to ask?"), a second `ask_user` converged on the floor-to-`ask` design and wrapper set before any code was planned.
+  This avoided building the heavier re-parse approach the issue author suggested.
+- Incremental verification held throughout TDD: `pnpm run check` ran immediately after the step-1 `TSNode` interface change (a shared-type edit), the full suite ran after every step, and `pnpm run lint` + `pnpm fallow dead-code` ran before the ship push — no end-of-session surprise.
+- The ship prompt's step-6.4 guidance paid off: release PR #491 had a CI `check` still `IN_PROGRESS`, and the flow correctly waited for it to finish rather than falling back to `gh pr merge` while a check was running, then merged by rebase.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (self-identified) — the planning stage wrote issue cross-references as backticked `` `[#452]` `` / `` `[#306]` `` / `` `[#393]` `` in the plan body, which renders them as code spans, not link references; the `[#N]:` definitions at the file foot then had no matching reference and tripped MD053.
+  This surfaced at the TDD green-baseline lint check and forced a separate `docs:` cleanup commit (5915260d) before TDD could start.
+  Impact: one extra commit and a baseline detour; no wrong code.
+  The `markdown-conventions` skill already states "every `[#N]:` definition must have a matching `[#N]` reference," but does not warn that backticks disqualify the reference — the exact failure mode here.
+- `scope-drift` (minor) — the plan listed a `program.ts` `commands()` JSDoc update that the first TDD pass missed (only the `collectCommands` JSDoc was updated); caught during the Module-Level-Changes cross-check and fixed in a follow-up `docs:` commit (18920980).
+  Impact: one extra small commit; no rework.
+- `other` (tooling) — the `eslint` pre-commit hook auto-fixed one optional-chain in step 2, but `biome` independently flagged a second optional-chain in `commandUnitText` that only surfaced at the end-of-step root lint, landing as a separate `style:` commit (8cef1c88).
+  Impact: one extra commit; the two linters do not agree on which optional-chains they auto-fix at commit time.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's counter-question during planning was a net positive — it redirected toward the simpler, fail-safe design before code was written, exactly the kind of early strategic intervention the workflow wants.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the single subagent dispatch (`pre-completion-reviewer`) ran on `anthropic/claude-sonnet-4-6`, appropriate for the judgment-heavy review (acceptance criteria, design, cross-step invariants); no mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; no error or approach occupied more than two consecutive tool calls.
+- **Unused-tool detection** — none warranted; exact-symbol exploration (`grep`/`Read`) was the right fit for tracing `collectCommandsInto` / `makeUnit` / `variable_assignment`, and the one judgment task was correctly delegated to the reviewer subagent.
+- **Feedback-loop gap analysis** — no gap; verification was incremental (typecheck after the interface change, full suite per step, lint + fallow before push) rather than end-loaded.
+
+### Changes made
+
+1. `.pi/skills/markdown-conventions/SKILL.md` — added a rule to the "Issue references" subsection: a `[#N]` wrapped in backticks is a code span, not a link reference, so the `[#N]:` definition still trips MD053; write `[#N]` as plain text, including inside other formatting.
+
 [#452]: https://github.com/gotgenes/pi-packages/issues/452
 [#490]: https://github.com/gotgenes/pi-packages/issues/490
