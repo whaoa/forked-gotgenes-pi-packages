@@ -120,28 +120,7 @@ describe("PermissionResolver", () => {
     });
   });
 
-  describe("resolve — path-values intent", () => {
-    it("forwards a path-values intent with the current session ruleset", () => {
-      const { resolver, permissionManager } = makeResolver();
-
-      resolver.resolve({
-        kind: "path-values",
-        surface: "path",
-        values: ["/proj/src/a.ts", "src/a.ts"],
-        agentName: "agent-x",
-      });
-
-      expect(permissionManager.check).toHaveBeenCalledWith(
-        {
-          kind: "path-values",
-          surface: "path",
-          values: ["/proj/src/a.ts", "src/a.ts"],
-          agentName: "agent-x",
-        },
-        [],
-      );
-    });
-
+  describe("resolve — session ruleset threading", () => {
     it("applies a recorded session approval on the next call", () => {
       const pm = makePermissionManager();
       const sessionRules = new SessionRules();
@@ -151,9 +130,9 @@ describe("PermissionResolver", () => {
         SessionApproval.single("path", "src/*"),
       );
       resolver.resolve({
-        kind: "path-values",
+        kind: "access-path",
         surface: "path",
-        values: ["src/a.ts"],
+        path: AccessPath.forPath("src/a.ts", { cwd: "/proj" }),
       });
 
       const passedRules = vi.mocked(pm.check).mock.calls[0][1];

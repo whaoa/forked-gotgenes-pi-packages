@@ -78,11 +78,7 @@ describe("selectUncoveredExternalPaths", () => {
     const resolver = makeResolver();
     resolver.resolve.mockImplementation((intent) => {
       const values =
-        intent.kind === "access-path"
-          ? intent.path.matchValues()
-          : intent.kind === "path-values"
-            ? intent.values
-            : [];
+        intent.kind === "access-path" ? intent.path.matchValues() : [];
       return values.includes("/outside/ok.ts")
         ? makeCheckResult("allow")
         : makeCheckResult("ask");
@@ -103,11 +99,7 @@ describe("selectUncoveredExternalPaths", () => {
     const resolver = makeResolver();
     resolver.resolve.mockImplementation((intent) => {
       const values =
-        intent.kind === "access-path"
-          ? intent.path.matchValues()
-          : intent.kind === "path-values"
-            ? intent.values
-            : [];
+        intent.kind === "access-path" ? intent.path.matchValues() : [];
       return values.includes("/outside/deny.ts")
         ? makeCheckResult("deny")
         : makeCheckResult("ask");

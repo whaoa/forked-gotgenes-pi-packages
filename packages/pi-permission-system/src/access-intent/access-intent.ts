@@ -17,8 +17,9 @@ export interface ToolAccessIntent {
 /**
  * Precomputed equivalent policy values for a path-shaped surface.
  *
- * Used by the bash-path gate (`path` surface), whose cd-resolved lexical
- * `string[]` carry no canonical-boundary notion.
+ * Not gate-emitted: the resolver produces it internally by unwrapping an
+ * `access-path` intent via `matchValues()`, keeping the low-level manager
+ * string-based (it never imports `AccessPath`). See {@link ResolvedAccessIntent}.
  */
 export interface PathValuesAccessIntent {
   kind: "path-values";
@@ -31,9 +32,9 @@ export interface PathValuesAccessIntent {
 /**
  * An `AccessPath` value object for a path-shaped surface.
  *
- * Used by the external-directory gates; lets `AccessPath` flow into the
- * resolver as a first-class variant so the resolver — not the gate — asks it
- * for `matchValues()` (Tell-Don't-Ask).
+ * Emitted by every path gate (the `path` and `external_directory` surfaces);
+ * lets `AccessPath` flow into the resolver as a first-class variant so the
+ * resolver — not the gate — asks it for `matchValues()` (Tell-Don't-Ask).
  */
 export interface AccessPathAccessIntent {
   kind: "access-path";
@@ -42,11 +43,8 @@ export interface AccessPathAccessIntent {
   agentName?: string;
 }
 
-/** What a gate emits — the full three-variant union. */
-export type AccessIntent =
-  | ToolAccessIntent
-  | PathValuesAccessIntent
-  | AccessPathAccessIntent;
+/** What a gate emits — a raw tool input or an `AccessPath`. */
+export type AccessIntent = ToolAccessIntent | AccessPathAccessIntent;
 
 /**
  * What the manager consumes — the `access-path` variant has already been

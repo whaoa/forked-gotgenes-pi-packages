@@ -44,7 +44,6 @@ function makeCheckResult(
 /** Extract the policy match values a resolve(intent) call carries. */
 function intentValues(intent: AccessIntent): readonly string[] {
   if (intent.kind === "access-path") return intent.path.matchValues();
-  if (intent.kind === "path-values") return intent.values;
   return [];
 }
 

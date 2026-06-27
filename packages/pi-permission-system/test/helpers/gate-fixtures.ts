@@ -213,8 +213,7 @@ export function makePathDispatchResolver(
       }
       return defaultResult;
     }
-    const values =
-      intent.kind === "access-path" ? intent.path.matchValues() : intent.values;
+    const values = intent.path.matchValues();
     for (const value of values) {
       if (value in byPath) return byPath[value];
     }
