@@ -7,15 +7,27 @@
  */
 import { vi } from "vitest";
 
+import { GateDecisionReporter } from "#src/decision-reporter";
 import type { GatePrompter } from "#src/gate-prompter";
+import { GateRunner } from "#src/handlers/gates/runner";
+import { SkillInputGatePipeline } from "#src/handlers/gates/skill-input-gate-pipeline";
+import { ToolCallGatePipeline } from "#src/handlers/gates/tool-call-gate-pipeline";
+import { PermissionGateHandler } from "#src/handlers/permission-gate-handler";
+import type { ScopedPermissionManager } from "#src/permission-manager";
 import type { SessionLogger } from "#src/session-logger";
-import type { PermissionState } from "#src/types";
+import type { PermissionCheckResult, PermissionState } from "#src/types";
+import { wildcardMatch } from "#src/wildcard-matcher";
 
 import {
   getDecisionEvents,
-  type makeEvents,
+  makeEvents,
   makeSurfaceCheck,
+  makeToolRegistry,
 } from "#test/helpers/handler-fixtures";
+import {
+  makeRealResolver,
+  makeRealSession,
+} from "#test/helpers/session-fixtures";
 
 // ── Shared constants ───────────────────────────────────────────────────────
 
@@ -113,4 +125,145 @@ export function blockReviewEntries(logger: SessionLogger) {
   return (logger.review as ReturnType<typeof vi.fn>).mock.calls.filter(
     ([eventName]: string[]) => eventName === "permission_request.blocked",
   );
+}
+
+// ── Session-dedup wiring ──────────────────────────────────────────────────
+
+/**
+ * Installs the session-aware `check(intent)` mock on the permission manager.
+ *
+ * Returns `ask` for `external_directory` on first access; re-checks recorded
+ * session rules on subsequent calls and returns `allow` (source: "session")
+ * when a `wildcardMatch` covers the path.
+ */
+export function makeExtDirDedupCheck(
+  permissionManager: ScopedPermissionManager,
+): void {
+  vi.mocked(permissionManager.check).mockImplementation(
+    (intent, rules): PermissionCheckResult => {
+      const { surface } = intent;
+      const pathValue =
+        intent.kind === "path-values" ? (intent.values[0] ?? null) : null;
+
+      if (surface === "external_directory") {
+        if (pathValue && rules && rules.length > 0) {
+          const match = rules.findLast(
+            (r) =>
+              r.surface === "external_directory" &&
+              wildcardMatch(r.pattern, pathValue),
+          );
+          if (match) {
+            return {
+              state: "allow",
+              toolName: surface,
+              source: "session",
+              origin: "session",
+              matchedPattern: match.pattern,
+            };
+          }
+        }
+        return {
+          state: "ask",
+          toolName: surface,
+          source: "special",
+          origin: "global",
+        };
+      }
+
+      return {
+        state: "allow",
+        toolName: surface,
+        source: "tool",
+        origin: "builtin",
+      };
+    },
+  );
+}
+
+/** GatePrompter stub that approves for the session (`state: "approved_for_session"`). */
+function makeSessionApprovingPrompter(): GatePrompter {
+  return {
+    canConfirm: vi.fn().mockReturnValue(true),
+    prompt: vi
+      .fn<GatePrompter["prompt"]>()
+      .mockResolvedValue({ approved: true, state: "approved_for_session" }),
+  };
+}
+
+/**
+ * Builds the fully-wired session-dedup handler with real collaborators.
+ *
+ * Unlike `makeHandler`, this wires `makeRealSession` + `makeRealResolver`
+ * manually so the caller can access the raw `session` for shutdown tests.
+ *
+ * Returns `{ handler, prompter, session }`.
+ */
+export function makeDedupWiring(prompter?: GatePrompter) {
+  const { session, permissionManager, sessionRules, logger } =
+    makeRealSession();
+  const { resolver } = makeRealResolver(permissionManager, sessionRules);
+  makeExtDirDedupCheck(permissionManager);
+  const events = makeEvents();
+  const reporter = new GateDecisionReporter(logger, events);
+  const resolvedPrompter: GatePrompter =
+    prompter ?? makeSessionApprovingPrompter();
+  const runner = new GateRunner(
+    resolver,
+    sessionRules,
+    resolvedPrompter,
+    reporter,
+  );
+  const handler = new PermissionGateHandler(
+    session,
+    makeToolRegistry({
+      getAll: vi
+        .fn()
+        .mockReturnValue([
+          { name: "read" },
+          { name: "write" },
+          { name: "edit" },
+          { name: "bash" },
+        ]),
+    }),
+    new ToolCallGatePipeline(resolver, session),
+    new SkillInputGatePipeline(resolver),
+    runner,
+  );
+  return { handler, prompter: resolvedPrompter, session };
+}
+
+/**
+ * Builds the session-dedup handler without exposing the raw session.
+ *
+ * Wraps `makeDedupWiring`; returns `{ handler, prompter }`.
+ * Use `makeDedupWiring` when the test also needs `session.shutdown()`.
+ */
+export function makeDeduplicatingHandler(prompter?: GatePrompter) {
+  const { handler, prompter: resolvedPrompter } = makeDedupWiring(prompter);
+  return { handler, prompter: resolvedPrompter };
+}
+
+// ── Event builders ─────────────────────────────────────────────────────────
+
+/**
+ * Builds a tool-call event in the shape that external-directory-session-dedup
+ * tests use — `toolName` field (not `name`); both are accepted by
+ * `getToolNameFromValue`.
+ */
+export function makeExtDirToolEvent(
+  toolName: string,
+  path: string,
+  toolCallId = "tc-1",
+) {
+  return { type: "tool_call" as const, toolCallId, toolName, input: { path } };
+}
+
+/** Builds a bash tool-call event for external-directory session-dedup tests. */
+export function makeExtDirBashEvent(command: string, toolCallId = "tc-1") {
+  return {
+    type: "tool_call" as const,
+    toolCallId,
+    toolName: "bash",
+    input: { command },
+  };
 }
