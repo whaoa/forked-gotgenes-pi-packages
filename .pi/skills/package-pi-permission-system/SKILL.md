@@ -18,7 +18,8 @@ Pre-monorepo plans from the upstream fork live in `docs/plans/archive/` — issu
 
 `docs/architecture/architecture.md` tracks the improvement phases as a flat numbered step list plus a Mermaid graph — one issue per step, never a chain inside a single node label.
 When a plan touches that roadmap, enumerate the whole phase: search dependents too (`gh issue list --search "#N"`), not just the issues the current one references.
-When a roadmap step ships, mark it complete in `docs/architecture/architecture.md` as part of the shipping change — using the completion-marker convention from the implementation prompts (`✅` on both the step heading and its Mermaid diagram node) — do not leave it for a later session.
+When the implementation completes a numbered roadmap step, mark it complete in `docs/architecture/architecture.md` in the implementation doc-update commit (`/tdd-plan` step 7 / `/build-plan`), not a deferred `/ship-issue` commit — `✅` on both the step heading and its Mermaid diagram node, plus any stale health-metric/target rows in the same commit.
+Deferring the marker to ship splits it from the work and risks it falling through entirely (Refs #479, #480).
 
 ## Implementation Priorities
 

@@ -50,3 +50,50 @@ Package duplication dropped from 7.1% to exactly 6.5% — the roadmap Step 8 tar
 - **Event-shape preservation** — File 2 uses `toolName:` (not `name:`) in event literals; the new `makeExtDirToolEvent` / `makeExtDirBashEvent` builders match that shape exactly so `getToolNameFromValue` behavior is unchanged.
 - **Pre-completion reviewer verdict: WARN** (non-blocking).
   All WARN items are `architecture.md` roadmap markers (`✅` on Step 7 + Step 8 headings and Mermaid nodes, Track C flip to `✅ complete`, Step 8 `Target:` description update to remove the scoped-out `bash-external-directory.test.ts`) — all explicitly deferred to ship time per the plan.
+
+## Stage: Final Retrospective (2026-06-26T22:15:00Z)
+
+### Session summary
+
+Shipped #480 across a clean three-stage arc (plan → TDD → ship): the shared `external-directory-fixtures.ts` landed, both handler-pipeline test files migrated, package duplication hit the 6.5% target exactly, and Phase 6 of the `pi-permission-system` roadmap completed.
+The one recurring friction — surfaced across this issue and #479 — is that the roadmap-completion `✅` marker keeps getting deferred to ship time, where it either falls through entirely (#479) or lands as a post-CI commit that triggers a second CI cycle (#480).
+
+### Observations
+
+#### What went well
+
+- **`ask_user` File-3 scoping caught a real divergence (novel win).**
+  The issue's "Proposed change" named three files; the planning `ask_user` gate surfaced that `test/bash-external-directory.test.ts` tests a different surface (the pure path-extraction function) whose bulk is the SUT-call act the `testing` skill says not to wrap.
+  Scoping it out up front prevented wasted migration work and still hit the duplication target from Files 1 & 2 alone.
+- **Prediction accuracy.**
+  The plan predicted duplication would drop to ≤ 6.5% from Files 1 & 2 alone; it landed at exactly 6.5%, and the test count was unchanged (2124 → 2124) as designed for a behavior-preserving refactor.
+- **Incremental verification (no feedback-loop gap).**
+  The TDD stage ran the affected file plus the full suite after each of Steps 1 and 2, then `check` / `lint` / `dead-code` / `fallow dupes` before finishing — verification was paced per-change, not deferred to the end.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (self-identified, but recurring) — the **roadmap-completion `✅` marker was deferred to ship time** instead of landing in the implementation doc-update commit (`/tdd-plan` step 7).
+  The package skill says to mark it "as part of the shipping change ... using the completion-marker convention from the implementation prompts ... do not leave it for a later session" — an internally contradictory phrasing that two consecutive planning sessions (#479 and #480) both read as "defer to `/ship-issue`."
+  Impact: #479's ship never applied its `✅` (it fell through — the `/ship-issue` prompt has no step for it), so #480's ship had to clean up both issues' markers in a separate post-CI commit (`92f9fc99`), triggering a **second full push + CI cycle (~150 s)**.
+  This is the dominant cross-session pattern and the only finding worth a guidance change.
+- `other` (minor) — two `architecture.md` `Edit` `oldText` match failures during ship, because the replacement text was constructed from the plan's quoted prose rather than the live file (the roadmap heading read `Split the` with backticks, not `Split`).
+  Impact: two extra `Read` calls and one retry; recovered immediately by reading the exact region.
+  No rework beyond the retries.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's only interactive input was the planning `ask_user` File-3 scoping decision, which was strategic and well-timed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the sole subagent dispatch (`pre-completion-reviewer`) ran on `anthropic/claude-sonnet-4-6`, appropriate for judgment-heavy review; it produced an accurate WARN (correctly flagging the deferred `✅` items and the `dead-code` self-consumption nuance).
+  Main work ran on opus.
+  No mismatch.
+- **Escalation-delay tracking** — no rabbit-holes; the longest retry sequence was the two `architecture.md` edit attempts, well under the 5-call threshold.
+- **Feedback-loop gap analysis** — none; verification ran incrementally (see "What went well").
+
+### Changes made
+
+1. `.pi/skills/package-pi-permission-system/SKILL.md` — reworded the roadmap-completion guidance: the `✅` step/Mermaid marker (plus stale health-metric/target rows) now lands in the implementation doc-update commit (`/tdd-plan` step 7 / `/build-plan`), not a deferred `/ship-issue` commit.
+   Added a `Refs #479, #480` justification.
