@@ -1,3 +1,4 @@
+import type { AccessPath } from "#src/access-intent/access-path";
 import type { BashProgram } from "#src/access-intent/bash/program";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
@@ -41,20 +42,20 @@ export function describeBashPathGate(
   const tokens = candidates.map(({ token }) => token);
 
   // Tokens whose resolved state needs a check (deny/ask), paired with the raw
-  // token (prompt/decision display) and its policy values (the first of which
-  // is the canonical absolute path the approval pattern is derived from).
+  // token (prompt/decision display) and its `AccessPath` (whose `value()` is
+  // the lexical absolute path the approval pattern is derived from).
   const uncovered: Array<{
     token: string;
-    policyValues: readonly string[];
+    path: AccessPath;
     check: PermissionCheckResult;
   }> = [];
   let allSessionCovered = true;
 
-  for (const { token, policyValues } of candidates) {
+  for (const { token, path } of candidates) {
     const check = resolver.resolve({
-      kind: "path-values",
+      kind: "access-path",
       surface: "path",
-      values: policyValues,
+      path,
       agentName: tcc.agentName ?? undefined,
     });
 
@@ -71,11 +72,11 @@ export function describeBashPathGate(
     }
 
     if (check.state === "deny") {
-      uncovered.push({ token, policyValues, check });
+      uncovered.push({ token, path, check });
       break; // Short-circuit on deny.
     }
     if (check.state === "ask") {
-      uncovered.push({ token, policyValues, check });
+      uncovered.push({ token, path, check });
     }
   }
 
@@ -108,11 +109,10 @@ export function describeBashPathGate(
   // All tokens evaluate to allow — no restriction.
   if (!worstCheck || !worstToken || !worstEntry) return null;
 
-  // Derive the pattern from the canonical absolute policy value (the cd-aware
-  // resolved path), so it matches the values a later call produces. Falls back
-  // to the raw token only when no base was resolvable (no cwd / unknown cd).
-  const approvalBase = worstEntry.policyValues[0] ?? worstToken;
-  const pattern = deriveApprovalPattern(approvalBase);
+  // Derive the pattern from the lexical absolute form (the cd-aware resolved
+  // path), so it matches the values a later call produces. For an unknown base
+  // (`forLiteral`) `value()` is the raw token.
+  const pattern = deriveApprovalPattern(worstEntry.path.value());
   const askMessage = formatPathAskPrompt(
     tcc.toolName,
     worstToken,

@@ -16,14 +16,20 @@ describe("BashProgram", () => {
   describe("pathRuleCandidates", () => {
     const cwd = "/projects/my-app";
 
+    beforeEach(() => {
+      realpathSync.mockReset();
+      realpathSync.mockImplementation((p: string) => p);
+    });
+
     it("adds absolute and relative policy values for relative tokens", async () => {
       const program = await BashProgram.parse("cat src/foo.ts", cwd);
-      expect(program.pathRuleCandidates()).toEqual([
-        {
-          token: "src/foo.ts",
-          policyValues: ["/projects/my-app/src/foo.ts", "src/foo.ts"],
-        },
+      const candidates = program.pathRuleCandidates();
+      expect(candidates.map(({ token }) => token)).toEqual(["src/foo.ts"]);
+      expect(candidates[0].path.matchValues()).toEqual([
+        "/projects/my-app/src/foo.ts",
+        "src/foo.ts",
       ]);
+      expect(candidates[0].path.value()).toBe("/projects/my-app/src/foo.ts");
     });
 
     it("resolves tokens after literal cd against the effective directory", async () => {
@@ -34,14 +40,28 @@ describe("BashProgram", () => {
       const fileCandidate = program
         .pathRuleCandidates()
         .find((candidate) => candidate.token === "src/file.txt");
-      expect(fileCandidate).toEqual({
-        token: "src/file.txt",
-        policyValues: [
-          "/projects/my-app/nested/src/file.txt",
-          "nested/src/file.txt",
-          "src/file.txt",
-        ],
-      });
+      expect(fileCandidate?.path.matchValues()).toEqual([
+        "/projects/my-app/nested/src/file.txt",
+        "nested/src/file.txt",
+        "src/file.txt",
+      ]);
+      expect(fileCandidate?.path.value()).toBe(
+        "/projects/my-app/nested/src/file.txt",
+      );
+    });
+
+    it("adds the canonical alias for a symlinked token (#486)", async () => {
+      // /projects/my-app/src/foo.ts is a symlink to /vault/foo.ts.
+      realpathSync.mockImplementation((p: string) =>
+        p === "/projects/my-app/src/foo.ts" ? "/vault/foo.ts" : p,
+      );
+      const program = await BashProgram.parse("cat src/foo.ts", cwd);
+      const candidate = program.pathRuleCandidates()[0];
+      expect(candidate.path.matchValues()).toEqual([
+        "/projects/my-app/src/foo.ts",
+        "src/foo.ts",
+        "/vault/foo.ts",
+      ]);
     });
 
     it("does not absolute-allow relative tokens after unknown cd", async () => {
@@ -52,10 +72,22 @@ describe("BashProgram", () => {
       const fileCandidate = program
         .pathRuleCandidates()
         .find((candidate) => candidate.token === "src/foo.ts");
-      expect(fileCandidate).toEqual({
-        token: "src/foo.ts",
-        policyValues: ["src/foo.ts"],
-      });
+      expect(fileCandidate?.path.matchValues()).toEqual(["src/foo.ts"]);
+      expect(fileCandidate?.path.value()).toBe("src/foo.ts");
+    });
+
+    it("keeps an unknown-cd token literal-only even when it would resolve a symlink (#393)", async () => {
+      // A canonical alias here would resolve against the wrong (unknown) base.
+      realpathSync.mockImplementation(() => "/somewhere/else");
+      const program = await BashProgram.parse(
+        'cd "$DIR" && cat src/foo.ts',
+        cwd,
+      );
+      const fileCandidate = program
+        .pathRuleCandidates()
+        .find((candidate) => candidate.token === "src/foo.ts");
+      expect(fileCandidate?.path.matchValues()).toEqual(["src/foo.ts"]);
+      expect(fileCandidate?.path.boundaryValue()).toBe("");
     });
   });
 

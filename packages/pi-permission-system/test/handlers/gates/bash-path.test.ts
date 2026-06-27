@@ -9,6 +9,7 @@ vi.mock("node:os", () => {
   };
 });
 
+import { AccessPath } from "#src/access-intent/access-path";
 import { BashProgram } from "#src/access-intent/bash/program";
 import { describeBashPathGate } from "#src/handlers/gates/bash-path";
 import type {
@@ -229,13 +230,12 @@ describe("describeBashPathGate", () => {
     )) as GateDescriptor;
 
     expect(resolver.resolve).toHaveBeenCalledWith({
-      kind: "path-values",
+      kind: "access-path",
       surface: "path",
-      values: [
-        "/test/project/nested/src/file.txt",
-        "nested/src/file.txt",
-        "src/file.txt",
-      ],
+      path: AccessPath.forPath("src/file.txt", {
+        cwd: "/test/project",
+        resolveBase: "/test/project/nested",
+      }),
       agentName: undefined,
     });
     // The raw token drives the prompt, denial context, and session approval.
@@ -256,9 +256,9 @@ describe("describeBashPathGate", () => {
     );
 
     expect(resolver.resolve).toHaveBeenCalledWith({
-      kind: "path-values",
+      kind: "access-path",
       surface: "path",
-      values: ["src/foo.ts"],
+      path: AccessPath.forLiteral("src/foo.ts"),
       agentName: undefined,
     });
   });

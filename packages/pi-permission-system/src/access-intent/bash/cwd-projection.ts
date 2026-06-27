@@ -17,7 +17,6 @@ import {
 } from "#src/access-intent/bash/token-collection";
 import { canonicalizePath } from "#src/canonicalize-path";
 import {
-  getPathPolicyValues,
   isPathWithinDirectory,
   isSafeSystemPath,
   normalizePathForComparison,
@@ -54,8 +53,8 @@ interface PathCandidate {
 export interface BashPathRuleCandidate {
   /** Raw path-like token shown in prompts, logs, and session approvals. */
   readonly token: string;
-  /** Equivalent values used for permission policy matching. */
-  readonly policyValues: readonly string[];
+  /** The path's lexical and canonical forms for permission policy matching. */
+  readonly path: AccessPath;
 }
 
 // ── Walk-time constants ──────────────────────────────────────────────────────
@@ -379,18 +378,20 @@ function isRelativeCandidate(candidate: string): boolean {
   return !candidate.startsWith("/") && !candidate.startsWith("~");
 }
 
-function getPolicyValuesForRuleCandidate(
+function buildRuleCandidatePath(
   candidate: string,
   base: EffectiveBase,
   cwd: string,
-): string[] {
+): AccessPath {
+  // An unknown base + relative candidate stays literal-only: a resolved
+  // absolute or canonical alias would resolve against the wrong directory and
+  // could spuriously match a rule (#393).
   if (base.kind === "unknown" && isRelativeCandidate(candidate)) {
-    const literal = normalizePathPolicyLiteral(candidate);
-    return literal ? [literal] : [];
+    return AccessPath.forLiteral(normalizePathPolicyLiteral(candidate));
   }
 
   const resolveBase = base.kind === "known" ? resolve(cwd, base.offset) : cwd;
-  return getPathPolicyValues(candidate, { cwd, resolveBase });
+  return AccessPath.forPath(candidate, { cwd, resolveBase });
 }
 
 // ── Projection functions ─────────────────────────────────────────────────────
@@ -485,13 +486,14 @@ export function projectRuleCandidates(
     const candidate = classifyTokenAsRuleCandidate(token);
     if (!candidate) continue;
 
-    const policyValues = getPolicyValuesForRuleCandidate(candidate, base, cwd);
-    if (policyValues.length === 0) continue;
+    const path = buildRuleCandidatePath(candidate, base, cwd);
+    const matchValues = path.matchValues();
+    if (matchValues.length === 0) continue;
 
-    const key = policyValues.join("\0");
+    const key = matchValues.join("\0");
     if (seen.has(key)) continue;
     seen.add(key);
-    result.push({ token: candidate, policyValues });
+    result.push({ token: candidate, path });
   }
 
   return result;
