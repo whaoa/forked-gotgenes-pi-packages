@@ -193,7 +193,7 @@ function basename(name: string): string {
 function commandUnitText(node: TSNode): string {
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i);
-    if (child && child.isNamed && child.type !== "variable_assignment") {
+    if (child?.isNamed && child.type !== "variable_assignment") {
       return node.text.slice(child.startIndex - node.startIndex);
     }
   }
