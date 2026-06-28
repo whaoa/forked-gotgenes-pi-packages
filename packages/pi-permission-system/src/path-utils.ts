@@ -1,9 +1,7 @@
 import {
   join,
-  normalize,
   posix as posixPath,
   relative,
-  resolve,
   win32 as winPath,
 } from "node:path";
 
@@ -16,6 +14,7 @@ import { wildcardMatch } from "./wildcard-matcher";
 export function normalizePathForComparison(
   pathValue: string,
   cwd: string,
+  platform: NodeJS.Platform = process.platform,
 ): string {
   const trimmed = pathValue.trim().replace(/^['"]|['"]$/g, "");
   if (!trimmed) {
@@ -25,9 +24,10 @@ export function normalizePathForComparison(
   let normalizedPath = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
   normalizedPath = expandHomePath(normalizedPath);
 
-  const absolutePath = resolve(cwd, normalizedPath);
-  const normalizedAbsolutePath = normalize(absolutePath);
-  return process.platform === "win32"
+  const impl = platform === "win32" ? winPath : posixPath;
+  const absolutePath = impl.resolve(cwd, normalizedPath);
+  const normalizedAbsolutePath = impl.normalize(absolutePath);
+  return platform === "win32"
     ? normalizedAbsolutePath.toLowerCase()
     : normalizedAbsolutePath;
 }
@@ -253,11 +253,12 @@ export function getToolInputPath(
 export function canonicalNormalizePathForComparison(
   pathValue: string,
   cwd: string,
+  platform: NodeJS.Platform = process.platform,
 ): string {
-  const lexical = normalizePathForComparison(pathValue, cwd);
+  const lexical = normalizePathForComparison(pathValue, cwd, platform);
   if (!lexical) return "";
-  const canonical = canonicalizePath(lexical);
-  return process.platform === "win32" ? canonical.toLowerCase() : canonical;
+  const canonical = canonicalizePath(lexical, platform);
+  return platform === "win32" ? canonical.toLowerCase() : canonical;
 }
 
 export function isPathOutsideWorkingDirectory(

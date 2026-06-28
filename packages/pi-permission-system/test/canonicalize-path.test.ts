@@ -90,4 +90,24 @@ describe("canonicalizePath", () => {
       "/real/parent/not-a-dir",
     );
   });
+
+  // ── injected platform flavor (win32-separator splitting) ──────────────
+
+  test("win32: splits and rejoins on the backslash separator", () => {
+    realpathSync
+      .mockImplementationOnce(() => {
+        throw enoent("C:\\projects\\link\\file.ts");
+      })
+      .mockReturnValueOnce("C:\\real\\app");
+    expect(canonicalizePath("C:\\projects\\link\\file.ts", "win32")).toBe(
+      "C:\\real\\app\\file.ts",
+    );
+  });
+
+  test("win32: resolves an existing path via realpathSync", () => {
+    realpathSync.mockReturnValueOnce("C:\\real\\app");
+    expect(canonicalizePath("C:\\projects\\link", "win32")).toBe(
+      "C:\\real\\app",
+    );
+  });
 });

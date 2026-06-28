@@ -1,5 +1,5 @@
 import { realpathSync } from "node:fs";
-import { join } from "node:path";
+import { posix as posixPath, win32 as winPath } from "node:path";
 
 /**
  * Resolve symlinks in an absolute path, best-effort.
@@ -11,16 +11,22 @@ import { join } from "node:path";
  * encountered (e.g. `EACCES`, `ELOOP`), so callers fall back to lexical
  * containment for paths that cannot be resolved.
  */
-export function canonicalizePath(absolutePath: string): string {
+export function canonicalizePath(
+  absolutePath: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
   if (!absolutePath) return absolutePath;
 
-  const parts = absolutePath.split("/").filter(Boolean);
+  const impl = platform === "win32" ? winPath : posixPath;
+  const root = impl.parse(absolutePath).root;
+  const rest = absolutePath.slice(root.length);
+  const parts = rest.split(impl.sep).filter(Boolean);
   for (let i = parts.length; i >= 0; i--) {
-    const candidate = "/" + parts.slice(0, i).join("/");
+    const candidate = root + parts.slice(0, i).join(impl.sep);
     try {
       const real = realpathSync(candidate);
       const tail = parts.slice(i);
-      return tail.length === 0 ? real : join(real, ...tail);
+      return tail.length === 0 ? real : impl.join(real, ...tail);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== "ENOENT" && code !== "ENOTDIR") return absolutePath;

@@ -91,6 +91,30 @@ describe("normalizePathForComparison", () => {
     expect(normalizePathForComparison("", cwd)).toBe("");
     expect(normalizePathForComparison("   ", cwd)).toBe("");
   });
+
+  // ── injected platform flavor (Windows is case-folded, win32-resolved) ────
+
+  test("win32: lowercases the resolved absolute path", () => {
+    expect(
+      normalizePathForComparison(
+        "C:\\Users\\Foo\\Bar.txt",
+        "C:\\Projects",
+        "win32",
+      ),
+    ).toBe("c:\\users\\foo\\bar.txt");
+  });
+
+  test("win32: resolves a relative path against cwd with win32 rules", () => {
+    expect(
+      normalizePathForComparison("src\\foo.ts", "C:\\Projects\\App", "win32"),
+    ).toBe("c:\\projects\\app\\src\\foo.ts");
+  });
+
+  test("posix platform leaves case untouched", () => {
+    expect(
+      normalizePathForComparison("/Projects/App/Src.ts", cwd, "linux"),
+    ).toBe("/Projects/App/Src.ts");
+  });
 });
 
 describe("isPathWithinDirectory", () => {
@@ -413,6 +437,16 @@ describe("canonicalNormalizePathForComparison", () => {
     expect(
       canonicalNormalizePathForComparison("/projects/my-app/src/index.ts", cwd),
     ).toBe("/projects/my-app/src/index.ts");
+  });
+
+  test("win32: lowercases the canonical form", () => {
+    expect(
+      canonicalNormalizePathForComparison(
+        "C:\\Projects\\App\\Src",
+        "C:\\Projects\\App",
+        "win32",
+      ),
+    ).toBe("c:\\projects\\app\\src");
   });
 });
 
