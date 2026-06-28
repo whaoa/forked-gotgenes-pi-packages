@@ -97,6 +97,8 @@ A missing export throws `is not a function` at runtime but surfaces as `TS2305` 
 - When a TDD plan lists separate steps that share a type definition, changing that type in step N breaks steps N+1…N+k.
   Either fold them into one step or introduce the new type alongside the old one and migrate callers incrementally.
 - When a plan adds a parameter that flows through callback chains, the "Module-Level Changes" section must list every file in the chain.
+- When a plan adds a lint guard forbidding a global read (e.g. `process.platform`), it bans the *text* everywhere — including `= process.platform` default parameters.
+  Every such default must be removed in the guard's commit, which makes the param required and cascades to all callers, so enumerate every occurrence and caller at plan time rather than a representative subset (Refs #510).
 - When a TDD step changes a shared interface, run `pnpm run check` immediately after that step's commit.
 - When a TDD step changes an interface that has a single call site (e.g., a deps bag constructed in `index.ts`), the step must include updating that call site — the type checker will not allow the interface change and the call-site update to land in separate commits.
 - When a TDD plan deletes a module across multiple steps (extract → remove consumers → delete), account for the doomed module's own imports at each intermediate step.

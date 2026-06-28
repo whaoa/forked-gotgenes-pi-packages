@@ -67,3 +67,54 @@ Final state: all 10 `#510` commits green on `pnpm run check` / `pnpm run lint` /
 - **Pre-completion reviewer: PASS** — all deterministic checks green, all cross-step invariants ([#418], [#393], [#308], [#382], [#478]) preserved, all 4 Mermaid diagrams validated, no dead code, docs forward/reverse complete.
   No WARN findings.
 - **Doc note.** `architecture.md` recorded the seam as "### Related: PathNormalizer platform seam ([#510])" under Phase 7 (a precursor refactor, not one of the five Phase 7 steps), updated the `cwd-projection.ts` → `bash-path-resolver.ts` rename, the `BashProgram.parse` signature, the `evaluate()` pseudo-code, and added a `path-normalizer.ts` module entry.
+
+## Stage: Final Retrospective (2026-06-28T20:30:00Z)
+
+### Session summary
+
+Shipped [#510] as `pi-permission-system` v17.1.0 (the lone `feat:` — `add PathNormalizer collaborator` — promoted the otherwise-`refactor:` batch into a minor release, exactly as the plan predicted).
+During the post-implementation review the operator's question "what besides `PathNormalizer` references the platform-taking utilities?"
+surfaced residual `getPlatform()` threading the seam had left behind, which was documented in `architecture.md` and filed as follow-up [#511].
+The dominant arc-wide theme: the operator's `required`-param choice generated large mechanical test churn, and the step-9 lint-guard blast radius repeatedly exceeded the plan's stated scope.
+
+### Observations
+
+#### What went well
+
+- **Paren-balancing migration scripts.**
+  Two disposable Python scripts (top-level-arg splitter + balanced-paren insertion) migrated ~177 call sites across `rule.ts`/`synthesize`/`session-rules` (step 7) and the path-utils/`AccessPath.forPath` consumers (step 9) — a novel, effective answer to a required-param signature change with noise-arg churn that hand-editing would have made error-prone.
+- **Operator Q&A surfaced real debt.**
+  The "what else references these utilities?"
+  question caught the residual `getPlatform()` straggler sites (infra-read containment, skill-prompt sanitization) the implementation left un-folded; it was mapped to the Phase 7 roadmap and tracked as [#511] rather than left implicit.
+  A clean bidirectional win.
+- **Clean ship.**
+  The release-please PR's `UNSTABLE`-no-checks state was the expected `GITHUB_TOKEN` case; the documented `gh pr merge --rebase` fallback worked, and v17.1.0 landed by rebase with the baseline auto-advanced.
+
+#### What caused friction (agent side)
+
+- `missing-context` (planning) — step 9 underscoped the lint-guard blast radius: the plan named only `isPathWithinDirectory`/`isPiInfrastructureRead`, but a `no-restricted-syntax` guard bans the *text* `process.platform` everywhere, so **all** seven leaf defaults had to go in one atomic commit, making each param required and cascading to ~6 unplanned production callers (`input-normalizer`, the `tool`/`skill-read`/`external-directory` gates, `skill-prompt-sanitizer`) plus ~93 test edits.
+  Impact: self-identified (caught by `tsc`), no wrong-direction rework, but two mid-TDD `ask_user` rounds, a new `getPlatform()` session accessor, and a second migration script.
+- `premature-convergence` — the first param-style `ask_user` ("required vs posix-default") was framed around `rule.ts` before the path-utils blast radius was scoped, so the same underlying decision re-opened for a second `ask_user` at step 9.
+  Impact: two ask rounds for one decision; the second could have been folded in had the full caller set been enumerated before the first.
+- `other` (tooling hazard) — the lint-guard sanity check (temporarily adding an interior `process.platform` to confirm the guard fires) used `git checkout` to revert, which also reverted the *uncommitted* step-9 change to `canonicalize-path.ts`.
+  Impact: caught immediately via `grep "= process.platform"` and re-applied; ~3 tool calls, no rework.
+
+#### What caused friction (user side)
+
+- Opportunity, not criticism: the `required`-vs-`defaulted` preference was asked twice across the TDD session.
+  Presenting the full blast radius (path-utils leaves + ~177 test edits) in the *first* question would have made it a single decision boundary — but that gap was the agent's scoping, not the operator's.
+
+### Diagnostic details
+
+- **Unused-tool (planning).**
+  A `grep -rn "process.platform"` plus a caller-enumeration pass at plan time would have surfaced the true blast radius (all seven leaf functions + ~6 production callers) instead of the representative two the plan named.
+  This is the root of the step-9 deviation.
+- **Feedback-loop.**
+  Verification cadence was healthy: `tsc` after each interface-changing step, `vitest` per affected file, full suite + lint + `fallow` at TDD end, and lint + `fallow` pre-push.
+  No end-only-verification gap.
+- **Model-performance.**
+  The only subagent (the `pre-completion-reviewer`, dispatched in the TDD session) ran fresh-context on judgment-heavy review work — an appropriate match; no mismatch.
+
+### Changes made
+
+1. `.pi/skills/testing/SKILL.md` — added a TDD-planning rule (after the "parameter that flows through callback chains" rule) that a plan adding a lint guard forbidding a global read bans the *text* everywhere (including `= process.platform` default params), so every default must be removed in the guard's commit and every occurrence + caller enumerated at plan time.
