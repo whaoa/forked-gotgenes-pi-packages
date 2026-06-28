@@ -87,13 +87,13 @@ export class AccessPath {
    */
   static forPath(
     pathValue: string,
-    options: { cwd: string; resolveBase?: string },
+    options: { cwd: string; resolveBase?: string; platform?: NodeJS.Platform },
   ): AccessPath {
-    const { cwd, resolveBase = cwd } = options;
+    const { cwd, resolveBase = cwd, platform } = options;
     return new AccessPath(
-      normalizePathForComparison(pathValue, resolveBase),
-      getPathPolicyValues(pathValue, { cwd, resolveBase }),
-      canonicalNormalizePathForComparison(pathValue, resolveBase),
+      normalizePathForComparison(pathValue, resolveBase, platform),
+      getPathPolicyValues(pathValue, { cwd, resolveBase, platform }),
+      canonicalNormalizePathForComparison(pathValue, resolveBase, platform),
     );
   }
 

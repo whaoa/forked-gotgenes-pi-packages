@@ -1,9 +1,4 @@
-import {
-  join,
-  posix as posixPath,
-  relative,
-  win32 as winPath,
-} from "node:path";
+import { join, posix as posixPath, win32 as winPath } from "node:path";
 
 import { canonicalizePath } from "./canonicalize-path";
 import { expandHomePath } from "./expand-home";
@@ -75,6 +70,11 @@ export interface PathPolicyValueOptions {
    * Defaults to `cwd`. Bash uses this for tokens seen after a literal `cd`.
    */
   resolveBase?: string;
+  /**
+   * Platform flavor governing path resolution and case-folding. Defaults to
+   * the host platform; injectable so Windows behavior is testable on POSIX.
+   */
+  platform?: NodeJS.Platform;
 }
 
 /**
@@ -119,28 +119,37 @@ function getAbsolutePathPolicyValues(
   const resolveBase = options.resolveBase ?? options.cwd;
   if (!resolveBase) return [];
 
-  const absolute = normalizePathForComparison(pathValue, resolveBase);
+  const absolute = normalizePathForComparison(
+    pathValue,
+    resolveBase,
+    options.platform,
+  );
   if (!absolute) return [];
 
-  return [absolute, ...getCwdRelativePathPolicyValues(absolute, options.cwd)];
+  return [
+    absolute,
+    ...getCwdRelativePathPolicyValues(absolute, options.cwd, options.platform),
+  ];
 }
 
 function getCwdRelativePathPolicyValues(
   absolute: string,
   cwd: string | undefined,
+  platform: NodeJS.Platform = process.platform,
 ): string[] {
   if (!cwd) return [];
 
-  const normalizedCwd = normalizePathForComparison(cwd, cwd);
+  const normalizedCwd = normalizePathForComparison(cwd, cwd, platform);
   if (!normalizedCwd) return [];
   if (
     absolute !== normalizedCwd &&
-    !isPathWithinDirectory(absolute, normalizedCwd)
+    !isPathWithinDirectory(absolute, normalizedCwd, platform)
   ) {
     return [];
   }
 
-  const relativeValue = relative(normalizedCwd, absolute);
+  const impl = platform === "win32" ? winPath : posixPath;
+  const relativeValue = impl.relative(normalizedCwd, absolute);
   return relativeValue ? [relativeValue] : [];
 }
 

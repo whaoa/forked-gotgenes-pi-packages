@@ -90,6 +90,33 @@ describe("AccessPath.forPath", () => {
     });
   });
 
+  describe("platform option", () => {
+    test("win32: builds lexical/match/boundary values with win32 rules", () => {
+      const ap = AccessPath.forPath("src\\foo.ts", {
+        cwd: "C:\\Projects\\App",
+        platform: "win32",
+      });
+      expect(ap.value()).toBe("c:\\projects\\app\\src\\foo.ts");
+      expect(ap.boundaryValue()).toBe("c:\\projects\\app\\src\\foo.ts");
+      expect(ap.matchValues()).toEqual([
+        "c:\\projects\\app\\src\\foo.ts",
+        "src\\foo.ts",
+      ]);
+    });
+
+    test("win32: lowercases the symlink-resolved boundary value", () => {
+      realpathSync.mockImplementation((p: string) =>
+        p === "c:\\projects\\app\\link" ? "C:\\Real\\App" : p,
+      );
+      expect(
+        AccessPath.forPath("link", {
+          cwd: "C:\\Projects\\App",
+          platform: "win32",
+        }).boundaryValue(),
+      ).toBe("c:\\real\\app");
+    });
+  });
+
   describe("boundaryValue()", () => {
     test("returns the canonical (symlink-resolved) form", () => {
       realpathSync.mockImplementation((p: string) =>
