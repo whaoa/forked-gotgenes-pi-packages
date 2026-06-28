@@ -273,16 +273,21 @@ export function canonicalNormalizePathForComparison(
 export function isPathOutsideWorkingDirectory(
   pathValue: string,
   cwd: string,
+  platform: NodeJS.Platform = process.platform,
 ): boolean {
-  const normalizedCwd = canonicalNormalizePathForComparison(cwd, cwd);
-  const normalizedPath = canonicalNormalizePathForComparison(pathValue, cwd);
+  const normalizedCwd = canonicalNormalizePathForComparison(cwd, cwd, platform);
+  const normalizedPath = canonicalNormalizePathForComparison(
+    pathValue,
+    cwd,
+    platform,
+  );
   if (!normalizedCwd || !normalizedPath) {
     return false;
   }
   if (isSafeSystemPath(normalizedPath)) {
     return false;
   }
-  return !isPathWithinDirectory(normalizedPath, normalizedCwd);
+  return !isPathWithinDirectory(normalizedPath, normalizedCwd, platform);
 }
 
 function containsGlobChars(value: string): boolean {
