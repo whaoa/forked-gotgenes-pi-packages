@@ -9,6 +9,7 @@ import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ExtensionPaths } from "./extension-paths";
 import type { ForwardingController } from "./forwarding-manager";
 import type { ToolCallGateInputs } from "./handlers/gates/tool-call-gate-pipeline";
+import { PathNormalizer } from "./path-normalizer";
 import type { ScopedPermissionManager } from "./permission-manager";
 import type { PromptingGatewayLifecycle } from "./prompting-gateway";
 
@@ -37,6 +38,7 @@ export class PermissionSession implements ToolCallGateInputs {
   private context: ExtensionContext | null = null;
   private skillEntries: SkillPromptEntry[] = [];
   private knownAgentName: string | null = null;
+  private pathNormalizer: PathNormalizer;
 
   constructor(
     private readonly paths: ExtensionPaths,
@@ -45,7 +47,12 @@ export class PermissionSession implements ToolCallGateInputs {
     private readonly sessionRules: SessionRules,
     private readonly configStore: SessionConfigStore,
     private readonly gateway: PromptingGatewayLifecycle,
-  ) {}
+    private readonly platform: NodeJS.Platform,
+  ) {
+    // Placeholder until the first session_start rebinds it with the real cwd;
+    // every gate evaluate runs after resetForNewSession, so this is never read.
+    this.pathNormalizer = new PathNormalizer(platform, "");
+  }
 
   // ── Context lifecycle ──────────────────────────────────────────────────
 
@@ -85,6 +92,7 @@ export class PermissionSession implements ToolCallGateInputs {
    */
   resetForNewSession(ctx: ExtensionContext): void {
     this.permissionManager.configureForCwd(ctx.cwd);
+    this.pathNormalizer = new PathNormalizer(this.platform, ctx.cwd);
     this.skillEntries = [];
     this.activate(ctx);
   }
@@ -185,5 +193,16 @@ export class PermissionSession implements ToolCallGateInputs {
    */
   getToolPreviewLimits(): ToolPreviewFormatterOptions {
     return resolveToolPreviewLimits(this.config);
+  }
+
+  // ── Path normalization ────────────────────────────────────────────────
+
+  /**
+   * The session's {@link PathNormalizer}, carrying the host platform and the
+   * session cwd. Rebuilt on every `resetForNewSession` so a session switch
+   * rebinds the cwd.
+   */
+  getPathNormalizer(): PathNormalizer {
+    return this.pathNormalizer;
   }
 }

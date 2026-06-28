@@ -42,6 +42,10 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // getPackageDir() is Pi's own install dir; auto-allow it for read-only tools
   // so the agent can read Pi's bundled docs/examples regardless of layout.
   const paths = computeExtensionPaths(agentDir, getPackageDir());
+  // The single process.platform read for the whole extension; injected into the
+  // session (PathNormalizer) and, later, rule evaluation. Interior modules must
+  // not read process.platform (enforced by the eslint guard scoped to src/).
+  const hostPlatform = process.platform;
   const permissionManager = new PermissionManager({ agentDir });
   const sessionRules = new SessionRules();
   const subagentRegistry = getSubagentSessionRegistry();
@@ -106,6 +110,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     sessionRules,
     configStore,
     gateway,
+    hostPlatform,
   );
 
   // refresh() must run after `session` is assigned: a debug-write IO failure

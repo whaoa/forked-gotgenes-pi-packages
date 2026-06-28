@@ -1,4 +1,5 @@
 import { BashProgram } from "#src/access-intent/bash/program";
+import type { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
@@ -36,6 +37,8 @@ export interface ToolCallGateInputs {
   getInfrastructureReadDirs(): string[];
   /** Resolved tool-preview formatter options from the current config. */
   getToolPreviewLimits(): ToolPreviewFormatterOptions;
+  /** The session's path normalizer (platform + cwd baked in). */
+  getPathNormalizer(): PathNormalizer;
 }
 
 /**

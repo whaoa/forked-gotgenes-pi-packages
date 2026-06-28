@@ -135,6 +135,36 @@ describe("PermissionSession", () => {
     });
   });
 
+  describe("getPathNormalizer", () => {
+    it("returns a normalizer bound to the reset session cwd", () => {
+      const { session } = createSession();
+      session.resetForNewSession(makeCtx({ cwd: "/projects/app" }));
+
+      const ap = session.getPathNormalizer().forPath("src/foo.ts");
+
+      expect(ap.value()).toBe("/projects/app/src/foo.ts");
+    });
+
+    it("rebinds the normalizer cwd on a subsequent reset", () => {
+      const { session } = createSession();
+      session.resetForNewSession(makeCtx({ cwd: "/projects/app" }));
+      session.resetForNewSession(makeCtx({ cwd: "/projects/other" }));
+
+      expect(session.getPathNormalizer().forPath("a.ts").value()).toBe(
+        "/projects/other/a.ts",
+      );
+    });
+
+    it("builds a win32 normalizer when constructed with the win32 platform", () => {
+      const { session } = createSession({ platform: "win32" });
+      session.resetForNewSession(makeCtx({ cwd: "C:\\Projects\\App" }));
+
+      expect(session.getPathNormalizer().forPath("src\\foo.ts").value()).toBe(
+        "c:\\projects\\app\\src\\foo.ts",
+      );
+    });
+  });
+
   describe("shutdown", () => {
     it("clears session rules", () => {
       const { session, sessionRules } = createSession();

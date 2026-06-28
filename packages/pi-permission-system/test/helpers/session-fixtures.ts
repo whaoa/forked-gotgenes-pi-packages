@@ -126,6 +126,7 @@ export function makeRealSession(overrides?: {
   sessionRules?: SessionRules;
   configStore?: SessionConfigStore;
   gateway?: PromptingGatewayLifecycle;
+  platform?: NodeJS.Platform;
 }): {
   session: PermissionSession;
   paths: ExtensionPaths;
@@ -146,6 +147,7 @@ export function makeRealSession(overrides?: {
   const sessionRules = overrides?.sessionRules ?? new SessionRules();
   const configStore = overrides?.configStore ?? makeConfigStore();
   const gateway = overrides?.gateway ?? makeGateway();
+  const platform = overrides?.platform ?? process.platform;
   const session = new PermissionSession(
     paths,
     forwarding,
@@ -153,6 +155,7 @@ export function makeRealSession(overrides?: {
     sessionRules,
     configStore,
     gateway,
+    platform,
   );
   return {
     session,
