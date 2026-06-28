@@ -9,7 +9,7 @@ import { wildcardMatch } from "./wildcard-matcher";
 export function normalizePathForComparison(
   pathValue: string,
   cwd: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): string {
   const trimmed = pathValue.trim().replace(/^['"]|['"]$/g, "");
   if (!trimmed) {
@@ -33,13 +33,13 @@ export function normalizePathForComparison(
  * Containment is decided with Node's platform-native `path.relative` rather
  * than a hand-rolled prefix check: on `win32` the comparison folds case (and
  * tolerates either separator), matching the case-insensitive filesystem.
- * `platform` defaults to `process.platform` and is injectable so Windows
- * behavior is testable on a POSIX CI.
+ * `platform` is injected from the composition root so Windows behavior is
+ * testable on a POSIX CI.
  */
 export function isPathWithinDirectory(
   pathValue: string,
   directory: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): boolean {
   if (!pathValue || !directory) {
     return false;
@@ -70,11 +70,6 @@ export interface PathPolicyValueOptions {
    * Defaults to `cwd`. Bash uses this for tokens seen after a literal `cd`.
    */
   resolveBase?: string;
-  /**
-   * Platform flavor governing path resolution and case-folding. Defaults to
-   * the host platform; injectable so Windows behavior is testable on POSIX.
-   */
-  platform?: NodeJS.Platform;
 }
 
 /**
@@ -101,41 +96,42 @@ export function normalizePathPolicyLiteral(pathValue: string): string {
  */
 export function getPathPolicyValues(
   pathValue: string,
-  options: PathPolicyValueOptions = {},
+  options: PathPolicyValueOptions,
+  platform: NodeJS.Platform,
 ): string[] {
   const literal = normalizePathPolicyLiteral(pathValue);
   if (!literal) return [];
   if (literal === "*") return ["*"];
 
   return [
-    ...new Set([...getAbsolutePathPolicyValues(pathValue, options), literal]),
+    ...new Set([
+      ...getAbsolutePathPolicyValues(pathValue, options, platform),
+      literal,
+    ]),
   ];
 }
 
 function getAbsolutePathPolicyValues(
   pathValue: string,
   options: PathPolicyValueOptions,
+  platform: NodeJS.Platform,
 ): string[] {
   const resolveBase = options.resolveBase ?? options.cwd;
   if (!resolveBase) return [];
 
-  const absolute = normalizePathForComparison(
-    pathValue,
-    resolveBase,
-    options.platform,
-  );
+  const absolute = normalizePathForComparison(pathValue, resolveBase, platform);
   if (!absolute) return [];
 
   return [
     absolute,
-    ...getCwdRelativePathPolicyValues(absolute, options.cwd, options.platform),
+    ...getCwdRelativePathPolicyValues(absolute, options.cwd, platform),
   ];
 }
 
 function getCwdRelativePathPolicyValues(
   absolute: string,
   cwd: string | undefined,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): string[] {
   if (!cwd) return [];
 
@@ -262,7 +258,7 @@ export function getToolInputPath(
 export function canonicalNormalizePathForComparison(
   pathValue: string,
   cwd: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): string {
   const lexical = normalizePathForComparison(pathValue, cwd, platform);
   if (!lexical) return "";
@@ -273,7 +269,7 @@ export function canonicalNormalizePathForComparison(
 export function isPathOutsideWorkingDirectory(
   pathValue: string,
   cwd: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): boolean {
   const normalizedCwd = canonicalNormalizePathForComparison(cwd, cwd, platform);
   const normalizedPath = canonicalNormalizePathForComparison(
@@ -314,7 +310,7 @@ export function isPiInfrastructureRead(
   normalizedPath: string,
   infrastructureDirs: readonly string[],
   cwd: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): boolean {
   if (!READ_ONLY_PATH_BEARING_TOOLS.has(toolName)) {
     return false;

@@ -157,4 +157,27 @@ export default tseslint.config(
       "@typescript-eslint/require-await": "off",
     },
   },
+
+  // ---------------------------------------------------------------------------
+  // pi-permission-system: forbid interior `process.platform` reads (#510).
+  // The host platform is read once at the composition root (`index.ts`) and
+  // injected into interior modules (PathNormalizer, rule evaluation, subagent
+  // context). Reading `process.platform` anywhere else re-introduces the hidden
+  // global-state dependency the PathNormalizer seam removed.
+  // ---------------------------------------------------------------------------
+  {
+    files: ["packages/pi-permission-system/src/**/*.ts"],
+    ignores: ["packages/pi-permission-system/src/index.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            'MemberExpression[object.name="process"][property.name="platform"]',
+          message:
+            "Read process.platform only at the composition root (index.ts); inject the platform (PathNormalizer / rule platform / subagent-context) into interior modules.",
+        },
+      ],
+    },
+  },
 );

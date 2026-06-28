@@ -53,6 +53,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "read" }),
       makeCheckResult("ask"),
       makeFormatter(),
+      "linux",
     );
     expect(desc.surface).toBe("read");
     expect(desc.decision.surface).toBe("read");
@@ -63,6 +64,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "write" }),
       makeCheckResult("ask"),
       makeFormatter(),
+      "linux",
     );
     expect(desc.decision.value).toBe("write");
   });
@@ -76,6 +78,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "git status" } }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.surface).toBe("bash");
     expect(desc.decision.surface).toBe("bash");
@@ -91,6 +94,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "mcp", input: { tool: "server:tool" } }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.surface).toBe("mcp");
     expect(desc.decision.surface).toBe("mcp");
@@ -99,7 +103,7 @@ describe("describeToolGate", () => {
 
   it("populates denialContext with kind 'tool' and check result", () => {
     const check = makeCheckResult("deny", { toolName: "read" });
-    const desc = describeToolGate(makeTcc(), check, makeFormatter());
+    const desc = describeToolGate(makeTcc(), check, makeFormatter(), "linux");
     expect(desc.denialContext).toEqual({
       kind: "tool",
       check,
@@ -114,6 +118,7 @@ describe("describeToolGate", () => {
       makeTcc({ agentName: "my-agent" }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.denialContext.agentName).toBe("my-agent");
   });
@@ -124,6 +129,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "ls" } }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.denialContext).toMatchObject({
       kind: "tool",
@@ -140,6 +146,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "git status" } }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.sessionApproval).toBeDefined();
     expect(desc.sessionApproval?.surface).toBe("bash");
@@ -156,6 +163,7 @@ describe("describeToolGate", () => {
       }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.sessionApproval?.surface).toBe("edit");
     expect(desc.sessionApproval?.representativePattern).toBe("/test/project/*");
@@ -174,6 +182,7 @@ describe("describeToolGate", () => {
       }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.sessionApproval?.representativePattern).toBe(
       "/test/project/src/*",
@@ -186,6 +195,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "read", agentName: "my-agent", toolCallId: "tc-42" }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.promptDetails).toMatchObject({
       source: "tool_call",
@@ -203,6 +213,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "ls" } }),
       check,
       makeFormatter(),
+      "linux",
     );
     expect(desc.logContext).toMatchObject({
       source: "tool_call",
@@ -216,6 +227,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "edit", input: { path: "/a.ts" } }),
       makeCheckResult("ask", { toolName: "edit" }),
       makeFormatter(),
+      "linux",
     );
     expect(desc.surface).toBe("edit");
     expect(desc.input).toEqual({ path: "/a.ts" });

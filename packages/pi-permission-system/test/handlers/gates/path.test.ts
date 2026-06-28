@@ -191,7 +191,10 @@ describe("describePathGate", () => {
     expect(resolver.resolve).toHaveBeenCalledWith({
       kind: "access-path",
       surface: "path",
-      path: AccessPath.forPath(".env", { cwd: "/test/project" }),
+      path: AccessPath.forPath(".env", {
+        cwd: "/test/project",
+        platform: "linux",
+      }),
       agentName: "my-agent",
     });
   });
@@ -240,7 +243,10 @@ describe("describePathGate — home-relative paths", () => {
     expect(resolver.resolve).toHaveBeenCalledWith({
       kind: "access-path",
       surface: "path",
-      path: AccessPath.forPath("~/.ssh/config", { cwd: "/test/project" }),
+      path: AccessPath.forPath("~/.ssh/config", {
+        cwd: "/test/project",
+        platform: "linux",
+      }),
       agentName: undefined,
     });
   });
@@ -300,7 +306,10 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     expect(resolver.resolve).toHaveBeenCalledWith({
       kind: "access-path",
       surface: "path",
-      path: AccessPath.forPath(".env", { cwd: "/test/project" }),
+      path: AccessPath.forPath(".env", {
+        cwd: "/test/project",
+        platform: "linux",
+      }),
       agentName: undefined,
     });
   });
@@ -318,7 +327,10 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     expect(resolver.resolve).toHaveBeenCalledWith({
       kind: "access-path",
       surface: "path",
-      path: AccessPath.forPath(".env", { cwd: "/test/project" }),
+      path: AccessPath.forPath(".env", {
+        cwd: "/test/project",
+        platform: "linux",
+      }),
       agentName: undefined,
     });
   });
@@ -336,7 +348,10 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     expect(resolver.resolve).toHaveBeenCalledWith({
       kind: "access-path",
       surface: "path",
-      path: AccessPath.forPath("/etc/passwd", { cwd: "/test/project" }),
+      path: AccessPath.forPath("/etc/passwd", {
+        cwd: "/test/project",
+        platform: "linux",
+      }),
       agentName: undefined,
     });
   });

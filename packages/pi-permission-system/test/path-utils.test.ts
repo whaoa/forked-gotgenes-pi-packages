@@ -41,55 +41,57 @@ describe("normalizePathForComparison", () => {
   const cwd = "/projects/my-app";
 
   test("resolves absolute path unchanged", () => {
-    expect(normalizePathForComparison("/usr/local/bin", cwd)).toBe(
+    expect(normalizePathForComparison("/usr/local/bin", cwd, "linux")).toBe(
       "/usr/local/bin",
     );
   });
 
   test("resolves relative path against cwd", () => {
-    expect(normalizePathForComparison("src/foo.ts", cwd)).toBe(
+    expect(normalizePathForComparison("src/foo.ts", cwd, "linux")).toBe(
       "/projects/my-app/src/foo.ts",
     );
   });
 
   test("expands bare ~ to homedir", () => {
-    expect(normalizePathForComparison("~", cwd)).toBe("/mock/home");
+    expect(normalizePathForComparison("~", cwd, "linux")).toBe("/mock/home");
   });
 
   test("expands ~/... to homedir-relative path", () => {
-    expect(normalizePathForComparison("~/docs/readme.md", cwd)).toBe(
+    expect(normalizePathForComparison("~/docs/readme.md", cwd, "linux")).toBe(
       join("/mock/home", "docs/readme.md"),
     );
   });
 
   test("expands bare $HOME to homedir", () => {
-    expect(normalizePathForComparison("$HOME", cwd)).toBe("/mock/home");
+    expect(normalizePathForComparison("$HOME", cwd, "linux")).toBe(
+      "/mock/home",
+    );
   });
 
   test("expands $HOME/... to homedir-relative path", () => {
-    expect(normalizePathForComparison("$HOME/.ssh/config", cwd)).toBe(
+    expect(normalizePathForComparison("$HOME/.ssh/config", cwd, "linux")).toBe(
       join("/mock/home", ".ssh/config"),
     );
   });
 
   test("strips leading @ before resolving", () => {
-    expect(normalizePathForComparison("@/usr/local/bin", cwd)).toBe(
+    expect(normalizePathForComparison("@/usr/local/bin", cwd, "linux")).toBe(
       "/usr/local/bin",
     );
   });
 
   test("strips surrounding quotes", () => {
-    expect(normalizePathForComparison("'/usr/local/bin'", cwd)).toBe(
+    expect(normalizePathForComparison("'/usr/local/bin'", cwd, "linux")).toBe(
       "/usr/local/bin",
     );
-    expect(normalizePathForComparison('"/usr/local/bin"', cwd)).toBe(
+    expect(normalizePathForComparison('"/usr/local/bin"', cwd, "linux")).toBe(
       "/usr/local/bin",
     );
   });
 
   test("returns empty string for blank/whitespace-only path", () => {
-    expect(normalizePathForComparison("", cwd)).toBe("");
-    expect(normalizePathForComparison("   ", cwd)).toBe("");
+    expect(normalizePathForComparison("", cwd, "linux")).toBe("");
+    expect(normalizePathForComparison("   ", cwd, "linux")).toBe("");
   });
 
   // ── injected platform flavor (Windows is case-folded, win32-resolved) ────
@@ -119,31 +121,31 @@ describe("normalizePathForComparison", () => {
 
 describe("isPathWithinDirectory", () => {
   test("returns true when path equals directory", () => {
-    expect(isPathWithinDirectory("/a/b", "/a/b")).toBe(true);
+    expect(isPathWithinDirectory("/a/b", "/a/b", "linux")).toBe(true);
   });
 
   test("returns true when path is a direct child", () => {
-    expect(isPathWithinDirectory("/a/b/c", "/a/b")).toBe(true);
+    expect(isPathWithinDirectory("/a/b/c", "/a/b", "linux")).toBe(true);
   });
 
   test("returns true when path is a deep descendant", () => {
-    expect(isPathWithinDirectory("/a/b/c/d/e", "/a/b")).toBe(true);
+    expect(isPathWithinDirectory("/a/b/c/d/e", "/a/b", "linux")).toBe(true);
   });
 
   test("returns false when path is a sibling directory", () => {
-    expect(isPathWithinDirectory("/a/bc", "/a/b")).toBe(false);
+    expect(isPathWithinDirectory("/a/bc", "/a/b", "linux")).toBe(false);
   });
 
   test("returns false when path is outside the directory", () => {
-    expect(isPathWithinDirectory("/other/path", "/a/b")).toBe(false);
+    expect(isPathWithinDirectory("/other/path", "/a/b", "linux")).toBe(false);
   });
 
   test("returns false for empty path", () => {
-    expect(isPathWithinDirectory("", "/a/b")).toBe(false);
+    expect(isPathWithinDirectory("", "/a/b", "linux")).toBe(false);
   });
 
   test("returns false for empty directory", () => {
-    expect(isPathWithinDirectory("/a/b", "")).toBe(false);
+    expect(isPathWithinDirectory("/a/b", "", "linux")).toBe(false);
   });
 
   // ── platform-aware containment (Windows is case-insensitive) ────────────
@@ -343,49 +345,65 @@ describe("isPathOutsideWorkingDirectory", () => {
   });
 
   test("returns false when path is inside cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/projects/my-app/src", cwd)).toBe(
+    expect(
+      isPathOutsideWorkingDirectory("/projects/my-app/src", cwd, "linux"),
+    ).toBe(false);
+  });
+
+  test("returns false when path equals cwd", () => {
+    expect(
+      isPathOutsideWorkingDirectory("/projects/my-app", cwd, "linux"),
+    ).toBe(false);
+  });
+
+  test("returns true when path is outside cwd", () => {
+    expect(isPathOutsideWorkingDirectory("/etc/passwd", cwd, "linux")).toBe(
+      true,
+    );
+  });
+
+  test("returns true for home directory when outside cwd", () => {
+    expect(isPathOutsideWorkingDirectory("~/secrets", cwd, "linux")).toBe(true);
+  });
+
+  test("returns false for relative path resolving inside cwd", () => {
+    expect(isPathOutsideWorkingDirectory("src/index.ts", cwd, "linux")).toBe(
       false,
     );
   });
 
-  test("returns false when path equals cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/projects/my-app", cwd)).toBe(false);
-  });
-
-  test("returns true when path is outside cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/etc/passwd", cwd)).toBe(true);
-  });
-
-  test("returns true for home directory when outside cwd", () => {
-    expect(isPathOutsideWorkingDirectory("~/secrets", cwd)).toBe(true);
-  });
-
-  test("returns false for relative path resolving inside cwd", () => {
-    expect(isPathOutsideWorkingDirectory("src/index.ts", cwd)).toBe(false);
-  });
-
   test("returns false for empty path (normalizes to empty string)", () => {
-    expect(isPathOutsideWorkingDirectory("", cwd)).toBe(false);
+    expect(isPathOutsideWorkingDirectory("", cwd, "linux")).toBe(false);
   });
 
   test("returns false for /dev/null regardless of cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/null", cwd)).toBe(false);
+    expect(isPathOutsideWorkingDirectory("/dev/null", cwd, "linux")).toBe(
+      false,
+    );
   });
 
   test("returns false for /dev/stdin regardless of cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/stdin", cwd)).toBe(false);
+    expect(isPathOutsideWorkingDirectory("/dev/stdin", cwd, "linux")).toBe(
+      false,
+    );
   });
 
   test("returns false for /dev/stdout regardless of cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/stdout", cwd)).toBe(false);
+    expect(isPathOutsideWorkingDirectory("/dev/stdout", cwd, "linux")).toBe(
+      false,
+    );
   });
 
   test("returns false for /dev/stderr regardless of cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/stderr", cwd)).toBe(false);
+    expect(isPathOutsideWorkingDirectory("/dev/stderr", cwd, "linux")).toBe(
+      false,
+    );
   });
 
   test("returns true for /dev/null/subdir (not a safe path)", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/null/subdir", cwd)).toBe(true);
+    expect(
+      isPathOutsideWorkingDirectory("/dev/null/subdir", cwd, "linux"),
+    ).toBe(true);
   });
 
   test("returns true for in-cwd symlink that resolves to external path", () => {
@@ -394,7 +412,9 @@ describe("isPathOutsideWorkingDirectory", () => {
       if (p === "/projects/my-app/link/hosts") return "/etc/hosts";
       return p;
     });
-    expect(isPathOutsideWorkingDirectory("./link/hosts", cwd)).toBe(true);
+    expect(isPathOutsideWorkingDirectory("./link/hosts", cwd, "linux")).toBe(
+      true,
+    );
   });
 
   test("returns false for path inside a symlinked cwd", () => {
@@ -406,7 +426,11 @@ describe("isPathOutsideWorkingDirectory", () => {
       return p;
     });
     expect(
-      isPathOutsideWorkingDirectory("/tmp/workspace/file.ts", symlinkCwd),
+      isPathOutsideWorkingDirectory(
+        "/tmp/workspace/file.ts",
+        symlinkCwd,
+        "linux",
+      ),
     ).toBe(false);
   });
 });
@@ -424,18 +448,22 @@ describe("canonicalNormalizePathForComparison", () => {
       if (p === "/projects/link") return "/real/projects/app";
       return p;
     });
-    expect(canonicalNormalizePathForComparison("/projects/link", cwd)).toBe(
-      "/real/projects/app",
-    );
+    expect(
+      canonicalNormalizePathForComparison("/projects/link", cwd, "linux"),
+    ).toBe("/real/projects/app");
   });
 
   test("returns empty string for empty input", () => {
-    expect(canonicalNormalizePathForComparison("", cwd)).toBe("");
+    expect(canonicalNormalizePathForComparison("", cwd, "linux")).toBe("");
   });
 
   test("returns lexical form when no symlinks (identity realpathSync)", () => {
     expect(
-      canonicalNormalizePathForComparison("/projects/my-app/src/index.ts", cwd),
+      canonicalNormalizePathForComparison(
+        "/projects/my-app/src/index.ts",
+        cwd,
+        "linux",
+      ),
     ).toBe("/projects/my-app/src/index.ts");
   });
 
@@ -461,6 +489,7 @@ describe("isPiInfrastructureRead", () => {
         "/mock/home/.pi/agent/config.json",
         infraDirs,
         cwd,
+        "linux",
       ),
     ).toBe(true);
   });
@@ -472,6 +501,7 @@ describe("isPiInfrastructureRead", () => {
         "/mock/home/.pi/agent/config.json",
         infraDirs,
         cwd,
+        "linux",
       ),
     ).toBe(false);
   });
@@ -483,6 +513,7 @@ describe("isPiInfrastructureRead", () => {
         "/projects/my-app/.pi/npm/package.json",
         [],
         cwd,
+        "linux",
       ),
     ).toBe(true);
   });
@@ -494,14 +525,15 @@ describe("isPiInfrastructureRead", () => {
         "/projects/my-app/.pi/git/some-file",
         [],
         cwd,
+        "linux",
       ),
     ).toBe(true);
   });
 
   test("returns false for path outside all infra dirs and project dirs", () => {
-    expect(isPiInfrastructureRead("read", "/etc/passwd", infraDirs, cwd)).toBe(
-      false,
-    );
+    expect(
+      isPiInfrastructureRead("read", "/etc/passwd", infraDirs, cwd, "linux"),
+    ).toBe(false);
   });
 
   // ── glob patterns ─────────────────────────────────────────────────
@@ -513,6 +545,7 @@ describe("isPiInfrastructureRead", () => {
         "/opt/homebrew/Cellar/pi-coding-agent/0.74.0/libexec/lib/node_modules/@earendil-works/pi-coding-agent/SKILL.md",
         ["/opt/homebrew/**/@earendil-works/pi-coding-agent/**"],
         cwd,
+        "linux",
       ),
     ).toBe(true);
   });
@@ -524,6 +557,7 @@ describe("isPiInfrastructureRead", () => {
         "/etc/passwd",
         ["/opt/homebrew/**/@earendil-works/pi-coding-agent/**"],
         cwd,
+        "linux",
       ),
     ).toBe(false);
   });
@@ -536,6 +570,7 @@ describe("isPiInfrastructureRead", () => {
         "/mock/home/.pi/agent/config.json",
         ["~/.pi/agent"],
         cwd,
+        "linux",
       ),
     ).toBe(true);
   });
@@ -616,35 +651,45 @@ describe("getPathPolicyValues", () => {
   const cwd = "/projects/my-app";
 
   test("returns only the literal when no base is available", () => {
-    expect(getPathPolicyValues("src/foo.ts")).toEqual(["src/foo.ts"]);
-    expect(getPathPolicyValues("src/foo.ts", {})).toEqual(["src/foo.ts"]);
+    expect(getPathPolicyValues("src/foo.ts", {}, "linux")).toEqual([
+      "src/foo.ts",
+    ]);
+    expect(getPathPolicyValues("src/foo.ts", {}, "linux")).toEqual([
+      "src/foo.ts",
+    ]);
   });
 
   test("adds absolute and project-relative aliases for a relative token", () => {
-    expect(getPathPolicyValues("src/foo.ts", { cwd })).toEqual([
+    expect(getPathPolicyValues("src/foo.ts", { cwd }, "linux")).toEqual([
       "/projects/my-app/src/foo.ts",
       "src/foo.ts",
     ]);
   });
 
   test("omits the relative alias for a token outside cwd", () => {
-    expect(getPathPolicyValues("/etc/hosts", { cwd })).toEqual(["/etc/hosts"]);
+    expect(getPathPolicyValues("/etc/hosts", { cwd }, "linux")).toEqual([
+      "/etc/hosts",
+    ]);
   });
 
   test("resolves against resolveBase while aliasing relative to cwd", () => {
     expect(
-      getPathPolicyValues("foo.txt", {
-        cwd,
-        resolveBase: "/projects/my-app/nested",
-      }),
+      getPathPolicyValues(
+        "foo.txt",
+        {
+          cwd,
+          resolveBase: "/projects/my-app/nested",
+        },
+        "linux",
+      ),
     ).toEqual(["/projects/my-app/nested/foo.txt", "nested/foo.txt", "foo.txt"]);
   });
 
   test("preserves the surface catch-all", () => {
-    expect(getPathPolicyValues("*", { cwd })).toEqual(["*"]);
+    expect(getPathPolicyValues("*", { cwd }, "linux")).toEqual(["*"]);
   });
 
   test("returns empty for blank input", () => {
-    expect(getPathPolicyValues("   ", { cwd })).toEqual([]);
+    expect(getPathPolicyValues("   ", { cwd }, "linux")).toEqual([]);
   });
 });

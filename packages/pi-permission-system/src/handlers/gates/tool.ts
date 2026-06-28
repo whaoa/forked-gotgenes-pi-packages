@@ -23,12 +23,13 @@ import type { ToolCallContext } from "./types";
 function deriveSuggestionValue(
   tcc: ToolCallContext,
   check: PermissionCheckResult,
+  platform: NodeJS.Platform,
 ): string {
   if (tcc.toolName === "bash") return check.command ?? "";
   if (tcc.toolName === "mcp") return check.target ?? "mcp";
   const path = getPathBearingToolPath(tcc.toolName, tcc.input);
   if (path === null) return "*";
-  return normalizePathForComparison(path, tcc.cwd);
+  return normalizePathForComparison(path, tcc.cwd, platform);
 }
 
 /**
@@ -41,6 +42,7 @@ export function describeToolGate(
   tcc: ToolCallContext,
   check: PermissionCheckResult,
   formatter: ToolPreviewFormatter,
+  platform: NodeJS.Platform,
 ): GateDescriptor {
   const permissionLogContext = formatter.getPermissionLogContext(
     check,
@@ -51,7 +53,7 @@ export function describeToolGate(
   // Compute session approval suggestion for the "for this session" option.
   const suggestion = suggestSessionPattern(
     tcc.toolName,
-    deriveSuggestionValue(tcc, check),
+    deriveSuggestionValue(tcc, check, platform),
   );
 
   const askMessage = formatAskPrompt(

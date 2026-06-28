@@ -280,6 +280,7 @@ export class PermissionManager implements ScopedPermissionManager {
       toolName,
       intent.input,
       this.loader.getConfiguredMcpServerNames(),
+      this.platform,
       this.currentCwd,
     );
     return buildCheckResult(

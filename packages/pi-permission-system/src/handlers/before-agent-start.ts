@@ -85,6 +85,7 @@ export class AgentPrepHandler {
       this.resolver,
       agentName,
       ctx.cwd,
+      this.session.getPlatform(),
     );
     this.session.setActiveSkillEntries(skillPromptResult.entries);
     return skillPromptResult.prompt !== event.systemPrompt

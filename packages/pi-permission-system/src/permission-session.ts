@@ -85,6 +85,11 @@ export class PermissionSession implements ToolCallGateInputs {
     return this.context;
   }
 
+  /** The host platform injected at the composition root. */
+  getPlatform(): NodeJS.Platform {
+    return this.platform;
+  }
+
   // ── UI notifications ────────────────────────────────────────────────────
 
   /** Surface a warning message to the user via the active UI context, if any. */

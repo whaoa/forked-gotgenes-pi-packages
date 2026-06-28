@@ -239,6 +239,7 @@ describe("describeBashPathGate", () => {
       path: AccessPath.forPath("src/file.txt", {
         cwd: "/test/project",
         resolveBase: "/test/project/nested",
+        platform: "linux",
       }),
       agentName: undefined,
     });

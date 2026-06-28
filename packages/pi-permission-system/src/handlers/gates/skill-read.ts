@@ -15,6 +15,7 @@ import type { ToolCallContext } from "./types";
  */
 export function describeSkillReadGate(
   tcc: ToolCallContext,
+  platform: NodeJS.Platform,
   getActiveSkillEntries: () => SkillPromptEntry[],
 ): GateDescriptor | null {
   const activeSkillEntries = getActiveSkillEntries();
@@ -29,10 +30,15 @@ export function describeSkillReadGate(
     return null;
   }
 
-  const normalizedReadPath = normalizePathForComparison(path, tcc.cwd);
+  const normalizedReadPath = normalizePathForComparison(
+    path,
+    tcc.cwd,
+    platform,
+  );
   const matchedSkill = findSkillPathMatch(
     normalizedReadPath,
     activeSkillEntries,
+    platform,
   );
 
   if (!matchedSkill) {

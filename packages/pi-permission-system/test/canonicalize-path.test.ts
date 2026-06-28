@@ -21,12 +21,14 @@ describe("canonicalizePath", () => {
   });
 
   test("returns empty string for empty input", () => {
-    expect(canonicalizePath("")).toBe("");
+    expect(canonicalizePath("", "linux")).toBe("");
   });
 
   test("returns realpathSync result when path exists", () => {
     realpathSync.mockReturnValueOnce("/real/projects/app");
-    expect(canonicalizePath("/projects/link")).toBe("/real/projects/app");
+    expect(canonicalizePath("/projects/link", "linux")).toBe(
+      "/real/projects/app",
+    );
   });
 
   test("re-appends a non-existent leaf to the canonical parent", () => {
@@ -35,7 +37,7 @@ describe("canonicalizePath", () => {
         throw enoent("/projects/app/new-file.ts");
       })
       .mockReturnValueOnce("/canonical/app");
-    expect(canonicalizePath("/projects/app/new-file.ts")).toBe(
+    expect(canonicalizePath("/projects/app/new-file.ts", "linux")).toBe(
       "/canonical/app/new-file.ts",
     );
   });
@@ -52,7 +54,7 @@ describe("canonicalizePath", () => {
         throw enoent("/projects/app");
       })
       .mockReturnValueOnce("/canonical/projects");
-    expect(canonicalizePath("/projects/app/src/new-file.ts")).toBe(
+    expect(canonicalizePath("/projects/app/src/new-file.ts", "linux")).toBe(
       "/canonical/projects/app/src/new-file.ts",
     );
   });
@@ -61,7 +63,7 @@ describe("canonicalizePath", () => {
     realpathSync.mockImplementation(() => {
       throw enoent("");
     });
-    expect(canonicalizePath("/nonexistent/path/file.ts")).toBe(
+    expect(canonicalizePath("/nonexistent/path/file.ts", "linux")).toBe(
       "/nonexistent/path/file.ts",
     );
   });
@@ -70,14 +72,18 @@ describe("canonicalizePath", () => {
     realpathSync.mockImplementation(() => {
       throw Object.assign(new Error("ELOOP"), { code: "ELOOP" });
     });
-    expect(canonicalizePath("/some/looping/path")).toBe("/some/looping/path");
+    expect(canonicalizePath("/some/looping/path", "linux")).toBe(
+      "/some/looping/path",
+    );
   });
 
   test("returns input unchanged on EACCES (permission denied)", () => {
     realpathSync.mockImplementation(() => {
       throw Object.assign(new Error("EACCES"), { code: "EACCES" });
     });
-    expect(canonicalizePath("/restricted/path")).toBe("/restricted/path");
+    expect(canonicalizePath("/restricted/path", "linux")).toBe(
+      "/restricted/path",
+    );
   });
 
   test("handles ENOTDIR by walking up (like ENOENT)", () => {
@@ -86,7 +92,7 @@ describe("canonicalizePath", () => {
         throw Object.assign(new Error("ENOTDIR"), { code: "ENOTDIR" });
       })
       .mockReturnValueOnce("/real/parent");
-    expect(canonicalizePath("/real/parent/not-a-dir")).toBe(
+    expect(canonicalizePath("/real/parent/not-a-dir", "linux")).toBe(
       "/real/parent/not-a-dir",
     );
   });

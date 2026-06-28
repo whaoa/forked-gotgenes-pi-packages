@@ -152,14 +152,23 @@ function createResolvedSkillEntry(
   entry: ParsedSkillPromptEntry,
   state: PermissionState,
   cwd: string,
+  platform: NodeJS.Platform,
 ): SkillPromptEntry {
   return {
     name: entry.name,
     description: entry.description,
     location: entry.location,
     state,
-    normalizedLocation: normalizePathForComparison(entry.location, cwd),
-    normalizedBaseDir: normalizePathForComparison(dirname(entry.location), cwd),
+    normalizedLocation: normalizePathForComparison(
+      entry.location,
+      cwd,
+      platform,
+    ),
+    normalizedBaseDir: normalizePathForComparison(
+      dirname(entry.location),
+      cwd,
+      platform,
+    ),
   };
 }
 
@@ -190,6 +199,7 @@ export function resolveSkillPromptEntries(
   permissionManager: SkillPermissionChecker,
   agentName: string | null,
   cwd: string,
+  platform: NodeJS.Platform,
 ): { prompt: string; entries: SkillPromptEntry[] } {
   const sections = parseAllSkillPromptSections(prompt);
   if (sections.length === 0) {
@@ -209,7 +219,7 @@ export function resolveSkillPromptEntries(
         agentName,
         permissionCache,
       );
-      return createResolvedSkillEntry(entry, state, cwd);
+      return createResolvedSkillEntry(entry, state, cwd, platform);
     });
 
     const visibleSectionEntries = resolvedEntries.filter(
@@ -257,6 +267,7 @@ export function resolveSkillPromptEntries(
 export function findSkillPathMatch(
   normalizedPath: string,
   entries: readonly SkillPromptEntry[],
+  platform: NodeJS.Platform,
 ): SkillPromptEntry | null {
   if (!normalizedPath || entries.length === 0) {
     return null;
@@ -275,7 +286,7 @@ export function findSkillPathMatch(
   for (const entry of entries) {
     if (
       !entry.normalizedBaseDir ||
-      !isPathWithinDirectory(normalizedPath, entry.normalizedBaseDir)
+      !isPathWithinDirectory(normalizedPath, entry.normalizedBaseDir, platform)
     ) {
       continue;
     }

@@ -22,6 +22,7 @@ export function describeExternalDirectoryGate(
   infraDirs: string[],
   resolver: ScopedPermissionResolver,
   normalizer: PathNormalizer,
+  platform: NodeJS.Platform,
   extractors?: ToolAccessExtractorLookup,
 ): GateResult {
   const externalDirectoryPath = getToolInputPath(
@@ -43,7 +44,13 @@ export function describeExternalDirectoryGate(
 
   // ── Pi infrastructure read bypass ──────────────────────────────────────
   if (
-    isPiInfrastructureRead(tcc.toolName, canonicalExtPath, infraDirs, tcc.cwd)
+    isPiInfrastructureRead(
+      tcc.toolName,
+      canonicalExtPath,
+      infraDirs,
+      tcc.cwd,
+      platform,
+    )
   ) {
     return {
       action: "allow",

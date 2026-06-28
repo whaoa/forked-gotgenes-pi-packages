@@ -66,13 +66,14 @@ export function normalizeInput(
   toolName: string,
   input: unknown,
   configuredMcpServerNames: readonly string[],
+  platform: NodeJS.Platform,
   cwd?: string,
 ): NormalizedInput {
   // --- Special surfaces (path, external_directory) ---
   if (SPECIAL_PERMISSION_KEYS.has(toolName)) {
     return {
       surface: toolName,
-      values: normalizePathSurfaceValues(input, cwd),
+      values: normalizePathSurfaceValues(input, platform, cwd),
       resultExtras: {},
     };
   }
@@ -123,7 +124,7 @@ export function normalizeInput(
   if (PATH_BEARING_TOOLS.has(toolName)) {
     return {
       surface: toolName,
-      values: normalizePathSurfaceValues(input, cwd),
+      values: normalizePathSurfaceValues(input, platform, cwd),
       resultExtras: {},
     };
   }
@@ -149,9 +150,13 @@ export function normalizeInput(
  * Only `input.path` is read — policy values are never sourced from any other
  * (potentially attacker-controlled) field on the raw tool input.
  */
-function normalizePathSurfaceValues(input: unknown, cwd?: string): string[] {
+function normalizePathSurfaceValues(
+  input: unknown,
+  platform: NodeJS.Platform,
+  cwd?: string,
+): string[] {
   const path = getNonEmptyString(toRecord(input).path);
   if (path === null) return ["*"];
-  const values = getPathPolicyValues(path, cwd ? { cwd } : {});
+  const values = getPathPolicyValues(path, cwd ? { cwd } : {}, platform);
   return values.length > 0 ? values : ["*"];
 }

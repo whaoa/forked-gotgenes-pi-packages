@@ -35,30 +35,37 @@ describe("AccessPath.forPath", () => {
       realpathSync.mockImplementation((p: string) =>
         p.startsWith("/tmp") ? `/private${p}` : p,
       );
-      expect(AccessPath.forPath("/tmp/x", { cwd }).matchValues()).toEqual([
-        "/tmp/x",
-        "/private/tmp/x",
-      ]);
+      expect(
+        AccessPath.forPath("/tmp/x", { cwd, platform: "linux" }).matchValues(),
+      ).toEqual(["/tmp/x", "/private/tmp/x"]);
     });
 
     test("deduplicates when the canonical form equals the lexical form", () => {
-      expect(AccessPath.forPath("/etc/hosts", { cwd }).matchValues()).toEqual([
-        "/etc/hosts",
-      ]);
+      expect(
+        AccessPath.forPath("/etc/hosts", {
+          cwd,
+          platform: "linux",
+        }).matchValues(),
+      ).toEqual(["/etc/hosts"]);
     });
 
     test("keeps the relative aliases for an in-cwd token without duplicating", () => {
-      expect(AccessPath.forPath("src/foo.ts", { cwd }).matchValues()).toEqual([
-        "/projects/my-app/src/foo.ts",
-        "src/foo.ts",
-      ]);
+      expect(
+        AccessPath.forPath("src/foo.ts", {
+          cwd,
+          platform: "linux",
+        }).matchValues(),
+      ).toEqual(["/projects/my-app/src/foo.ts", "src/foo.ts"]);
     });
 
     test("includes only the lexical aliases when canonical is empty", () => {
       // Force canonicalizePath to return the original (no-op symlink resolution
       // effectively means canonical === lexical, handled by dedup).
       expect(
-        AccessPath.forPath("/etc/hosts", { cwd }).matchValues(),
+        AccessPath.forPath("/etc/hosts", {
+          cwd,
+          platform: "linux",
+        }).matchValues(),
       ).not.toHaveLength(0);
     });
 
@@ -68,6 +75,7 @@ describe("AccessPath.forPath", () => {
         AccessPath.forPath("foo.ts", {
           cwd,
           resolveBase: "/projects/my-app/sub",
+          platform: "linux",
         }).matchValues(),
       ).toEqual(["/projects/my-app/sub/foo.ts", "sub/foo.ts", "foo.ts"]);
     });
@@ -80,6 +88,7 @@ describe("AccessPath.forPath", () => {
         AccessPath.forPath("foo.ts", {
           cwd,
           resolveBase: "/projects/my-app/sub",
+          platform: "linux",
         }).matchValues(),
       ).toEqual([
         "/projects/my-app/sub/foo.ts",
@@ -122,19 +131,27 @@ describe("AccessPath.forPath", () => {
       realpathSync.mockImplementation((p: string) =>
         p.startsWith("/tmp") ? `/private${p}` : p,
       );
-      expect(AccessPath.forPath("/tmp/x", { cwd }).boundaryValue()).toBe(
-        "/private/tmp/x",
-      );
+      expect(
+        AccessPath.forPath("/tmp/x", {
+          cwd,
+          platform: "linux",
+        }).boundaryValue(),
+      ).toBe("/private/tmp/x");
     });
 
     test("returns the lexical form when path has no symlinks", () => {
-      expect(AccessPath.forPath("/etc/hosts", { cwd }).boundaryValue()).toBe(
-        "/etc/hosts",
-      );
+      expect(
+        AccessPath.forPath("/etc/hosts", {
+          cwd,
+          platform: "linux",
+        }).boundaryValue(),
+      ).toBe("/etc/hosts");
     });
 
     test("returns empty string for empty input", () => {
-      expect(AccessPath.forPath("", { cwd }).boundaryValue()).toBe("");
+      expect(
+        AccessPath.forPath("", { cwd, platform: "linux" }).boundaryValue(),
+      ).toBe("");
     });
   });
 
@@ -144,14 +161,16 @@ describe("AccessPath.forPath", () => {
         p.startsWith("/tmp") ? `/private${p}` : p,
       );
       // Even when the path resolves to a different canonical, value() stays lexical.
-      expect(AccessPath.forPath("/tmp/x", { cwd }).value()).toBe("/tmp/x");
+      expect(
+        AccessPath.forPath("/tmp/x", { cwd, platform: "linux" }).value(),
+      ).toBe("/tmp/x");
     });
 
     test("normalizes the path against cwd", () => {
       // A relative path becomes an absolute lexical value.
-      expect(AccessPath.forPath("src/foo.ts", { cwd }).value()).toBe(
-        "/projects/my-app/src/foo.ts",
-      );
+      expect(
+        AccessPath.forPath("src/foo.ts", { cwd, platform: "linux" }).value(),
+      ).toBe("/projects/my-app/src/foo.ts");
     });
 
     test("normalizes a relative path against an explicit resolveBase", () => {
@@ -159,12 +178,15 @@ describe("AccessPath.forPath", () => {
         AccessPath.forPath("foo.ts", {
           cwd,
           resolveBase: "/projects/my-app/sub",
+          platform: "linux",
         }).value(),
       ).toBe("/projects/my-app/sub/foo.ts");
     });
 
     test("returns empty string for empty input", () => {
-      expect(AccessPath.forPath("", { cwd }).value()).toBe("");
+      expect(AccessPath.forPath("", { cwd, platform: "linux" }).value()).toBe(
+        "",
+      );
     });
   });
 });

@@ -132,7 +132,10 @@ describe("PermissionResolver", () => {
       resolver.resolve({
         kind: "access-path",
         surface: "path",
-        path: AccessPath.forPath("src/a.ts", { cwd: "/proj" }),
+        path: AccessPath.forPath("src/a.ts", {
+          cwd: "/proj",
+          platform: "linux",
+        }),
       });
 
       const passedRules = vi.mocked(pm.check).mock.calls[0][1];
@@ -148,7 +151,10 @@ describe("PermissionResolver", () => {
   describe("resolve — access-path intent", () => {
     it("unwraps the AccessPath via matchValues() into a path-values intent", () => {
       const { resolver, permissionManager } = makeResolver();
-      const accessPath = AccessPath.forPath("/tmp/x", { cwd: "/workspace" });
+      const accessPath = AccessPath.forPath("/tmp/x", {
+        cwd: "/workspace",
+        platform: "linux",
+      });
 
       resolver.resolve({
         kind: "access-path",
@@ -178,7 +184,10 @@ describe("PermissionResolver", () => {
         matchedPattern: "/tmp/*",
       });
       const { resolver } = makeResolver(pm);
-      const accessPath = AccessPath.forPath("/tmp/x", { cwd: "/workspace" });
+      const accessPath = AccessPath.forPath("/tmp/x", {
+        cwd: "/workspace",
+        platform: "linux",
+      });
 
       const result = resolver.resolve({
         kind: "access-path",

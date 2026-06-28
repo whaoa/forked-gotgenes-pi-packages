@@ -39,6 +39,8 @@ export interface ToolCallGateInputs {
   getToolPreviewLimits(): ToolPreviewFormatterOptions;
   /** The session's path normalizer (platform + cwd baked in). */
   getPathNormalizer(): PathNormalizer;
+  /** The host platform injected at the composition root. */
+  getPlatform(): NodeJS.Platform;
 }
 
 /**
@@ -79,10 +81,13 @@ export class ToolCallGatePipeline {
     );
 
     const infraDirs = this.inputs.getInfrastructureReadDirs();
+    const platform = this.inputs.getPlatform();
 
     const gateProducers: Array<() => GateResult | Promise<GateResult>> = [
       () =>
-        describeSkillReadGate(tcc, () => this.inputs.getActiveSkillEntries()),
+        describeSkillReadGate(tcc, platform, () =>
+          this.inputs.getActiveSkillEntries(),
+        ),
       () =>
         describePathGate(tcc, this.resolver, normalizer, this.customExtractors),
       () =>
@@ -91,6 +96,7 @@ export class ToolCallGatePipeline {
           infraDirs,
           this.resolver,
           normalizer,
+          platform,
           this.customExtractors,
         ),
       () => describeBashExternalDirectoryGate(tcc, bashProgram, this.resolver),
@@ -114,7 +120,12 @@ export class ToolCallGatePipeline {
                 input: tcc.input,
                 agentName: tcc.agentName ?? undefined,
               });
-        const toolDescriptor = describeToolGate(tcc, toolCheck, formatter);
+        const toolDescriptor = describeToolGate(
+          tcc,
+          toolCheck,
+          formatter,
+          platform,
+        );
         toolDescriptor.preCheck = toolCheck;
         return toolDescriptor;
       },

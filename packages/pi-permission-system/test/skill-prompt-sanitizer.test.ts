@@ -72,7 +72,13 @@ describe("resolveSkillPromptEntries", () => {
   test("returns unchanged prompt and empty entries when no skills section present", () => {
     const input = "You are a helpful assistant.";
     const manager = makeManager("allow");
-    const result = resolveSkillPromptEntries(input, manager, null, CWD);
+    const result = resolveSkillPromptEntries(
+      input,
+      manager,
+      null,
+      CWD,
+      "linux",
+    );
     expect(result.prompt).toBe(input);
     expect(result.entries).toEqual([]);
     expect(manager.checkPermission).not.toHaveBeenCalled();
@@ -81,7 +87,13 @@ describe("resolveSkillPromptEntries", () => {
   test("keeps all skills when all are allowed", () => {
     const input = availableSkillsSection("librarian", "ask-user");
     const manager = makeManager("allow");
-    const result = resolveSkillPromptEntries(input, manager, null, CWD);
+    const result = resolveSkillPromptEntries(
+      input,
+      manager,
+      null,
+      CWD,
+      "linux",
+    );
     expect(result.prompt).toContain("librarian");
     expect(result.prompt).toContain("ask-user");
     expect(result.entries).toHaveLength(2);
@@ -90,7 +102,13 @@ describe("resolveSkillPromptEntries", () => {
   test("removes denied skill from section", () => {
     const input = availableSkillsSection("librarian", "dangerous");
     const manager = makeManager("allow", { dangerous: "deny" });
-    const result = resolveSkillPromptEntries(input, manager, null, CWD);
+    const result = resolveSkillPromptEntries(
+      input,
+      manager,
+      null,
+      CWD,
+      "linux",
+    );
     expect(result.prompt).toContain("librarian");
     expect(result.prompt).not.toContain("dangerous");
     // denied skill is excluded from returned entries
@@ -100,7 +118,13 @@ describe("resolveSkillPromptEntries", () => {
   test("removes entire section when all skills are denied", () => {
     const input = `Intro\n${availableSkillsSection("dangerous")}\nOutro`;
     const manager = makeManager("deny");
-    const result = resolveSkillPromptEntries(input, manager, null, CWD);
+    const result = resolveSkillPromptEntries(
+      input,
+      manager,
+      null,
+      CWD,
+      "linux",
+    );
     expect(result.prompt).not.toContain("<available_skills>");
     expect(result.prompt).toContain("Intro");
     expect(result.prompt).toContain("Outro");
@@ -110,7 +134,13 @@ describe("resolveSkillPromptEntries", () => {
   test("keeps ask-state skills in section and entries", () => {
     const input = availableSkillsSection("librarian");
     const manager = makeManager("ask");
-    const result = resolveSkillPromptEntries(input, manager, null, CWD);
+    const result = resolveSkillPromptEntries(
+      input,
+      manager,
+      null,
+      CWD,
+      "linux",
+    );
     expect(result.prompt).toContain("librarian");
     expect(result.entries).toHaveLength(1);
     expect(result.entries[0].state).toBe("ask");
@@ -119,7 +149,7 @@ describe("resolveSkillPromptEntries", () => {
   test("delegates permission check to permissionManager for each skill", () => {
     const input = availableSkillsSection("alpha", "beta");
     const manager = makeManager("allow");
-    resolveSkillPromptEntries(input, manager, null, CWD);
+    resolveSkillPromptEntries(input, manager, null, CWD, "linux");
     expect(manager.checkPermission).toHaveBeenCalledWith(
       "skill",
       { name: "alpha" },
@@ -135,7 +165,7 @@ describe("resolveSkillPromptEntries", () => {
   test("passes agentName to permissionManager", () => {
     const input = availableSkillsSection("librarian");
     const manager = makeManager("allow");
-    resolveSkillPromptEntries(input, manager, "my-agent", CWD);
+    resolveSkillPromptEntries(input, manager, "my-agent", CWD, "linux");
     expect(manager.checkPermission).toHaveBeenCalledWith(
       "skill",
       { name: "librarian" },
@@ -150,7 +180,7 @@ describe("resolveSkillPromptEntries", () => {
       availableSkillsSection("librarian"),
     ].join("\n");
     const manager = makeManager("allow");
-    resolveSkillPromptEntries(input, manager, null, CWD);
+    resolveSkillPromptEntries(input, manager, null, CWD, "linux");
     // Should only be called once despite appearing twice.
     expect(manager.checkPermission).toHaveBeenCalledTimes(1);
   });
@@ -159,7 +189,13 @@ describe("resolveSkillPromptEntries", () => {
     const location = "/skills/librarian/SKILL.md";
     const input = availableSkillsSection("librarian");
     const manager = makeManager("allow");
-    const result = resolveSkillPromptEntries(input, manager, null, CWD);
+    const result = resolveSkillPromptEntries(
+      input,
+      manager,
+      null,
+      CWD,
+      "linux",
+    );
     expect(result.entries[0].normalizedLocation).toBe(location);
     expect(result.entries[0].normalizedBaseDir).toBe("/skills/librarian");
   });
@@ -169,7 +205,13 @@ describe("resolveSkillPromptEntries", () => {
     const section2 = availableSkillsSection("beta");
     const input = `${section1}\n${section2}`;
     const manager = makeManager("allow", { beta: "deny" });
-    const result = resolveSkillPromptEntries(input, manager, null, CWD);
+    const result = resolveSkillPromptEntries(
+      input,
+      manager,
+      null,
+      CWD,
+      "linux",
+    );
     expect(result.entries.map((e) => e.name)).toContain("alpha");
     expect(result.entries.map((e) => e.name)).not.toContain("beta");
   });
@@ -198,15 +240,21 @@ describe("findSkillPathMatch", () => {
   ];
 
   test("returns null for empty normalized path", () => {
-    expect(findSkillPathMatch("", entries)).toBeNull();
+    expect(findSkillPathMatch("", entries, "linux")).toBeNull();
   });
 
   test("returns null for empty entries array", () => {
-    expect(findSkillPathMatch("/skills/librarian/SKILL.md", [])).toBeNull();
+    expect(
+      findSkillPathMatch("/skills/librarian/SKILL.md", [], "linux"),
+    ).toBeNull();
   });
 
   test("matches exact location path", () => {
-    const match = findSkillPathMatch("/skills/librarian/SKILL.md", entries);
+    const match = findSkillPathMatch(
+      "/skills/librarian/SKILL.md",
+      entries,
+      "linux",
+    );
     expect(match?.name).toBe("librarian");
   });
 
@@ -214,12 +262,13 @@ describe("findSkillPathMatch", () => {
     const match = findSkillPathMatch(
       "/skills/librarian/extra/helper.md",
       entries,
+      "linux",
     );
     expect(match?.name).toBe("librarian");
   });
 
   test("returns null for path not within any skill directory", () => {
-    const match = findSkillPathMatch("/other/path/file.md", entries);
+    const match = findSkillPathMatch("/other/path/file.md", entries, "linux");
     expect(match).toBeNull();
   });
 
@@ -228,6 +277,7 @@ describe("findSkillPathMatch", () => {
     const match = findSkillPathMatch(
       "/skills/librarian-extra/SKILL.md",
       entries,
+      "linux",
     );
     expect(match).toBeNull();
   });
@@ -254,6 +304,7 @@ describe("findSkillPathMatch", () => {
     const match = findSkillPathMatch(
       "/skills/parent/child/helper.md",
       nestedEntries,
+      "linux",
     );
     expect(match?.name).toBe("child");
   });
@@ -330,6 +381,7 @@ test("REGRESSION: resolveSkillPromptEntries sanitizes every available_skills blo
       asChecker(manager),
       null,
       "/cwd",
+      "linux",
     );
 
     expect(result.prompt).not.toContain("denied-skill");
@@ -377,16 +429,19 @@ test("REGRESSION: resolveSkillPromptEntries keeps only visible skills available 
       asChecker(manager),
       null,
       "/cwd",
+      "linux",
     );
     const visiblePath = resolve("/cwd", "./skills/visible/file.ts");
     const blockedPath = resolve("/cwd", "./skills/blocked/file.ts");
     const matchedVisibleSkill = findSkillPathMatch(
       process.platform === "win32" ? visiblePath.toLowerCase() : visiblePath,
       result.entries,
+      "linux",
     );
     const matchedBlockedSkill = findSkillPathMatch(
       process.platform === "win32" ? blockedPath.toLowerCase() : blockedPath,
       result.entries,
+      "linux",
     );
 
     expect(matchedVisibleSkill?.name).toBe("visible-skill");

@@ -13,7 +13,7 @@ import { posix as posixPath, win32 as winPath } from "node:path";
  */
 export function canonicalizePath(
   absolutePath: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): string {
   if (!absolutePath) return absolutePath;
 
