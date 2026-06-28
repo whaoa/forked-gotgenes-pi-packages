@@ -89,7 +89,6 @@ describe("external_directory symlink acceptance (#418)", () => {
         [],
         resolver,
         new PathNormalizer(process.platform, cwd),
-        "linux",
       );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("allow");
@@ -113,7 +112,6 @@ describe("external_directory symlink acceptance (#418)", () => {
         [],
         resolver,
         new PathNormalizer(process.platform, cwd),
-        "linux",
       );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("allow");
@@ -132,7 +130,6 @@ describe("external_directory symlink acceptance (#418)", () => {
         [],
         resolver,
         new PathNormalizer(process.platform, cwd),
-        "linux",
       );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("ask");

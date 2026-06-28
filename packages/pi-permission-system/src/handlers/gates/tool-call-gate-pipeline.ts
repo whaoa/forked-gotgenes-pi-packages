@@ -96,7 +96,6 @@ export class ToolCallGatePipeline {
           infraDirs,
           this.resolver,
           normalizer,
-          platform,
           this.customExtractors,
         ),
       () => describeBashExternalDirectoryGate(tcc, bashProgram, this.resolver),

@@ -1,5 +1,5 @@
 import type { PathNormalizer } from "#src/path-normalizer";
-import { getToolInputPath, isPiInfrastructureRead } from "#src/path-utils";
+import { getToolInputPath } from "#src/path-utils";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
@@ -22,7 +22,6 @@ export function describeExternalDirectoryGate(
   infraDirs: string[],
   resolver: ScopedPermissionResolver,
   normalizer: PathNormalizer,
-  platform: NodeJS.Platform,
   extractors?: ToolAccessExtractorLookup,
 ): GateResult {
   const externalDirectoryPath = getToolInputPath(
@@ -40,18 +39,9 @@ export function describeExternalDirectoryGate(
   // check (below) use the canonical, symlink-resolved path; pattern matching
   // uses the typed and resolved aliases (#418).
   const accessPath = normalizer.forPath(externalDirectoryPath);
-  const canonicalExtPath = accessPath.boundaryValue();
 
   // ── Pi infrastructure read bypass ──────────────────────────────────────
-  if (
-    isPiInfrastructureRead(
-      tcc.toolName,
-      canonicalExtPath,
-      infraDirs,
-      tcc.cwd,
-      platform,
-    )
-  ) {
+  if (normalizer.isInfrastructureRead(tcc.toolName, accessPath, infraDirs)) {
     return {
       action: "allow",
       log: {

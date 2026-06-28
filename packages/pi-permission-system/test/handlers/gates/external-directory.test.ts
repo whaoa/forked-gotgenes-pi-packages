@@ -43,7 +43,6 @@ function gateUnderTest(
     infraDirs,
     resolver,
     new PathNormalizer(process.platform, tcc.cwd),
-    "linux",
     extractors,
   );
 }
