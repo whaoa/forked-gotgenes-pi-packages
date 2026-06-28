@@ -171,6 +171,7 @@ When investigating a reported bug:
 3. Instrument only after confirming the bug reproduces in isolation.
 4. When the bug involves path, filesystem, or platform semantics, check how `@earendil-works/pi-coding-agent` solves it first (local checkout or published source).
    Prefer Node `path` builtins (`path.relative`, `path.win32`/`path.posix`) over hand-rolled comparison; pi's containment idiom is `relative()` + a `..`/absolute-prefix check (case-insensitive on Windows).
+5. When a report claims a path/permission **bypass** (or that a rule is evadable), reproduce the literal repro against the running extension before concluding it is already handled — a live deny is stronger evidence than unit tests and can surface adjacent bugs (#493's bypass claim was already fixed, but the live repro exposed a misleading prompt, filed as #507).
 
 The gate fails closed (#452).
 Every `tool_call` goes through `createFailClosedToolCall` (`src/handlers/tool-call-boundary.ts`), the only `pi.on("tool_call")` target and the sole place an internal `GateOutcome` is translated to the SDK result shape.
