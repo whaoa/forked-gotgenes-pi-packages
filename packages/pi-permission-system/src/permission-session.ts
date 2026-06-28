@@ -49,16 +49,26 @@ export class PermissionSession implements ToolCallGateInputs {
     private readonly gateway: PromptingGatewayLifecycle,
     private readonly platform: NodeJS.Platform,
   ) {
-    // Placeholder until the first session_start rebinds it with the real cwd;
-    // every gate evaluate runs after resetForNewSession, so this is never read.
+    // Placeholder until the first activate(ctx) binds the real cwd; every gate
+    // evaluate runs after activate (handleToolCall activates first), so this
+    // empty-cwd value is never read.
     this.pathNormalizer = new PathNormalizer(platform, "");
   }
 
   // ── Context lifecycle ──────────────────────────────────────────────────
 
-  /** Store the current extension context, start forwarding, and activate the gateway. */
+  /**
+   * Store the current extension context, rebuild the path normalizer for its
+   * cwd, start forwarding, and activate the gateway.
+   *
+   * The normalizer is (re)built here rather than only at `resetForNewSession`
+   * so it always tracks the active context's cwd — `ctx.cwd` is stable within a
+   * session, so this is a no-op rebuild in production, but it closes the
+   * fail-open gap if a tool call ever arrives before `session_start`.
+   */
   activate(ctx: ExtensionContext): void {
     this.context = ctx;
+    this.pathNormalizer = new PathNormalizer(this.platform, ctx.cwd);
     this.forwarding.start(ctx);
     this.gateway.activate(ctx);
   }
@@ -92,7 +102,6 @@ export class PermissionSession implements ToolCallGateInputs {
    */
   resetForNewSession(ctx: ExtensionContext): void {
     this.permissionManager.configureForCwd(ctx.cwd);
-    this.pathNormalizer = new PathNormalizer(this.platform, ctx.cwd);
     this.skillEntries = [];
     this.activate(ctx);
   }

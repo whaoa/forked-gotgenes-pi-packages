@@ -83,12 +83,14 @@ export class ToolCallGatePipeline {
     const gateProducers: Array<() => GateResult | Promise<GateResult>> = [
       () =>
         describeSkillReadGate(tcc, () => this.inputs.getActiveSkillEntries()),
-      () => describePathGate(tcc, this.resolver, this.customExtractors),
+      () =>
+        describePathGate(tcc, this.resolver, normalizer, this.customExtractors),
       () =>
         describeExternalDirectoryGate(
           tcc,
           infraDirs,
           this.resolver,
+          normalizer,
           this.customExtractors,
         ),
       () => describeBashExternalDirectoryGate(tcc, bashProgram, this.resolver),

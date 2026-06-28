@@ -155,6 +155,17 @@ describe("PermissionSession", () => {
       );
     });
 
+    it("binds the normalizer on activate, before any reset (no fail-open)", () => {
+      const { session } = createSession();
+      // A tool call can activate the session before session_start resets it;
+      // the normalizer must still track the active ctx cwd.
+      session.activate(makeCtx({ cwd: "/projects/activated" }));
+
+      expect(session.getPathNormalizer().forPath("a.ts").value()).toBe(
+        "/projects/activated/a.ts",
+      );
+    });
+
     it("builds a win32 normalizer when constructed with the win32 platform", () => {
       const { session } = createSession({ platform: "win32" });
       session.resetForNewSession(makeCtx({ cwd: "C:\\Projects\\App" }));

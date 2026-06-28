@@ -84,7 +84,12 @@ describe("external_directory symlink acceptance (#418)", () => {
       },
     });
     try {
-      const result = describeExternalDirectoryGate(readTcc(), [], resolver);
+      const result = describeExternalDirectoryGate(
+        readTcc(),
+        [],
+        resolver,
+        new PathNormalizer(process.platform, cwd),
+      );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("allow");
     } finally {
@@ -102,7 +107,12 @@ describe("external_directory symlink acceptance (#418)", () => {
       },
     });
     try {
-      const result = describeExternalDirectoryGate(readTcc(), [], resolver);
+      const result = describeExternalDirectoryGate(
+        readTcc(),
+        [],
+        resolver,
+        new PathNormalizer(process.platform, cwd),
+      );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("allow");
     } finally {
@@ -115,7 +125,12 @@ describe("external_directory symlink acceptance (#418)", () => {
       permission: { external_directory: { "*": "ask" } },
     });
     try {
-      const result = describeExternalDirectoryGate(readTcc(), [], resolver);
+      const result = describeExternalDirectoryGate(
+        readTcc(),
+        [],
+        resolver,
+        new PathNormalizer(process.platform, cwd),
+      );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("ask");
     } finally {

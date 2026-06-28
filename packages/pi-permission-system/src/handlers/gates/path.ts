@@ -1,4 +1,4 @@
-import { AccessPath } from "#src/access-intent/access-path";
+import type { PathNormalizer } from "#src/path-normalizer";
 import { getToolInputPath } from "#src/path-utils";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
@@ -18,6 +18,7 @@ import type { ToolCallContext } from "./types";
 export function describePathGate(
   tcc: ToolCallContext,
   resolver: ScopedPermissionResolver,
+  normalizer: PathNormalizer,
   extractors?: ToolAccessExtractorLookup,
 ): GateResult {
   const filePath = getToolInputPath(tcc.toolName, tcc.input, extractors);
@@ -26,7 +27,7 @@ export function describePathGate(
   // Emit an access-path intent so the resolver matches the lexical aliases
   // *and* the canonical (symlink-resolved) form, the same set
   // `external_directory` matches (#418, #486).
-  const accessPath = AccessPath.forPath(filePath, { cwd: tcc.cwd });
+  const accessPath = normalizer.forPath(filePath);
   const check = resolver.resolve({
     kind: "access-path",
     surface: "path",

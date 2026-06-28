@@ -1,10 +1,5 @@
-import { AccessPath } from "#src/access-intent/access-path";
-import {
-  getToolInputPath,
-  isPathOutsideWorkingDirectory,
-  isPiInfrastructureRead,
-  normalizePathForComparison,
-} from "#src/path-utils";
+import type { PathNormalizer } from "#src/path-normalizer";
+import { getToolInputPath, isPiInfrastructureRead } from "#src/path-utils";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
@@ -26,6 +21,7 @@ export function describeExternalDirectoryGate(
   tcc: ToolCallContext,
   infraDirs: string[],
   resolver: ScopedPermissionResolver,
+  normalizer: PathNormalizer,
   extractors?: ToolAccessExtractorLookup,
 ): GateResult {
   const externalDirectoryPath = getToolInputPath(
@@ -35,16 +31,14 @@ export function describeExternalDirectoryGate(
   );
   if (!externalDirectoryPath) return null;
 
-  if (!isPathOutsideWorkingDirectory(externalDirectoryPath, tcc.cwd)) {
+  if (!normalizer.isOutsideWorkingDirectory(externalDirectoryPath)) {
     return null;
   }
 
   // The boundary decision (above) and the infrastructure-read containment
   // check (below) use the canonical, symlink-resolved path; pattern matching
   // uses the typed and resolved aliases (#418).
-  const accessPath = AccessPath.forPath(externalDirectoryPath, {
-    cwd: tcc.cwd,
-  });
+  const accessPath = normalizer.forPath(externalDirectoryPath);
   const canonicalExtPath = accessPath.boundaryValue();
 
   // ── Pi infrastructure read bypass ──────────────────────────────────────
@@ -89,9 +83,7 @@ export function describeExternalDirectoryGate(
     resolver,
     tcc.agentName ?? undefined,
   );
-  const pattern = deriveApprovalPattern(
-    normalizePathForComparison(externalDirectoryPath, tcc.cwd),
-  );
+  const pattern = deriveApprovalPattern(accessPath.value());
 
   return {
     surface: "external_directory",

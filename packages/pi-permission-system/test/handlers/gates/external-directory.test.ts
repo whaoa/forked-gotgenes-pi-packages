@@ -7,6 +7,7 @@ import type {
 import { isGateBypass, isGateDescriptor } from "#src/handlers/gates/descriptor";
 import { describeExternalDirectoryGate } from "#src/handlers/gates/external-directory";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
 import { makeResolver } from "#test/helpers/gate-fixtures";
@@ -37,7 +38,13 @@ function gateUnderTest(
     makeCheckResult({ state: "ask", toolName: "external_directory" }),
   ),
 ) {
-  return describeExternalDirectoryGate(tcc, infraDirs, resolver, extractors);
+  return describeExternalDirectoryGate(
+    tcc,
+    infraDirs,
+    resolver,
+    new PathNormalizer(process.platform, tcc.cwd),
+    extractors,
+  );
 }
 
 // ── tests ────────────────────��────────────────────────────────────��────────

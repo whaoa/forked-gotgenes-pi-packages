@@ -15,6 +15,7 @@ import type { GateDescriptor } from "#src/handlers/gates/descriptor";
 import { isGateDescriptor } from "#src/handlers/gates/descriptor";
 import { describePathGate } from "#src/handlers/gates/path";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { PathNormalizer } from "#src/path-normalizer";
 
 import {
   makeGateCheckResult as makeCheckResult,
@@ -35,6 +36,10 @@ function makeTcc(overrides: Partial<ToolCallContext> = {}): ToolCallContext {
   };
 }
 
+// The gate reads the path normalizer (platform + cwd baked in) from the
+// session; here it is bound to the makeTcc default cwd.
+const normalizer = new PathNormalizer(process.platform, "/test/project");
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 describe("describePathGate", () => {
@@ -48,6 +53,7 @@ describe("describePathGate", () => {
     const result = describePathGate(
       makeTcc({ toolName: "bash", input: { command: "ls" } }),
       resolver,
+      normalizer,
     );
     expect(result).toBeNull();
     expect(resolver.resolve).not.toHaveBeenCalled();
@@ -58,13 +64,14 @@ describe("describePathGate", () => {
     const result = describePathGate(
       makeTcc({ toolName: "read", input: {} }),
       resolver,
+      normalizer,
     );
     expect(result).toBeNull();
   });
 
   it("returns null when path check result is allow", () => {
     const resolver = makeResolver(makeCheckResult({ state: "allow" }));
-    const result = describePathGate(makeTcc(), resolver);
+    const result = describePathGate(makeTcc(), resolver, normalizer);
     expect(result).toBeNull();
   });
 
@@ -77,7 +84,7 @@ describe("describePathGate", () => {
         origin: "builtin",
       }),
     );
-    const result = describePathGate(makeTcc(), resolver);
+    const result = describePathGate(makeTcc(), resolver, normalizer);
     expect(result).toBeNull();
   });
 
@@ -90,7 +97,7 @@ describe("describePathGate", () => {
         origin: "global",
       }),
     );
-    const result = describePathGate(makeTcc(), resolver);
+    const result = describePathGate(makeTcc(), resolver, normalizer);
     expect(result).not.toBeNull();
     expect(isGateDescriptor(result)).toBe(true);
   });
@@ -99,7 +106,7 @@ describe("describePathGate", () => {
     const resolver = makeResolver(
       makeCheckResult({ state: "deny", matchedPattern: "*.env" }),
     );
-    const result = describePathGate(makeTcc(), resolver);
+    const result = describePathGate(makeTcc(), resolver, normalizer);
     expect(result).not.toBeNull();
     expect(isGateDescriptor(result)).toBe(true);
     const desc = result as GateDescriptor;
@@ -111,7 +118,7 @@ describe("describePathGate", () => {
     const resolver = makeResolver(
       makeCheckResult({ state: "ask", matchedPattern: "*.env" }),
     );
-    const result = describePathGate(makeTcc(), resolver);
+    const result = describePathGate(makeTcc(), resolver, normalizer);
     expect(result).not.toBeNull();
     expect(isGateDescriptor(result)).toBe(true);
     const desc = result as GateDescriptor;
@@ -126,6 +133,7 @@ describe("describePathGate", () => {
     const result = describePathGate(
       makeTcc({ input: { path: "/test/project/src/.env" } }),
       resolver,
+      normalizer,
     ) as GateDescriptor;
     expect(result.sessionApproval).toBeDefined();
     expect(result.sessionApproval?.surface).toBe("path");
@@ -139,6 +147,7 @@ describe("describePathGate", () => {
     const result = describePathGate(
       makeTcc({ input: { path: "index.html" }, cwd: "/test/project" }),
       resolver,
+      normalizer,
     ) as GateDescriptor;
     expect(result.sessionApproval?.surface).toBe("path");
     expect(result.sessionApproval?.representativePattern).toBe(
@@ -150,7 +159,11 @@ describe("describePathGate", () => {
     const resolver = makeResolver(
       makeCheckResult({ state: "deny", matchedPattern: "*.env" }),
     );
-    const result = describePathGate(makeTcc(), resolver) as GateDescriptor;
+    const result = describePathGate(
+      makeTcc(),
+      resolver,
+      normalizer,
+    ) as GateDescriptor;
     expect(result.denialContext).toEqual({
       kind: "path",
       toolName: "read",
@@ -163,14 +176,18 @@ describe("describePathGate", () => {
     const resolver = makeResolver(
       makeCheckResult({ state: "deny", matchedPattern: "*.env" }),
     );
-    const result = describePathGate(makeTcc(), resolver) as GateDescriptor;
+    const result = describePathGate(
+      makeTcc(),
+      resolver,
+      normalizer,
+    ) as GateDescriptor;
     expect(result.decision.surface).toBe("path");
     expect(result.decision.value).toBe(".env");
   });
 
   it("resolves the path surface with an access-path intent and agent name", () => {
     const resolver = makeResolver(makeCheckResult({ state: "allow" }));
-    describePathGate(makeTcc({ agentName: "my-agent" }), resolver);
+    describePathGate(makeTcc({ agentName: "my-agent" }), resolver, normalizer);
     expect(resolver.resolve).toHaveBeenCalledWith({
       kind: "access-path",
       surface: "path",
@@ -185,7 +202,7 @@ describe("describePathGate", () => {
       p === "/test/project/.env" ? "/vault/secret.env" : p,
     );
     const resolver = makeResolver(makeCheckResult({ state: "allow" }));
-    describePathGate(makeTcc(), resolver);
+    describePathGate(makeTcc(), resolver, normalizer);
 
     const intent = resolver.resolve.mock.lastCall?.[0];
     expect(intent?.kind).toBe("access-path");
@@ -209,6 +226,7 @@ describe("describePathGate — home-relative paths", () => {
     const result = describePathGate(
       makeTcc({ input: { path: "~/.ssh/config" } }),
       resolver,
+      normalizer,
     ) as GateDescriptor;
 
     expect(isGateDescriptor(result)).toBe(true);
@@ -234,6 +252,7 @@ describe("describePathGate — home-relative paths", () => {
     const result = describePathGate(
       makeTcc({ input: { path: "$HOME/.ssh/config" } }),
       resolver,
+      normalizer,
     ) as GateDescriptor;
 
     expect(isGateDescriptor(result)).toBe(true);
@@ -249,6 +268,7 @@ describe("describePathGate — home-relative paths", () => {
     const result = describePathGate(
       makeTcc({ input: { path: "~/.ssh/config" } }),
       resolver,
+      normalizer,
     );
     expect(result).toBeNull();
   });
@@ -274,6 +294,7 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     const result = describePathGate(
       makeTcc({ toolName: "my-ext", input: { path: ".env" } }),
       resolver,
+      normalizer,
     );
     expect(isGateDescriptor(result)).toBe(true);
     expect(resolver.resolve).toHaveBeenCalledWith({
@@ -291,6 +312,7 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     const result = describePathGate(
       makeTcc({ toolName: "mcp", input: { arguments: { path: ".env" } } }),
       resolver,
+      normalizer,
     );
     expect(isGateDescriptor(result)).toBe(true);
     expect(resolver.resolve).toHaveBeenCalledWith({
@@ -308,6 +330,7 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     describePathGate(
       makeTcc({ toolName: "ffgrep", input: { target: "/etc/passwd" } }),
       resolver,
+      normalizer,
       extractorLookup("ffgrep", "target"),
     );
     expect(resolver.resolve).toHaveBeenCalledWith({
@@ -323,6 +346,7 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
     const result = describePathGate(
       makeTcc({ toolName: "my-ext", input: { other: true } }),
       resolver,
+      normalizer,
     );
     expect(result).toBeNull();
     expect(resolver.resolve).not.toHaveBeenCalled();
