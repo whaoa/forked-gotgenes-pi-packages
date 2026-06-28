@@ -78,10 +78,18 @@ Last-match-wins: `evaluate()` scans from the end.
 ### Evaluate
 
 ```typescript
-function evaluate(surface: string, value: string, rules: Ruleset): Rule {
+function evaluate(
+  surface: string,
+  value: string,
+  rules: Ruleset,
+  platform: NodeJS.Platform,
+): Rule {
   for (let i = rules.length - 1; i >= 0; i--) {
     const rule = rules[i];
-    if (wildcardMatch(rule.surface, surface) && wildcardMatch(rule.pattern, value)) {
+    // On win32 a path-surface match folds case + separators; `platform` is
+    // injected from `PermissionManager` (read once at the composition root,
+    // #510), never `process.platform` ambiently.
+    if (ruleMatches(rule, surface, value, platform)) {
       return rule;
     }
   }
@@ -640,7 +648,7 @@ The concept and the code role take two grammatical forms of one root, each for w
 
 ```text
 src/
-├── rule.ts                   Rule type, Ruleset type, evaluate()
+├── rule.ts                   Rule type, Ruleset type, evaluate() (takes an injected `platform` for win32 path-surface case-folding, supplied by `PermissionManager`, #510)
 ├── normalize.ts              Config → Ruleset normalization (flat format)
 ├── synthesize.ts             Universal default + MCP baseline → Ruleset
 ├── wildcard-matcher.ts       Compiled glob matching
@@ -665,17 +673,18 @@ src/
 ├── session-approval-recorder.ts `SessionApprovalRecorder` interface - records a granted session-scoped approval into the session ruleset; implemented by `SessionRules` (#323, #341)
 │
 ├── permission-session.ts     `PermissionSession` class - state/lifecycle owner: owns context lifecycle, session-rule lifecycle (`reset`/`shutdown`/`reload`), skill entries, agent-name resolution, the config gateway, the Tell-Don't-Ask gate inputs, and `notify(message)` (Tell-Don't-Ask UI warn over the owned context, no-op before activation — dissolves the `index.ts` forward-reference cycle, #363); `implements ToolCallGateInputs` (the pipeline's input contract); the resolve role moved to `PermissionResolver` (#340), the recorder role to `SessionRules`, and the three fig-leaf handler role interfaces (`GateHandlerSession` / `AgentPrepSession` / `SessionLifecycleSession`) were retired — handlers depend on the concrete class + `PermissionResolver` (#341)
+├── path-normalizer.ts        `PathNormalizer` class - the path-interpretation collaborator constructed once at the session edge with the host `platform` and session `cwd` baked in (#510); hands raw tokens, returns prepared values: `forPath`/`forLiteral` (build `AccessPath`s), `isAbsolute`/`resolveBase`/`joinBase` (platform-aware `cd`-fold routing the `BashPathResolver` asks), `isWithinDirectory`/`isOutsideWorkingDirectory` (containment); selects the `win32`/`posix` flavor once and delegates to the platform-parameterized `path-utils`/`AccessPath` primitives, so no consumer reads `process.platform` or threads `cwd`; a facade over (not a relocation of) those primitives — Phase 7 [#505] can later move them behind it
 ├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473); bash sub-domain completed by Phase 6 Step 3 (#475); `AccessPath` value object added by Phase 6 Step 4 (#476); `AccessIntent` union added by Phase 6 Step 6 (#478)
 │   ├── access-intent.ts     `AccessIntent` discriminated union each gate emits: `tool` (raw input the manager normalizes) and `access-path` (an `AccessPath` for every path gate — `path` and `external_directory`, #486); `ResolvedAccessIntent` (`tool | path-values`) is what the manager consumes after the resolver unwraps `access-path` via `matchValues()`, keeping the manager string-based — `path-values` is resolver-internal, not gate-emitted, since #486 (#478, #486)
-│   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form); the surface-neutral `forPath(pathValue, { cwd, resolveBase? })` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison` (resolveBase defaults to cwd; serves every path surface, #486), and `forLiteral(literal)` builds a literal-only path with no canonical for the unknown-base bash case ([#393]); type-distinct accessors make the lexical/canonical conflation a compile error (#476)
+│   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form); the surface-neutral `forPath(pathValue, { cwd, resolveBase?, platform })` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison` (resolveBase defaults to cwd; `platform` injected, not read ambiently, #510; serves every path surface, #486), and `forLiteral(literal)` builds a literal-only path with no canonical for the unknown-base bash case ([#393]); type-distinct accessors make the lexical/canonical conflation a compile error (#476)
 │   └── bash/
 │       ├── parser.ts           Lazy tree-sitter-bash parser: `TSNode` interface (exported), `TSParser` interface (private), `initParser` (private), `getParser = memoizeAsyncWithRetry(initParser)` (exported); dropped from `bash-program.ts` (#473)
 │       ├── node-text.ts        Quote-aware AST node-text resolver: `resolveNodeText` (pure; handles `word`, `raw_string`, `string`, `concatenation`, expansions, default fallback), `SKIP_SUBTREE_TYPES` (heredoc/comment sentinel set), `ARG_NODE_TYPES` (argument-value node-type set; peer of `SKIP_SUBTREE_TYPES`); dropped from `bash-program.ts` (#473, #474)
 │       ├── token-collection.ts Bash argument/flag tokenizer: `collectPathCandidateTokens`, `collectCommandTokens`, `collectRedirectTokens`, `extractCommandName` (exported); private: `PATTERN_FIRST_COMMANDS` table, `PatternCommandConfig`, `classifyPatternCommandFlag`, `collectPatternCommandTokens`, `collectGenericCommandTokens`; imports `resolveNodeText`, `SKIP_SUBTREE_TYPES`, `ARG_NODE_TYPES` from `node-text.ts`; dropped from `bash-program.ts` (#474)
 │       ├── command-enumeration.ts Bash command enumerator: `collectCommands` (exported) + private `collectCommandsInto`, `makeUnit`, `commandUnitText`, `isOpaqueWrapperCommand`, `basename`, `descendCommandChildren`, `collectSubstitutionCommands`; `COMMAND_ENUM_DESCEND` / `COMMAND_ENUM_SKIP` / `NESTED_EXECUTION_CONTEXTS` / `SHELL_WRAPPER_NAMES` tables; owns the `BashCommand` interface (exported), including the `opaque` flag for `bash -c`/`eval` wrappers (#481); strips leading `variable_assignment` prefixes from command units (#481); dropped from `bash-program.ts` (#475)
-│       ├── cwd-projection.ts  Effective-working-directory `cd`-fold projection: `collectPathCandidates` (exported) walks the AST tagging each path-candidate token with the `EffectiveBase` in force at its position; `projectExternalPaths` (exported) returns `AccessPath[]`; `projectRuleCandidates` (exported) returns `BashPathRuleCandidate[]` (`{ token, path: AccessPath }`, #486); owns `EffectiveBase`, `PathCandidate` (private), `BashPathRuleCandidate` (exported); private helpers: `walkForCandidates`, `walkCurrentShellSequence`, `walkPipeline`, `foldPipelineFirstStage`, `foldListExceptTerminal`, `isBackgrounded`, `tagTokens`, `foldCd`, `cdLiteralTarget`, `literalTextOf`, `isRelativeCandidate`, `buildRuleCandidatePath` (builds the candidate's `AccessPath` via `forPath`/`forLiteral`, #486); the subtlest region in the package (#307, #454); dropped from `bash-program.ts` (#475)
-│       ├── token-classification.ts Pure token classifiers: `classifyTokenAsPathCandidate` (strict: `/`, `~/`, `..`) and `classifyTokenAsRuleCandidate` (broader: also dot-files and relative paths); shared `rejectNonPathToken` predicate; consumed by `cwd-projection.ts`; relocated from `handlers/gates/bash-token-classification.ts` (#475)
-│       └── program.ts         Born-ready `BashProgram` value object (102 LOC): `parse(command, cwd: string)` eagerly resolves all three slices at construction time; parameter-free getters `commands(): BashCommand[]`, `externalPaths(): AccessPath[]`, `pathRuleCandidates(): BashPathRuleCandidate[]`; `commands()` splits the chain AND descends into command/process substitutions and subshells, emitting each nested command tagged with its execution `context` (never-weaker, #306), strips any leading `variable_assignment` prefix from each unit, and flags opaque-payload wrappers (`bash -c`/`eval`) with `opaque: true` so their decision is floored to `ask` (#481); `externalPaths()` and `pathRuleCandidates()` delegate to `cwd-projection.ts` projection functions (born-ready, #475); the `ToolCallContext.cwd: string | undefined` widening was corrected to `string` (#475) — `tcc.cwd` is always a `string` at runtime; relocated from `handlers/gates/bash-program.ts` (#475)
+│       ├── bash-path-resolver.ts  `BashPathResolver` class (constructed with a `PathNormalizer`): `resolve(rootNode): ResolvedBashPaths` walks the AST once, tagging each path-candidate token with the `EffectiveBase` in force at its position, and returns `{ externalPaths: AccessPath[], ruleCandidates: BashPathRuleCandidate[] }` (#486); routes every path through the injected `PathNormalizer` (no `process.platform`/`cwd` threading, #510); owns `ResolvedBashPaths` + `BashPathRuleCandidate` (exported), `EffectiveBase` + `PathCandidate` (private); private methods: `walkForCandidates`, `walkCurrentShellSequence`, `walkPipeline`, `foldPipelineFirstStage`, `foldListExceptTerminal`, `isBackgrounded`, `tagTokens`, `foldCd`, `cdLiteralTarget`, `literalTextOf`, `isRelativeCandidate`, `buildRuleCandidatePath` (builds the candidate's `AccessPath` via the normalizer's `forPath`/`forLiteral`, #486); the subtlest region in the package (#307, #454); renamed from `cwd-projection.ts` and converted to a `PathNormalizer`-backed class (#510)
+│       ├── token-classification.ts Pure token classifiers: `classifyTokenAsPathCandidate` (strict: `/`, `~/`, `..`) and `classifyTokenAsRuleCandidate` (broader: also dot-files and relative paths); shared `rejectNonPathToken` predicate; consumed by `bash-path-resolver.ts`; relocated from `handlers/gates/bash-token-classification.ts` (#475)
+│       └── program.ts         Born-ready `BashProgram` value object: `parse(command, normalizer: PathNormalizer)` eagerly resolves all three slices at construction time; parameter-free getters `commands(): BashCommand[]`, `externalPaths(): AccessPath[]`, `pathRuleCandidates(): BashPathRuleCandidate[]`; `commands()` splits the chain AND descends into command/process substitutions and subshells, emitting each nested command tagged with its execution `context` (never-weaker, #306), strips any leading `variable_assignment` prefix from each unit, and flags opaque-payload wrappers (`bash -c`/`eval`) with `opaque: true` so their decision is floored to `ask` (#481); `externalPaths()` and `pathRuleCandidates()` delegate to a `BashPathResolver` built from the injected `PathNormalizer` (born-ready, #475; normalizer seam, #510); the `ToolCallContext.cwd: string | undefined` widening was corrected to `string` (#475) — `tcc.cwd` is always a `string` at runtime; relocated from `handlers/gates/bash-program.ts` (#475)
 ├── handlers/                 Handler classes with narrow constructor injection
 │   ├── index.ts              Barrel re-exports
 │   ├── lifecycle.ts          SessionLifecycleHandler (session: `PermissionSession` + resolver: `PermissionResolver` (getConfigIssues) + serviceLifecycle: `ServiceLifecycle` + audit: `DecisionSummaryWriter`); writes the decision-audit summary on `session_shutdown` (#341, #320, #452)
@@ -686,7 +695,7 @@ src/
 │       ├── types.ts          GateOutcome, ToolCallContext
 │       ├── descriptor.ts     GateDescriptor (with DenialContext), GateBypass, GateResult types
 │       ├── runner.ts         GateRunner class — constructed with three distinct collaborators: `ScopedPermissionResolver` (resolver), `SessionApprovalRecorder` (`SessionRules` recorder), `GatePrompter` (`PromptingGateway`), plus `DecisionReporter`; `run(gate, agentName, toolCallId)` dispatches null / bypass / descriptor (#341)
-│       ├── tool-call-gate-pipeline.ts `ToolCallGateInputs` interface (three query methods: `getActiveSkillEntries`, `getInfrastructureReadDirs`, `getToolPreviewLimits`) + `ToolCallGatePipeline` class — constructed with `ScopedPermissionResolver` + `ToolCallGateInputs`; owns bash-command extraction + single `BashProgram.parse`, `ToolPreviewFormatter` construction, infra-dir list, the six gate producers, and the run loop; `evaluate(tcc, runner)` returns the first block outcome or allow (#327, #340)
+│       ├── tool-call-gate-pipeline.ts `ToolCallGateInputs` interface (query methods: `getActiveSkillEntries`, `getInfrastructureReadDirs`, `getToolPreviewLimits`, `getPathNormalizer`, `getPlatform`) + `ToolCallGatePipeline` class — constructed with `ScopedPermissionResolver` + `ToolCallGateInputs`; owns bash-command extraction + single `BashProgram.parse` (fed the session `PathNormalizer`, #510), `ToolPreviewFormatter` construction, infra-dir list, the six gate producers, and the run loop; `evaluate(tcc, runner)` returns the first block outcome or allow (#327, #340)
 │       ├── skill-input-gate-pipeline.ts `SkillInputGateInputs` + `GateNotifier` interfaces + `SkillInputGatePipeline` class — constructed once in the composition root and injected into `PermissionGateHandler`; owns raw `checkPermission` pre-check, deny notify, `describeSkillInputGate` descriptor, request-id mint (`createSkillInputRequestId`), and `runner.run`; `evaluate(skillName, agentName, notifier, runner)` makes the `input` path symmetric with the `tool_call` path (#329, absorbs #330)
 │       ├── helpers.ts        deriveDecisionValue, deriveResolution, buildDecisionEvent
 │       ├── skill-read.ts     describeSkillReadGate - pure descriptor factory
@@ -857,6 +866,14 @@ flowchart TD
 - **Principal identity and cross-session path portability.**
   Still deferred (the broader access-intent design work), out of Phase 7 scope.
 
+### Related: PathNormalizer platform seam ([#510])
+
+A precursor refactor (not one of the five steps above) threaded a single injected `PathNormalizer` collaborator through the bash path pipeline, completing the half-built platform seam behind the recurring Windows-path bugs ([#382], [#345], [#418], [#508]).
+The host `platform` is read once at the composition root (`index.ts`) and injected: into `PermissionManager` (rule-matching case-fold), into `PermissionSession` (which builds the `PathNormalizer` from `platform` + the session `cwd` and exposes it via `getPathNormalizer()` / `getPlatform()`), and into the subagent-context detection.
+No interior `src/` module reads `process.platform` — an ESLint `no-restricted-syntax` guard scoped to `pi-permission-system/src` (exempting `index.ts`) enforces this, so every path-utils / canonicalize / rule / subagent-context leaf takes an injected `platform` rather than a `= process.platform` default.
+`PathNormalizer` is a facade *over* the platform-parameterized `path-utils` / `AccessPath` primitives, not a relocation: Phase 7 Step 4 ([#505]) can later move those internals behind it without re-touching the seam.
+The change is behavior-preserving on POSIX (every converted op already used the host `node:path`); the `win32` flavor is newly exercised by injected-platform unit tests, and [#508] then lands the drive-letter routing fix on the seam.
+
 ## Improvement roadmap — Phase 6: Access-intent extraction (complete)
 
 Phase 6 extracted the access-intent domain across eight steps: it decomposed the 1,143-line `bash-program.ts` god file into focused modules under `src/access-intent/bash/`, introduced the `AccessPath` value object that makes the [#418] lexical/canonical conflation a compile-time error, collapsed the two external-directory gates onto a single shared policy check, narrowed `ScopedPermissionResolver` to one `resolve(intent)` entry point (eliminating the [#393] false-green class), dissolved the `common.ts` grab-bag, and extracted a shared external-directory test fixture.
@@ -926,6 +943,8 @@ Eight steps ([#473]–[#480]), all closed.
 [#342]: https://github.com/gotgenes/pi-packages/issues/342
 [#362]: https://github.com/gotgenes/pi-packages/issues/362
 [#368]: https://github.com/gotgenes/pi-packages/issues/368
+[#345]: https://github.com/gotgenes/pi-packages/issues/345
+[#382]: https://github.com/gotgenes/pi-packages/issues/382
 [#393]: https://github.com/gotgenes/pi-packages/issues/393
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
 [#473]: https://github.com/gotgenes/pi-packages/issues/473
@@ -943,4 +962,6 @@ Eight steps ([#473]–[#480]), all closed.
 [#504]: https://github.com/gotgenes/pi-packages/issues/504
 [#505]: https://github.com/gotgenes/pi-packages/issues/505
 [#506]: https://github.com/gotgenes/pi-packages/issues/506
+[#508]: https://github.com/gotgenes/pi-packages/issues/508
+[#510]: https://github.com/gotgenes/pi-packages/issues/510
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
