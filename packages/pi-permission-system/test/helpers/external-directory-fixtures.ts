@@ -20,6 +20,7 @@ import { wildcardMatch } from "#src/wildcard-matcher";
 
 import {
   getDecisionEvents,
+  makeCtx,
   makeEvents,
   makeSurfaceCheck,
   makeToolRegistry,
@@ -201,6 +202,9 @@ function makeSessionApprovingPrompter(): GatePrompter {
 export function makeDedupWiring(prompter?: GatePrompter) {
   const { session, permissionManager, sessionRules, logger } =
     makeRealSession();
+  // Bind the session PathNormalizer to the suite cwd, mirroring the
+  // session_start → resetForNewSession edge that builds it in production.
+  session.resetForNewSession(makeCtx({ cwd: EXT_DIR_CWD }));
   const { resolver } = makeRealResolver(permissionManager, sessionRules);
   makeExtDirDedupCheck(permissionManager);
   const events = makeEvents();

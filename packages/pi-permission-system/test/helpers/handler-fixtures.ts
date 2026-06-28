@@ -233,6 +233,9 @@ export function makeHandler(overrides?: {
 }) {
   const { session, permissionManager, sessionRules, forwarding, logger } =
     makeRealSession();
+  // Bind the session PathNormalizer to the default test cwd, mirroring the
+  // session_start → resetForNewSession edge that builds it in production.
+  session.resetForNewSession(makeCtx());
   const { resolver } = makeRealResolver(permissionManager, sessionRules);
 
   // Apply session override bag to the real collaborators.

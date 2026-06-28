@@ -22,6 +22,7 @@ import {
 } from "#src/handlers/gates/descriptor";
 import { describeExternalDirectoryGate } from "#src/handlers/gates/external-directory";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { PathNormalizer } from "#src/path-normalizer";
 import { PermissionResolver } from "#src/permission-resolver";
 import { SessionRules } from "#src/session-rules";
 import type { ScopeConfig } from "#src/types";
@@ -137,7 +138,10 @@ describe("external_directory symlink acceptance (#418)", () => {
         toolCallId: "tc-2",
         cwd,
       };
-      const program = await BashProgram.parse(command, cwd);
+      const program = await BashProgram.parse(
+        command,
+        new PathNormalizer(process.platform, cwd),
+      );
       const result = describeBashExternalDirectoryGate(tcc, program, resolver);
       // All external paths are covered by the allow → bypass, no prompt.
       expect(isGateBypass(result)).toBe(true);

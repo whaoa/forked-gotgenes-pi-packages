@@ -67,9 +67,10 @@ export class ToolCallGatePipeline {
     // Parse the bash command exactly once per evaluate; the three bash gates
     // share this single BashProgram instead of each re-parsing (#308).
     const command = getNonEmptyString(toRecord(tcc.input).command);
+    const normalizer = this.inputs.getPathNormalizer();
     const bashProgram =
       tcc.toolName === "bash" && command
-        ? await BashProgram.parse(command, tcc.cwd)
+        ? await BashProgram.parse(command, normalizer)
         : null;
 
     const formatter = new ToolPreviewFormatter(

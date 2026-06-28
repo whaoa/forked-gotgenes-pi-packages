@@ -18,12 +18,26 @@ vi.mock("node:fs", () => ({
 }));
 
 import { formatDenyReason } from "#src/denial-messages";
-import { extractExternalPathsFromBashCommand } from "#src/handlers/gates/bash-path-extractor";
+import { extractExternalPathsFromBashCommand as extractWithNormalizer } from "#src/handlers/gates/bash-path-extractor";
 import { formatBashExternalDirectoryAskPrompt } from "#src/handlers/gates/external-directory-messages";
+import { PathNormalizer } from "#src/path-normalizer";
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+// The production facade now takes a PathNormalizer (platform + cwd baked in);
+// this wrapper preserves the (command, cwd) call shape the suite uses
+// throughout so the projection-correctness assertions stay unchanged.
+function extractExternalPathsFromBashCommand(
+  command: string,
+  cwd: string,
+): Promise<string[]> {
+  return extractWithNormalizer(
+    command,
+    new PathNormalizer(process.platform, cwd),
+  );
+}
 
 describe("extractExternalPathsFromBashCommand", () => {
   const cwd = "/projects/my-app";

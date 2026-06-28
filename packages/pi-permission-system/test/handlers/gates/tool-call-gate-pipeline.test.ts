@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AccessPath } from "#src/access-intent/access-path";
 import { ToolCallGatePipeline } from "#src/handlers/gates/tool-call-gate-pipeline";
+import { PathNormalizer } from "#src/path-normalizer";
 
 import {
   makeGateInputs,
@@ -172,7 +173,7 @@ describe("ToolCallGatePipeline", () => {
       expect(mockBashProgramParse).toHaveBeenCalledTimes(1);
       expect(mockBashProgramParse).toHaveBeenCalledWith(
         "echo hello",
-        "/test/project",
+        expect.any(PathNormalizer),
       );
     });
 

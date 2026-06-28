@@ -9,6 +9,7 @@ import type {
 } from "#src/handlers/gates/descriptor";
 import { isGateBypass, isGateDescriptor } from "#src/handlers/gates/descriptor";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { PermissionCheckResult } from "#src/types";
 import { getNonEmptyString, toRecord } from "#src/value-guards";
@@ -59,7 +60,10 @@ async function describeGate(
   const command = getNonEmptyString(toRecord(tcc.input).command);
   const bashProgram =
     tcc.toolName === "bash" && command
-      ? await BashProgram.parse(command, tcc.cwd)
+      ? await BashProgram.parse(
+          command,
+          new PathNormalizer(process.platform, tcc.cwd),
+        )
       : null;
   return describeBashExternalDirectoryGate(tcc, bashProgram, resolver);
 }

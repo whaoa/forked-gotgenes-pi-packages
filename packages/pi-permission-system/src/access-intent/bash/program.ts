@@ -1,15 +1,14 @@
 import type { AccessPath } from "#src/access-intent/access-path";
 import {
+  BashPathResolver,
+  type BashPathRuleCandidate,
+} from "#src/access-intent/bash/bash-path-resolver";
+import {
   type BashCommand,
   collectCommands,
 } from "#src/access-intent/bash/command-enumeration";
-import {
-  type BashPathRuleCandidate,
-  collectPathCandidates,
-  projectExternalPaths,
-  projectRuleCandidates,
-} from "#src/access-intent/bash/cwd-projection";
 import { getParser } from "#src/access-intent/bash/parser";
+import type { PathNormalizer } from "#src/path-normalizer";
 
 export type { BashCommand, BashPathRuleCandidate };
 
@@ -35,20 +34,26 @@ export class BashProgram {
    *
    * Uses tree-sitter-bash to build the full AST, enumerates command units and
    * walks path-candidate tokens once, then eagerly resolves all three slices
-   * against `cwd`. Heredoc bodies, comments, and other non-argument content are
-   * skipped. An unparseable command yields an empty program.
+   * through the injected {@link PathNormalizer} (platform + cwd baked in).
+   * Heredoc bodies, comments, and other non-argument content are skipped. An
+   * unparseable command yields an empty program.
    */
-  static async parse(command: string, cwd: string): Promise<BashProgram> {
+  static async parse(
+    command: string,
+    normalizer: PathNormalizer,
+  ): Promise<BashProgram> {
     const parser = await getParser();
     const tree = parser.parse(command);
     if (!tree) return new BashProgram([], [], []);
 
     try {
-      const candidates = collectPathCandidates(tree.rootNode);
+      const { externalPaths, ruleCandidates } = new BashPathResolver(
+        normalizer,
+      ).resolve(tree.rootNode);
       return new BashProgram(
         collectCommands(tree.rootNode),
-        projectExternalPaths(candidates, cwd),
-        projectRuleCandidates(candidates, cwd),
+        externalPaths,
+        ruleCandidates,
       );
     } finally {
       tree.delete();
@@ -81,7 +86,8 @@ export class BashProgram {
    * objects holding both the lexical (as-typed) and canonical (symlink-resolved)
    * forms behind distinct accessors.
    *
-   * Resolved eagerly at parse time against the `cwd` supplied to `parse()`.
+   * Resolved eagerly at parse time through the `PathNormalizer` supplied to
+   * `parse()` (platform + cwd baked in).
    * Use `.matchValues()` for `external_directory` pattern matching and
    * `.boundaryValue()` for containment checks; `.value()` for display and logs.
    */
@@ -92,7 +98,8 @@ export class BashProgram {
   /**
    * Path-rule candidates paired with their policy lookup values.
    *
-   * Resolved eagerly at parse time against the `cwd` supplied to `parse()`.
+   * Resolved eagerly at parse time through the `PathNormalizer` supplied to
+   * `parse()` (platform + cwd baked in).
    * Each token is resolved against the effective working directory in force at
    * the token's position (folding literal current-shell `cd` commands), while
    * raw and project-relative aliases are retained for backward-compatible
