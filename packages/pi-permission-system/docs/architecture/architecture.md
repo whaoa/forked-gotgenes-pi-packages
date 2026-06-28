@@ -874,7 +874,7 @@ No interior `src/` module reads `process.platform` — an ESLint `no-restricted-
 `PathNormalizer` is a facade *over* the platform-parameterized `path-utils` / `AccessPath` primitives, not a relocation: Phase 7 Step 4 ([#505]) can later move those internals behind it without re-touching the seam.
 The change is behavior-preserving on POSIX (every converted op already used the host `node:path`); the `win32` flavor is newly exercised by injected-platform unit tests, and [#508] then lands the drive-letter routing fix on the seam.
 
-#### Residual `getPlatform()` threading (follow-up)
+#### Residual `getPlatform()` threading (follow-up [#511])
 
 The seam left five call sites threading `platform` *directly* rather than through `PathNormalizer`, because they call raw `path-utils` functions that are not `AccessPath` operations.
 `PermissionSession.getPlatform()` (and the `ToolCallGateInputs.getPlatform()` it backs) exists only to feed them; it can be retired as each is folded, and the leaf `platform` parameters in `path-utils.ts` persist until then.
@@ -887,7 +887,7 @@ How each relates to the Phase 7 steps above:
 - **Skill-prompt sanitization** (`skill-prompt-sanitizer.ts` `createResolvedSkillEntry` → `normalizePathForComparison`, `findSkillPathMatch` → `isPathWithinDirectory`; reached from `before-agent-start.ts` and `handlers/gates/skill-read.ts`) — **not** covered by any Phase 7 step.
   Skill entries cache `normalizedLocation` / `normalizedBaseDir` as strings rather than `AccessPath`s, so routing them through the value object (and dropping the last two `getPlatform()` reads) is unscoped follow-up work.
 
-So `getPlatform()` disappears only after Steps 1–4 land *and* the infra-read + skill-sanitizer reads are addressed; Step 4 relocates the `AccessPath`-backing normalizers behind the value object but keeps the containment / infra-read predicates platform-parameterized.
+So `getPlatform()` disappears only after Steps 1–4 land *and* the infra-read + skill-sanitizer reads are addressed (tracked in [#511]); Step 4 relocates the `AccessPath`-backing normalizers behind the value object but keeps the containment / infra-read predicates platform-parameterized.
 
 ## Improvement roadmap — Phase 6: Access-intent extraction (complete)
 
@@ -979,4 +979,5 @@ Eight steps ([#473]–[#480]), all closed.
 [#506]: https://github.com/gotgenes/pi-packages/issues/506
 [#508]: https://github.com/gotgenes/pi-packages/issues/508
 [#510]: https://github.com/gotgenes/pi-packages/issues/510
+[#511]: https://github.com/gotgenes/pi-packages/issues/511
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
