@@ -85,10 +85,17 @@ export interface PermissionManagerOptions extends PolicyLoaderOptions {
    * from this value and supports {@link PermissionManager.configureForCwd}.
    */
   agentDir?: string;
+  /**
+   * Host platform, injected from the composition root, that decides whether
+   * path-surface rule matching folds case (and separators) on Windows.
+   * Defaults to a POSIX flavor; production always supplies the real platform.
+   */
+  platform?: NodeJS.Platform;
 }
 
 export class PermissionManager implements ScopedPermissionManager {
   private readonly agentDir: string | undefined;
+  private readonly platform: NodeJS.Platform;
   private currentCwd: string | undefined;
   private loader: PolicyLoader;
   private readonly resolvedPermissionsCache = new Map<
@@ -98,6 +105,7 @@ export class PermissionManager implements ScopedPermissionManager {
 
   constructor(options: PermissionManagerOptions = {}) {
     this.agentDir = options.agentDir;
+    this.platform = options.platform ?? "linux";
     this.loader =
       options.policyLoader ??
       new FilePolicyLoader(
@@ -216,23 +224,25 @@ export class PermissionManager implements ScopedPermissionManager {
 
     // Special surfaces (external_directory): evaluate directly by surface name.
     if (SPECIAL_PERMISSION_KEYS.has(normalizedToolName)) {
-      return evaluate(normalizedToolName, "*", composedRules).action;
+      return evaluate(normalizedToolName, "*", composedRules, this.platform)
+        .action;
     }
 
     // Bash, MCP, skill: evaluate with "*" value — the per-surface catch-all
     // (or universal default) handles this correctly.
     if (normalizedToolName === "bash") {
-      return evaluate("bash", "*", composedRules).action;
+      return evaluate("bash", "*", composedRules, this.platform).action;
     }
     if (normalizedToolName === "mcp") {
-      return evaluate("mcp", "*", composedRules).action;
+      return evaluate("mcp", "*", composedRules, this.platform).action;
     }
     if (normalizedToolName === "skill") {
-      return evaluate("skill", "*", composedRules).action;
+      return evaluate("skill", "*", composedRules, this.platform).action;
     }
 
     // Tool-name surfaces (read, write, etc. and extension tools).
-    return evaluate(normalizedToolName, "*", composedRules).action;
+    return evaluate(normalizedToolName, "*", composedRules, this.platform)
+      .action;
   }
 
   /**
@@ -260,6 +270,7 @@ export class PermissionManager implements ScopedPermissionManager {
         intent.surface,
         intent.surface,
         fullRules,
+        this.platform,
       );
     }
 
@@ -278,6 +289,7 @@ export class PermissionManager implements ScopedPermissionManager {
       toolName,
       intent.surface,
       fullRules,
+      this.platform,
     );
   }
 }
@@ -296,10 +308,11 @@ function buildCheckResult(
   normalizedToolName: string,
   toolName: string,
   fullRules: Ruleset,
+  platform: NodeJS.Platform,
 ): PermissionCheckResult {
   const { rule, value } = PATH_SURFACES.has(surface)
-    ? evaluateAnyValue(surface, values, fullRules)
-    : evaluateFirst(surface, values, fullRules);
+    ? evaluateAnyValue(surface, values, fullRules, platform)
+    : evaluateFirst(surface, values, fullRules, platform);
 
   // For MCP, replace the normalizer's fallback target with the actual
   // matched candidate value so PermissionCheckResult.target is accurate.

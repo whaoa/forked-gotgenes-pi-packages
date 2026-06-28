@@ -30,15 +30,17 @@ describe("synthesizeDefaults", () => {
 
   test("universal rule catches any surface via wildcardMatch", () => {
     const rules = synthesizeDefaults("ask");
-    expect(evaluate("read", "*", rules).action).toBe("ask");
-    expect(evaluate("bash", "git status", rules).action).toBe("ask");
-    expect(evaluate("external_directory", "*", rules).action).toBe("ask");
-    expect(evaluate("future_surface", "*", rules).action).toBe("ask");
+    expect(evaluate("read", "*", rules, "linux").action).toBe("ask");
+    expect(evaluate("bash", "git status", rules, "linux").action).toBe("ask");
+    expect(evaluate("external_directory", "*", rules, "linux").action).toBe(
+      "ask",
+    );
+    expect(evaluate("future_surface", "*", rules, "linux").action).toBe("ask");
   });
 
   test("universal rule has layer 'default'", () => {
     const rules = synthesizeDefaults("allow");
-    expect(evaluate("read", "*", rules).layer).toBe("default");
+    expect(evaluate("read", "*", rules, "linux").layer).toBe("default");
   });
 
   test("defaults to origin 'builtin' when no origin supplied", () => {
@@ -54,7 +56,7 @@ describe("synthesizeDefaults", () => {
 
   test("origin is preserved through evaluate()", () => {
     const rules = synthesizeDefaults("allow", "project");
-    const result = evaluate("read", "*", rules);
+    const result = evaluate("read", "*", rules, "linux");
     expect(result.origin).toBe("project");
   });
 
@@ -171,7 +173,7 @@ describe("synthesizeBaseline", () => {
       },
     ];
     const rules = synthesizeBaseline(configRules);
-    const result = evaluate("mcp", "mcp_status", rules);
+    const result = evaluate("mcp", "mcp_status", rules, "linux");
     expect(result.action).toBe("allow");
     expect(result.layer).toBe("baseline");
     expect(result.origin).toBe("baseline");
@@ -218,7 +220,7 @@ describe("composeRuleset", () => {
       },
     ];
     const composed = composeRuleset(defaults, [], config);
-    const result = evaluate("bash", "echo hello", composed);
+    const result = evaluate("bash", "echo hello", composed, "linux");
     expect(result.action).toBe("deny");
     expect(result.layer).toBe("config");
   });
@@ -235,7 +237,7 @@ describe("composeRuleset", () => {
       },
     ];
     const composed = composeRuleset(defaults, [], config);
-    const result = evaluate("read", "*", composed);
+    const result = evaluate("read", "*", composed, "linux");
     expect(result.action).toBe("allow");
     expect(result.layer).toBe("config");
   });
@@ -261,7 +263,7 @@ describe("composeRuleset", () => {
       },
     ];
     const composed = composeRuleset(defaults, baseline, config);
-    const result = evaluate("mcp", "mcp_status", composed);
+    const result = evaluate("mcp", "mcp_status", composed, "linux");
     expect(result.action).toBe("deny");
     expect(result.layer).toBe("config");
   });
@@ -287,7 +289,7 @@ describe("composeRuleset", () => {
       },
     ];
     const composed = composeRuleset(defaults, baseline, config);
-    const result = evaluate("mcp", "exa_web_search", composed);
+    const result = evaluate("mcp", "exa_web_search", composed, "linux");
     expect(result.action).toBe("allow");
     expect(result.layer).toBe("config");
   });

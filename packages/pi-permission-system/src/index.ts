@@ -46,7 +46,10 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // session (PathNormalizer) and, later, rule evaluation. Interior modules must
   // not read process.platform (enforced by the eslint guard scoped to src/).
   const hostPlatform = process.platform;
-  const permissionManager = new PermissionManager({ agentDir });
+  const permissionManager = new PermissionManager({
+    agentDir,
+    platform: hostPlatform,
+  });
   const sessionRules = new SessionRules();
   const subagentRegistry = getSubagentSessionRegistry();
   const formatterRegistry = new ToolInputFormatterRegistry();

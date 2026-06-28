@@ -71,6 +71,46 @@ const sessionAllow = (surface: string, pattern: string): Rule => ({
   origin: "session",
 });
 
+describe("PermissionManager — injected platform (#510)", () => {
+  const winAllow: Ruleset = [
+    sessionAllow("external_directory", "C:\\Users\\Foo\\pi\\*"),
+  ];
+
+  it("win32 manager folds case for path-surface matching", () => {
+    const manager = new PermissionManager({
+      globalConfigPath: "/nonexistent/config.json",
+      agentsDir: "/nonexistent/agents",
+      platform: "win32",
+    });
+    const result = manager.check(
+      {
+        kind: "path-values",
+        surface: "external_directory",
+        values: ["c:\\users\\foo\\pi\\docs\\readme.md"],
+      },
+      winAllow,
+    );
+    expect(result.state).toBe("allow");
+  });
+
+  it("posix manager keeps path-surface matching case-sensitive", () => {
+    const manager = new PermissionManager({
+      globalConfigPath: "/nonexistent/config.json",
+      agentsDir: "/nonexistent/agents",
+      platform: "linux",
+    });
+    const result = manager.check(
+      {
+        kind: "path-values",
+        surface: "external_directory",
+        values: ["c:\\users\\foo\\pi\\docs\\readme.md"],
+      },
+      winAllow,
+    );
+    expect(result.state).not.toBe("allow");
+  });
+});
+
 // Adapters that build an AccessIntent and call the unified `check` entry point,
 // so these tests exercise the single resolution path (#478) without a
 // production-class wrapper used only by tests.

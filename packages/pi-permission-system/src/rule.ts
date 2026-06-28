@@ -54,8 +54,8 @@ export function evaluate(
   surface: string,
   pattern: string,
   rules: Ruleset,
+  platform: NodeJS.Platform,
   defaultAction?: PermissionState,
-  platform: NodeJS.Platform = process.platform,
 ): Rule {
   const rule = rules.findLast((r) =>
     ruleMatches(r, surface, pattern, platform),
@@ -124,10 +124,11 @@ export function evaluateMostRestrictive(
   surface: string,
   values: string[],
   rules: Ruleset,
+  platform: NodeJS.Platform,
 ): { rule: Rule; value: string } | null {
   let worst: { rule: Rule; value: string } | null = null;
   for (const value of values) {
-    const rule = evaluate(surface, value, rules);
+    const rule = evaluate(surface, value, rules, platform);
     if (rule.action === "deny") return { rule, value };
     if (rule.action === "ask" && worst?.rule.action !== "ask") {
       worst = { rule, value };
@@ -140,9 +141,10 @@ export function evaluateFirst(
   surface: string,
   values: string[],
   rules: Ruleset,
+  platform: NodeJS.Platform,
 ): { rule: Rule; value: string } {
   for (const value of values) {
-    const rule = evaluate(surface, value, rules);
+    const rule = evaluate(surface, value, rules, platform);
     if (rule.layer !== "default") {
       return { rule, value };
     }
@@ -150,7 +152,7 @@ export function evaluateFirst(
   // All candidates matched only the synthesized default — use the first.
   const fallbackValue = values[0] ?? "*";
   return {
-    rule: evaluate(surface, fallbackValue, rules),
+    rule: evaluate(surface, fallbackValue, rules, platform),
     value: fallbackValue,
   };
 }
@@ -167,7 +169,7 @@ export function evaluateAnyValue(
   surface: string,
   values: string[],
   rules: Ruleset,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): { rule: Rule; value: string } {
   const fallbackValue = values[0] ?? "*";
   const rule = rules.findLast((r) =>
@@ -182,7 +184,7 @@ export function evaluateAnyValue(
     };
   }
   return {
-    rule: evaluate(surface, fallbackValue, rules),
+    rule: evaluate(surface, fallbackValue, rules, platform),
     value: fallbackValue,
   };
 }
