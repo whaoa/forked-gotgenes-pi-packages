@@ -37,3 +37,33 @@ Confirmed a behavior-preserving `refactor:` that batches into [#508]'s `fix:` re
   No new follow-up issue filed (the deferred `isRelativeCandidate` conversion already lives in [#508]).
 - **Testability payoff.**
   The whole point is exercising Windows behavior on a POSIX CI by injecting a `win32` `PathNormalizer` — no `vi.mock("node:path")`.
+
+## Stage: Implementation — TDD (2026-06-28T18:35:00Z)
+
+### Session summary
+
+Completed the 10-step plan: steps 1–6 (leaf-normalizer platform flavor, `AccessPath` platform option, the `PathNormalizer` collaborator, session-edge construction, the `BashPathResolver` rename, and the gate migration) landed in a prior session; this session executed steps 7–10 (inject `platform` into `rule.ts` evaluation, into `subagent-context.ts` detection, the `process.platform` ESLint guard + removal of all interior defaults, and the architecture/SKILL docs).
+The test count rose from 2183 to 2189 (+6: the `rule.ts` and `subagent-context.ts` win32/posix injection assertions).
+Final state: all 10 `#510` commits green on `pnpm run check` / `pnpm run lint` / 2189 tests / `pnpm fallow dead-code`; pre-completion reviewer returned **PASS**.
+
+### Observations
+
+- **`required` vs defaulted platform param (operator decision via `ask_user`).**
+  Chose required params (no `= process.platform` default) on `rule.ts`, `subagent-context.ts`, and every `path-utils`/`canonicalize-path` leaf — fully `tsc`-enforced threading — over a lower-churn posix-literal default.
+  `PermissionManager`'s constructor option `platform?` keeps an internal `?? "linux"` default (its only production caller, `index.ts`, passes `hostPlatform`), which contained the manager-construction test churn.
+- **`evaluate` param reorder.**
+  `evaluate`'s optional `defaultAction` blocked a required trailing `platform`, so the signature became `evaluate(surface, pattern, rules, platform, defaultAction?)`.
+  Migrated ~84 `rule.ts`/`synthesize`/`session-rules` test call sites with a paren-balancing Python script (append `"linux"` for 3-arg calls, insert before `"deny"` for `defaultAction` calls, drop the old `undefined,` slot for the win32 calls).
+- **Step-9 blast radius exceeded the plan (operator-confirmed deviation).**
+  The plan named only `isPathWithinDirectory`/`isPiInfrastructureRead`, but the package-wide lint guard forbids the *text* `process.platform`, so **all** leaf defaults had to go.
+  That forced threading `platform` to ~6 production sites the plan did not enumerate: `input-normalizer` (via `manager.platform`), the `tool`/`skill-read`/`external-directory` gates (via a new `ToolCallGateInputs.getPlatform()` off the session), and `skill-prompt-sanitizer` (via `before-agent-start` → `session.getPlatform()`).
+  Test churn (~93 path-utils call sites + `AccessPath.forPath({ cwd })` object injection) was automated with a second paren-balancing script.
+- **Lint-guard sanity check gotcha.**
+  Verifying the guard fires (temporarily adding an interior `process.platform`) used `git checkout` to revert — which also reverted the *uncommitted* step-9 change to `canonicalize-path.ts`.
+  Caught it (`grep "= process.platform"`) and re-applied before committing.
+- **`getPlatform()` alongside `getPathNormalizer()`.**
+  Two session accessors on `ToolCallGateInputs`: the normalizer for the bash pipeline, and the bare `platform` for the rule/gate sites that call raw `path-utils`/`isPiInfrastructureRead` rather than an `AccessPath` op.
+  The reviewer confirmed the split is correct (path-interpretation vs. rule case-folding are distinct concerns).
+- **Pre-completion reviewer: PASS** — all deterministic checks green, all cross-step invariants ([#418], [#393], [#308], [#382], [#478]) preserved, all 4 Mermaid diagrams validated, no dead code, docs forward/reverse complete.
+  No WARN findings.
+- **Doc note.** `architecture.md` recorded the seam as "### Related: PathNormalizer platform seam ([#510])" under Phase 7 (a precursor refactor, not one of the five Phase 7 steps), updated the `cwd-projection.ts` → `bash-path-resolver.ts` rename, the `BashProgram.parse` signature, the `evaluate()` pseudo-code, and added a `path-normalizer.ts` module entry.
