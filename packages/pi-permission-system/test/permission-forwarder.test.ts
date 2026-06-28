@@ -18,6 +18,7 @@ function makeDeps(
   return {
     forwardingDir: "/tmp/forwarding",
     subagentSessionsDir: "/tmp/subagents",
+    platform: "linux",
     logger: { review: vi.fn(), debug: vi.fn() },
     requestPermissionDecisionFromUi: vi
       .fn()

@@ -66,21 +66,51 @@ describe("isRegisteredSubagentChild", () => {
 
 describe("normalizeFilesystemPath", () => {
   test("normalizes a simple absolute path", () => {
-    expect(normalizeFilesystemPath("/projects/my-app")).toBe(
+    expect(normalizeFilesystemPath("/projects/my-app", "linux")).toBe(
       "/projects/my-app",
     );
   });
 
   test("collapses redundant separators", () => {
-    expect(normalizeFilesystemPath("/projects//my-app")).toBe(
+    expect(normalizeFilesystemPath("/projects//my-app", "linux")).toBe(
       "/projects/my-app",
     );
   });
 
   test("resolves . and .. segments", () => {
-    expect(normalizeFilesystemPath("/projects/my-app/../other")).toBe(
+    expect(normalizeFilesystemPath("/projects/my-app/../other", "linux")).toBe(
       "/projects/other",
     );
+  });
+
+  test("win32: lowercases and normalizes with win32 separators", () => {
+    expect(normalizeFilesystemPath("C:\\Projects\\My-App", "win32")).toBe(
+      "c:\\projects\\my-app",
+    );
+  });
+
+  test("posix: leaves case untouched", () => {
+    expect(normalizeFilesystemPath("/Projects/My-App", "linux")).toBe(
+      "/Projects/My-App",
+    );
+  });
+});
+
+describe("isSubagentExecutionContext — injected platform (#510)", () => {
+  test("win32: detects a subagent session dir case-insensitively", () => {
+    const subagentRoot = "C:\\Sessions\\Subagents";
+    const sessionDir = "c:\\sessions\\subagents\\child";
+    expect(
+      isSubagentExecutionContext(makeCtx(sessionDir), subagentRoot, "win32"),
+    ).toBe(true);
+  });
+
+  test("posix: the same mixed-case dir is not a subagent context", () => {
+    const subagentRoot = "/Sessions/Subagents";
+    const sessionDir = "/sessions/subagents/child";
+    expect(
+      isSubagentExecutionContext(makeCtx(sessionDir), subagentRoot, "linux"),
+    ).toBe(false);
   });
 });
 
@@ -88,21 +118,21 @@ describe("isSubagentExecutionContext — env hint detection", () => {
   test("returns true when PI_IS_SUBAGENT is set", () => {
     vi.stubEnv("PI_IS_SUBAGENT", "true");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_SUBAGENT_SESSION_ID is set", () => {
     vi.stubEnv("PI_SUBAGENT_SESSION_ID", "abc123");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_AGENT_ROUTER_SUBAGENT is set", () => {
     vi.stubEnv("PI_AGENT_ROUTER_SUBAGENT", "1");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
@@ -110,35 +140,35 @@ describe("isSubagentExecutionContext — env hint detection", () => {
   test("returns true when PI_SUBAGENT_CHILD is set", () => {
     vi.stubEnv("PI_SUBAGENT_CHILD", "1");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_SUBAGENT_RUN_ID is set", () => {
     vi.stubEnv("PI_SUBAGENT_RUN_ID", "run-abc");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_SUBAGENT_CHILD_AGENT is set", () => {
     vi.stubEnv("PI_SUBAGENT_CHILD_AGENT", "worker");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_SUBAGENT_DEPTH is set", () => {
     vi.stubEnv("PI_SUBAGENT_DEPTH", "1");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_SUBAGENT_DEPTH is zero (depth-0 is still a subagent context)", () => {
     vi.stubEnv("PI_SUBAGENT_DEPTH", "0");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
@@ -146,28 +176,28 @@ describe("isSubagentExecutionContext — env hint detection", () => {
   test("returns true when PI_SUBAGENT_NAME is set", () => {
     vi.stubEnv("PI_SUBAGENT_NAME", "my-agent");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_SUBAGENT_ID is set", () => {
     vi.stubEnv("PI_SUBAGENT_ID", "id-xyz");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_SUBAGENT_SESSION is set", () => {
     vi.stubEnv("PI_SUBAGENT_SESSION", "session-xyz");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
   test("returns true when PI_SUBAGENT_ACTIVITY_FILE is set", () => {
     vi.stubEnv("PI_SUBAGENT_ACTIVITY_FILE", "/tmp/activity.json");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(true);
   });
 
@@ -191,14 +221,14 @@ describe("isSubagentExecutionContext — env hint detection", () => {
   test("returns false when env hint value is empty string", () => {
     vi.stubEnv("PI_IS_SUBAGENT", "");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(false);
   });
 
   test("returns false when env hint value is whitespace only", () => {
     vi.stubEnv("PI_IS_SUBAGENT", "   ");
     expect(
-      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents"),
+      isSubagentExecutionContext(makeCtx(null), "/sessions/subagents", "linux"),
     ).toBe(false);
   });
 });
@@ -208,38 +238,42 @@ describe("isSubagentExecutionContext — session dir detection", () => {
 
   test("returns true when session dir is within subagent root", () => {
     const sessionDir = `${subagentRoot}/session-abc`;
-    expect(isSubagentExecutionContext(makeCtx(sessionDir), subagentRoot)).toBe(
-      true,
-    );
+    expect(
+      isSubagentExecutionContext(makeCtx(sessionDir), subagentRoot, "linux"),
+    ).toBe(true);
   });
 
   test("returns true when session dir equals subagent root", () => {
     expect(
-      isSubagentExecutionContext(makeCtx(subagentRoot), subagentRoot),
+      isSubagentExecutionContext(makeCtx(subagentRoot), subagentRoot, "linux"),
     ).toBe(true);
   });
 
   test("returns false when session dir is outside subagent root", () => {
     const sessionDir = "/home/user/.pi/agent/sessions/main-session";
-    expect(isSubagentExecutionContext(makeCtx(sessionDir), subagentRoot)).toBe(
-      false,
-    );
+    expect(
+      isSubagentExecutionContext(makeCtx(sessionDir), subagentRoot, "linux"),
+    ).toBe(false);
   });
 
   test("returns false when session dir is a sibling with shared prefix", () => {
     // "/sessions/subagents-extra" should not match root "/sessions/subagents"
     const sessionDir = `${subagentRoot}-extra/session-abc`;
-    expect(isSubagentExecutionContext(makeCtx(sessionDir), subagentRoot)).toBe(
-      false,
-    );
+    expect(
+      isSubagentExecutionContext(makeCtx(sessionDir), subagentRoot, "linux"),
+    ).toBe(false);
   });
 
   test("returns false when getSessionDir returns null", () => {
-    expect(isSubagentExecutionContext(makeCtx(null), subagentRoot)).toBe(false);
+    expect(
+      isSubagentExecutionContext(makeCtx(null), subagentRoot, "linux"),
+    ).toBe(false);
   });
 
   test("returns false when getSessionDir returns empty string", () => {
-    expect(isSubagentExecutionContext(makeCtx(""), subagentRoot)).toBe(false);
+    expect(isSubagentExecutionContext(makeCtx(""), subagentRoot, "linux")).toBe(
+      false,
+    );
   });
 });
 
@@ -256,6 +290,7 @@ describe("isSubagentExecutionContext — registry detection", () => {
       isSubagentExecutionContext(
         makeCtx(outsideDir, childSessionId),
         subagentRoot,
+        "linux",
         registry,
       ),
     ).toBe(true);
@@ -268,6 +303,7 @@ describe("isSubagentExecutionContext — registry detection", () => {
       isSubagentExecutionContext(
         makeCtx(outsideDir, childSessionId),
         subagentRoot,
+        "linux",
         registry,
       ),
     ).toBe(true);
@@ -279,6 +315,7 @@ describe("isSubagentExecutionContext — registry detection", () => {
       isSubagentExecutionContext(
         makeCtx(outsideDir, childSessionId),
         subagentRoot,
+        "linux",
         registry,
       ),
     ).toBe(false);
@@ -287,7 +324,12 @@ describe("isSubagentExecutionContext — registry detection", () => {
   test("returns false when session id is empty and registry has no matching entry", () => {
     const registry = new SubagentSessionRegistry();
     expect(
-      isSubagentExecutionContext(makeCtx(null, ""), subagentRoot, registry),
+      isSubagentExecutionContext(
+        makeCtx(null, ""),
+        subagentRoot,
+        "linux",
+        registry,
+      ),
     ).toBe(false);
   });
 
@@ -301,6 +343,7 @@ describe("isSubagentExecutionContext — registry detection", () => {
       isSubagentExecutionContext(
         makeCtx(outsideDir, childSessionId),
         subagentRoot,
+        "linux",
         registry,
       ),
     ).toBe(true);
@@ -314,6 +357,7 @@ describe("isSubagentExecutionContext — registry detection", () => {
       isSubagentExecutionContext(
         makeCtx(outsideDir, childSessionId),
         subagentRoot,
+        "linux",
         registry,
       ),
     ).toBe(true);
@@ -321,6 +365,8 @@ describe("isSubagentExecutionContext — registry detection", () => {
 
   test("no registry passed — existing behaviour unchanged", () => {
     // Ensure the parameter is truly optional (no registry arg)
-    expect(isSubagentExecutionContext(makeCtx(null), subagentRoot)).toBe(false);
+    expect(
+      isSubagentExecutionContext(makeCtx(null), subagentRoot, "linux"),
+    ).toBe(false);
   });
 });

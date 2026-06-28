@@ -78,6 +78,7 @@ function makeDeps(
     config: overrides.config ?? makeConfigReader(),
     subagentSessionsDir:
       overrides.subagentSessionsDir ?? "/test/agent/subagent-sessions",
+    platform: overrides.platform ?? "linux",
     registry: overrides.registry,
     prompter: overrides.prompter ?? makePrompterApi(),
   };

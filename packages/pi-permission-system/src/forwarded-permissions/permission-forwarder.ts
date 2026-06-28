@@ -77,6 +77,8 @@ export interface ForwarderContext {
 export interface PermissionForwarderDeps {
   forwardingDir: string;
   subagentSessionsDir: string;
+  /** Host platform, injected from the composition root, for subagent-context path detection. */
+  platform: NodeJS.Platform;
   /** In-process subagent session registry for detection and forwarding target resolution. */
   registry?: SubagentSessionRegistry;
   /** Event bus used for UI prompt broadcasts. */
@@ -185,6 +187,7 @@ export interface InboxProcessor {
 export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
   private readonly forwardingDir: string;
   private readonly subagentSessionsDir: string;
+  private readonly platform: NodeJS.Platform;
   private readonly registry: SubagentSessionRegistry | undefined;
   private readonly events: PermissionEventBus | undefined;
   private readonly logger: DebugReviewLogger;
@@ -199,6 +202,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
   constructor(deps: PermissionForwarderDeps) {
     this.forwardingDir = deps.forwardingDir;
     this.subagentSessionsDir = deps.subagentSessionsDir;
+    this.platform = deps.platform;
     this.registry = deps.registry;
     this.events = deps.events;
     this.logger = deps.logger;
@@ -228,7 +232,12 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
     }
 
     if (
-      !isSubagentExecutionContext(ctx, this.subagentSessionsDir, this.registry)
+      !isSubagentExecutionContext(
+        ctx,
+        this.subagentSessionsDir,
+        this.platform,
+        this.registry,
+      )
     ) {
       return Promise.resolve({ approved: false, state: "denied" });
     }
@@ -307,6 +316,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
       isSubagent: isSubagentExecutionContext(
         ctx,
         this.subagentSessionsDir,
+        this.platform,
         this.registry,
       ),
       currentSessionId: requesterSessionId,

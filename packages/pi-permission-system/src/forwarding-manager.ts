@@ -30,6 +30,7 @@ export class ForwardingManager {
   constructor(
     private readonly subagentSessionsDir: string,
     private readonly forwarder: InboxProcessor,
+    private readonly platform: NodeJS.Platform,
     private readonly registry?: SubagentSessionRegistry,
   ) {}
 
@@ -42,7 +43,12 @@ export class ForwardingManager {
   start(ctx: ExtensionContext): void {
     if (
       !ctx.hasUI ||
-      isSubagentExecutionContext(ctx, this.subagentSessionsDir, this.registry)
+      isSubagentExecutionContext(
+        ctx,
+        this.subagentSessionsDir,
+        this.platform,
+        this.registry,
+      )
     ) {
       this.stop();
       return;

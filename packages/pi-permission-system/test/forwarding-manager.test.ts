@@ -30,7 +30,11 @@ function makeForwarder() {
 }
 
 function makeManager() {
-  return new ForwardingManager("/agent/subagent-sessions", makeForwarder());
+  return new ForwardingManager(
+    "/agent/subagent-sessions",
+    makeForwarder(),
+    "linux",
+  );
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -180,6 +184,7 @@ describe("ForwardingManager", () => {
       const manager = new ForwardingManager(
         "/custom/subagent-dir",
         makeForwarder(),
+        "linux",
       );
       const ctx = makeCtx();
       manager.start(ctx);
@@ -187,6 +192,7 @@ describe("ForwardingManager", () => {
       expect(mockIsSubagentExecutionContext).toHaveBeenCalledWith(
         ctx,
         "/custom/subagent-dir",
+        "linux",
         undefined,
       );
     });

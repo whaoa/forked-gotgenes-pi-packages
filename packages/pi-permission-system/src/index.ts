@@ -80,6 +80,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const forwardingDeps: PermissionForwarderDeps = {
     forwardingDir: paths.forwardingDir,
     subagentSessionsDir: paths.subagentSessionsDir,
+    platform: hostPlatform,
     registry: subagentRegistry,
     events: pi.events,
     logger,
@@ -98,6 +99,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const gateway = new PromptingGateway({
     config: configStore,
     subagentSessionsDir: paths.subagentSessionsDir,
+    platform: hostPlatform,
     registry: subagentRegistry,
     prompter,
   });
@@ -107,6 +109,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     new ForwardingManager(
       paths.subagentSessionsDir,
       forwarder,
+      hostPlatform,
       subagentRegistry,
     ),
     permissionManager,

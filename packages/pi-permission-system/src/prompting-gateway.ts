@@ -23,6 +23,8 @@ export interface PromptingGatewayDeps {
   config: ConfigReader;
   /** Static path used to detect a forwarding subagent context. */
   subagentSessionsDir: string;
+  /** Host platform, injected from the composition root, for subagent-context path detection. */
+  platform: NodeJS.Platform;
   /** Process-global registry used to detect a registered child session. */
   registry?: SubagentSessionRegistry;
   /** Resolves the permission decision: direct UI dialog or forwarded to parent. */
@@ -82,6 +84,7 @@ export class PromptingGateway
       isSubagent: isSubagentExecutionContext(
         this.context,
         this.deps.subagentSessionsDir,
+        this.deps.platform,
         this.deps.registry,
       ),
     });
