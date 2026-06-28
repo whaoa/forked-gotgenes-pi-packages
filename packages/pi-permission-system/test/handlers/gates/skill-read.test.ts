@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { describeSkillReadGate } from "#src/handlers/gates/skill-read";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { PathNormalizer } from "#src/path-normalizer";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
+
+// All test tccs use cwd "/test/project"; one normalizer serves every call.
+const normalizer = new PathNormalizer("linux", "/test/project");
 
 // ── SDK stubs ──────────────────────────────────────────────────────────────
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
@@ -43,21 +47,21 @@ describe("describeSkillReadGate", () => {
   it("returns null when tool is not read", () => {
     const result = describeSkillReadGate(
       makeTcc({ toolName: "write" }),
-      "linux",
+      normalizer,
       () => [makeSkillEntry()],
     );
     expect(result).toBeNull();
   });
 
   it("returns null when no active skill entries", () => {
-    const result = describeSkillReadGate(makeTcc(), "linux", () => []);
+    const result = describeSkillReadGate(makeTcc(), normalizer, () => []);
     expect(result).toBeNull();
   });
 
   it("returns null when read path does not match any skill", () => {
     const result = describeSkillReadGate(
       makeTcc({ input: { path: "/test/project/src/index.ts" } }),
-      "linux",
+      normalizer,
       () => [makeSkillEntry()],
     );
     expect(result).toBeNull();
@@ -66,14 +70,14 @@ describe("describeSkillReadGate", () => {
   it("returns null when input has no path", () => {
     const result = describeSkillReadGate(
       makeTcc({ input: {} }),
-      "linux",
+      normalizer,
       () => [makeSkillEntry()],
     );
     expect(result).toBeNull();
   });
 
   it("returns GateDescriptor with preResolved.state matching skill entry state (ask)", () => {
-    const result = describeSkillReadGate(makeTcc(), "linux", () => [
+    const result = describeSkillReadGate(makeTcc(), normalizer, () => [
       makeSkillEntry({ state: "ask" }),
     ]);
     expect(result).not.toBeNull();
@@ -82,7 +86,7 @@ describe("describeSkillReadGate", () => {
   });
 
   it("returns GateDescriptor with preResolved.state matching skill entry state (allow)", () => {
-    const result = describeSkillReadGate(makeTcc(), "linux", () => [
+    const result = describeSkillReadGate(makeTcc(), normalizer, () => [
       makeSkillEntry({ state: "allow" }),
     ]);
     expect(result).not.toBeNull();
@@ -91,7 +95,7 @@ describe("describeSkillReadGate", () => {
   });
 
   it("returns GateDescriptor with preResolved.state matching skill entry state (deny)", () => {
-    const result = describeSkillReadGate(makeTcc(), "linux", () => [
+    const result = describeSkillReadGate(makeTcc(), normalizer, () => [
       makeSkillEntry({ state: "deny" }),
     ]);
     expect(result).not.toBeNull();
@@ -100,7 +104,7 @@ describe("describeSkillReadGate", () => {
   });
 
   it("decision surface is 'skill' and decision value is the skill name", () => {
-    const result = describeSkillReadGate(makeTcc(), "linux", () => [
+    const result = describeSkillReadGate(makeTcc(), normalizer, () => [
       makeSkillEntry({ name: "my-skill" }),
     ])!;
     expect(result.decision.surface).toBe("skill");
@@ -108,7 +112,7 @@ describe("describeSkillReadGate", () => {
   });
 
   it("denialContext contains the skill name and read path", () => {
-    const result = describeSkillReadGate(makeTcc(), "linux", () => [
+    const result = describeSkillReadGate(makeTcc(), normalizer, () => [
       makeSkillEntry({ name: "librarian" }),
     ])!;
     expect(result.denialContext).toEqual({
@@ -122,7 +126,7 @@ describe("describeSkillReadGate", () => {
   it("promptDetails includes skill_read source and skillName", () => {
     const result = describeSkillReadGate(
       makeTcc({ agentName: "test-agent", toolCallId: "tc-42" }),
-      "linux",
+      normalizer,
       () => [makeSkillEntry({ name: "my-skill" })],
     )!;
     expect(result.promptDetails).toMatchObject({
@@ -138,7 +142,7 @@ describe("describeSkillReadGate", () => {
   it("logContext includes skill_read source and skillName", () => {
     const result = describeSkillReadGate(
       makeTcc({ agentName: "agent-1" }),
-      "linux",
+      normalizer,
       () => [makeSkillEntry({ name: "librarian" })],
     )!;
     expect(result.logContext).toMatchObject({
@@ -149,7 +153,7 @@ describe("describeSkillReadGate", () => {
   });
 
   it("surface is 'skill' on the descriptor", () => {
-    const result = describeSkillReadGate(makeTcc(), "linux", () => [
+    const result = describeSkillReadGate(makeTcc(), normalizer, () => [
       makeSkillEntry(),
     ])!;
     expect(result.surface).toBe("skill");

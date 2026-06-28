@@ -85,7 +85,7 @@ export class ToolCallGatePipeline {
 
     const gateProducers: Array<() => GateResult | Promise<GateResult>> = [
       () =>
-        describeSkillReadGate(tcc, platform, () =>
+        describeSkillReadGate(tcc, normalizer, () =>
           this.inputs.getActiveSkillEntries(),
         ),
       () =>

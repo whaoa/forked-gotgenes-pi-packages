@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionManager } from "#src/permission-manager";
 import {
   findSkillPathMatch,
@@ -29,6 +30,11 @@ afterEach(() => {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const CWD = "/projects/my-app";
+
+// `findSkillPathMatch` only uses the normalizer's platform (it compares two
+// already-absolute paths via `isWithinDirectory`), so this CWD-baked instance
+// serves every call regardless of the entries' cwd.
+const normalizer = new PathNormalizer("linux", CWD);
 
 function makeManager(
   defaultState: "allow" | "deny" | "ask" = "allow",
@@ -72,13 +78,7 @@ describe("resolveSkillPromptEntries", () => {
   test("returns unchanged prompt and empty entries when no skills section present", () => {
     const input = "You are a helpful assistant.";
     const manager = makeManager("allow");
-    const result = resolveSkillPromptEntries(
-      input,
-      manager,
-      null,
-      CWD,
-      "linux",
-    );
+    const result = resolveSkillPromptEntries(input, manager, null, normalizer);
     expect(result.prompt).toBe(input);
     expect(result.entries).toEqual([]);
     expect(manager.checkPermission).not.toHaveBeenCalled();
@@ -87,13 +87,7 @@ describe("resolveSkillPromptEntries", () => {
   test("keeps all skills when all are allowed", () => {
     const input = availableSkillsSection("librarian", "ask-user");
     const manager = makeManager("allow");
-    const result = resolveSkillPromptEntries(
-      input,
-      manager,
-      null,
-      CWD,
-      "linux",
-    );
+    const result = resolveSkillPromptEntries(input, manager, null, normalizer);
     expect(result.prompt).toContain("librarian");
     expect(result.prompt).toContain("ask-user");
     expect(result.entries).toHaveLength(2);
@@ -102,13 +96,7 @@ describe("resolveSkillPromptEntries", () => {
   test("removes denied skill from section", () => {
     const input = availableSkillsSection("librarian", "dangerous");
     const manager = makeManager("allow", { dangerous: "deny" });
-    const result = resolveSkillPromptEntries(
-      input,
-      manager,
-      null,
-      CWD,
-      "linux",
-    );
+    const result = resolveSkillPromptEntries(input, manager, null, normalizer);
     expect(result.prompt).toContain("librarian");
     expect(result.prompt).not.toContain("dangerous");
     // denied skill is excluded from returned entries
@@ -118,13 +106,7 @@ describe("resolveSkillPromptEntries", () => {
   test("removes entire section when all skills are denied", () => {
     const input = `Intro\n${availableSkillsSection("dangerous")}\nOutro`;
     const manager = makeManager("deny");
-    const result = resolveSkillPromptEntries(
-      input,
-      manager,
-      null,
-      CWD,
-      "linux",
-    );
+    const result = resolveSkillPromptEntries(input, manager, null, normalizer);
     expect(result.prompt).not.toContain("<available_skills>");
     expect(result.prompt).toContain("Intro");
     expect(result.prompt).toContain("Outro");
@@ -134,13 +116,7 @@ describe("resolveSkillPromptEntries", () => {
   test("keeps ask-state skills in section and entries", () => {
     const input = availableSkillsSection("librarian");
     const manager = makeManager("ask");
-    const result = resolveSkillPromptEntries(
-      input,
-      manager,
-      null,
-      CWD,
-      "linux",
-    );
+    const result = resolveSkillPromptEntries(input, manager, null, normalizer);
     expect(result.prompt).toContain("librarian");
     expect(result.entries).toHaveLength(1);
     expect(result.entries[0].state).toBe("ask");
@@ -149,7 +125,7 @@ describe("resolveSkillPromptEntries", () => {
   test("delegates permission check to permissionManager for each skill", () => {
     const input = availableSkillsSection("alpha", "beta");
     const manager = makeManager("allow");
-    resolveSkillPromptEntries(input, manager, null, CWD, "linux");
+    resolveSkillPromptEntries(input, manager, null, normalizer);
     expect(manager.checkPermission).toHaveBeenCalledWith(
       "skill",
       { name: "alpha" },
@@ -165,7 +141,7 @@ describe("resolveSkillPromptEntries", () => {
   test("passes agentName to permissionManager", () => {
     const input = availableSkillsSection("librarian");
     const manager = makeManager("allow");
-    resolveSkillPromptEntries(input, manager, "my-agent", CWD, "linux");
+    resolveSkillPromptEntries(input, manager, "my-agent", normalizer);
     expect(manager.checkPermission).toHaveBeenCalledWith(
       "skill",
       { name: "librarian" },
@@ -180,7 +156,7 @@ describe("resolveSkillPromptEntries", () => {
       availableSkillsSection("librarian"),
     ].join("\n");
     const manager = makeManager("allow");
-    resolveSkillPromptEntries(input, manager, null, CWD, "linux");
+    resolveSkillPromptEntries(input, manager, null, normalizer);
     // Should only be called once despite appearing twice.
     expect(manager.checkPermission).toHaveBeenCalledTimes(1);
   });
@@ -189,13 +165,7 @@ describe("resolveSkillPromptEntries", () => {
     const location = "/skills/librarian/SKILL.md";
     const input = availableSkillsSection("librarian");
     const manager = makeManager("allow");
-    const result = resolveSkillPromptEntries(
-      input,
-      manager,
-      null,
-      CWD,
-      "linux",
-    );
+    const result = resolveSkillPromptEntries(input, manager, null, normalizer);
     expect(result.entries[0].normalizedLocation).toBe(location);
     expect(result.entries[0].normalizedBaseDir).toBe("/skills/librarian");
   });
@@ -205,13 +175,7 @@ describe("resolveSkillPromptEntries", () => {
     const section2 = availableSkillsSection("beta");
     const input = `${section1}\n${section2}`;
     const manager = makeManager("allow", { beta: "deny" });
-    const result = resolveSkillPromptEntries(
-      input,
-      manager,
-      null,
-      CWD,
-      "linux",
-    );
+    const result = resolveSkillPromptEntries(input, manager, null, normalizer);
     expect(result.entries.map((e) => e.name)).toContain("alpha");
     expect(result.entries.map((e) => e.name)).not.toContain("beta");
   });
@@ -240,12 +204,12 @@ describe("findSkillPathMatch", () => {
   ];
 
   test("returns null for empty normalized path", () => {
-    expect(findSkillPathMatch("", entries, "linux")).toBeNull();
+    expect(findSkillPathMatch("", entries, normalizer)).toBeNull();
   });
 
   test("returns null for empty entries array", () => {
     expect(
-      findSkillPathMatch("/skills/librarian/SKILL.md", [], "linux"),
+      findSkillPathMatch("/skills/librarian/SKILL.md", [], normalizer),
     ).toBeNull();
   });
 
@@ -253,7 +217,7 @@ describe("findSkillPathMatch", () => {
     const match = findSkillPathMatch(
       "/skills/librarian/SKILL.md",
       entries,
-      "linux",
+      normalizer,
     );
     expect(match?.name).toBe("librarian");
   });
@@ -262,13 +226,17 @@ describe("findSkillPathMatch", () => {
     const match = findSkillPathMatch(
       "/skills/librarian/extra/helper.md",
       entries,
-      "linux",
+      normalizer,
     );
     expect(match?.name).toBe("librarian");
   });
 
   test("returns null for path not within any skill directory", () => {
-    const match = findSkillPathMatch("/other/path/file.md", entries, "linux");
+    const match = findSkillPathMatch(
+      "/other/path/file.md",
+      entries,
+      normalizer,
+    );
     expect(match).toBeNull();
   });
 
@@ -277,7 +245,7 @@ describe("findSkillPathMatch", () => {
     const match = findSkillPathMatch(
       "/skills/librarian-extra/SKILL.md",
       entries,
-      "linux",
+      normalizer,
     );
     expect(match).toBeNull();
   });
@@ -304,7 +272,7 @@ describe("findSkillPathMatch", () => {
     const match = findSkillPathMatch(
       "/skills/parent/child/helper.md",
       nestedEntries,
-      "linux",
+      normalizer,
     );
     expect(match?.name).toBe("child");
   });
@@ -380,8 +348,7 @@ test("REGRESSION: resolveSkillPromptEntries sanitizes every available_skills blo
       prompt,
       asChecker(manager),
       null,
-      "/cwd",
-      "linux",
+      new PathNormalizer("linux", "/cwd"),
     );
 
     expect(result.prompt).not.toContain("denied-skill");
@@ -428,20 +395,19 @@ test("REGRESSION: resolveSkillPromptEntries keeps only visible skills available 
       prompt,
       asChecker(manager),
       null,
-      "/cwd",
-      "linux",
+      new PathNormalizer("linux", "/cwd"),
     );
     const visiblePath = resolve("/cwd", "./skills/visible/file.ts");
     const blockedPath = resolve("/cwd", "./skills/blocked/file.ts");
     const matchedVisibleSkill = findSkillPathMatch(
       process.platform === "win32" ? visiblePath.toLowerCase() : visiblePath,
       result.entries,
-      "linux",
+      normalizer,
     );
     const matchedBlockedSkill = findSkillPathMatch(
       process.platform === "win32" ? blockedPath.toLowerCase() : blockedPath,
       result.entries,
-      "linux",
+      normalizer,
     );
 
     expect(matchedVisibleSkill?.name).toBe("visible-skill");

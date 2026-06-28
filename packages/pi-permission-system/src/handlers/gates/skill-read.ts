@@ -1,4 +1,4 @@
-import { normalizePathForComparison } from "#src/path-utils";
+import type { PathNormalizer } from "#src/path-normalizer";
 import { formatSkillPathAskPrompt } from "#src/permission-prompts";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
 import { findSkillPathMatch } from "#src/skill-prompt-sanitizer";
@@ -15,7 +15,7 @@ import type { ToolCallContext } from "./types";
  */
 export function describeSkillReadGate(
   tcc: ToolCallContext,
-  platform: NodeJS.Platform,
+  normalizer: PathNormalizer,
   getActiveSkillEntries: () => SkillPromptEntry[],
 ): GateDescriptor | null {
   const activeSkillEntries = getActiveSkillEntries();
@@ -30,15 +30,11 @@ export function describeSkillReadGate(
     return null;
   }
 
-  const normalizedReadPath = normalizePathForComparison(
-    path,
-    tcc.cwd,
-    platform,
-  );
+  const normalizedReadPath = normalizer.comparableValue(path);
   const matchedSkill = findSkillPathMatch(
     normalizedReadPath,
     activeSkillEntries,
-    platform,
+    normalizer,
   );
 
   if (!matchedSkill) {

@@ -1,9 +1,6 @@
 import { dirname } from "node:path";
 
-import {
-  isPathWithinDirectory,
-  normalizePathForComparison,
-} from "./path-utils";
+import type { PathNormalizer } from "./path-normalizer";
 import type { PermissionCheckResult, PermissionState } from "./types";
 
 /**
@@ -151,24 +148,15 @@ function resolvePermissionState(
 function createResolvedSkillEntry(
   entry: ParsedSkillPromptEntry,
   state: PermissionState,
-  cwd: string,
-  platform: NodeJS.Platform,
+  normalizer: PathNormalizer,
 ): SkillPromptEntry {
   return {
     name: entry.name,
     description: entry.description,
     location: entry.location,
     state,
-    normalizedLocation: normalizePathForComparison(
-      entry.location,
-      cwd,
-      platform,
-    ),
-    normalizedBaseDir: normalizePathForComparison(
-      dirname(entry.location),
-      cwd,
-      platform,
-    ),
+    normalizedLocation: normalizer.comparableValue(entry.location),
+    normalizedBaseDir: normalizer.comparableValue(dirname(entry.location)),
   };
 }
 
@@ -198,8 +186,7 @@ export function resolveSkillPromptEntries(
   prompt: string,
   permissionManager: SkillPermissionChecker,
   agentName: string | null,
-  cwd: string,
-  platform: NodeJS.Platform,
+  normalizer: PathNormalizer,
 ): { prompt: string; entries: SkillPromptEntry[] } {
   const sections = parseAllSkillPromptSections(prompt);
   if (sections.length === 0) {
@@ -219,7 +206,7 @@ export function resolveSkillPromptEntries(
         agentName,
         permissionCache,
       );
-      return createResolvedSkillEntry(entry, state, cwd, platform);
+      return createResolvedSkillEntry(entry, state, normalizer);
     });
 
     const visibleSectionEntries = resolvedEntries.filter(
@@ -267,7 +254,7 @@ export function resolveSkillPromptEntries(
 export function findSkillPathMatch(
   normalizedPath: string,
   entries: readonly SkillPromptEntry[],
-  platform: NodeJS.Platform,
+  normalizer: PathNormalizer,
 ): SkillPromptEntry | null {
   if (!normalizedPath || entries.length === 0) {
     return null;
@@ -286,7 +273,7 @@ export function findSkillPathMatch(
   for (const entry of entries) {
     if (
       !entry.normalizedBaseDir ||
-      !isPathWithinDirectory(normalizedPath, entry.normalizedBaseDir, platform)
+      !normalizer.isWithinDirectory(normalizedPath, entry.normalizedBaseDir)
     ) {
       continue;
     }
