@@ -77,6 +77,13 @@ describe("PathNormalizer", () => {
       );
       expect(normalizer.isOutsideWorkingDirectory("/etc/hosts")).toBe(true);
     });
+
+    test("comparableValue returns the lexical absolute form (no FS)", () => {
+      expect(normalizer.comparableValue("src/foo.ts")).toBe(
+        "/projects/my-app/src/foo.ts",
+      );
+      expect(normalizer.comparableValue("/etc/hosts")).toBe("/etc/hosts");
+    });
   });
 
   describe("win32 flavor", () => {
@@ -118,6 +125,42 @@ describe("PathNormalizer", () => {
         normalizer.isOutsideWorkingDirectory("c:\\projects\\app\\src"),
       ).toBe(false);
       expect(normalizer.isOutsideWorkingDirectory("C:\\Other\\dir")).toBe(true);
+    });
+
+    test("comparableValue case-folds the lexical absolute form", () => {
+      expect(normalizer.comparableValue("src\\foo.ts")).toBe(
+        "c:\\projects\\app\\src\\foo.ts",
+      );
+    });
+  });
+
+  describe("isInfrastructureRead", () => {
+    const normalizer = new PathNormalizer("linux", "/projects/my-app");
+
+    test("allows a read-only tool targeting a configured infra dir", () => {
+      const ap = normalizer.forPath("/infra/git/pkg/SKILL.md");
+      expect(normalizer.isInfrastructureRead("read", ap, ["/infra"])).toBe(
+        true,
+      );
+    });
+
+    test("does not allow a write tool targeting an infra dir", () => {
+      const ap = normalizer.forPath("/infra/git/pkg/file.ts");
+      expect(normalizer.isInfrastructureRead("write", ap, ["/infra"])).toBe(
+        false,
+      );
+    });
+
+    test("does not allow a read-only tool outside any infra dir", () => {
+      const ap = normalizer.forPath("/elsewhere/file.ts");
+      expect(normalizer.isInfrastructureRead("read", ap, ["/infra"])).toBe(
+        false,
+      );
+    });
+
+    test("allows a read targeting the project-local .pi/npm dir (from baked cwd)", () => {
+      const ap = normalizer.forPath("/projects/my-app/.pi/npm/dep/index.js");
+      expect(normalizer.isInfrastructureRead("read", ap, [])).toBe(true);
     });
   });
 });

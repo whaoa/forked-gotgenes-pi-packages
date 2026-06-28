@@ -4,6 +4,8 @@ import { AccessPath } from "./access-intent/access-path";
 import {
   isPathOutsideWorkingDirectory,
   isPathWithinDirectory,
+  isPiInfrastructureRead,
+  normalizePathForComparison,
 } from "./path-utils";
 
 /**
@@ -66,5 +68,33 @@ export class PathNormalizer {
   /** Canonical (symlink-resolved) outside-cwd test against the baked cwd. */
   isOutsideWorkingDirectory(pathValue: string): boolean {
     return isPathOutsideWorkingDirectory(pathValue, this.cwd, this.platform);
+  }
+
+  /**
+   * Lexical (not symlink-resolved) comparison value, resolved against the baked
+   * cwd. Mirrors the as-typed absolute form used for skill-prompt matching;
+   * touches no filesystem, unlike {@link forPath}'s canonical alias.
+   */
+  comparableValue(pathValue: string): string {
+    return normalizePathForComparison(pathValue, this.cwd, this.platform);
+  }
+
+  /**
+   * Pi infrastructure-read containment for a read-only tool, decided against
+   * the canonical (symlink-resolved) path and the baked cwd/platform. Takes the
+   * already-built {@link AccessPath} so the caller does not re-resolve it.
+   */
+  isInfrastructureRead(
+    toolName: string,
+    accessPath: AccessPath,
+    infraDirs: readonly string[],
+  ): boolean {
+    return isPiInfrastructureRead(
+      toolName,
+      accessPath.boundaryValue(),
+      infraDirs,
+      this.cwd,
+      this.platform,
+    );
   }
 }
