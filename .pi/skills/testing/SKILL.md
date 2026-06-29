@@ -113,6 +113,8 @@ A missing export throws `is not a function` at runtime but surfaces as `TS2305` 
   This is the inverse of the excess-property rule: TypeScript rejects reading a property that no longer exists on the type.
 - When a TDD step removes an interface from an `extends` or intersection chain, grep for types that compose it (`extends <Interface>`, `<Interface> &`) — intersection mock supertypes (e.g. `MockGateHandlerSession`) silently lose the removed members and break at the construction site, not the type definition.
 - When removing fields from a shared init type, grep for all test files and factory helpers that pass the removed field — esbuild won't reject unknown properties at runtime, so tests silently get wrong default values instead of failing.
+- When a TDD step changes a parameter's *type* (not just adds one), the red can be hollow — esbuild does not typecheck, so the new-typed argument may coincidentally satisfy the old code's runtime path (an object passed where a `"win32"` string was expected takes the non-win32 branch).
+  Confirm the red lives in a test that exercises the new *behavior*, not just the new signature.
 - When a change moves *when* a value or service becomes available (e.g. factory-init → `session_start`), grep all test files for consumers that resolve it — not just the tests you already plan to touch.
   A timing change breaks them at runtime (the full suite), not at typecheck, so `pnpm run check` will not flag them.
 - When a step changes the *format* of a value recorded at runtime and replayed by a different consumer (e.g. a session-approval pattern matched against a later request), fold every producer and consumer of that namespace into one commit.

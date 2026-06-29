@@ -49,3 +49,39 @@ Pre-completion reviewer returned PASS.
   The meaningful behavioral red (per-tool gate emits `access-path`; symlink-canonical match blocks) lived in `tool-call-gate-pipeline.test.ts`, which used the established `node:fs` `realpathSync` mock from `path.test.ts`.
 - **Pre-completion reviewer: PASS** — no warnings; all cross-step invariants ([#486], [#438], [#510], missing-path fallback) verified preserved by their pinning tests.
 - **Remaining for ship:** close [#513] with a pointer to the [#502] SHA (its `getPlatform()` removal is folded into this work); confirm the mid-batch release deferral (batch "symlink-resistant-path-matching", tail = Step 3 [#504]).
+
+## Stage: Final Retrospective (2026-06-29T14:26:40Z)
+
+### Session summary
+
+Shipped Phase 7 Step 1 across plan → TDD → ship in one continuous session: a breaking `feat!:` per-tool gate migration to `access-path`, the folded-in [#513] `getPlatform()` removal, an unplanned stale-suppression cleanup, and docs.
+The operator deferred the release (mid-batch); commits landed on `main`, CI passed, and [#513] was closed with a pointer to the [#502] SHA while [#502] stays open until the batch tail (Step 3, [#504]) ships.
+A notably clean run — no rework, no rabbit-holes, pre-completion PASS.
+
+### Observations
+
+#### What went well
+
+- **Reading the [#486] plan as a template made planning fast and accurate.**
+  [#502] was "mechanically parallel to [#486]", so loading the prior plan and the already-migrated `path.ts` / `path.test.ts` gave a ready-made design (the `access-path` intent shape, the `node:fs` `realpathSync` mock convention) and a correct prediction of every invariant at risk.
+- **Verifying related-issue state caught the [#513] fold-in.**
+  Checking that [#511] was already `CLOSED` made [#502] the *second* `getPlatform()` consumer to fold, so the dead-code gate forced the accessor removal into this issue — a scope point that would have surfaced as a CI failure if planned around instead.
+- **The fallow gate did its job.**
+  The post-step `pnpm fallow dead-code` run flagged a now-stale suppression that the baseline check/lint/test triad cannot see; one focused `refactor:` commit cleared it.
+
+#### What caused friction (agent side)
+
+- `other` (weak red) — the Step 1 `tool.test.ts` changes passed against the *old* `describeToolGate`: an `AccessPath` passed where the old signature expected a `platform` string flowed through esbuild untypechecked and coincidentally behaved like posix (an object `!== "win32"`), so the unit test gave a hollow red.
+  Impact: no rework — the genuine behavioral red lived in `tool-call-gate-pipeline.test.ts` (access-path emission + symlink-canonical block), which was noticed and relied on at the time.
+  But the `tool.test.ts` red phase was not truly validating the change.
+- `missing-context` (minor) — the plan's Module-Level Changes did not anticipate that adding the `bashProgram: BashProgram | null` annotation in `resolvePerToolCheck` would give fallow a resolvable receiver and retire the `program.ts` suppression.
+  Impact: one extra unplanned `refactor:` commit; self-identified by the gate, no rework.
+
+#### What caused friction (user side)
+
+- None.
+  The single decision point (mid-batch release deferral) was surfaced early from the plan's `**Release:**` marker via `ask_user` and answered cleanly — the intended handshake.
+
+### Changes made
+
+1. `.pi/skills/testing/SKILL.md` — added a rule under `### Interface and type changes`: a TDD step that changes a parameter's *type* can produce a hollow red (esbuild does not typecheck, so the new-typed argument may coincidentally satisfy the old runtime path); confirm the red exercises the new *behavior*, not just the new signature.
