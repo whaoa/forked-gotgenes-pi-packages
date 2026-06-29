@@ -783,7 +783,7 @@ The single relevant structural signal is `path-utils.ts` — an accelerating chu
 
 The residual ad-hoc path handling (the "re-derive their representations ad hoc" [#487] names):
 
-- Per-tool path-bearing gate: `ToolCallGatePipeline` emits `kind: "tool"` → `normalizeInput` → `normalizePathSurfaceValues` → `getPathPolicyValues` (lexical only).
+- Per-tool path-bearing gate: `ToolCallGatePipeline` emits `kind: "tool"` → `normalizeInput` → `normalizePathSurfaceValues` → `getPathPolicyValues` (lexical only) — closed by Steps 1–3 ([#502], [#504]): Step 1 migrated the gate to emit `access-path`; Step 3 removed `normalizePathSurfaceValues` and the path branches from `normalizeInput`.
 - Service/RPC queries: `permissions-service.ts` / `permission-event-rpc.ts` — closed by Step 2 ([#503]): both build an `AccessPath` via `buildAccessIntentForSurface` and route an `access-path` intent through the resolver (was a lexical `tool` intent for `path` / `external_directory`).
 - `path-utils.ts`: the loose `getPathPolicyValues` / `normalizePathForComparison` / `normalizePathPolicyLiteral` derivations that `AccessPath` should own.
 - `path-values`: survives as the manager's deliberate string boundary (the manager stays string-based and never imports `AccessPath`).
