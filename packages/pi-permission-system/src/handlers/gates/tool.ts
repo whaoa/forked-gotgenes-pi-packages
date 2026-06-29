@@ -1,8 +1,5 @@
-import {
-  getPathBearingToolPath,
-  normalizePathForComparison,
-  PATH_BEARING_TOOLS,
-} from "#src/path-utils";
+import type { AccessPath } from "#src/access-intent/access-path";
+import { getPathBearingToolPath, PATH_BEARING_TOOLS } from "#src/path-utils";
 import { suggestSessionPattern } from "#src/pattern-suggest";
 import { formatAskPrompt } from "#src/permission-prompts";
 import { SessionApproval } from "#src/session-approval";
@@ -16,20 +13,19 @@ import type { ToolCallContext } from "./types";
  * Derive the value used for session-approval pattern suggestions.
  *
  * Bash → command string; MCP → qualified target;
- * path-bearing tools → the file path resolved to its canonical (cwd-anchored,
- * absolute) form so the suggested pattern matches the policy values a later
- * call produces; others → catch-all wildcard.
+ * path-bearing tools → the `AccessPath`'s lexical absolute form (`value()`),
+ * so the suggested pattern matches the policy values a later call produces;
+ * others (or a path-bearing tool with no path) → catch-all wildcard.
  */
 function deriveSuggestionValue(
   tcc: ToolCallContext,
   check: PermissionCheckResult,
-  platform: NodeJS.Platform,
+  accessPath?: AccessPath,
 ): string {
   if (tcc.toolName === "bash") return check.command ?? "";
   if (tcc.toolName === "mcp") return check.target ?? "mcp";
-  const path = getPathBearingToolPath(tcc.toolName, tcc.input);
-  if (path === null) return "*";
-  return normalizePathForComparison(path, tcc.cwd, platform);
+  if (accessPath) return accessPath.value();
+  return "*";
 }
 
 /**
@@ -42,7 +38,7 @@ export function describeToolGate(
   tcc: ToolCallContext,
   check: PermissionCheckResult,
   formatter: ToolPreviewFormatter,
-  platform: NodeJS.Platform,
+  accessPath?: AccessPath,
 ): GateDescriptor {
   const permissionLogContext = formatter.getPermissionLogContext(
     check,
@@ -53,7 +49,7 @@ export function describeToolGate(
   // Compute session approval suggestion for the "for this session" option.
   const suggestion = suggestSessionPattern(
     tcc.toolName,
-    deriveSuggestionValue(tcc, check, platform),
+    deriveSuggestionValue(tcc, check, accessPath),
   );
 
   const askMessage = formatAskPrompt(

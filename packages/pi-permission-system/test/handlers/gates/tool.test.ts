@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { describeToolGate } from "#src/handlers/gates/tool";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { PathNormalizer } from "#src/path-normalizer";
 import {
   TOOL_INPUT_LOG_PREVIEW_MAX_LENGTH,
   TOOL_INPUT_PREVIEW_MAX_LENGTH,
@@ -45,6 +46,10 @@ function makeCheckResult(
   };
 }
 
+// The per-tool gate now receives the AccessPath the pipeline builds, bound to
+// the makeTcc default cwd; approval values derive from `accessPath.value()`.
+const normalizer = new PathNormalizer("linux", "/test/project");
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 describe("describeToolGate", () => {
@@ -53,7 +58,6 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "read" }),
       makeCheckResult("ask"),
       makeFormatter(),
-      "linux",
     );
     expect(desc.surface).toBe("read");
     expect(desc.decision.surface).toBe("read");
@@ -64,7 +68,6 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "write" }),
       makeCheckResult("ask"),
       makeFormatter(),
-      "linux",
     );
     expect(desc.decision.value).toBe("write");
   });
@@ -78,7 +81,6 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "git status" } }),
       check,
       makeFormatter(),
-      "linux",
     );
     expect(desc.surface).toBe("bash");
     expect(desc.decision.surface).toBe("bash");
@@ -94,7 +96,6 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "mcp", input: { tool: "server:tool" } }),
       check,
       makeFormatter(),
-      "linux",
     );
     expect(desc.surface).toBe("mcp");
     expect(desc.decision.surface).toBe("mcp");
@@ -103,7 +104,7 @@ describe("describeToolGate", () => {
 
   it("populates denialContext with kind 'tool' and check result", () => {
     const check = makeCheckResult("deny", { toolName: "read" });
-    const desc = describeToolGate(makeTcc(), check, makeFormatter(), "linux");
+    const desc = describeToolGate(makeTcc(), check, makeFormatter());
     expect(desc.denialContext).toEqual({
       kind: "tool",
       check,
@@ -118,7 +119,6 @@ describe("describeToolGate", () => {
       makeTcc({ agentName: "my-agent" }),
       check,
       makeFormatter(),
-      "linux",
     );
     expect(desc.denialContext.agentName).toBe("my-agent");
   });
@@ -129,7 +129,6 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "ls" } }),
       check,
       makeFormatter(),
-      "linux",
     );
     expect(desc.denialContext).toMatchObject({
       kind: "tool",
@@ -146,7 +145,6 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "git status" } }),
       check,
       makeFormatter(),
-      "linux",
     );
     expect(desc.sessionApproval).toBeDefined();
     expect(desc.sessionApproval?.surface).toBe("bash");
@@ -163,16 +161,17 @@ describe("describeToolGate", () => {
       }),
       check,
       makeFormatter(),
-      "linux",
+      normalizer.forPath("index.html"),
     );
     expect(desc.sessionApproval?.surface).toBe("edit");
     expect(desc.sessionApproval?.representativePattern).toBe("/test/project/*");
   });
 
   it("resolves a sub-directory file's session approval to an absolute pattern", () => {
-    // Resolve-at-gate canonicalizes every path (not just the cwd-root case),
-    // so sub-directory approvals are absolute too — the deliberate tradeoff
-    // that keeps the pattern aligned with the policy values it is matched against.
+    // The approval value derives from the AccessPath's lexical absolute form
+    // (`value()`), so sub-directory approvals are absolute too — the deliberate
+    // tradeoff that keeps the pattern aligned with the policy values it is
+    // matched against.
     const check = makeCheckResult("ask", { toolName: "edit" });
     const desc = describeToolGate(
       makeTcc({
@@ -182,11 +181,23 @@ describe("describeToolGate", () => {
       }),
       check,
       makeFormatter(),
-      "linux",
+      normalizer.forPath("src/foo.ts"),
     );
     expect(desc.sessionApproval?.representativePattern).toBe(
       "/test/project/src/*",
     );
+  });
+
+  it("falls back to a wildcard session approval when no AccessPath is given", () => {
+    // A path-bearing tool with no `input.path` keeps the `tool` intent and gets
+    // no AccessPath, so the suggestion collapses to the catch-all.
+    const desc = describeToolGate(
+      makeTcc({ toolName: "read", input: {} }),
+      makeCheckResult("ask"),
+      makeFormatter(),
+    );
+    expect(desc.sessionApproval?.surface).toBe("read");
+    expect(desc.sessionApproval?.representativePattern).toBe("*");
   });
 
   it("populates promptDetails with correct fields", () => {
@@ -195,7 +206,6 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "read", agentName: "my-agent", toolCallId: "tc-42" }),
       check,
       makeFormatter(),
-      "linux",
     );
     expect(desc.promptDetails).toMatchObject({
       source: "tool_call",
@@ -213,7 +223,6 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "bash", input: { command: "ls" } }),
       check,
       makeFormatter(),
-      "linux",
     );
     expect(desc.logContext).toMatchObject({
       source: "tool_call",
@@ -227,7 +236,7 @@ describe("describeToolGate", () => {
       makeTcc({ toolName: "edit", input: { path: "/a.ts" } }),
       makeCheckResult("ask", { toolName: "edit" }),
       makeFormatter(),
-      "linux",
+      normalizer.forPath("/a.ts"),
     );
     expect(desc.surface).toBe("edit");
     expect(desc.input).toEqual({ path: "/a.ts" });

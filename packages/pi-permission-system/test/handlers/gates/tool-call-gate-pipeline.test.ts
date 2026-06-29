@@ -22,6 +22,16 @@ vi.mock("#src/access-intent/bash/program", () => ({
   BashProgram: { parse: mockBashProgramParse },
 }));
 
+// Mock node:fs so realpathSync (used by canonicalizePath) is controllable for
+// the per-tool symlink-resolution test. Default implementation is identity.
+const realpathSync = vi.hoisted(() =>
+  vi.fn<(path: string) => string>((p) => p),
+);
+vi.mock("node:fs", () => ({
+  realpathSync,
+  default: { realpathSync },
+}));
+
 function makeMockBashProgram() {
   return {
     commands: vi.fn<() => []>(() => []),
@@ -36,6 +46,8 @@ describe("ToolCallGatePipeline", () => {
   beforeEach(() => {
     mockBashProgramParse.mockReset();
     mockBashProgramParse.mockResolvedValue(makeMockBashProgram());
+    realpathSync.mockReset();
+    realpathSync.mockImplementation((p: string) => p);
   });
 
   // ── non-bash tools ───────────────────────────────────────────────────────
@@ -252,6 +264,67 @@ describe("ToolCallGatePipeline", () => {
       );
 
       expect(result).toEqual({ action: "allow" });
+    });
+  });
+
+  // ── per-tool path-bearing gate (#502) ────────────────────────────────────
+
+  describe("evaluate — per-tool path-bearing gate (#502)", () => {
+    it("emits an access-path intent on the tool-name surface for a path-bearing tool", async () => {
+      const resolver = makeResolver(makeCheckResult());
+      const inputs = makeGateInputs();
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      await pipeline.evaluate(
+        makeTcc({ toolName: "read", input: { path: "/test/cwd/foo.ts" } }),
+        runner,
+      );
+
+      const perTool = resolver.resolve.mock.calls.find(
+        ([intent]) => intent.surface === "read",
+      );
+      expect(perTool?.[0].kind).toBe("access-path");
+    });
+
+    it("keeps a path-bearing tool with no path on the tool intent", async () => {
+      const resolver = makeResolver(makeCheckResult());
+      const inputs = makeGateInputs();
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      await pipeline.evaluate(makeTcc({ toolName: "read", input: {} }), runner);
+
+      const perTool = resolver.resolve.mock.calls.find(
+        ([intent]) => intent.surface === "read",
+      );
+      expect(perTool?.[0].kind).toBe("tool");
+    });
+
+    it("blocks when a per-tool rule matches the symlink-resolved form", async () => {
+      // /test/cwd/foo.env is a symlink to /vault/foo.env; the per-tool rule is
+      // keyed on the resolved target, which is only reachable via matchValues().
+      realpathSync.mockImplementation((p: string) =>
+        p === "/test/cwd/foo.env" ? "/vault/foo.env" : p,
+      );
+      const resolver = makeResolver();
+      resolver.resolve.mockImplementation((intent) =>
+        intent.kind === "access-path" &&
+        intent.surface === "read" &&
+        intent.path.matchValues().includes("/vault/foo.env")
+          ? makeCheckResult({ state: "deny", matchedPattern: "*.env" })
+          : makeCheckResult(),
+      );
+      const inputs = makeGateInputs();
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      const result = await pipeline.evaluate(
+        makeTcc({ toolName: "read", input: { path: "/test/cwd/foo.env" } }),
+        runner,
+      );
+
+      expect(result).toMatchObject({ action: "block" });
     });
   });
 });

@@ -1,5 +1,7 @@
+import type { AccessPath } from "#src/access-intent/access-path";
 import { BashProgram } from "#src/access-intent/bash/program";
 import type { PathNormalizer } from "#src/path-normalizer";
+import { getPathBearingToolPath } from "#src/path-utils";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
@@ -8,6 +10,7 @@ import {
   ToolPreviewFormatter,
   type ToolPreviewFormatterOptions,
 } from "#src/tool-preview-formatter";
+import type { PermissionCheckResult } from "#src/types";
 import { getNonEmptyString, toRecord } from "#src/value-guards";
 import { resolveBashCommandCheck } from "./bash-command";
 import { describeBashExternalDirectoryGate } from "./bash-external-directory";
@@ -81,7 +84,6 @@ export class ToolCallGatePipeline {
     );
 
     const infraDirs = this.inputs.getInfrastructureReadDirs();
-    const platform = this.inputs.getPlatform();
 
     const gateProducers: Array<() => GateResult | Promise<GateResult>> = [
       () =>
@@ -101,29 +103,17 @@ export class ToolCallGatePipeline {
       () => describeBashExternalDirectoryGate(tcc, bashProgram, this.resolver),
       () => describeBashPathGate(tcc, bashProgram, this.resolver),
       () => {
-        // Bash commands may chain several sub-commands (`a && b`, `a | b`, …);
-        // evaluate each unit from the shared parse on the bash surface and
-        // select the most restrictive, rather than matching the whole program
-        // string (#301). Other tools evaluate their single input directly.
-        const toolCheck =
-          tcc.toolName === "bash" && bashProgram
-            ? resolveBashCommandCheck(
-                command ?? "",
-                bashProgram.commands(),
-                tcc.agentName ?? undefined,
-                this.resolver,
-              )
-            : this.resolver.resolve({
-                kind: "tool",
-                surface: tcc.toolName,
-                input: tcc.input,
-                agentName: tcc.agentName ?? undefined,
-              });
+        const { toolCheck, accessPath } = this.resolvePerToolCheck(
+          tcc,
+          bashProgram,
+          command,
+          normalizer,
+        );
         const toolDescriptor = describeToolGate(
           tcc,
           toolCheck,
           formatter,
-          platform,
+          accessPath,
         );
         toolDescriptor.preCheck = toolCheck;
         return toolDescriptor;
@@ -142,5 +132,56 @@ export class ToolCallGatePipeline {
     }
 
     return { action: "allow" };
+  }
+
+  /**
+   * Resolve the per-tool gate's check, choosing the intent by tool shape:
+   * bash chains its sub-commands; a path-bearing tool with a path emits an
+   * `access-path` intent (so the per-tool surface matches lexical ∪ canonical,
+   * #502); every other tool (and a path-bearing tool with no path) keeps the
+   * raw `tool` intent the manager normalizes.
+   *
+   * Returns the `AccessPath` alongside the check so `describeToolGate` derives
+   * the session-approval value from `accessPath.value()`.
+   */
+  private resolvePerToolCheck(
+    tcc: ToolCallContext,
+    bashProgram: BashProgram | null,
+    command: string | null,
+    normalizer: PathNormalizer,
+  ): { toolCheck: PermissionCheckResult; accessPath?: AccessPath } {
+    if (tcc.toolName === "bash" && bashProgram) {
+      return {
+        toolCheck: resolveBashCommandCheck(
+          command ?? "",
+          bashProgram.commands(),
+          tcc.agentName ?? undefined,
+          this.resolver,
+        ),
+      };
+    }
+
+    const filePath = getPathBearingToolPath(tcc.toolName, tcc.input);
+    if (filePath !== null) {
+      const accessPath = normalizer.forPath(filePath);
+      return {
+        accessPath,
+        toolCheck: this.resolver.resolve({
+          kind: "access-path",
+          surface: tcc.toolName,
+          path: accessPath,
+          agentName: tcc.agentName ?? undefined,
+        }),
+      };
+    }
+
+    return {
+      toolCheck: this.resolver.resolve({
+        kind: "tool",
+        surface: tcc.toolName,
+        input: tcc.input,
+        agentName: tcc.agentName ?? undefined,
+      }),
+    };
   }
 }
