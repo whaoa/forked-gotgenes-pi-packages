@@ -27,3 +27,25 @@ Produced a three-step plan (breaking `feat!:` behavior change, a `refactor:` acc
 - **Release:** Step 1 of batch "symlink-resistant-path-matching" (tail = Step 3, [#504]); mid-batch → defer.
   The breaking `feat!:` lands on `main` and auto-batches; the major-bump release cuts when Step 3 lands.
 - Skipped the `ask_user` gate: operator-authored issue, unambiguous proposal, and the only scope addition (`getPlatform()` removal) is forced by the dead-code gate + [#513], not a genuine design choice.
+
+## Stage: Implementation — TDD (2026-06-29T10:15:00Z)
+
+### Session summary
+
+Implemented all three planned TDD steps: the breaking `feat!:` per-tool gate migration to `access-path`, the `refactor:` removal of the dead `getPlatform()` accessor (resolving [#513]), and the `docs:` updates marking Phase 7 Step 1 complete.
+Four new tests added (suite 2211 → 2215); full suite, `tsc`, root lint, and `pnpm fallow dead-code` all green.
+Pre-completion reviewer returned PASS.
+
+### Observations
+
+- **One unplanned deviation — a stale fallow suppression.**
+  Adding the explicit `bashProgram: BashProgram | null` annotation in the new `resolvePerToolCheck` helper gave fallow a resolvable receiver for `BashProgram.commands()`, which retired the long-standing `unused-class-member` false-positive suppression in `program.ts`.
+  Removed it as a focused fourth `refactor:` commit (not in the plan; the plan only listed the touched files).
+  This is why `fallow dead-code` must be run — the baseline-green checks (check/lint/test) do not catch a now-stale suppression.
+- **`describeToolGate` signature change was structurally improved, not just mechanical.**
+  Swapping the `platform: NodeJS.Platform` parameter for an optional `accessPath?: AccessPath` removed a three-layer parameter relay (Tell-Don't-Ask via `value()`), exactly as the plan predicted.
+- **The `tool.test.ts` red was weak; the pipeline test carried the real red.**
+  Passing an `AccessPath` where the old code expected a `platform` string coincidentally behaved like posix (an object `!== "win32"`), so `tool.test.ts` passed against old code.
+  The meaningful behavioral red (per-tool gate emits `access-path`; symlink-canonical match blocks) lived in `tool-call-gate-pipeline.test.ts`, which used the established `node:fs` `realpathSync` mock from `path.test.ts`.
+- **Pre-completion reviewer: PASS** — no warnings; all cross-step invariants ([#486], [#438], [#510], missing-path fallback) verified preserved by their pinning tests.
+- **Remaining for ship:** close [#513] with a pointer to the [#502] SHA (its `getPlatform()` removal is folded into this work); confirm the mid-batch release deferral (batch "symlink-resistant-path-matching", tail = Step 3 [#504]).
