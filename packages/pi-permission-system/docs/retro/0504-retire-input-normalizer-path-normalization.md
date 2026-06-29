@@ -59,3 +59,49 @@ Pre-completion reviewer returned WARN with two findings, both resolved before th
 - **Pre-completion reviewer WARN findings (both fixed before commit):**
   1. `docs/architecture/architecture.md` line ~786: per-tool gate bullet in the Findings "residual ad-hoc path handling" section lacked a "closed by" annotation — added `— closed by Steps 1–3 ([#502], [#504])`.
   2. `test/input-normalizer.test.ts`: `import { join } from "node:path"` was unused after removing the home-expansion test blocks; Biome had auto-fixed it during Step 3 but the fix wasn't staged before commit — removed explicitly and committed.
+
+## Stage: Final Retrospective (2026-06-29T18:38:34Z)
+
+### Session summary
+
+Shipped Phase 7 Step 3 across plan → TDD → ship, completing the three-step "symlink-resistant-path-matching" batch as a single `pi-permission-system v18.0.0` major release.
+The ship stage merged release-please PR #515 (UNSTABLE / no-checks `GITHUB_TOKEN` case → `gh pr merge --rebase`) and closed all three batch issues (#504, #502, #503), recognizing #513 was already closed.
+A clean run end to end — no rework, no rabbit-holes; the only friction (a low call-site estimate, an `Edit` string-truncation) was self-caught within the same commit.
+
+### Observations
+
+#### What went well
+
+- **The ship prompt is deterministic enough that a weak model executed it flawlessly.**
+  The entire ship stage ran on `opencode-go/deepseek-v4-flash` (a low-cost model), yet it correctly read the plan's `**Release:** ship now — batch tail` marker without asking, navigated the nuanced `release_pr_merge` UNSTABLE refusal by checking `statusCheckRollup` (empty → no checks → `gh pr merge 515 --rebase`), and closed three issues with batch-aware summaries.
+  This validates the ship prompt's step-by-step protocol: the judgment is encoded in the prompt, not delegated to the model.
+- **Batch-tail release coordination worked exactly as designed across three issues.**
+  The plan's `**Release:**` marker drove the no-ask release decision; the already-landed breaking `feat!:` commits from Steps 1–2 cut the major bump when this `refactor:`/`docs:`/`fix:` tail landed; and reading the [#502] retro notes prompted closing #502, #503, and verifying #513 — none of which leave a `refactor:` changelog reminder.
+- **The plan's risk mitigation caught its own scope miss.**
+  The plan under-counted the migration surface (~30 vs. ~50 real calls), but its stated mitigation — "any unmigrated real-path `checkTool` surfaces as a red in Step 3's full-suite run" — fired exactly as written: 4 unexpected failures appeared at the Step 3 full-suite run and were fixed in the same commit, no separate rework.
+
+#### What caused friction (agent side)
+
+- `missing-context` (planning) — the plan's `checkTool` call-site count (~30) was derived from a single-line grep (`grep 'checkTool(manager, "<surface>"'`), which cannot match the 4 multi-line invocations where `checkTool(`, `manager`, and the surface literal sit on separate continuation lines.
+  Impact: 4 unexpected test failures at the Step 3 full-suite run; fixed within the same commit (no separate rework), because the plan's full-suite mitigation caught them.
+- `other` (Edit-tool string truncation) — one Step 2 `Edit` produced a `newText` that terminated a test description string early (`"universal '*': 'deny'"` from `"universal '*': 'deny' with no path key …"`), corrupting the `describe` block.
+  Impact: one structural-repair detour via a Python line-range replacement; caught immediately by `biome check`, no rework beyond the repair.
+  Self-identified.
+
+#### What caused friction (user side)
+
+- None.
+  The single decision point (batch-tail release) was pre-resolved from the plan's `**Release:**` marker, so the ship ran without an `ask_user` interrupt — the intended handshake for a non-deferred batch tail.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the ship stage ran on `opencode-go/deepseek-v4-flash` and the `pre-completion-reviewer` (TDD stage) on `anthropic/claude-sonnet-4-6` per its frontmatter; both appropriate.
+  No reasoning-weak-model-on-judgment-work mismatch: the ship prompt encodes the judgment, so the weak model only had to follow steps.
+- **Escalation-delay tracking** — no `rabbit-hole`; the longest same-target sequence was 2 grep retries (entries 4–6) probing `release-please-config.json` exclude-paths, resolved immediately.
+- **Unused-tool detection** — no gap warranted an Explore/`colgrep` dispatch; the planning `missing-context` miss was a grep-pattern limitation, not a missing tool.
+- **Feedback-loop gap analysis** — verification was incremental in TDD (per-file red→green, `pnpm run check` right after the signature change, full suite + lint + `fallow` after Step 3); the ship stage's CI watch + release watch ran in protocol order.
+  No end-loaded verification.
+
+### Changes made
+
+1. `.pi/skills/testing/SKILL.md` — added a rule under `### Interface and type changes`: when estimating the call-site count for a test migration, grep the bare callee (`checkTool(`), not `callee(arg, "literal"`, since a single-line pattern misses multi-line invocations and undercounts scope (the planning `missing-context` miss above).
