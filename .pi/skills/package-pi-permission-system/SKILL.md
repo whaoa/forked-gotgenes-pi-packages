@@ -203,8 +203,10 @@ When planning a refactoring that targets testability, read the test files alongs
 
 When planning a refactoring that touches handler wiring or shared interfaces, load the `design-review` skill to audit for structural smells before writing the plan.
 
-The bash `external_directory` gate only sees tokens that `classifyTokenAsPathCandidate` accepts — absolute, `~/`-relative, or `..`-traversal paths.
+The bash `external_directory` gate only sees tokens that `classifyTokenAsPathCandidate` accepts — absolute (`/…`), home-relative (`~/…`), parent-traversal (`..`), and Windows drive-letter absolute paths (`C:/…` or `C:\…`).
 A plain `./relative` token (e.g. `cat ./link/hosts`) is dropped before that gate and is instead gated by the broader `path` surface (`classifyTokenAsRuleCandidate`).
+The broader classifier also recognizes the backslash drive form (`D:\…`) — the forward-slash form is caught by `includes("/")`.
+On POSIX, a drive-shaped token (`C:/foo`) resolves as the real in-CWD path `./C:/foo` and remains gated by the `path` surface; the `PathNormalizer`'s `isAbsolute` decides platform-correct routing.
 When a plan or test asserts a specific bash repro string, trace the token through the classifier first — an issue's headline repro can describe a symptom whose literal input never reaches the gate being changed.
 
 [#261]: https://github.com/gotgenes/pi-packages/issues/261
