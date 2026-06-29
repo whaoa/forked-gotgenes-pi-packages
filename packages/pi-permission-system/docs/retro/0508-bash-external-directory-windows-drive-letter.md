@@ -69,3 +69,56 @@ Pre-completion reviewer returned **PASS**.
 - **`c://x` URL rejection confirmed**: the `URL_PATTERN` (`/^[a-z][a-z0-9+.-]*:\/\//i`) fires before the drive pattern for single-letter schemes with `//`, so there is no ambiguity between the URL guard and the new drive pattern.
 - **Pre-completion reviewer verdict**: PASS.
   All deterministic checks, invariants, and doc surfaces clean.
+
+## Stage: Final Retrospective (2026-06-29T01:00:00Z)
+
+### Session summary
+
+Shipped #508 cleanly: pushed the two commits, CI green, closed the issue, and merged release-please PR #514 to cut `pi-permission-system-v17.1.1`.
+This closes a four-stage arc (Planning → Planning refresh → TDD → Ship) in which operator-driven Socratic questioning during planning turned a one-line hand-rolled fix into a clean fix layered on a properly-threaded `PathNormalizer` seam (#510), with #511 as a follow-up.
+
+### Observations
+
+#### What went well
+
+- **Operator-driven architectural depth (planning).**
+  The progressive questioning — "which classifier?"
+  → "detect the platform?"
+  → "what makes this change easy?"
+  → "is there an architectural root cause?"
+  — surfaced the half-threaded ambient-platform dependency and produced #510 / #511.
+  Without it, #508 would have shipped a hand-rolled `startsWith("/")` check that drifts from `node:path` and a fragile `vi.mock("node:path")` test.
+  Strategic judgment applied at exactly the right moment.
+- **Plan contingency foresight paid off.**
+  The original plan flagged "if #510 defers the `isRelativeCandidate` conversion, fold it into #508." #510 did defer it; the Planning-refresh stage confirmed the contingency and folded it in with zero rework.
+- **Ship-flow `IN_PROGRESS`-check handling worked as designed.**
+  Release-please PR #514 returned `UNSTABLE` with a CI check still `IN_PROGRESS`.
+  The session polled `statusCheckRollup` until `SUCCESS` and then merged via `release_pr_merge`, rather than falling back to `gh pr merge` while a check was running — exactly the `/ship-issue` step-6.4 refinement.
+  The refined instruction prevented a premature merge.
+- **Clean TDD execution.**
+  Two cycles, +16 tests, pre-completion PASS, no follow-up fixups.
+
+#### What caused friction (agent side)
+
+- `other` — the `isRelativeCandidate` edit needed three attempts because `oldText` spanned the `──` decorator rule line in `bash-path-resolver.ts`; the Unicode box-drawing run miscounts and rejected the atomic batch.
+  Impact: two extra `Edit` calls, no rework — resolved by anchoring on adjacent code lines, which is exactly what AGENTS.md already prescribes.
+  The rule exists and is crisp; this was a first-attempt-application slip, not a missing rule.
+- `other` — the unknown-base win32 test passed green before implementation (the token was dropped upstream → empty result), so it was not a strict red test for the over-flag path.
+  Impact: none — documented in the test comment and the TDD stage notes; a true red test for over-flag would need an outside-CWD drive path under an unknown base.
+  This is a manifestation of the existing package-SKILL rule ("trace the token through the classifier first"), already covered.
+
+#### What caused friction (user side)
+
+- None.
+  Operator involvement was strategic (planning depth, sequencing choice, scope confirmation via `ask_user`), not mechanical oversight.
+
+### Considered but not proposed
+
+- No `AGENTS.md` change for the decorator-line edit trap — the rule already exists and is crisp; adding salience text to an already-dense file would not improve first-attempt recall.
+- No `testing`-skill change for the green-before-red test — the package SKILL's "trace the token through the classifier first" already covers the underlying principle.
+- No `/ship-issue` change — the `IN_PROGRESS` refinement worked; nothing to add.
+
+### Changes made
+
+1. Added this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0508-bash-external-directory-windows-drive-letter.md`.
+2. No `AGENTS.md`, prompt, or skill changes — operator confirmed retro-only; existing rules covered every friction point.
