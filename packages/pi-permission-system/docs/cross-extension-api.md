@@ -88,6 +88,8 @@ interface PermissionsService {
 
 Returns `PermissionCheckResult` with fields `state`, `matchedPattern`, `source`, `origin`, etc.
 
+For a path-shaped surface (`path`, `external_directory`, or a path-bearing tool — `read`/`write`/`edit`/`grep`/`find`/`ls`), the supplied `value` is matched against both the path as given and its canonical (symlink-resolved) form, at parity with the gates — so a query for a symlinked path matches a rule on its real target.
+
 #### `getToolPermission`
 
 Returns `"allow"` | `"deny"` | `"ask"` for a tool name without considering command-level rules.
@@ -443,6 +445,8 @@ Callers should implement a timeout and treat no-reply as `deny` (graceful degrad
 | `surface`   | Yes      | Permission surface to evaluate                             |
 | `value`     | No       | Value to evaluate (command, name, path); defaults to `"*"` |
 | `agentName` | No       | Agent name for per-agent policy resolution                 |
+
+As with the `checkPermission` service method, a path-shaped surface (`path`, `external_directory`, or a path-bearing tool) matches the `value` against both the path as given and its canonical (symlink-resolved) form.
 
 ### Reply Data Fields (`PermissionsCheckReplyData`)
 

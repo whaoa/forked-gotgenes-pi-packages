@@ -116,6 +116,7 @@ Shared communication channels:
   Use for direct service access.
 
 The in-process implementation of `PermissionsService` is `LocalPermissionsService` (`src/permissions-service.ts`).
+It and the event-bus RPC check handler (`permission-event-rpc.ts`) route policy queries through the `PermissionResolver`, not `PermissionManager` directly: a path-shaped surface (`path` / `external_directory` / `read` / `write` / `edit` / `grep` / `find` / `ls`) query builds an `AccessPath` via `buildAccessIntentForSurface` and emits an `access-path` intent, so external queries match the lexical ∪ canonical set the gates do (#503); the normalizer is fetched per call from the session (`getPathNormalizer()`), so the published service answers against the parent cwd.
 The `session_start`-gated publication, #302 subagent-child guard, ready-event emit, and session teardown ordering are all owned by `PermissionServiceLifecycle` (`src/service-lifecycle.ts`), which is injected into `SessionLifecycleHandler`.
 Changes to publication timing or teardown order should go through `PermissionServiceLifecycle`, not `index.ts`.
 

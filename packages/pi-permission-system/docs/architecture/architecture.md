@@ -713,11 +713,11 @@ src/
 │       └── index.ts          Barrel re-exports
 │
 ├── index.ts                  Extension factory - event wiring, collaborator construction (~170 lines after #320; established injection-bag wiring kept inline per anti-procedure-splitting rule)
-├── permissions-service.ts    `LocalPermissionsService` class - in-process implementation of `PermissionsService`; injected with narrow collaborator interfaces `ScopedPermissionManager`, `Pick<SessionRules, "getRuleset">`, `ToolInputFormatterRegistrar`, `ToolAccessExtractorRegistrar` (#320, narrowed #366, extractor #352)
+├── permissions-service.ts    `LocalPermissionsService` class - in-process implementation of `PermissionsService`; injected with narrow collaborator interfaces (a `resolve` + `getToolPermission` resolver view, a `getPathNormalizer` session view, `ToolInputFormatterRegistrar`, `ToolAccessExtractorRegistrar`); routes path-surface queries through the resolver as an `access-path` intent so external policy queries match lexical ∪ canonical like the gates (#320, narrowed #366, extractor #352, AccessPath #503)
 ├── service-lifecycle.ts      `ServiceLifecycle` interface + `PermissionServiceLifecycle` class — owns the process-global service publish (#302 child-gated), ready emit, and session teardown ordering (#320)
 ├── service.ts                PermissionsService interface, Symbol.for() accessor (cross-extension API)
 ├── permission-events.ts      Event channel constants, payload types, emit helpers
-├── permission-event-rpc.ts   permissions:rpc:check (deprecated) and permissions:rpc:prompt handlers
+├── permission-event-rpc.ts   permissions:rpc:check (deprecated) and permissions:rpc:prompt handlers; the check handler routes path-surface queries through the resolver as an `access-path` intent (canonical parity, #503)
 ├── permission-ui-prompt.ts   Centralized construction for `permissions:ui_prompt` event payloads - single source for the emitted contract shape
 ├── config-store.ts           `ConfigStore` class — owns `config` + `lastConfigWarning`; `ConfigReader`, `SessionConfigStore`, `CommandConfigStore` narrow interfaces (#335, #337)
 ├── config-loader.ts          File I/O, format detection
@@ -765,8 +765,8 @@ src/
 
 Phase 7 finishes the direction opened by [#487]: make `AccessPath` the one internal representation for every concrete path the system handles.
 Phase 6 introduced `AccessPath` for the `external_directory` surface; follow-on [#486] brought the `path` surface and the bash-path tokens to lexical ∪ canonical parity and collapsed the gate-emitted `path-values` variant.
-Two ad-hoc path-derivation paths remain: the per-tool path-bearing gate (`read`/`write`/`edit`/`grep`/`find`/`ls`) and the service/RPC policy-query path both normalize lexically only, so a per-tool rule (`read: deny *.env`) is still symlink-evadable while the cross-cutting `path` rule is not.
-Phase 7 routes both onto `AccessPath` (closing the asymmetry, a breaking change), retires the now-dead lexical-only normalization, consolidates the `path-utils.ts` derivation hub behind the value object, and formalizes the resolver-internal `path-values` boundary.
+Two ad-hoc path-derivation paths once normalized lexically only — the per-tool path-bearing gate (`read`/`write`/`edit`/`grep`/`find`/`ls`) and the service/RPC policy-query path — so a per-tool rule (`read: deny *.env`) was symlink-evadable while the cross-cutting `path` rule was not.
+Steps 1 ([#502]) and 2 ([#503]) routed both onto `AccessPath` (closing the asymmetry, a breaking change); Phase 7 still retires the now-dead lexical-only normalization, consolidates the `path-utils.ts` derivation hub behind the value object, and formalizes the resolver-internal `path-values` boundary.
 
 This is a direction-driven phase: [#487] sets the framing, and the discovery confirmed the residual surface rather than proposing an unrelated health sweep.
 
@@ -785,7 +785,7 @@ The single relevant structural signal is `path-utils.ts` — an accelerating chu
 The residual ad-hoc path handling (the "re-derive their representations ad hoc" [#487] names):
 
 - Per-tool path-bearing gate: `ToolCallGatePipeline` emits `kind: "tool"` → `normalizeInput` → `normalizePathSurfaceValues` → `getPathPolicyValues` (lexical only).
-- Service/RPC queries: `permissions-service.ts` / `permission-event-rpc.ts` build `buildInputForSurface` + a lexical `tool` intent, so external policy queries for `path` / `external_directory` match lexical only.
+- Service/RPC queries: `permissions-service.ts` / `permission-event-rpc.ts` — closed by Step 2 ([#503]): both build an `AccessPath` via `buildAccessIntentForSurface` and route an `access-path` intent through the resolver (was a lexical `tool` intent for `path` / `external_directory`).
 - `path-utils.ts`: the loose `getPathPolicyValues` / `normalizePathForComparison` / `normalizePathPolicyLiteral` derivations that `AccessPath` should own.
 - `path-values`: survives as the manager's deliberate string boundary (the manager stays string-based and never imports `AccessPath`).
 
@@ -798,9 +798,11 @@ The residual ad-hoc path handling (the "re-derive their representations ad hoc" 
    Outcome: `read`/`write`/`edit`/`grep`/`find`/`ls` per-tool rules match lexical ∪ canonical (symlink-resistant); **breaking**.
    Release: batch "symlink-resistant-path-matching"
 
-2. **Migrate the service/RPC path queries onto `AccessPath` (canonical parity).**
-   ([#503]) Target: `src/permissions-service.ts`, `src/permission-event-rpc.ts`, `src/input-normalizer.ts` (`buildInputForSurface`).
-   For `path` / `external_directory` / path-bearing surface queries, build an `AccessPath` and resolve an `access-path` intent instead of a lexical `tool` intent; non-path surfaces keep the existing path.
+2. ✅ **Migrate the service/RPC path queries onto `AccessPath` (canonical parity).**
+   ([#503]) Target: `src/permissions-service.ts`, `src/permission-event-rpc.ts`, `src/input-normalizer.ts` (`buildAccessIntentForSurface`).
+   For `path` / `external_directory` / path-bearing surface queries, build an `AccessPath` and route an `access-path` intent through the resolver instead of a lexical `tool` intent to the manager; non-path surfaces keep the existing path.
+   Routing through the resolver (not a second `path-values` producer) keeps it the sole `matchValues()` unwrap site, the premise Step 5 ([#506]) decides against.
+   Also fixed a latent gap: the `path` and path-bearing service/RPC queries dropped their value (collapsing to `["*"]`) and now evaluate the supplied path.
    Smell: Category C (coupling / match asymmetry).
    Outcome: external policy queries match the same lexical ∪ canonical set the gates do; **breaking** for external consumers.
    Release: batch "symlink-resistant-path-matching"
@@ -831,7 +833,7 @@ The residual ad-hoc path handling (the "re-derive their representations ad hoc" 
 ```mermaid
 flowchart TD
     S1["✅ Step 1 (#502)<br/>Per-tool gate to AccessPath<br/>(breaking)"]
-    S2["Step 2 (#503)<br/>Service/RPC to AccessPath<br/>(breaking)"]
+    S2["✅ Step 2 (#503)<br/>Service/RPC to AccessPath<br/>(breaking)"]
     S3["Step 3 (#504)<br/>Retire input-normalizer path normalization"]
     S4["Step 4 (#505)<br/>Dissolve path-utils grab-bag"]
     S5["Step 5 (#506)<br/>Decide path-values boundary"]
