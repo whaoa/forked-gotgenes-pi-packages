@@ -83,6 +83,13 @@ scripts/hunk-pkg-diff.sh pi-permission-system --mode split
 
 The tag glob is `<package>-v*` (not `<package>-*`) so `pi-subagents` does not match the sibling `pi-subagents-worktrees` tags.
 
+An equivalent command for [Diffview.nvim](https://github.com/sindrets/diffview.nvim) is defined in the project-local `.nvim.lua`, sourced by [`nvim-config-local`](https://github.com/klen/nvim-config-local) when Neovim is opened in this repo:
+
+```vim
+:PkgDiffview pi-subagents
+:PkgDiffview pi-permission-system
+```
+
 ### Agentic development workflow
 
 Always start Pi from the **repo root**:
