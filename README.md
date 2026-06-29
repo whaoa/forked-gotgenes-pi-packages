@@ -71,6 +71,18 @@ pnpm run lint     # biome + rumdl
 pnpm run lint:fix # auto-fix lint issues
 ```
 
+### Reviewing changes per package
+
+`scripts/hunk-pkg-diff.sh <package-name> [hunk-options...]` reviews the working-tree diff of a single package against its most recent release tag, scoped to that package's directory, using [Hunk](https://github.com/modem-dev/hunk).
+It resolves the latest `<component>-v<version>` tag and runs `hunk diff <tag> -- packages/<package>`.
+
+```bash
+scripts/hunk-pkg-diff.sh pi-subagents
+scripts/hunk-pkg-diff.sh pi-permission-system --mode split
+```
+
+The tag glob is `<package>-v*` (not `<package>-*`) so `pi-subagents` does not match the sibling `pi-subagents-worktrees` tags.
+
 ### Agentic development workflow
 
 Always start Pi from the **repo root**:
