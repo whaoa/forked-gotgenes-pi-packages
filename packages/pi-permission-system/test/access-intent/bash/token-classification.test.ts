@@ -114,6 +114,40 @@ describe("classifyTokenAsPathCandidate", () => {
       expect(classifyTokenAsPathCandidate("./build")).toBeNull();
     });
   });
+
+  describe("Windows drive-letter acceptance gate", () => {
+    test("forward-slash drive path → returned as-is", () => {
+      expect(classifyTokenAsPathCandidate("C:/Windows/win.ini")).toBe(
+        "C:/Windows/win.ini",
+      );
+      expect(classifyTokenAsPathCandidate("D:/secrets/password.txt")).toBe(
+        "D:/secrets/password.txt",
+      );
+    });
+
+    test("backslash drive path → returned as-is", () => {
+      expect(classifyTokenAsPathCandidate("C:\\Windows\\win.ini")).toBe(
+        "C:\\Windows\\win.ini",
+      );
+      expect(classifyTokenAsPathCandidate("D:\\secrets\\password.txt")).toBe(
+        "D:\\secrets\\password.txt",
+      );
+    });
+
+    test("lowercase drive letter → returned as-is", () => {
+      expect(classifyTokenAsPathCandidate("c:/foo")).toBe("c:/foo");
+    });
+
+    test("single-letter scheme with double-slash (c://x) → null (URL_PATTERN fires first)", () => {
+      // c:// matches URL_PATTERN before the drive-letter check runs.
+      expect(classifyTokenAsPathCandidate("c://x")).toBeNull();
+    });
+
+    test("drive-relative path without separator (C:foo) → null", () => {
+      // No / or \ after the colon — not an absolute drive path per node:path.
+      expect(classifyTokenAsPathCandidate("C:foo")).toBeNull();
+    });
+  });
 });
 
 describe("classifyTokenAsRuleCandidate", () => {
@@ -204,6 +238,35 @@ describe("classifyTokenAsRuleCandidate", () => {
     });
   });
 
+  describe("Windows drive-letter acceptance gate", () => {
+    test("forward-slash drive path → returned as-is", () => {
+      // Forward-slash form was already accepted via token.includes("/").
+      // The explicit branch makes it first-class and order-independent.
+      expect(classifyTokenAsRuleCandidate("C:/Windows/win.ini")).toBe(
+        "C:/Windows/win.ini",
+      );
+    });
+
+    test("backslash drive path → returned as-is (new: no forward slash)", () => {
+      // Previously dropped by both classifiers; the backslash form has no /
+      // so the includes("/") branch could not catch it.
+      expect(classifyTokenAsRuleCandidate("D:\\secrets\\password.txt")).toBe(
+        "D:\\secrets\\password.txt",
+      );
+      expect(classifyTokenAsRuleCandidate("C:\\Windows\\win.ini")).toBe(
+        "C:\\Windows\\win.ini",
+      );
+    });
+
+    test("lowercase drive letter (backslash) → returned as-is", () => {
+      expect(classifyTokenAsRuleCandidate("c:\\foo")).toBe("c:\\foo");
+    });
+
+    test("drive-relative path without separator (C:foo) → null", () => {
+      expect(classifyTokenAsRuleCandidate("C:foo")).toBeNull();
+    });
+  });
+
   describe("rule-vs-path divergence", () => {
     const dotFiles = [".env", ".gitignore", ".eslintrc"];
     const relPaths = ["src/index.ts", "lib/utils.js", "config/settings.json"];
@@ -225,6 +288,18 @@ describe("classifyTokenAsRuleCandidate", () => {
     const sharedAccepted = ["/etc/hosts", "~/docs", "../sibling"];
     for (const tok of sharedAccepted) {
       test(`"${tok}": both classifiers accept`, () => {
+        expect(classifyTokenAsRuleCandidate(tok)).toBe(tok);
+        expect(classifyTokenAsPathCandidate(tok)).toBe(tok);
+      });
+    }
+
+    const winDrivePaths = [
+      "C:/Windows/win.ini",
+      "D:\\secrets\\password.txt",
+      "c:/foo",
+    ];
+    for (const tok of winDrivePaths) {
+      test(`Windows drive path "${tok}": both classifiers accept`, () => {
         expect(classifyTokenAsRuleCandidate(tok)).toBe(tok);
         expect(classifyTokenAsPathCandidate(tok)).toBe(tok);
       });

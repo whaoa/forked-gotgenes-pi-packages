@@ -347,7 +347,7 @@ export class BashPathResolver {
       // anywhere, so flag it conservatively (resolved against the baked cwd
       // only for a display path). Absolute / `~` candidates are base-independent
       // below.
-      if (base.kind === "unknown" && isRelativeCandidate(candidate)) {
+      if (base.kind === "unknown" && this.isRelativeCandidate(candidate)) {
         const accessPath = this.normalizer.forPath(candidate);
         const canonical = accessPath.boundaryValue();
         if (canonical && !isSafeSystemPath(canonical) && !seen.has(canonical)) {
@@ -421,7 +421,7 @@ export class BashPathResolver {
     // An unknown base + relative candidate stays literal-only: a resolved
     // absolute or canonical alias would resolve against the wrong directory and
     // could spuriously match a rule (#393).
-    if (base.kind === "unknown" && isRelativeCandidate(candidate)) {
+    if (base.kind === "unknown" && this.isRelativeCandidate(candidate)) {
       return this.normalizer.forLiteral(normalizePathPolicyLiteral(candidate));
     }
 
@@ -430,6 +430,20 @@ export class BashPathResolver {
         ? this.normalizer.resolveBase(base.offset)
         : undefined;
     return this.normalizer.forPath(candidate, { resolveBase });
+  }
+
+  /**
+   * True when a path candidate is relative (resolved against the effective
+   * directory) rather than absolute or home-relative (`~…`), which are
+   * base-independent.
+   *
+   * Delegates the absoluteness decision to the platform-aware `PathNormalizer`
+   * rather than a POSIX-only `startsWith("/")` check, so Windows drive-letter
+   * paths (`C:/…`, `C:\…`) are correctly treated as absolute on win32 and as
+   * relative on POSIX (where they denote an in-CWD path).
+   */
+  private isRelativeCandidate(candidate: string): boolean {
+    return !this.normalizer.isAbsolute(candidate) && !candidate.startsWith("~");
   }
 }
 
@@ -518,14 +532,4 @@ function literalTextOf(node: TSNode): string | null {
     default:
       return null;
   }
-}
-
-/**
- * True when a path candidate is relative (resolved against the effective
- * directory) rather than absolute (`/…`) or home-relative (`~…`), which are
- * base-independent.
- * Used to decide which candidates an unknown base affects.
- */
-function isRelativeCandidate(candidate: string): boolean {
-  return !candidate.startsWith("/") && !candidate.startsWith("~");
 }

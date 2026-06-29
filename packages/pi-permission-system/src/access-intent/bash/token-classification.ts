@@ -8,6 +8,12 @@
  * Both classifiers share the private `rejectNonPathToken` predicate that captures
  * the seven rejection cases common to both (the production clone this module was
  * extracted to eliminate).
+ *
+ * Both classifiers recognize Windows drive-letter absolute paths (`C:/…`, `C:\…`)
+ * unconditionally on all platforms. On POSIX the token resolves as a real in-CWD
+ * relative path and is gated by the `path` surface; on Windows the `PathNormalizer`
+ * routes it through the absolute-path branch. Shape recognition is platform-independent
+ * string matching; the platform-sensitive absoluteness decision belongs to `PathNormalizer`.
  */
 
 // ── Public classifiers ─────────────────────────────────────────────────────
@@ -19,6 +25,7 @@
  * - Absolute paths (starting with `/`)
  * - Home-relative paths (starting with `~/`)
  * - Parent-traversal paths (containing `..`)
+ * - Windows drive-letter absolute paths (`C:/…` or `C:\…`)
  *
  * Returns the raw token string if it qualifies, or `null` to skip.
  */
@@ -28,6 +35,7 @@ export function classifyTokenAsPathCandidate(token: string): string | null {
   if (token.startsWith("/")) return token;
   if (token.startsWith("~/")) return token;
   if (token.includes("..")) return token;
+  if (WINDOWS_DRIVE_PATH_PATTERN.test(token)) return token;
 
   return null;
 }
@@ -38,8 +46,13 @@ export function classifyTokenAsPathCandidate(token: string): string | null {
  * Accepts the same shapes as `classifyTokenAsPathCandidate`, plus:
  * - Dot-files and `./`-relative paths (starting with `.`)
  * - Any relative path containing `/` (e.g. `src/foo.ts`)
+ * - Windows drive-letter absolute paths (`C:/…` or `C:\…`)
  *
  * The `~/foo` case is covered by `includes("/")` — no separate `~/` branch needed.
+ * The forward-slash drive form (`C:/…`) is also caught by `includes("/")`, but the
+ * explicit `WINDOWS_DRIVE_PATH_PATTERN` branch makes both separator forms first-class
+ * and order-independent, and covers the backslash-only form (`D:\…`) which `includes("/")`
+ * cannot reach.
  *
  * Does NOT require the strict "must start with `/` or `~/` or contain `..`"
  * gate that the external-directory classifier uses.
@@ -52,11 +65,21 @@ export function classifyTokenAsRuleCandidate(token: string): string | null {
   if (token.startsWith(".")) return token;
   if (token.includes("/")) return token; // covers ~/ paths and all relative paths with /
   if (token.includes("..")) return token; // bare ".." (no slash)
+  if (WINDOWS_DRIVE_PATH_PATTERN.test(token)) return token; // backslash-only drive form
 
   return null;
 }
 
 // ── Private rejection predicate ────────────────────────────────────────────
+
+/**
+ * Windows drive-letter absolute path: a single ASCII letter, a colon, then a
+ * separator (`/` or `\`). Matches `C:/…` and `C:\…` but not drive-relative
+ * `C:foo` (no separator) or multi-letter schemes (`https:`, `mailto:`).
+ * Single-letter schemes with `//` (e.g. `c://x`) are already rejected by
+ * `URL_PATTERN` before this pattern is tested.
+ */
+const WINDOWS_DRIVE_PATH_PATTERN = /^[a-zA-Z]:[/\\]/;
 
 /**
  * URL pattern to skip tokens that look like URLs rather than paths.

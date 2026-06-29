@@ -953,6 +953,44 @@ describe("formatBashExternalDirectoryAskPrompt", () => {
   });
 });
 
+describe("Windows drive-letter paths (win32 semantics)", () => {
+  const windowsCwd = "C:/projects/app";
+
+  async function extractWin32(command: string): Promise<string[]> {
+    return extractWithNormalizer(
+      command,
+      new PathNormalizer("win32", windowsCwd),
+    );
+  }
+
+  test("forward-slash drive path outside CWD is flagged", async () => {
+    const result = await extractWin32("cat C:/Windows/win.ini");
+    expect(result).not.toHaveLength(0);
+  });
+
+  test("different drive letter outside CWD is flagged", async () => {
+    const result = await extractWin32("cat D:/secrets/password.txt");
+    expect(result).not.toHaveLength(0);
+  });
+
+  test("drive path inside CWD is not flagged (known base)", async () => {
+    const result = await extractWin32("cat C:/projects/app/inside.txt");
+    expect(result).toHaveLength(0);
+  });
+
+  test("drive path inside CWD is not flagged after non-literal cd (unknown base)", async () => {
+    // Before the isRelativeCandidate conversion, the hand-rolled startsWith("/")
+    // check treats C:/ as relative on win32, so the unknown-base conservative
+    // branch fires and over-flags an inside-CWD drive path.
+    // After the conversion (!normalizer.isAbsolute), C:/ is absolute on win32
+    // and routes to the resolved branch with its inside-CWD check.
+    const result = await extractWin32(
+      'cd "$D" && cat C:/projects/app/inside.txt',
+    );
+    expect(result).toHaveLength(0);
+  });
+});
+
 describe("bash external-directory denial messages (centralized)", () => {
   test("denial message includes command, paths, and extension tag", () => {
     const result = formatDenyReason({
