@@ -869,7 +869,7 @@ flowchart TD
 ### Related: PathNormalizer platform seam ([#510])
 
 A precursor refactor (not one of the five steps above) threaded a single injected `PathNormalizer` collaborator through the bash path pipeline, completing the half-built platform seam behind the recurring Windows-path bugs ([#382], [#345], [#418], [#508]).
-The host `platform` is read once at the composition root (`index.ts`) and injected: into `PermissionManager` (rule-matching case-fold), into `PermissionSession` (which builds the `PathNormalizer` from `platform` + the session `cwd` and exposes it via `getPathNormalizer()` / `getPlatform()`), and into the subagent-context detection.
+The host `platform` is read once at the composition root (`index.ts`) and injected: into `PermissionManager` (rule-matching case-fold), into `PermissionSession` (which builds the `PathNormalizer` from `platform` + the session `cwd` and exposes it via `getPathNormalizer()`), and into the subagent-context detection.
 No interior `src/` module reads `process.platform` — an ESLint `no-restricted-syntax` guard scoped to `pi-permission-system/src` (exempting `index.ts`) enforces this, so every path-utils / canonicalize / rule / subagent-context leaf takes an injected `platform` rather than a `= process.platform` default.
 `PathNormalizer` is a facade *over* the platform-parameterized `path-utils` / `AccessPath` primitives, not a relocation: Phase 7 Step 4 ([#505]) can later move those internals behind it without re-touching the seam.
 The change is behavior-preserving on POSIX (every converted op already used the host `node:path`); the `win32` flavor is newly exercised by injected-platform unit tests, and [#508] then lands the drive-letter routing fix on the seam.
