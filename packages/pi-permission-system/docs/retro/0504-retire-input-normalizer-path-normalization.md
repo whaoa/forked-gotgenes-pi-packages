@@ -35,3 +35,27 @@ Produced a four-step plan (two `test:` steps, one `refactor:`, one `docs:`) at `
 
 [#502]: https://github.com/gotgenes/pi-packages/issues/502
 [#503]: https://github.com/gotgenes/pi-packages/issues/503
+
+## Stage: Implementation — TDD (2026-06-29T21:15:00Z)
+
+### Session summary
+
+Implemented all four planned TDD steps: Step 1 migrated ~50 real-path `checkTool` calls in `permission-manager-unified.test.ts` to a new `checkPath` helper (green against production); Step 2 replaced three dead `describe` blocks in `input-normalizer.test.ts` with 4 red assertions asserting the new `["*"]`-only contract; Step 3 removed the dead branches, dropped `platform`/`cwd` from `normalizeInput` and `currentCwd` from `PermissionManager` (green, `tsc` + full suite + lint + fallow); Step 4 updated `architecture.md` and `SKILL.md` and marked Phase 7 Step 3 `✅`.
+Test count 2222 → 2198 (−24 deleted input-normalizer tests, +4 new contract assertions = −20 net from the normalizer, plus 4 extra missed-path corrections).
+Pre-completion reviewer returned WARN with two findings, both resolved before the retro commit.
+
+### Observations
+
+- **The plan's ~30 estimate was low — actual migration surface was ~50 calls.**
+  Planning identified multi-line `checkTool` calls where the surface name is on the next line, and single-line ones where the surface is inline, but missed four calls where the surface (`external_directory`) was embedded in larger multi-line patterns with session rules or agent names (lines 171, 2676, 2686, 2872 / 3005 in the original file).
+  These surfaced as 4 unexpected failures when the full suite ran after Step 3; fixed as part of the same step before committing.
+- **A structural repair was needed mid-Step 2.**
+  One `Edit` call used `"universal '*': 'deny'"` as an anchor, which split the test's string literal at the embedded `'deny'` quote, corrupting the `describe` block structure.
+  Detected immediately by `pnpm exec biome check`; repaired via a targeted Python line-range replacement since the exact bytes (with trailing `})` closure) didn't match any clean `Edit` anchor.
+  Lesson: when a test description contains smart quotes or embedded single-quotes, use a wider anchor that includes a few surrounding lines rather than the string literal alone.
+- **Step 1 test migration was the largest work unit.**
+  The `checkPath` helper matched the plan design exactly; the `getPathPolicyValues(path, cwd ? { cwd } : {}, "linux")` call was faithful to the old `normalizeInput` path branch.
+  The two cwd-aware tests (lines 3302–3352) correctly passed both `manager.configureForCwd(cwd)` (for loader) and `{ cwd }` to `checkPath` (for alias derivation).
+- **Pre-completion reviewer WARN findings (both fixed before commit):**
+  1. `docs/architecture/architecture.md` line ~786: per-tool gate bullet in the Findings "residual ad-hoc path handling" section lacked a "closed by" annotation — added `— closed by Steps 1–3 ([#502], [#504])`.
+  2. `test/input-normalizer.test.ts`: `import { join } from "node:path"` was unused after removing the home-expansion test blocks; Biome had auto-fixed it during Step 3 but the fix wasn't staged before commit — removed explicitly and committed.
