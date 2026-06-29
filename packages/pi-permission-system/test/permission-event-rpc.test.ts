@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-deprecated -- tests the deprecated RPC channel implementation */
 import { createEventBus } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PathNormalizer } from "#src/path-normalizer";
 import {
   type PermissionRpcDeps,
@@ -83,6 +83,11 @@ function waitForReply<T>(
     });
   });
 }
+
+beforeEach(() => {
+  realpathSync.mockReset();
+  realpathSync.mockImplementation((p: string) => p);
+});
 
 // ── registerPermissionRpcHandlers — check RPC ──────────────────────────────
 
