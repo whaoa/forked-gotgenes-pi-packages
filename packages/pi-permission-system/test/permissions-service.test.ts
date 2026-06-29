@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { AccessIntent } from "#src/access-intent/access-intent";
 import { PathNormalizer } from "#src/path-normalizer";
 import { LocalPermissionsService } from "#src/permissions-service";
@@ -23,11 +23,9 @@ vi.mock("node:fs", () => ({
 // ── helpers ────────────────────────────────────────────────────────────────
 
 interface FakeResolver {
-  resolve: ReturnType<
-    typeof vi.fn<(intent: AccessIntent) => PermissionCheckResult>
-  >;
-  getToolPermission: ReturnType<
-    typeof vi.fn<(toolName: string, agentName?: string) => PermissionState>
+  resolve: Mock<(intent: AccessIntent) => PermissionCheckResult>;
+  getToolPermission: Mock<
+    (toolName: string, agentName?: string) => PermissionState
   >;
 }
 
