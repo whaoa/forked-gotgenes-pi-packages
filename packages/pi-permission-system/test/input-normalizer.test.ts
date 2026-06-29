@@ -32,100 +32,21 @@ afterEach(() => {
 });
 
 describe("normalizeInput — non-MCP surfaces", () => {
-  describe("special / path", () => {
-    it("uses path from input as the lookup value", () => {
+  // Path-bearing and special surfaces no longer derive path lookup values
+  // through normalizeInput — that is now done by the access-path gate (#502)
+  // and the service/RPC builder (#503). normalizeInput's tool branch collapses
+  // every path-bearing or special surface to the catch-all ["*"] exactly as it
+  // does for any unrecognised extension tool.
+  describe("path-bearing and special surfaces collapse to '*'", () => {
+    it("path surface ignores input.path and returns ['*']", () => {
+      // After #504 removal: path no longer has a special branch.
       const result = normalizeInput("path", { path: ".env" }, [], "linux");
       expect(result.surface).toBe("path");
-      expect(result.values).toEqual([".env"]);
+      expect(result.values).toEqual(["*"]);
       expect(result.resultExtras).toEqual({});
     });
 
-    it("falls back to '*' when path is missing", () => {
-      const result = normalizeInput("path", {}, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("falls back to '*' when path is not a string", () => {
-      const result = normalizeInput("path", { path: 42 }, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("falls back to '*' when path is an empty string", () => {
-      const result = normalizeInput("path", { path: "" }, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("falls back to '*' when path is whitespace-only", () => {
-      const result = normalizeInput("path", { path: "   " }, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("handles null input", () => {
-      const result = normalizeInput("path", null, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("expands ~/... path value to absolute home path", () => {
-      const result = normalizeInput(
-        "path",
-        { path: "~/.ssh/config" },
-        [],
-        "linux",
-      );
-      expect(result.values).toEqual([join("/mock/home", ".ssh/config")]);
-    });
-
-    it("expands $HOME/... path value to absolute home path", () => {
-      const result = normalizeInput(
-        "path",
-        { path: "$HOME/.ssh/config" },
-        [],
-        "linux",
-      );
-      expect(result.values).toEqual([join("/mock/home", ".ssh/config")]);
-    });
-
-    it("does not expand non-home values", () => {
-      const result = normalizeInput("path", { path: ".env" }, [], "linux");
-      expect(result.values).toEqual([".env"]);
-    });
-
-    it("does not expand the '*' fallback", () => {
-      const result = normalizeInput("path", {}, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("adds cwd-normalized and relative aliases when cwd is provided", () => {
-      const result = normalizeInput(
-        "path",
-        { path: "src/App.jsx" },
-        [],
-        "linux",
-        "/workspace/project",
-      );
-      expect(result.values).toEqual([
-        "/workspace/project/src/App.jsx",
-        "src/App.jsx",
-      ]);
-    });
-
-    it("ignores a user-supplied string pathPolicyValues field", () => {
-      const result = normalizeInput(
-        "path",
-        { path: "src/App.jsx", pathPolicyValues: ["/etc/shadow"] },
-        [],
-        "linux",
-        "/workspace/project",
-      );
-      expect(result.values).toEqual([
-        "/workspace/project/src/App.jsx",
-        "src/App.jsx",
-      ]);
-    });
-  });
-
-  describe("special / external_directory", () => {
-    it("uses path from input as the lookup value", () => {
+    it("external_directory surface ignores input.path and returns ['*']", () => {
       const result = normalizeInput(
         "external_directory",
         { path: "/other/project" },
@@ -133,72 +54,31 @@ describe("normalizeInput — non-MCP surfaces", () => {
         "linux",
       );
       expect(result.surface).toBe("external_directory");
-      expect(result.values).toEqual(["/other/project"]);
+      expect(result.values).toEqual(["*"]);
       expect(result.resultExtras).toEqual({});
     });
 
-    it("falls back to '*' when path is missing", () => {
-      const result = normalizeInput("external_directory", {}, [], "linux");
+    it("read surface ignores input.path and returns ['*']", () => {
+      const result = normalizeInput("read", { path: ".env" }, [], "linux");
+      expect(result.surface).toBe("read");
       expect(result.values).toEqual(["*"]);
+      expect(result.resultExtras).toEqual({});
     });
 
-    it("falls back to '*' when path is not a string", () => {
-      const result = normalizeInput(
+    it("missing path also returns ['*'] (unchanged fallback)", () => {
+      for (const surface of [
+        "path",
         "external_directory",
-        { path: 42 },
-        [],
-        "linux",
-      );
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("falls back to '*' when path is an empty string", () => {
-      const result = normalizeInput(
-        "external_directory",
-        { path: "" },
-        [],
-        "linux",
-      );
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("handles null input", () => {
-      const result = normalizeInput("external_directory", null, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("expands ~/... path value to absolute home path", () => {
-      const result = normalizeInput(
-        "external_directory",
-        { path: "~/dev/project" },
-        [],
-        "linux",
-      );
-      expect(result.values).toEqual([join("/mock/home", "dev/project")]);
-    });
-
-    it("expands $HOME/... path value to absolute home path", () => {
-      const result = normalizeInput(
-        "external_directory",
-        { path: "$HOME/dev/project" },
-        [],
-        "linux",
-      );
-      expect(result.values).toEqual([join("/mock/home", "dev/project")]);
-    });
-
-    it("adds cwd-normalized and relative aliases when cwd is provided", () => {
-      const result = normalizeInput(
-        "external_directory",
-        { path: "src/App.jsx" },
-        [],
-        "linux",
-        "/workspace/project",
-      );
-      expect(result.values).toEqual([
-        "/workspace/project/src/App.jsx",
-        "src/App.jsx",
-      ]);
+        "read",
+        "write",
+        "edit",
+        "grep",
+        "find",
+        "ls",
+      ]) {
+        const result = normalizeInput(surface, {}, [], "linux");
+        expect(result.values).toEqual(["*"]);
+      }
     });
   });
 
@@ -278,78 +158,6 @@ describe("normalizeInput — non-MCP surfaces", () => {
       const cmd = "# just a comment";
       const result = normalizeInput("bash", { command: cmd }, [], "linux");
       expect(result.values).toEqual(["# just a comment"]);
-    });
-  });
-
-  describe("path-bearing tools (read, write, edit, grep, find, ls)", () => {
-    it("uses input.path as the lookup value when path is present", () => {
-      for (const tool of ["read", "write", "edit", "grep", "find", "ls"]) {
-        const result = normalizeInput(
-          tool,
-          { path: "/project/src/main.ts" },
-          [],
-          "linux",
-        );
-        expect(result.surface).toBe(tool);
-        expect(result.values).toEqual(["/project/src/main.ts"]);
-        expect(result.resultExtras).toEqual({});
-      }
-    });
-
-    it("falls back to '*' when input.path is missing", () => {
-      for (const tool of ["read", "write", "edit", "grep", "find", "ls"]) {
-        const result = normalizeInput(tool, {}, [], "linux");
-        expect(result.values).toEqual(["*"]);
-      }
-    });
-
-    it("falls back to '*' when input.path is empty string", () => {
-      const result = normalizeInput("read", { path: "" }, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("falls back to '*' when input.path is not a string", () => {
-      const result = normalizeInput("write", { path: 42 }, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("falls back to '*' when input is null", () => {
-      const result = normalizeInput("edit", null, [], "linux");
-      expect(result.values).toEqual(["*"]);
-    });
-
-    it("expands ~/... path value to absolute home path", () => {
-      const result = normalizeInput(
-        "read",
-        { path: "~/.ssh/config" },
-        [],
-        "linux",
-      );
-      expect(result.values).toEqual([join("/mock/home", ".ssh/config")]);
-    });
-
-    it("expands $HOME/... path value to absolute home path", () => {
-      const result = normalizeInput(
-        "write",
-        { path: "$HOME/.ssh/config" },
-        [],
-        "linux",
-      );
-      expect(result.values).toEqual([join("/mock/home", ".ssh/config")]);
-    });
-
-    it("adds cwd-normalized and relative aliases when cwd is provided", () => {
-      const result = normalizeInput(
-        "read",
-        { path: "src/App.jsx" },
-        [],
-        "linux",
-        "/workspace/project",
-      );
-      expect(result.values).toEqual([
-        "/workspace/project/src/App.jsx",
-        "src/App.jsx",
-      ]);
     });
   });
 
