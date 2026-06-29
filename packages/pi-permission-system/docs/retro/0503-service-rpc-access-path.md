@@ -33,3 +33,30 @@ Produced a three-step plan (two breaking `feat!:` migrations — service then RP
 - **Skipped the `ask_user` gate:** operator-authored issue, unambiguous and roadmap-blessed proposal; the only design nuance (resolver-injection vs. a localized swap) is settled by Step 5's premise, not a genuine open choice.
 - **Release:** Step 2 of batch "symlink-resistant-path-matching" (tail = Step 3, [#504]); mid-batch → defer.
   The breaking `feat!:` commits land on `main` and auto-batch; the major-bump release cuts when Step 3 lands.
+
+## Stage: Implementation — TDD (2026-06-29T11:55:00Z)
+
+### Session summary
+
+Implemented all three planned TDD steps plus an unplanned cleanup: the breaking `feat!:` service migration (Step 1), the breaking `feat!:` RPC migration (Step 2), the `docs:` roadmap/API updates (Step 3), and a `refactor:` un-exporting `buildInputForSurface`.
+Test suite went 2215 → 2222 (+7); `pnpm run check`, root `pnpm run lint`, full `pnpm run test`, and `pnpm fallow dead-code` all green.
+Pre-completion reviewer returned PASS with no warnings.
+
+### Observations
+
+- **The design matched the plan exactly — routing through the resolver was the load-bearing decision.**
+  Both consumers emit an `access-path` intent to `resolver.resolve` (never building `path-values` themselves), so the resolver stays the sole `path-values` producer (the [#506] premise).
+  The service collaborators narrowed cleanly from `(manager, sessionRules, …)` to `(resolver, session, …)` — the resolver subsumes the session-ruleset composition, so it was a 1:1 substitution plus the per-call `getPathNormalizer()` fetch.
+- **Two deviations, both follow-the-evidence cleanups:**
+  1. `buildInputForSurface` was made module-private (the plan said keep it exported).
+  Once `test/service.test.ts`'s adapter block was rewritten to drive the real `LocalPermissionsService`, the export had no remaining external consumer.
+  `pnpm fallow dead-code` passed either way (internal caller present), but un-exporting is the honest surface — landed as a separate `refactor:` commit.
+  2. The `service.test.ts` "service adapter delegation" describe (a hand-rolled `buildInputForSurface` adapter simulating the *old* `index.ts` wiring) was renamed to "service round-trip through the global slot" and rewritten to exercise the real class, deleting the stale `read → {}` assertion that documented the latent value-drop bug.
+- **The latent gap is real and now fixed end-to-end.**
+  `buildInputForSurface` returned `{}` for the `path` and path-bearing surfaces, so those service/RPC queries collapsed to `["*"]` and dropped the supplied path — only `external_directory` ever worked.
+  Added a composition-root end-to-end test (`#503`) proving a `path`-surface service query now resolves against a deny rule on the supplied path; this distinguishes new behavior from old without needing a symlink (a pure value-passing proof).
+- **`PermissionRpcDeps.session` widening cascaded to the prompt tests.**
+  Adding `getPathNormalizer` to the narrow `session` view broke the prompt-RPC tests' inline `session: { getRuntimeContext }` overrides at `tsc` time (not at runtime — esbuild skips types).
+  Resolved by extracting a `makeSession(ctx)` helper so all overrides carry both methods; caught only by `pnpm run check`, a reminder to run it after a shared-interface change.
+- **ESLint auto-fixes fired twice on commit** (stripping unnecessary `!` non-null assertions on `mock.calls[0]![0]` and a redundant return-type cast) — the pre-commit hook modified files and aborted the commit; re-staging and re-committing cleared it both times.
+- **Pre-completion reviewer: PASS** — no warnings; verified the resolver-routing invariant, the `✅` Step 2 markers (heading + `S2` Mermaid node), conventional-commit/BREAKING-CHANGE correctness, and the two deviations as sound.
