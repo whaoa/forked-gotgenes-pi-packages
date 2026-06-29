@@ -255,7 +255,6 @@ export function makeGateInputs(
     getInfrastructureReadDirs?: () => string[];
     getToolPreviewLimits?: () => ToolPreviewFormatterOptions;
     getPathNormalizer?: () => PathNormalizer;
-    getPlatform?: () => NodeJS.Platform;
   } = {},
 ): ToolCallGateInputs {
   return {
@@ -276,8 +275,6 @@ export function makeGateInputs(
       vi.fn<() => PathNormalizer>(
         () => new PathNormalizer(process.platform, "/test/cwd"),
       ),
-    getPlatform:
-      overrides.getPlatform ?? vi.fn<() => NodeJS.Platform>(() => "linux"),
   };
 }
 

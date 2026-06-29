@@ -42,8 +42,6 @@ export interface ToolCallGateInputs {
   getToolPreviewLimits(): ToolPreviewFormatterOptions;
   /** The session's path normalizer (platform + cwd baked in). */
   getPathNormalizer(): PathNormalizer;
-  /** The host platform injected at the composition root. */
-  getPlatform(): NodeJS.Platform;
 }
 
 /**
