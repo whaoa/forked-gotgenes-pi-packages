@@ -675,7 +675,7 @@ src/
 ├── permission-session.ts     `PermissionSession` class - state/lifecycle owner: owns context lifecycle, session-rule lifecycle (`reset`/`shutdown`/`reload`), skill entries, agent-name resolution, the config gateway, the Tell-Don't-Ask gate inputs, and `notify(message)` (Tell-Don't-Ask UI warn over the owned context, no-op before activation — dissolves the `index.ts` forward-reference cycle, #363); `implements ToolCallGateInputs` (the pipeline's input contract); the resolve role moved to `PermissionResolver` (#340), the recorder role to `SessionRules`, and the three fig-leaf handler role interfaces (`GateHandlerSession` / `AgentPrepSession` / `SessionLifecycleSession`) were retired — handlers depend on the concrete class + `PermissionResolver` (#341)
 ├── path-normalizer.ts        `PathNormalizer` class - the path-interpretation collaborator constructed once at the session edge with the host `platform` and session `cwd` baked in (#510); hands raw tokens, returns prepared values: `forPath`/`forLiteral` (build `AccessPath`s), `isAbsolute`/`resolveBase`/`joinBase` (platform-aware `cd`-fold routing the `BashPathResolver` asks), `isWithinDirectory`/`isOutsideWorkingDirectory` (containment), `comparableValue` (lexical comparison value for skill-prompt matching, [#511]), `isInfrastructureRead` (Pi infra-read containment over an `AccessPath`, [#511]); selects the `win32`/`posix` flavor once and delegates to the platform-parameterized `path-utils`/`AccessPath` primitives, so no consumer reads `process.platform` or threads `cwd`; a facade over (not a relocation of) those primitives — Phase 7 [#505] can later move them behind it
 ├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473); bash sub-domain completed by Phase 6 Step 3 (#475); `AccessPath` value object added by Phase 6 Step 4 (#476); `AccessIntent` union added by Phase 6 Step 6 (#478)
-│   ├── access-intent.ts     `AccessIntent` discriminated union each gate emits: `tool` (raw input the manager normalizes) and `access-path` (an `AccessPath` for every path gate — `path` and `external_directory`, #486); `ResolvedAccessIntent` (`tool | path-values`) is what the manager consumes after the resolver unwraps `access-path` via `matchValues()`, keeping the manager string-based — `path-values` is resolver-internal, not gate-emitted, since #486 (#478, #486)
+│   ├── access-intent.ts     `AccessIntent` discriminated union each gate emits: `tool` (raw input the manager normalizes) and `access-path` (an `AccessPath` for every path gate — `path`, `external_directory`, and the per-tool path-bearing surfaces `read`/`write`/`edit`/`grep`/`find`/`ls`, #486, #502); `ResolvedAccessIntent` (`tool | path-values`) is what the manager consumes after the resolver unwraps `access-path` via `matchValues()`, keeping the manager string-based — `path-values` is resolver-internal, not gate-emitted, since #486 (#478, #486)
 │   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form); the surface-neutral `forPath(pathValue, { cwd, resolveBase?, platform })` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison` (resolveBase defaults to cwd; `platform` injected, not read ambiently, #510; serves every path surface, #486), and `forLiteral(literal)` builds a literal-only path with no canonical for the unknown-base bash case ([#393]); type-distinct accessors make the lexical/canonical conflation a compile error (#476)
 │   └── bash/
 │       ├── parser.ts           Lazy tree-sitter-bash parser: `TSNode` interface (exported), `TSParser` interface (private), `initParser` (private), `getParser = memoizeAsyncWithRetry(initParser)` (exported); dropped from `bash-program.ts` (#473)
@@ -695,7 +695,7 @@ src/
 │       ├── types.ts          GateOutcome, ToolCallContext
 │       ├── descriptor.ts     GateDescriptor (with DenialContext), GateBypass, GateResult types
 │       ├── runner.ts         GateRunner class — constructed with three distinct collaborators: `ScopedPermissionResolver` (resolver), `SessionApprovalRecorder` (`SessionRules` recorder), `GatePrompter` (`PromptingGateway`), plus `DecisionReporter`; `run(gate, agentName, toolCallId)` dispatches null / bypass / descriptor (#341)
-│       ├── tool-call-gate-pipeline.ts `ToolCallGateInputs` interface (query methods: `getActiveSkillEntries`, `getInfrastructureReadDirs`, `getToolPreviewLimits`, `getPathNormalizer`, `getPlatform`) + `ToolCallGatePipeline` class — constructed with `ScopedPermissionResolver` + `ToolCallGateInputs`; owns bash-command extraction + single `BashProgram.parse` (fed the session `PathNormalizer`, #510), `ToolPreviewFormatter` construction, infra-dir list, the six gate producers, and the run loop; `evaluate(tcc, runner)` returns the first block outcome or allow (#327, #340)
+│       ├── tool-call-gate-pipeline.ts `ToolCallGateInputs` interface (query methods: `getActiveSkillEntries`, `getInfrastructureReadDirs`, `getToolPreviewLimits`, `getPathNormalizer`) + `ToolCallGatePipeline` class — constructed with `ScopedPermissionResolver` + `ToolCallGateInputs`; owns bash-command extraction + single `BashProgram.parse` (fed the session `PathNormalizer`, #510), `ToolPreviewFormatter` construction, infra-dir list, the six gate producers, and the run loop; `evaluate(tcc, runner)` returns the first block outcome or allow (#327, #340)
 │       ├── skill-input-gate-pipeline.ts `SkillInputGateInputs` + `GateNotifier` interfaces + `SkillInputGatePipeline` class — constructed once in the composition root and injected into `PermissionGateHandler`; owns raw `checkPermission` pre-check, deny notify, `describeSkillInputGate` descriptor, request-id mint (`createSkillInputRequestId`), and `runner.run`; `evaluate(skillName, agentName, notifier, runner)` makes the `input` path symmetric with the `tool_call` path (#329, absorbs #330)
 │       ├── helpers.ts        deriveDecisionValue, deriveResolution, buildDecisionEvent
 │       ├── skill-read.ts     describeSkillReadGate - pure descriptor factory
@@ -709,7 +709,7 @@ src/
 │       ├── bash-path-extractor.ts Thin facade (`extractExternalPathsFromBashCommand`) over `BashProgram`
 │       ├── bash-command.ts   `resolveBashCommandCheck` - pure combiner over caller-supplied `BashCommand[]` units (the handler decomposes via `BashProgram.commands()`), checks each unit on the `bash` surface, tags the winning result with the offending command's execution `context` (#306), selects via `pickMostRestrictive`; when empty, resolves the whole command only for a trivially-empty command (empty / whitespace / comment-only) and otherwise fails closed to a synthetic `ask` with the `<unparseable-bash-command>` sentinel (#301, #452)
 │       ├── path.ts           describePathGate - pure descriptor factory for cross-cutting path rules; builds an `AccessPath` and emits an `access-path` `AccessIntent` on the `path` surface so it matches the canonical (symlink-resolved) form like `external_directory` (#486)
-│       ├── tool.ts           describeToolGate - pure descriptor factory
+│       ├── tool.ts           describeToolGate - pure descriptor factory for the per-tool gate; for path-bearing built-in tools (`read`/`write`/`edit`/`grep`/`find`/`ls`) the pipeline builds an `AccessPath` and emits an `access-path` intent on the tool-name surface so per-tool rules match lexical ∪ canonical (#502), and the session-approval value derives from `accessPath.value()`; bash/MCP/extension tools keep the raw `tool` intent
 │       └── index.ts          Barrel re-exports
 │
 ├── index.ts                  Extension factory - event wiring, collaborator construction (~170 lines after #320; established injection-bag wiring kept inline per anti-procedure-splitting rule)
@@ -791,7 +791,7 @@ The residual ad-hoc path handling (the "re-derive their representations ad hoc" 
 
 ### Steps
 
-1. **Migrate the per-tool path-bearing tool gate onto `AccessPath` (canonical parity).**
+1. ✅ **Migrate the per-tool path-bearing tool gate onto `AccessPath` (canonical parity).**
    ([#502]) Target: `src/handlers/gates/tool-call-gate-pipeline.ts` (build `AccessPath.forPath` and emit `kind: "access-path"` with `surface: toolName` for path-bearing tools, keeping non-path tools on the `tool` intent), `src/handlers/gates/tool.ts` (derive the session-approval value from `accessPath.value()`).
    The resolver already unwraps `access-path` → `path-values` and the manager's path-value branch already routes `PATH_BEARING_TOOLS` through `evaluateAnyValue`, so the only behavior change is the canonical alias joining the match set — mechanically parallel to [#486].
    Smell: Category C (coupling / match asymmetry).
@@ -830,7 +830,7 @@ The residual ad-hoc path handling (the "re-derive their representations ad hoc" 
 
 ```mermaid
 flowchart TD
-    S1["Step 1 (#502)<br/>Per-tool gate to AccessPath<br/>(breaking)"]
+    S1["✅ Step 1 (#502)<br/>Per-tool gate to AccessPath<br/>(breaking)"]
     S2["Step 2 (#503)<br/>Service/RPC to AccessPath<br/>(breaking)"]
     S3["Step 3 (#504)<br/>Retire input-normalizer path normalization"]
     S4["Step 4 (#505)<br/>Dissolve path-utils grab-bag"]
@@ -877,17 +877,18 @@ The change is behavior-preserving on POSIX (every converted op already used the 
 #### Residual `getPlatform()` threading (follow-up [#511])
 
 The seam left five call sites threading `platform` *directly* rather than through `PathNormalizer`, because they call raw `path-utils` functions that are not `AccessPath` operations.
-`PermissionSession.getPlatform()` (and the `ToolCallGateInputs.getPlatform()` it backs) exists only to feed them; it can be retired as each is folded, and the leaf `platform` parameters in `path-utils.ts` persist until then.
+`PermissionSession.getPlatform()` (and the `ToolCallGateInputs.getPlatform()` it backed) existed only to feed them; it has been retired now that every consumer is folded, while the leaf `platform` parameters in `path-utils.ts` persist.
 How each relates to the Phase 7 steps above:
 
-- **Per-tool gate suggestion value** (`handlers/gates/tool.ts` `deriveSuggestionValue` → `normalizePathForComparison`) — retired by **Step 1 ([#502])**, which already targets `tool.ts` to derive the session-approval value from `accessPath.value()`.
+- **Per-tool gate suggestion value** (`handlers/gates/tool.ts` `deriveSuggestionValue` → `normalizePathForComparison`) — ✅ retired by **Step 1 ([#502])**: `deriveSuggestionValue` now derives the session-approval value from `accessPath.value()`, dropping the `platform` thread into `describeToolGate`.
 - **`input-normalizer` path-policy values** (`normalizePathSurfaceValues` → `getPathPolicyValues`) — retired by **Steps 2–3 ([#503], [#504])**, which migrate the service/RPC path queries onto `AccessPath` and then remove the path-bearing/special-surface branches from `normalizeInput` entirely.
 - **Infra-read containment** (`handlers/gates/external-directory.ts`) — ✅ routed through `PathNormalizer.isInfrastructureRead` ([#511]): the gate already holds the normalizer, which now answers the containment question over the already-built `AccessPath`.
   Step 4 ([#505]) still keeps `isPiInfrastructureRead` (and `isPathWithinDirectory` / `isPathOutsideWorkingDirectory`) as platform-taking leaf predicates that the normalizer delegates to.
 - **Skill-prompt sanitization** (`skill-prompt-sanitizer.ts` `createResolvedSkillEntry` / `findSkillPathMatch`; reached from `before-agent-start.ts` and `handlers/gates/skill-read.ts`) — ✅ routed through `PathNormalizer.comparableValue` / `isWithinDirectory` ([#511]).
   Skill entries still cache `normalizedLocation` / `normalizedBaseDir` as lexical strings (matching stays lexical, no new filesystem access), but they are now computed by the normalizer rather than by direct `normalizePathForComparison` calls.
 
-So `getPlatform()` disappears only after the per-tool gate read folds too — `ToolCallGatePipeline.evaluate` reads it once and still threads it to `describeToolGate` until Step 1 ([#502]) lands; whichever of [#502]/[#511] lands second drops the accessor (tracked in [#513]).
+✅ `getPlatform()` has been removed: with both [#511] and Step 1 ([#502]) landed, `ToolCallGatePipeline.evaluate` no longer reads it, so `PermissionSession.getPlatform()` and `ToolCallGateInputs.getPlatform()` were dropped ([#513] resolved).
+The leaf `platform` parameters in `path-utils.ts` persist (the containment / infra-read predicates still take it).
 
 ## Improvement roadmap — Phase 6: Access-intent extraction (complete)
 

@@ -32,9 +32,11 @@ export interface PathValuesAccessIntent {
 /**
  * An `AccessPath` value object for a path-shaped surface.
  *
- * Emitted by every path gate (the `path` and `external_directory` surfaces);
- * lets `AccessPath` flow into the resolver as a first-class variant so the
- * resolver — not the gate — asks it for `matchValues()` (Tell-Don't-Ask).
+ * Emitted by every path gate: the cross-cutting `path` and `external_directory`
+ * surfaces, and the per-tool path-bearing surfaces (`read`/`write`/`edit`/
+ * `grep`/`find`/`ls`, #502). Lets `AccessPath` flow into the resolver as a
+ * first-class variant so the resolver — not the gate — asks it for
+ * `matchValues()` (Tell-Don't-Ask).
  */
 export interface AccessPathAccessIntent {
   kind: "access-path";

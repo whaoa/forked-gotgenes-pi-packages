@@ -153,6 +153,7 @@ If a tool is not registered at runtime, this extension blocks it before permissi
 For path-bearing tools (`read`, `write`, `edit`, `find`, `grep`, `ls`), an object value maps file-path patterns to actions.
 Patterns are matched against `input.path` using the same last-match-wins wildcard semantics as bash command patterns.
 When Pi's current working directory is known, a relative path input is matched with both its original relative form and its cwd-normalized absolute form, so an absolute allowlist rule and a legacy relative rule can both apply to the same file.
+Per-tool path patterns also match the canonical (symlink-resolved) form, at parity with the `path` surface, so a per-tool deny on a sensitive spelling cannot be evaded through a symlink alias (see Symlinked paths below).
 `*` matches zero or more of any character **including** path separators — `src/*` matches both `src/foo.ts` and `src/deep/nested/foo.ts`.
 There is no single-segment vs. multi-segment distinction; `**` is not a supported token and behaves identically to `*`.
 
@@ -466,7 +467,7 @@ This is a best-effort heuristic — variable expansion and escaped quotes are no
 
 #### Symlinked paths
 
-A `path` or `external_directory` pattern matches the path **as the agent references it** and the OS-resolved (symlink-followed) path.
+A `path`, `external_directory`, or per-tool file-pattern rule (`read`/`write`/`edit`/`grep`/`find`/`ls`) matches the path **as the agent references it** and the OS-resolved (symlink-followed) path.
 This matters on macOS, where `/tmp` is a symlink to `/private/tmp`: a rule keyed on `/tmp/*` allows access via `/tmp` even though the access resolves to `/private/tmp`, and a rule keyed on `/private/tmp/*` works too.
 
 ```jsonc
@@ -480,7 +481,7 @@ This matters on macOS, where `/tmp` is a symlink to `/private/tmp`: a rule keyed
 }
 ```
 
-The same dual-form matching protects the `path` surface: a `path` deny on `~/.ssh/*` or `*.env` also catches a symlink whose resolved target matches the pattern, so a sensitive file cannot be reached through an aliasing symlink.
+The same dual-form matching protects the `path` surface and the per-tool file patterns: a `path` (or `read`/`write`/`edit`/`grep`/`find`/`ls`) deny on `~/.ssh/*` or `*.env` also catches a symlink whose resolved target matches the pattern, so a sensitive file cannot be reached through an aliasing symlink.
 For `external_directory`, the decision of whether a path is outside the working directory always uses the resolved form, so the gate still fires for every outside-CWD access; only which allow/deny/ask pattern matches considers both forms.
 
 #### Pi Infrastructure Read Auto-Allow
