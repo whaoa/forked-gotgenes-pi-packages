@@ -60,3 +60,54 @@ Pre-completion reviewer returned PASS with no warnings.
   Resolved by extracting a `makeSession(ctx)` helper so all overrides carry both methods; caught only by `pnpm run check`, a reminder to run it after a shared-interface change.
 - **ESLint auto-fixes fired twice on commit** (stripping unnecessary `!` non-null assertions on `mock.calls[0]![0]` and a redundant return-type cast) — the pre-commit hook modified files and aborted the commit; re-staging and re-committing cleared it both times.
 - **Pre-completion reviewer: PASS** — no warnings; verified the resolver-routing invariant, the `✅` Step 2 markers (heading + `S2` Mermaid node), conventional-commit/BREAKING-CHANGE correctness, and the two deviations as sound.
+
+## Stage: Final Retrospective (2026-06-29T17:01:27Z)
+
+### Session summary
+
+Shipped Phase 7 Step 2 across plan → TDD → a user-prompted guideline re-review → ship in one continuous session: two breaking `feat!:` migrations (service then RPC), a `docs:` roadmap/API update, and a `refactor:` un-export, plus two `test:` conformance fixes surfaced by the re-review.
+The operator deferred the release (mid-batch, batch "symlink-resistant-path-matching", tail = Step 3 [#504]); commits landed on `main`, CI passed, and the issue stays open until the batch tail ships.
+A clean run with no rework — the only friction was minor tool-usage slips and three testing-skill rules under-applied during test authoring, all caught before ship.
+
+### Observations
+
+#### What went well
+
+- **The [#502] template carried the whole batch.**
+  Reusing the [#502] plan/retro, the already-migrated `path.ts` / `path.test.ts`, and the `node:fs` `realpathSync` mock convention made [#503] a near-mechanical parallel — the design matched the plan exactly, every invariant at risk was predicted, and the pre-completion reviewer returned PASS first try.
+  This is the second batch member to ship cleanly off the same template (cross-stage pattern).
+- **Release coordination handshake worked as intended.**
+  The plan's `**Release:** mid-batch — defer` marker drove a single up-front `ask_user` at ship time; the operator confirmed defer, and steps 5–6 (close + release-please merge) were skipped cleanly with the issue left open.
+- **Incremental verification held the line.**
+  Each TDD step ran its affected test file (red→green), `pnpm run check` ran immediately after the interface changes, and the full suite + root lint + `fallow dead-code` ran after the last step — no end-of-session surprise.
+  `pnpm run check` was the *only* gate that caught the `PermissionRpcDeps.session` widening break (the prompt tests passed under esbuild), validating the "run check after a shared-interface change" rule.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (self/tool-caught) — authored the new tests against three testing-skill rules that were loaded but not applied: `mock.calls[0]![0]` with a `!` (the skill says use `toHaveBeenCalledWith` / drop the `!`), `ReturnType<typeof vi.fn<…>>` instead of `Mock<Sig>`, and a missing `beforeEach` `realpathSync` reset in the RPC suite.
+  The `!` was stripped by the ESLint pre-commit hook (aborting two commits, re-staged); the other two passed the pre-completion reviewer and were caught only by the operator's "do they meet our guidelines?"
+  prompt.
+  Impact: two ESLint commit re-tries plus two follow-up `test:` commits (`dc79ed9b`, `5b5e2553`) — no behavior rework.
+- `other` (Edit-tool misuse) — twice packed two replacements into one `edits[]` object via `oldText2`/`newText2` keys; the tool rejected with "must not have additional properties."
+  Impact: two rejected tool calls, immediately re-issued as separate array entries — no rework.
+- `other` (path slip) — once issued a `Read` with a doubled absolute path (`…/pi-packages/packages/pi-permission-system/packages/pi-permission-system/…`), denied by the permission gate.
+  Impact: one denied call, corrected immediately.
+
+#### What caused friction (user side)
+
+- The operator's mid-flight "take one more review of the code changes — do they meet our guidelines?"
+  was a high-value strategic intervention, not mechanical oversight: it surfaced two testing-skill conformance gaps the pre-completion reviewer's PASS had missed.
+  Framed as opportunity: the reviewer's design lens (2d) loads the `code-design` skill for `src/` files but has no symmetric lens that loads the `testing` skill for `test/` files, so test-code convention drift currently relies on a manual prompt to catch.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatch was the `pre-completion-reviewer` on `anthropic/claude-sonnet-4-6` (per its `model:` frontmatter), appropriate for judgment-heavy review.
+  Its PASS was correct within its checklist; the two missed items are outside its current coverage (no test-conformance lens), a checklist-scope gap rather than a model mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole`; no error or approach occupied more than two consecutive tool calls before resolving.
+- **Unused-tool detection** — no `missing-context` gaps warranted an Explore/`colgrep` dispatch; the [#502] template and direct source reads supplied the needed context.
+- **Feedback-loop gap analysis** — verification was incremental, not end-loaded: per-file red→green, `pnpm run check` right after the RPC interface change (the gate that caught the `session`-widening break), and the full suite/lint/fallow after the final step.
+
+### Changes made
+
+1. `.pi/agents/pre-completion-reviewer.md` — broadened section 2d ("Code design review") applicability to `src/` **or** `test/` files, and added a `testing`-skill spot-check for changed `test/` files (mock fields typed `Mock<Sig>` not `ReturnType<typeof vi.fn<…>>`; module-scope `vi.fn()` stubs reset in `beforeEach`; mock-call assertions via `toHaveBeenCalledWith` not `mock.calls[0]![0]`), reported as WARN; updated the output-format SKIP line and added a sample test-conformance WARN.
+2. `packages/pi-permission-system/docs/retro/0503-service-rpc-access-path.md` — this Final Retrospective stage entry.

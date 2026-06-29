@@ -109,18 +109,22 @@ Report staleness as **WARN** (non-blocking).
 
 ### 2d. Code design review
 
-**Applicability:** any `src/` files appear in the modified-files list.
-Skip if no `src/` files were changed.
+**Applicability:** any `src/` or `test/` files appear in the modified-files list.
+Skip if neither was changed.
 
-Load the `code-design` skill by reading `.pi/skills/code-design/SKILL.md`.
-
-Review changed `src/` files for:
+For changed `src/` files, load the `code-design` skill (`.pi/skills/code-design/SKILL.md`) and review for:
 
 - SRP violations — functions or modules doing more than one thing.
 - ISP violations — functions accepting wide interfaces but reading only a few fields.
 - Law of Demeter violations — chained access like `a.b.c.d()` where the caller reaches through collaborators.
 - Output arguments — functions that write back into a received parameter.
 - Naming — names that describe implementation rather than intent.
+
+For changed `test/` files, load the `testing` skill (`.pi/skills/testing/SKILL.md`) and spot-check for convention drift:
+
+- mock fields typed `Mock<Sig>`, not `ReturnType<typeof vi.fn<…>>`
+- module-scope `vi.fn()` stubs reset in `beforeEach`
+- mock-call assertions via `toHaveBeenCalledWith`, not `mock.calls[0]![0]`
 
 Report findings as **WARN** (non-blocking suggestions).
 
@@ -220,11 +224,13 @@ Reverse: PASS — no condensation needed
 Forward: WARN — AGENTS.md "Multi-session lifecycle" section does not mention the new reviewer step
 
 ### Code design review
-PASS — no structural concerns in changed src/ files
+PASS — no structural concerns in changed src/ or test/ files
 — or —
 WARN — src/foo.ts:42: function readConfig accepts a wide Options bag but reads only 2 of 8 fields
 — or —
-SKIP — no src/ files in modified-files list
+WARN — test/foo.test.ts:18: mock field typed ReturnType<typeof vi.fn<…>>; use Mock<Sig>
+— or —
+SKIP — no src/ or test/ files in modified-files list
 
 ### Test artifacts
 PASS — all 3 named test files exist on disk
