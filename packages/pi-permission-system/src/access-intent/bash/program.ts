@@ -73,10 +73,6 @@ export class BashProgram {
    * back to the whole command so the surface is never evaluated weaker than
    * before.
    */
-  // Used by resolveBashCommandCheck (bash-command.ts) and tests. Fallow's
-  // syntactic analysis cannot resolve the static-factory return type (private
-  // ctor), so it reports a false positive here.
-  // fallow-ignore-next-line unused-class-member
   commands(): BashCommand[] {
     return [...this.commandUnits];
   }
