@@ -7,7 +7,8 @@
  * permission prompts without importing this package.
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { buildInputForSurface } from "./input-normalizer";
+import { buildAccessIntentForSurface } from "./input-normalizer";
+import type { PathNormalizer } from "./path-normalizer";
 import type {
   PermissionPromptDecision,
   RequestPermissionOptions,
@@ -26,22 +27,26 @@ import {
   PERMISSIONS_RPC_CHECK_CHANNEL,
   PERMISSIONS_RPC_PROMPT_CHANNEL,
 } from "./permission-events";
-import type { ScopedPermissionManager } from "./permission-manager";
+import type { ScopedPermissionResolver } from "./permission-resolver";
 import { buildRpcUiPrompt } from "./permission-ui-prompt";
 import type { ReviewLogger } from "./session-logger";
-import type { SessionRules } from "./session-rules";
 
 /** Dependencies injected into the RPC handler registry. */
 export interface PermissionRpcDeps {
-  /** The shared PermissionManager instance. */
-  permissionManager: Pick<ScopedPermissionManager, "check">;
-  /** The shared SessionRules instance. */
-  sessionRules: Pick<SessionRules, "getRuleset">;
   /**
-   * Narrow session view: provides runtime context.
-   * Used by the prompt handler to check hasUI and access the UI dialog.
+   * The shared resolver: answers an access intent, composing the session
+   * ruleset and unwrapping `access-path` → `path-values` internally so the
+   * RPC check matches the same lexical ∪ canonical set the gates do (#503).
    */
-  session: { getRuntimeContext(): ExtensionContext | null };
+  resolver: Pick<ScopedPermissionResolver, "resolve">;
+  /**
+   * Narrow session view: runtime context for the prompt handler (hasUI / UI
+   * dialog) and the cwd-bound path normalizer for path-surface check queries.
+   */
+  session: {
+    getRuntimeContext(): ExtensionContext | null;
+    getPathNormalizer(): PathNormalizer;
+  };
   /** Show the interactive permission dialog in the parent session UI. */
   requestPermissionDecisionFromUi(
     ui: ExtensionContext["ui"],
@@ -107,12 +112,13 @@ function handleCheckRpc(
       return;
     }
 
-    const input = buildInputForSurface(surface, value);
-    const sessionRules = deps.sessionRules.getRuleset();
-    const result = deps.permissionManager.check(
-      { kind: "tool", surface, input, agentName: agentName ?? undefined },
-      sessionRules,
+    const intent = buildAccessIntentForSurface(
+      surface,
+      value,
+      deps.session.getPathNormalizer(),
+      agentName ?? undefined,
     );
+    const result = deps.resolver.resolve(intent);
 
     const data: PermissionsCheckReplyData = {
       result: result.state,

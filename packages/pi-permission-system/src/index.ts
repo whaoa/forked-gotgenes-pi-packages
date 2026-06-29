@@ -140,8 +140,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const resolver = new PermissionResolver(permissionManager, sessionRules);
 
   const rpcHandles = registerPermissionRpcHandlers(pi.events, {
-    permissionManager,
-    sessionRules,
+    resolver,
     session,
     requestPermissionDecisionFromUi,
     logger,
