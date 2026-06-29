@@ -45,22 +45,20 @@ export function buildAccessIntentForSurface(
 }
 
 /**
- * Construct a surface-appropriate input object from a raw value string.
+ * Construct a surface-appropriate input object from a raw value string for the
+ * `tool`-intent branch of {@link buildAccessIntentForSurface} (the non-path
+ * surfaces and value-less path queries).
  *
  * This is the inverse of `normalizeInput()` — it builds the minimal input
- * object that `PermissionManager.checkPermission()` expects for a given
- * surface, from a single string value.
- *
- * Used by the event-bus RPC handler and the `Symbol.for()` service accessor
- * so external callers can query policy with `(surface, value)` instead of
- * constructing a full tool-call input payload.
+ * object that the manager expects for a given surface, from a single string
+ * value.
  *
  * Note: MCP inputs are complex (server name + tool name derivation). Callers
  * providing an MCP surface receive a best-effort policy evaluation using the
  * value as a pre-qualified target string. Pass the fully-qualified target
  * (e.g. "exa:search" or "exa") directly.
  */
-export function buildInputForSurface(
+function buildInputForSurface(
   surface: string,
   value: string | undefined,
 ): unknown {
