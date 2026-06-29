@@ -134,6 +134,11 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
       ),
   });
 
+  // Resolver composes the manager + session ruleset and owns the
+  // access-path → path-values unwrap; the RPC and service route their policy
+  // queries through it, so it is constructed before both.
+  const resolver = new PermissionResolver(permissionManager, sessionRules);
+
   const rpcHandles = registerPermissionRpcHandlers(pi.events, {
     permissionManager,
     sessionRules,
@@ -143,8 +148,8 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   });
 
   const permissionsService = new LocalPermissionsService(
-    permissionManager,
-    sessionRules,
+    resolver,
+    session,
     formatterRegistry,
     accessExtractorRegistry,
   );
@@ -173,8 +178,6 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     getActive: () => pi.getActiveTools(),
     setActive: (names: string[]) => pi.setActiveTools(names),
   };
-
-  const resolver = new PermissionResolver(permissionManager, sessionRules);
 
   const audit = new DecisionAudit();
   const lifecycle = new SessionLifecycleHandler(

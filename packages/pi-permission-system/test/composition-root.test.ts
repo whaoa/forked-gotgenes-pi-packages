@@ -479,6 +479,28 @@ describe("single source of truth for session state", () => {
   });
 });
 
+describe("service path queries evaluate the supplied path (#503)", () => {
+  // Before #503 the service path query dropped the value (buildInputForSurface
+  // returned {} for the `path` surface), so the query collapsed to ["*"] and a
+  // path-specific rule never fired. The query now builds an AccessPath, so the
+  // supplied path flows through the resolver → manager and matches `path` rules
+  // end-to-end.
+  it("resolves a path-surface query against a deny rule on the supplied path", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-perm-svc-path-cwd-"));
+    const target = join(cwd, "secrets.env");
+    writeGlobalConfig({ permission: { path: { [target]: "deny" } } });
+
+    const pi = makeFakePi({ events: createEventBus() });
+    piPermissionSystemExtension(pi as unknown as ExtensionAPI);
+    await fireSessionStart(pi, makeChildCtx(cwd, "svc-path-session"));
+
+    const result = getPermissionsService()!.checkPermission("path", target);
+    expect(result.state).toBe("deny");
+
+    rmSync(cwd, { recursive: true, force: true });
+  });
+});
+
 describe("multi-instance global service interplay", () => {
   // The fix (#302) scopes the process-global service slot to the publishing
   // instance. The parent publishes at its session_start; an in-process child

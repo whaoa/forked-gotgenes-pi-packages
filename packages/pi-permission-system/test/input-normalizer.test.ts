@@ -8,11 +8,27 @@ vi.mock("node:os", () => ({
   default: { homedir: mockHomedir },
 }));
 
-import { normalizeInput } from "#src/input-normalizer";
+// Mock node:fs so realpathSync (used by the canonical alias) is controllable.
+// Default implementation is identity — lexical tests are unaffected.
+const realpathSync = vi.hoisted(() =>
+  vi.fn<(path: string) => string>((p) => p),
+);
+vi.mock("node:fs", () => ({
+  realpathSync,
+  default: { realpathSync },
+}));
+
+import {
+  buildAccessIntentForSurface,
+  normalizeInput,
+} from "#src/input-normalizer";
 import { createMcpPermissionTargets } from "#src/mcp-targets";
+import { PathNormalizer } from "#src/path-normalizer";
 
 afterEach(() => {
   mockHomedir.mockClear();
+  realpathSync.mockReset();
+  realpathSync.mockImplementation((p: string) => p);
 });
 
 describe("normalizeInput — non-MCP surfaces", () => {
@@ -428,5 +444,103 @@ describe("normalizeInput — MCP surface", () => {
     expect(result.values).toContain("mcp_connect_exa");
     expect(result.values).toContain("mcp_connect");
     expect(result.values.at(-1)).toBe("mcp");
+  });
+});
+
+describe("buildAccessIntentForSurface", () => {
+  const normalizer = new PathNormalizer("linux", "/test/project");
+
+  it("emits an access-path intent carrying the canonical alias for the path surface", () => {
+    realpathSync.mockImplementation((p: string) =>
+      p === "/test/project/link" ? "/test/project/real" : p,
+    );
+    const intent = buildAccessIntentForSurface(
+      "path",
+      "link",
+      normalizer,
+      undefined,
+    );
+    expect(intent.kind).toBe("access-path");
+    if (intent.kind === "access-path") {
+      expect(intent.surface).toBe("path");
+      expect(intent.path.matchValues()).toContain("/test/project/real");
+      expect(intent.path.value()).toBe("/test/project/link");
+    }
+  });
+
+  it("emits an access-path intent for the external_directory surface", () => {
+    const intent = buildAccessIntentForSurface(
+      "external_directory",
+      "/outside/dir",
+      normalizer,
+      undefined,
+    );
+    expect(intent.kind).toBe("access-path");
+    if (intent.kind === "access-path") {
+      expect(intent.surface).toBe("external_directory");
+      expect(intent.path.value()).toBe("/outside/dir");
+    }
+  });
+
+  it("emits an access-path intent for a path-bearing tool surface (read)", () => {
+    const intent = buildAccessIntentForSurface(
+      "read",
+      "/test/project/.env",
+      normalizer,
+      undefined,
+    );
+    expect(intent.kind).toBe("access-path");
+    if (intent.kind === "access-path") {
+      expect(intent.surface).toBe("read");
+      expect(intent.path.value()).toBe("/test/project/.env");
+    }
+  });
+
+  it("emits a tool intent for a non-path surface (bash)", () => {
+    const intent = buildAccessIntentForSurface(
+      "bash",
+      "echo hi",
+      normalizer,
+      "my-agent",
+    );
+    expect(intent).toEqual({
+      kind: "tool",
+      surface: "bash",
+      input: { command: "echo hi" },
+      agentName: "my-agent",
+    });
+  });
+
+  it("passes agentName through on the access-path branch", () => {
+    const intent = buildAccessIntentForSurface(
+      "path",
+      "/some/file",
+      normalizer,
+      "Explore",
+    );
+    expect(intent.agentName).toBe("Explore");
+  });
+
+  it("falls back to a tool intent for a value-less path surface", () => {
+    const intent = buildAccessIntentForSurface(
+      "path",
+      undefined,
+      normalizer,
+      undefined,
+    );
+    expect(intent.kind).toBe("tool");
+    if (intent.kind === "tool") {
+      expect(intent.surface).toBe("path");
+    }
+  });
+
+  it("falls back to a tool intent for a whitespace-only path value", () => {
+    const intent = buildAccessIntentForSurface(
+      "external_directory",
+      "   ",
+      normalizer,
+      undefined,
+    );
+    expect(intent.kind).toBe("tool");
   });
 });

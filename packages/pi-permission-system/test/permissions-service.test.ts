@@ -1,34 +1,44 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScopedPermissionManager } from "#src/permission-manager";
+import type { AccessIntent } from "#src/access-intent/access-intent";
+import { PathNormalizer } from "#src/path-normalizer";
 import { LocalPermissionsService } from "#src/permissions-service";
-import type { Ruleset } from "#src/rule";
-import type { SessionRules } from "#src/session-rules";
 import type { ToolAccessExtractorRegistrar } from "#src/tool-access-extractor-registry";
 import type {
   ToolInputFormatter,
   ToolInputFormatterRegistrar,
 } from "#src/tool-input-formatter-registry";
+import type { PermissionCheckResult, PermissionState } from "#src/types";
 
 import { makeCheckResult } from "#test/helpers/handler-fixtures";
-import { makeFakePermissionManager } from "#test/helpers/session-fixtures";
 
-// ── input-normalizer stub ──────────────────────────────────────────────────
-
-const mockBuildInputForSurface = vi.hoisted(() =>
-  vi.fn<(surface: string, value?: string) => unknown>(),
+// Mock node:fs so realpathSync (the canonical alias) is controllable.
+const realpathSync = vi.hoisted(() =>
+  vi.fn<(path: string) => string>((p) => p),
 );
-
-vi.mock("#src/input-normalizer", () => ({
-  buildInputForSurface: mockBuildInputForSurface,
+vi.mock("node:fs", () => ({
+  realpathSync,
+  default: { realpathSync },
 }));
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function makeSessionRules(
-  rules: Ruleset = [],
-): Pick<SessionRules, "getRuleset"> {
+interface FakeResolver {
+  resolve: ReturnType<
+    typeof vi.fn<(intent: AccessIntent) => PermissionCheckResult>
+  >;
+  getToolPermission: ReturnType<
+    typeof vi.fn<(toolName: string, agentName?: string) => PermissionState>
+  >;
+}
+
+function makeResolver(): FakeResolver {
   return {
-    getRuleset: vi.fn<SessionRules["getRuleset"]>().mockReturnValue(rules),
+    resolve: vi
+      .fn<(intent: AccessIntent) => PermissionCheckResult>()
+      .mockReturnValue(makeCheckResult()),
+    getToolPermission: vi
+      .fn<(toolName: string, agentName?: string) => PermissionState>()
+      .mockReturnValue("ask"),
   };
 }
 
@@ -49,90 +59,97 @@ function makeAccessExtractorRegistry(): ToolAccessExtractorRegistrar {
 }
 
 function makeService(overrides?: {
-  permissionManager?: ScopedPermissionManager;
-  sessionRules?: Pick<SessionRules, "getRuleset">;
+  resolver?: FakeResolver;
   formatterRegistry?: ToolInputFormatterRegistrar;
   accessExtractorRegistry?: ToolAccessExtractorRegistrar;
 }) {
-  const permissionManager =
-    overrides?.permissionManager ?? makeFakePermissionManager();
-  const sessionRules = overrides?.sessionRules ?? makeSessionRules();
+  const resolver = overrides?.resolver ?? makeResolver();
+  // The published service always answers against the parent session's cwd.
+  const session = { getPathNormalizer: () => normalizer };
   const formatterRegistry =
     overrides?.formatterRegistry ?? makeFormatterRegistry();
   const accessExtractorRegistry =
     overrides?.accessExtractorRegistry ?? makeAccessExtractorRegistry();
   const service = new LocalPermissionsService(
-    permissionManager,
-    sessionRules,
+    resolver,
+    session,
     formatterRegistry,
     accessExtractorRegistry,
   );
-  return {
-    service,
-    permissionManager,
-    sessionRules,
-    formatterRegistry,
-    accessExtractorRegistry,
-  };
+  return { service, resolver, formatterRegistry, accessExtractorRegistry };
 }
+
+const normalizer = new PathNormalizer("linux", "/test/project");
 
 // ── tests ──────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  mockBuildInputForSurface.mockReset();
-  mockBuildInputForSurface.mockReturnValue({ type: "tool-input" });
+  realpathSync.mockReset();
+  realpathSync.mockImplementation((p: string) => p);
 });
 
 describe("checkPermission", () => {
-  it("builds the surface input from surface and value", () => {
-    const { service } = makeService();
-    service.checkPermission("bash", "echo hi");
-    expect(mockBuildInputForSurface).toHaveBeenCalledWith("bash", "echo hi");
-  });
-
-  it("builds the surface input with undefined value when value is omitted", () => {
-    const { service } = makeService();
-    service.checkPermission("read");
-    expect(mockBuildInputForSurface).toHaveBeenCalledWith("read", undefined);
-  });
-
-  it("calls permissionManager.check with a tool intent, built input, agentName, and current ruleset", () => {
-    const ruleset: Ruleset = [
-      { surface: "bash", pattern: "*", action: "allow", origin: "global" },
-    ];
-    const builtInput = { type: "bash-input" };
-    mockBuildInputForSurface.mockReturnValue(builtInput);
-    const { service, permissionManager, sessionRules } = makeService({
-      sessionRules: makeSessionRules(ruleset),
-    });
+  it("resolves a non-path surface through a tool intent", () => {
+    const { service, resolver } = makeService();
     service.checkPermission("bash", "echo hi", "my-agent");
-    expect(permissionManager.check).toHaveBeenCalledWith(
-      {
-        kind: "tool",
-        surface: "bash",
-        input: builtInput,
-        agentName: "my-agent",
-      },
-      ruleset,
-    );
-    void sessionRules; // used indirectly
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "bash",
+      input: { command: "echo hi" },
+      agentName: "my-agent",
+    });
   });
 
-  it("returns the result from permissionManager.check", () => {
+  it("resolves an external_directory path query through an access-path intent matching the canonical alias", () => {
+    realpathSync.mockImplementation((p: string) =>
+      p === "/test/project/link" ? "/test/project/real" : p,
+    );
+    const { service, resolver } = makeService();
+    service.checkPermission("external_directory", "link");
+    expect(resolver.resolve).toHaveBeenCalledTimes(1);
+    const intent = resolver.resolve.mock.calls[0][0];
+    expect(intent.kind).toBe("access-path");
+    if (intent.kind === "access-path") {
+      expect(intent.surface).toBe("external_directory");
+      expect(intent.path.matchValues()).toContain("/test/project/real");
+    }
+  });
+
+  it("resolves a path-bearing tool query (read) through an access-path intent", () => {
+    const { service, resolver } = makeService();
+    service.checkPermission("read", "/test/project/.env");
+    const intent = resolver.resolve.mock.calls[0][0];
+    expect(intent.kind).toBe("access-path");
+    if (intent.kind === "access-path") {
+      expect(intent.surface).toBe("read");
+      expect(intent.path.value()).toBe("/test/project/.env");
+    }
+  });
+
+  it("falls back to a tool intent for a value-less path query", () => {
+    const { service, resolver } = makeService();
+    service.checkPermission("path");
+    const intent = resolver.resolve.mock.calls[0][0];
+    expect(intent.kind).toBe("tool");
+  });
+
+  it("returns the result from resolver.resolve", () => {
     const expected = makeCheckResult({ state: "deny", toolName: "bash" });
-    const { service, permissionManager } = makeService();
-    vi.mocked(permissionManager.check).mockReturnValue(expected);
+    const resolver = makeResolver();
+    resolver.resolve.mockReturnValue(expected);
+    const { service } = makeService({ resolver });
     const result = service.checkPermission("bash", "rm -rf /");
     expect(result).toBe(expected);
   });
 });
 
 describe("getToolPermission", () => {
-  it("delegates to permissionManager.getToolPermission", () => {
-    const { service, permissionManager } = makeService();
-    vi.mocked(permissionManager.getToolPermission).mockReturnValue("deny");
+  it("delegates to resolver.getToolPermission", () => {
+    const resolver = makeResolver();
+    resolver.getToolPermission.mockReturnValue("deny");
+    const { service } = makeService({ resolver });
     const result = service.getToolPermission("write", "my-agent");
-    expect(permissionManager.getToolPermission).toHaveBeenCalledWith(
+    expect(resolver.getToolPermission).toHaveBeenCalledWith(
       "write",
       "my-agent",
     );
@@ -140,12 +157,9 @@ describe("getToolPermission", () => {
   });
 
   it("omits agentName when not provided", () => {
-    const { service, permissionManager } = makeService();
+    const { service, resolver } = makeService();
     service.getToolPermission("read");
-    expect(permissionManager.getToolPermission).toHaveBeenCalledWith(
-      "read",
-      undefined,
-    );
+    expect(resolver.getToolPermission).toHaveBeenCalledWith("read", undefined);
   });
 });
 

@@ -1,7 +1,48 @@
+import type { AccessIntent } from "./access-intent/access-intent";
 import { stripBashCommentLines } from "./bash-arity";
 import { createMcpPermissionTargets } from "./mcp-targets";
-import { getPathPolicyValues, PATH_BEARING_TOOLS } from "./path-utils";
+import type { PathNormalizer } from "./path-normalizer";
+import {
+  getPathPolicyValues,
+  PATH_BEARING_TOOLS,
+  PATH_SURFACES,
+} from "./path-utils";
 import { getNonEmptyString, toRecord } from "./value-guards";
+
+/**
+ * Build the {@link AccessIntent} an external policy query (the `Symbol.for()`
+ * service and the event-bus RPC) feeds to the resolver from a `(surface, value)`
+ * pair.
+ *
+ * For a path-shaped surface (`path`, `external_directory`, or a path-bearing
+ * tool) carrying a non-empty value, it builds an `AccessPath` and emits an
+ * `access-path` intent, so the resolver matches the lexical aliases ∪ canonical
+ * (symlink-resolved) set — at parity with the gates (#486, #502). Every other
+ * surface, and any value-less surface-level query, keeps the `tool` intent so
+ * the manager's `normalizeInput` `["*"]` fallback is preserved.
+ */
+export function buildAccessIntentForSurface(
+  surface: string,
+  value: string | undefined,
+  normalizer: PathNormalizer,
+  agentName: string | undefined,
+): AccessIntent {
+  const pathValue = getNonEmptyString(value);
+  if (pathValue !== null && PATH_SURFACES.has(surface)) {
+    return {
+      kind: "access-path",
+      surface,
+      path: normalizer.forPath(pathValue),
+      agentName,
+    };
+  }
+  return {
+    kind: "tool",
+    surface,
+    input: buildInputForSurface(surface, value),
+    agentName,
+  };
+}
 
 /**
  * Construct a surface-appropriate input object from a raw value string.

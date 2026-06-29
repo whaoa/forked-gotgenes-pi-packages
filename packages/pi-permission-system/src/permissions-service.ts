@@ -1,7 +1,7 @@
-import { buildInputForSurface } from "./input-normalizer";
-import type { ScopedPermissionManager } from "./permission-manager";
+import type { AccessIntent } from "./access-intent/access-intent";
+import { buildAccessIntentForSurface } from "./input-normalizer";
+import type { PathNormalizer } from "./path-normalizer";
 import type { PermissionsService } from "./service";
-import type { SessionRules } from "./session-rules";
 import type {
   ToolAccessExtractor,
   ToolAccessExtractorRegistrar,
@@ -10,18 +10,37 @@ import type {
   ToolInputFormatter,
   ToolInputFormatterRegistrar,
 } from "./tool-input-formatter-registry";
+import type { PermissionCheckResult, PermissionState } from "./types";
+
+/**
+ * Resolution surface the service needs: answer a gate-style {@link AccessIntent}
+ * (composing the session ruleset internally) and report a tool-level state.
+ * `PermissionResolver` satisfies it.
+ */
+interface ResolverForService {
+  resolve(intent: AccessIntent): PermissionCheckResult;
+  getToolPermission(toolName: string, agentName?: string): PermissionState;
+}
+
+/** Narrow session view: hands out the cwd-bound path normalizer. */
+interface PathNormalizerProvider {
+  getPathNormalizer(): PathNormalizer;
+}
 
 /**
  * In-process implementation of the cross-extension {@link PermissionsService}.
  *
  * Constructed once in the composition root and backed by the single shared
- * `PermissionManager` and `SessionRules` instances that `PermissionSession`
- * also uses — so service queries and gate-path approvals see the same state.
+ * `PermissionResolver` and `PermissionSession` that the gates also use — so
+ * service queries and gate-path decisions see the same state. Path-shaped
+ * surface queries route through the resolver as an `access-path` intent, so
+ * they match the lexical aliases ∪ canonical (symlink-resolved) set the gates
+ * do (#503); non-path surfaces stay on the `tool` intent.
  */
 export class LocalPermissionsService implements PermissionsService {
   constructor(
-    private readonly permissionManager: ScopedPermissionManager,
-    private readonly sessionRules: Pick<SessionRules, "getRuleset">,
+    private readonly resolver: ResolverForService,
+    private readonly session: PathNormalizerProvider,
     private readonly formatterRegistry: ToolInputFormatterRegistrar,
     private readonly accessExtractorRegistry: ToolAccessExtractorRegistrar,
   ) {}
@@ -31,18 +50,20 @@ export class LocalPermissionsService implements PermissionsService {
     value?: string,
     agentName?: string,
   ): ReturnType<PermissionsService["checkPermission"]> {
-    const input = buildInputForSurface(surface, value);
-    return this.permissionManager.check(
-      { kind: "tool", surface, input, agentName },
-      this.sessionRules.getRuleset(),
+    const intent = buildAccessIntentForSurface(
+      surface,
+      value,
+      this.session.getPathNormalizer(),
+      agentName,
     );
+    return this.resolver.resolve(intent);
   }
 
   getToolPermission(
     toolName: string,
     agentName?: string,
   ): ReturnType<PermissionsService["getToolPermission"]> {
-    return this.permissionManager.getToolPermission(toolName, agentName);
+    return this.resolver.getToolPermission(toolName, agentName);
   }
 
   registerToolInputFormatter(

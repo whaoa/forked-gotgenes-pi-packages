@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildInputForSurface } from "#src/input-normalizer";
+import type { AccessIntent } from "#src/access-intent/access-intent";
+import { PathNormalizer } from "#src/path-normalizer";
+import { LocalPermissionsService } from "#src/permissions-service";
 import type { PermissionsService } from "#src/service";
 import {
   getPermissionsService,
@@ -8,7 +10,7 @@ import {
 } from "#src/service";
 import { ToolAccessExtractorRegistry } from "#src/tool-access-extractor-registry";
 import { ToolInputFormatterRegistry } from "#src/tool-input-formatter-registry";
-import type { PermissionCheckResult } from "#src/types";
+import type { PermissionCheckResult, PermissionState } from "#src/types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -77,7 +79,7 @@ describe("globalThis accessor", () => {
 
 // ── service adapter delegation ─────────────────────────────────────────────
 
-describe("service adapter delegation", () => {
+describe("service round-trip through the global slot", () => {
   afterEach(() => {
     const current = getPermissionsService();
     if (current) {
@@ -93,117 +95,68 @@ describe("service adapter delegation", () => {
     origin: "global",
   };
 
-  it("checkPermission delegates surface and value through buildInputForSurface", () => {
-    const checkPermission = vi.fn().mockReturnValue(fakeResult);
-    const sessionRules = [
-      {
-        surface: "bash",
-        pattern: "*",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
-    ];
+  function makeResolver() {
+    return {
+      resolve: vi
+        .fn<(intent: AccessIntent) => PermissionCheckResult>()
+        .mockReturnValue(fakeResult),
+      getToolPermission: vi
+        .fn<(toolName: string, agentName?: string) => PermissionState>()
+        .mockReturnValue("ask"),
+    };
+  }
 
-    // Build the adapter the same way index.ts will
-    const service = makeService({
-      checkPermission(surface, value, agentName) {
-        const input = buildInputForSurface(surface, value);
-        return checkPermission(surface, input, agentName, sessionRules);
-      },
-    });
+  function publishLocalService(resolver: ReturnType<typeof makeResolver>) {
+    publishPermissionsService(
+      new LocalPermissionsService(
+        resolver,
+        {
+          getPathNormalizer: () => new PathNormalizer("linux", "/test/project"),
+        },
+        new ToolInputFormatterRegistry(),
+        new ToolAccessExtractorRegistry(),
+      ),
+    );
+  }
 
-    publishPermissionsService(service);
-    const retrieved = getPermissionsService()!;
-    const result = retrieved.checkPermission("bash", "git push");
-
+  it("resolves a non-path query via a tool intent", () => {
+    const resolver = makeResolver();
+    publishLocalService(resolver);
+    const result = getPermissionsService()!.checkPermission(
+      "bash",
+      "git push",
+      "Explore",
+    );
     expect(result).toBe(fakeResult);
-    expect(checkPermission).toHaveBeenCalledWith(
-      "bash",
-      { command: "git push" },
-      undefined,
-      sessionRules,
-    );
-  });
-
-  it("checkPermission passes agentName through", () => {
-    const checkPermission = vi.fn().mockReturnValue(fakeResult);
-
-    const service = makeService({
-      checkPermission(surface, value, agentName) {
-        const input = buildInputForSurface(surface, value);
-        return checkPermission(surface, input, agentName, []);
-      },
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "bash",
+      input: { command: "git push" },
+      agentName: "Explore",
     });
-
-    publishPermissionsService(service);
-    getPermissionsService()!.checkPermission("skill", "my-skill", "Explore");
-
-    expect(checkPermission).toHaveBeenCalledWith(
-      "skill",
-      { name: "my-skill" },
-      "Explore",
-      [],
-    );
   });
 
-  it("getToolPermission delegates to the permission manager", () => {
-    const getToolPermissionFn = vi.fn(
-      (_t: string, _a?: string): "deny" => "deny",
-    );
-    const service: PermissionsService = {
-      checkPermission: vi.fn(),
-      getToolPermission(toolName, agentName) {
-        return getToolPermissionFn(toolName, agentName);
-      },
-      registerToolInputFormatter: vi.fn(),
-      registerToolAccessExtractor: vi.fn(),
-    };
+  it("resolves a path-surface query via an access-path intent", () => {
+    const resolver = makeResolver();
+    publishLocalService(resolver);
+    getPermissionsService()!.checkPermission("read", "/test/project/.env");
+    const intent = resolver.resolve.mock.calls[0][0];
+    expect(intent.kind).toBe("access-path");
+    if (intent.kind === "access-path") {
+      expect(intent.surface).toBe("read");
+    }
+  });
 
-    publishPermissionsService(service);
+  it("delegates getToolPermission through the resolver", () => {
+    const resolver = makeResolver();
+    resolver.getToolPermission.mockReturnValue("deny");
+    publishLocalService(resolver);
     const result = getPermissionsService()!.getToolPermission(
-      "bash",
+      "write",
       "Explore",
     );
-
     expect(result).toBe("deny");
-    expect(getToolPermissionFn).toHaveBeenCalledWith("bash", "Explore");
-  });
-
-  it("getToolPermission works without agentName", () => {
-    const getToolPermissionFn = vi.fn(
-      (_t: string, _a?: string): "ask" => "ask",
-    );
-    const service: PermissionsService = {
-      checkPermission: vi.fn(),
-      getToolPermission(toolName, agentName) {
-        return getToolPermissionFn(toolName, agentName);
-      },
-      registerToolInputFormatter: vi.fn(),
-      registerToolAccessExtractor: vi.fn(),
-    };
-
-    publishPermissionsService(service);
-    const result = getPermissionsService()!.getToolPermission("write");
-
-    expect(result).toBe("ask");
-    expect(getToolPermissionFn).toHaveBeenCalledWith("write", undefined);
-  });
-
-  it("checkPermission uses empty object for unknown surfaces", () => {
-    const checkPermission = vi.fn().mockReturnValue(fakeResult);
-
-    const service = makeService({
-      checkPermission(surface, value, agentName) {
-        const input = buildInputForSurface(surface, value);
-        return checkPermission(surface, input, agentName, []);
-      },
-    });
-
-    publishPermissionsService(service);
-    getPermissionsService()!.checkPermission("read", "/tmp/file");
-
-    expect(checkPermission).toHaveBeenCalledWith("read", {}, undefined, []);
+    expect(resolver.getToolPermission).toHaveBeenCalledWith("write", "Explore");
   });
 });
 
