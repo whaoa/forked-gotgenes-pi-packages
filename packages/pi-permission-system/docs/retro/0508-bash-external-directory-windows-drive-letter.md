@@ -49,3 +49,23 @@ Refreshed the #508 plan from its abstract "injected flavor" wording to the concr
 - **#508 now reduces to two production edits + docs**: drive-shape recognition in both classifiers (`token-classification.ts`, unchanged by #510) and the `isRelativeCandidate` conversion (`bash-path-resolver.ts`).
   Single `fix:` commit + `docs:` commit.
 - Next step: `/tdd-plan`.
+
+## Stage: Implementation — TDD (2026-06-28T20:15:00Z)
+
+### Session summary
+
+Completed 2 TDD cycles in a single session: (1) the core `fix:` commit adding `WINDOWS_DRIVE_PATH_PATTERN` to both classifiers and converting `isRelativeCandidate` to a private method delegating to `this.normalizer.isAbsolute`; (2) the `docs:` commit updating `architecture.md` and `SKILL.md`.
+Test count went from 2195 to 2211 (+16 tests: 8 new classifier unit tests and 4 new win32 end-to-end assertions across 2 test files).
+Pre-completion reviewer returned **PASS**.
+
+### Observations
+
+- **`isRelativeCandidate` edit required three partial attempts** due to the decorator rule line (`──`) in `bash-path-resolver.ts` — the Unicode box-drawing characters miscount when anchoring `oldText`, causing atomic batch rejections.
+  Resolved by anchoring on adjacent unique code lines rather than the rule itself (as AGENTS.md warns), and by splitting the class-closing brace into a separate edit from the rule line.
+- **The unknown-base win32 test passed green before the implementation** (tokens were dropped → empty result), so it was not a red test in the strict sense.
+  After the fix it stays green for the correct reason (inside-CWD check fires).
+  This is expected for the "over-flag prevention" path — the red test for the over-flag scenario would require a Windows absolute path that is *outside* CWD under an unknown base, but the plan test chose inside-CWD to exercise the conversion specifically.
+  No deviation: the test does cover the `isRelativeCandidate` routing change as documented in the test comment.
+- **`c://x` URL rejection confirmed**: the `URL_PATTERN` (`/^[a-z][a-z0-9+.-]*:\/\//i`) fires before the drive pattern for single-letter schemes with `//`, so there is no ambiguity between the URL guard and the new drive pattern.
+- **Pre-completion reviewer verdict**: PASS.
+  All deterministic checks, invariants, and doc surfaces clean.
