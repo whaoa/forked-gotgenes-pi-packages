@@ -291,16 +291,15 @@ Input normalization for all surfaces lives in `src/input-normalizer.ts`.
 
 ### Path-bearing tool normalization
 
-For path-bearing tools (`read`, `write`, `edit`, `find`, `grep`, `ls`), `normalizeInput` returns the file path from `input.path` as the match value instead of `"*"`.
-This enables per-tool path patterns: `"read": { "*": "allow", "*.env": "deny" }` denies reads of `.env` files while allowing everything else.
-When `input.path` is missing or empty, the value falls back to `"*"` (surface-level catch-all), preserving backward compatibility.
-Path values are home-expanded via `expandHomePath` before matching, so `~/...` and `$HOME/...` values match home-anchored patterns (`~/.ssh/*`) just as absolute paths do.
-`getToolPermission()` is unaffected - it always evaluates with `"*"` to determine whether to inject the tool at agent start.
+Per-tool path patterns — e.g. `"read": { "*": "allow", "*.env": "deny" }` — are evaluated via the `access-path` intent the per-tool gate emits ([#502]).
+When the pipeline calls `resolvePerToolCheck`, a present `input.path` triggers `normalizer.forPath(path)` and an `access-path` intent on the tool-name surface; the resolver unwraps it to `path-values` carrying the lexical ∪ canonical alias set before the manager evaluates the rule.
+When `input.path` is missing or empty, the pipeline falls back to a `tool` intent, which `normalizeInput` collapses to `["*"]` (surface catch-all).
+Path alias derivation (home-expansion, cwd-relative aliases) lives in `getPathPolicyValues` / `AccessPath` — not in `normalizeInput`, which no longer touches path surfaces (#504).
+`getToolPermission()` is unaffected — it always evaluates with `"*"` to determine whether to inject the tool at agent start.
 
-The per-tool surface above is still limited to the six built-in tools.
-The cross-cutting `path` and `external_directory` gates, however, extract paths for **extension and MCP tools too** (#352): `describePathGate` and `describeExternalDirectoryGate` call `getToolInputPath`, which reads `input.path` for built-ins, `input.arguments.path` for MCP, and a registered `ToolAccessExtractor` (or the default `input.path` convention) for any other tool.
+The cross-cutting `path` and `external_directory` gates extract paths for **extension and MCP tools too** (#352): `describePathGate` and `describeExternalDirectoryGate` call `getToolInputPath`, which reads `input.path` for built-ins, `input.arguments.path` for MCP, and a registered `ToolAccessExtractor` (or the default `input.path` convention) for any other tool.
 The extractor registry (`src/tool-access-extractor-registry.ts`) is created once in `index.ts` and shared: its lookup side is threaded into `ToolCallGatePipeline`, and its registrar side is exposed cross-extension via `PermissionsService.registerToolAccessExtractor`.
-Per-tool path maps for extension tools (threading the extractor through `normalizeInput`) are a deferred follow-up.
+Per-tool path maps for extension tools (a custom extractor key per tool) are a deferred follow-up.
 
 ## Session approvals: the cache-miss model
 
@@ -807,9 +806,9 @@ The residual ad-hoc path handling (the "re-derive their representations ad hoc" 
    Outcome: external policy queries match the same lexical ∪ canonical set the gates do; **breaking** for external consumers.
    Release: batch "symlink-resistant-path-matching"
 
-3. **Retire `input-normalizer`'s path normalization.**
-   ([#504]) Target: `src/input-normalizer.ts` (remove `normalizePathSurfaceValues`, the special-surface branch, and the `PATH_BEARING_TOOLS` branch from `normalizeInput`), `src/permission-manager.ts` (the `tool` branch no longer normalizes paths).
-   After Steps 1 and 2, these branches have no callers and `getPathPolicyValues` is consumed only by `AccessPath`.
+3. ✅ **Retire `input-normalizer`'s path normalization.**
+   ([#504]) Removed `normalizePathSurfaceValues`, the special-surface (`path` / `external_directory`) branch, and the `PATH_BEARING_TOOLS` branch from `normalizeInput`; dropped the `platform` / `cwd` parameters; removed the `currentCwd` field from `PermissionManager`.
+   After Steps 1 and 2, these branches had no callers; the missing-path case falls through to the generic `["*"]` branch.
    Smell: Category A (dead / redundant code).
    Outcome: `normalizeInput` handles only bash / skill / mcp / extension surfaces; a single `AccessPath` path-derivation entry remains.
    Release: batch "symlink-resistant-path-matching"
@@ -834,7 +833,7 @@ The residual ad-hoc path handling (the "re-derive their representations ad hoc" 
 flowchart TD
     S1["✅ Step 1 (#502)<br/>Per-tool gate to AccessPath<br/>(breaking)"]
     S2["✅ Step 2 (#503)<br/>Service/RPC to AccessPath<br/>(breaking)"]
-    S3["Step 3 (#504)<br/>Retire input-normalizer path normalization"]
+    S3["✅ Step 3 (#504)<br/>Retire input-normalizer path normalization"]
     S4["Step 4 (#505)<br/>Dissolve path-utils grab-bag"]
     S5["Step 5 (#506)<br/>Decide path-values boundary"]
 
@@ -883,7 +882,7 @@ The seam left five call sites threading `platform` *directly* rather than throug
 How each relates to the Phase 7 steps above:
 
 - **Per-tool gate suggestion value** (`handlers/gates/tool.ts` `deriveSuggestionValue` → `normalizePathForComparison`) — ✅ retired by **Step 1 ([#502])**: `deriveSuggestionValue` now derives the session-approval value from `accessPath.value()`, dropping the `platform` thread into `describeToolGate`.
-- **`input-normalizer` path-policy values** (`normalizePathSurfaceValues` → `getPathPolicyValues`) — retired by **Steps 2–3 ([#503], [#504])**, which migrate the service/RPC path queries onto `AccessPath` and then remove the path-bearing/special-surface branches from `normalizeInput` entirely.
+- **`input-normalizer` path-policy values** (`normalizePathSurfaceValues` → `getPathPolicyValues`) — ✅ retired by **Steps 2–3 ([#503], [#504])**: Step 2 migrated the service/RPC path queries onto `AccessPath`; Step 3 removed the path-bearing/special-surface branches from `normalizeInput` entirely (#504).
 - **Infra-read containment** (`handlers/gates/external-directory.ts`) — ✅ routed through `PathNormalizer.isInfrastructureRead` ([#511]): the gate already holds the normalizer, which now answers the containment question over the already-built `AccessPath`.
   Step 4 ([#505]) still keeps `isPiInfrastructureRead` (and `isPathWithinDirectory` / `isPathOutsideWorkingDirectory`) as platform-taking leaf predicates that the normalizer delegates to.
 - **Skill-prompt sanitization** (`skill-prompt-sanitizer.ts` `createResolvedSkillEntry` / `findSkillPathMatch`; reached from `before-agent-start.ts` and `handlers/gates/skill-read.ts`) — ✅ routed through `PathNormalizer.comparableValue` / `isWithinDirectory` ([#511]).
