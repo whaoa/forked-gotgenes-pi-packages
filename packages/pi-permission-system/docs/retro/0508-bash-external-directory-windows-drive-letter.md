@@ -33,3 +33,19 @@ Filed that as a separate architecture issue, #510, and rebased #508's plan to la
 - **Tidy-first insight.**
   The naive classifier-only fix would briefly over-flag an inside-CWD drive path under an unknown `cd` base (a Windows-absolute path mislabeled "relative" by the hand-rolled check). #510's `isAbsolute` delegation eliminates that window, so #508 needs no transient cleanup.
 - **`#509`** is the sibling issue (bare-filename `path`-surface bypass) split from the same parent #494 — explicitly out of scope here.
+
+## Stage: Planning refresh — post-#510/#511 (2026-06-28T00:00:00Z)
+
+### Session summary
+
+## 510 and #511 are closed; the platform/path-semantics seam landed as `PathNormalizer` (`src/path-normalizer.ts`), and the old `cwd-projection.ts` is now the class-based `bash-path-resolver.ts` holding `this.normalizer`
+
+Refreshed the #508 plan from its abstract "injected flavor" wording to the concrete API and confirmed the scope reduction the plan anticipated.
+
+### Observations
+
+- **#510 deferred the `isRelativeCandidate` conversion**, exactly the contingency the original plan flagged. `foldCd` already delegates to `this.normalizer.isAbsolute`, but the module-level free function `isRelativeCandidate` (`bash-path-resolver.ts`, two call sites: `projectExternalPaths`, `buildRuleCandidatePath`) still hand-rolls `!startsWith("/") && !startsWith("~")`. #508 folds in converting it to a private method delegating to `this.normalizer.isAbsolute` — load-bearing, since the projection's relative/unknown decision (not just `foldCd`) gates the over-flag.
+- **Testability is clean as predicted.** `BashProgram.parse(command, normalizer)` and `extractExternalPathsFromBashCommand(command, normalizer)` take a `PathNormalizer`; `bash-external-directory.test.ts` already builds `new PathNormalizer(process.platform, cwd)`. #508's Windows assertions construct `new PathNormalizer("win32", cwd)` — no `vi.mock("node:path")`.
+- **#508 now reduces to two production edits + docs**: drive-shape recognition in both classifiers (`token-classification.ts`, unchanged by #510) and the `isRelativeCandidate` conversion (`bash-path-resolver.ts`).
+  Single `fix:` commit + `docs:` commit.
+- Next step: `/tdd-plan`.
