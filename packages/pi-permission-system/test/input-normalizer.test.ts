@@ -40,7 +40,7 @@ describe("normalizeInput — non-MCP surfaces", () => {
   describe("path-bearing and special surfaces collapse to '*'", () => {
     it("path surface ignores input.path and returns ['*']", () => {
       // After #504 removal: path no longer has a special branch.
-      const result = normalizeInput("path", { path: ".env" }, [], "linux");
+      const result = normalizeInput("path", { path: ".env" }, []);
       expect(result.surface).toBe("path");
       expect(result.values).toEqual(["*"]);
       expect(result.resultExtras).toEqual({});
@@ -51,7 +51,6 @@ describe("normalizeInput — non-MCP surfaces", () => {
         "external_directory",
         { path: "/other/project" },
         [],
-        "linux",
       );
       expect(result.surface).toBe("external_directory");
       expect(result.values).toEqual(["*"]);
@@ -59,7 +58,7 @@ describe("normalizeInput — non-MCP surfaces", () => {
     });
 
     it("read surface ignores input.path and returns ['*']", () => {
-      const result = normalizeInput("read", { path: ".env" }, [], "linux");
+      const result = normalizeInput("read", { path: ".env" }, []);
       expect(result.surface).toBe("read");
       expect(result.values).toEqual(["*"]);
       expect(result.resultExtras).toEqual({});
@@ -76,7 +75,7 @@ describe("normalizeInput — non-MCP surfaces", () => {
         "find",
         "ls",
       ]) {
-        const result = normalizeInput(surface, {}, [], "linux");
+        const result = normalizeInput(surface, {}, []);
         expect(result.values).toEqual(["*"]);
       }
     });
@@ -84,63 +83,53 @@ describe("normalizeInput — non-MCP surfaces", () => {
 
   describe("skill", () => {
     it("uses skill name from input.name", () => {
-      const result = normalizeInput(
-        "skill",
-        { name: "librarian" },
-        [],
-        "linux",
-      );
+      const result = normalizeInput("skill", { name: "librarian" }, []);
       expect(result.surface).toBe("skill");
       expect(result.values).toEqual(["librarian"]);
       expect(result.resultExtras).toEqual({});
     });
 
     it("falls back to '*' when name is missing", () => {
-      const result = normalizeInput("skill", {}, [], "linux");
+      const result = normalizeInput("skill", {}, []);
       expect(result.values).toEqual(["*"]);
     });
 
     it("falls back to '*' when name is not a string", () => {
-      const result = normalizeInput("skill", { name: 99 }, [], "linux");
+      const result = normalizeInput("skill", { name: 99 }, []);
       expect(result.values).toEqual(["*"]);
     });
   });
 
   describe("bash", () => {
     it("uses command from input.command", () => {
-      const result = normalizeInput(
-        "bash",
-        { command: "git status" },
-        [],
-        "linux",
-      );
+      const result = normalizeInput("bash", { command: "git status" }, []);
       expect(result.surface).toBe("bash");
       expect(result.values).toEqual(["git status"]);
       expect(result.resultExtras).toEqual({ command: "git status" });
     });
 
     it("uses empty string when command is missing", () => {
-      const result = normalizeInput("bash", {}, [], "linux");
+      const result = normalizeInput("bash", {}, []);
       expect(result.values).toEqual([""]);
       expect(result.resultExtras).toEqual({ command: "" });
     });
 
     it("uses empty string when command is not a string", () => {
-      const result = normalizeInput("bash", { command: 42 }, [], "linux");
+      const result = normalizeInput("bash", { command: 42 }, []);
       expect(result.values).toEqual([""]);
       expect(result.resultExtras).toEqual({ command: "" });
     });
 
     it("strips leading comment lines from values but keeps original in resultExtras", () => {
       const cmd = "# Check debug logs\nfind /home -path '*debug*' -type f";
-      const result = normalizeInput("bash", { command: cmd }, [], "linux");
+      const result = normalizeInput("bash", { command: cmd }, []);
       expect(result.values).toEqual(["find /home -path '*debug*' -type f"]);
       expect(result.resultExtras).toEqual({ command: cmd });
     });
 
     it("strips multiple comment lines", () => {
       const cmd = "# Step 1\n# Step 2\ngit status --short";
-      const result = normalizeInput("bash", { command: cmd }, [], "linux");
+      const result = normalizeInput("bash", { command: cmd }, []);
       expect(result.values).toEqual(["git status --short"]);
     });
 
@@ -149,26 +138,20 @@ describe("normalizeInput — non-MCP surfaces", () => {
         "bash",
         { command: "grep -rn foo src/" },
         [],
-        "linux",
       );
       expect(result.values).toEqual(["grep -rn foo src/"]);
     });
 
     it("falls back to original when all lines are comments", () => {
       const cmd = "# just a comment";
-      const result = normalizeInput("bash", { command: cmd }, [], "linux");
+      const result = normalizeInput("bash", { command: cmd }, []);
       expect(result.values).toEqual(["# just a comment"]);
     });
   });
 
   describe("extension tools (non-path-bearing)", () => {
     it("uses '*' as the lookup value for extension tools", () => {
-      const result = normalizeInput(
-        "my_extension_tool",
-        { some: "input" },
-        [],
-        "linux",
-      );
+      const result = normalizeInput("my_extension_tool", { some: "input" }, []);
       expect(result.surface).toBe("my_extension_tool");
       expect(result.values).toEqual(["*"]);
       expect(result.resultExtras).toEqual({});
@@ -179,7 +162,6 @@ describe("normalizeInput — non-MCP surfaces", () => {
         "my_extension_tool",
         { path: "/some/path" },
         [],
-        "linux",
       );
       expect(result.values).toEqual(["*"]);
     });
@@ -188,17 +170,17 @@ describe("normalizeInput — non-MCP surfaces", () => {
 
 describe("normalizeInput — MCP surface", () => {
   it("surface is 'mcp'", () => {
-    const result = normalizeInput("mcp", { tool: "exa:search" }, [], "linux");
+    const result = normalizeInput("mcp", { tool: "exa:search" }, []);
     expect(result.surface).toBe("mcp");
   });
 
   it("values end with the catch-all 'mcp' target", () => {
-    const result = normalizeInput("mcp", { tool: "exa:search" }, [], "linux");
+    const result = normalizeInput("mcp", { tool: "exa:search" }, []);
     expect(result.values.at(-1)).toBe("mcp");
   });
 
   it("values include specific targets before the catch-all for a qualified tool call", () => {
-    const result = normalizeInput("mcp", { tool: "exa:search" }, [], "linux");
+    const result = normalizeInput("mcp", { tool: "exa:search" }, []);
     expect(result.values).toContain("exa_search");
     expect(result.values).toContain("exa:search");
     expect(result.values).toContain("exa");
@@ -211,44 +193,34 @@ describe("normalizeInput — MCP surface", () => {
     const rawTargets = createMcpPermissionTargets({ tool: "exa:search" }, [
       "exa",
     ]);
-    const result = normalizeInput(
-      "mcp",
-      { tool: "exa:search" },
-      ["exa"],
-      "linux",
-    );
+    const result = normalizeInput("mcp", { tool: "exa:search" }, ["exa"]);
     expect(result.values).toEqual([...rawTargets, "mcp"]);
   });
 
   it("resultExtras.target is the first specific target (most-specific)", () => {
-    const result = normalizeInput("mcp", { tool: "exa:search" }, [], "linux");
+    const result = normalizeInput("mcp", { tool: "exa:search" }, []);
     expect(result.resultExtras.target).toBe(result.values[0]);
   });
 
   it("resultExtras.target is 'mcp' when no specific targets are derived", () => {
     // Empty input → only mcp_status then mcp appended
-    const result = normalizeInput("mcp", {}, [], "linux");
+    const result = normalizeInput("mcp", {}, []);
     expect(result.resultExtras.target).toBe("mcp_status");
   });
 
   it("values contain no duplicates", () => {
-    const result = normalizeInput(
-      "mcp",
-      { tool: "exa:search" },
-      ["exa"],
-      "linux",
-    );
+    const result = normalizeInput("mcp", { tool: "exa:search" }, ["exa"]);
     const unique = [...new Set(result.values)];
     expect(result.values).toEqual(unique);
   });
 
   it("produces mcp_status + mcp for status input", () => {
-    const result = normalizeInput("mcp", {}, [], "linux");
+    const result = normalizeInput("mcp", {}, []);
     expect(result.values).toEqual(["mcp_status", "mcp"]);
   });
 
   it("produces connect targets + mcp for connect input", () => {
-    const result = normalizeInput("mcp", { connect: "exa" }, [], "linux");
+    const result = normalizeInput("mcp", { connect: "exa" }, []);
     expect(result.values).toContain("mcp_connect_exa");
     expect(result.values).toContain("mcp_connect");
     expect(result.values.at(-1)).toBe("mcp");

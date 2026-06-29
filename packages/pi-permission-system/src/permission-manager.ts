@@ -96,7 +96,6 @@ export interface PermissionManagerOptions extends PolicyLoaderOptions {
 export class PermissionManager implements ScopedPermissionManager {
   private readonly agentDir: string | undefined;
   private readonly platform: NodeJS.Platform;
-  private currentCwd: string | undefined;
   private loader: PolicyLoader;
   private readonly resolvedPermissionsCache = new Map<
     string,
@@ -123,8 +122,6 @@ export class PermissionManager implements ScopedPermissionManager {
    * built with explicit paths), only the cache is cleared.
    */
   configureForCwd(cwd: string | undefined | null): void {
-    this.currentCwd =
-      typeof cwd === "string" && cwd.trim().length > 0 ? cwd : undefined;
     if (this.agentDir !== undefined) {
       this.loader = new FilePolicyLoader(
         derivePolicyLoaderOptions(this.agentDir, cwd),
@@ -248,7 +245,9 @@ export class PermissionManager implements ScopedPermissionManager {
   /**
    * Unified resolution entry point — dispatches on intent kind.
    *
-   * `"tool"` → normalizes raw input through `normalizeInput`.
+   * `"tool"` → normalizes raw input through `normalizeInput` (bash, skill, mcp,
+   * extension surfaces). Path-bearing surfaces arrive as `"path-values"` via
+   * the access-path gate (#502) or service/RPC builder (#503).
    * `"path-values"` → evaluates the precomputed values directly.
    */
   check(
@@ -280,8 +279,6 @@ export class PermissionManager implements ScopedPermissionManager {
       toolName,
       intent.input,
       this.loader.getConfiguredMcpServerNames(),
-      this.platform,
-      this.currentCwd,
     );
     return buildCheckResult(
       surface,

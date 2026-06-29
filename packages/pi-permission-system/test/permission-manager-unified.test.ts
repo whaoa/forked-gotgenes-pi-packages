@@ -168,10 +168,11 @@ describe("checkPermission — session rules", () => {
     const sessionRules: Ruleset = [
       sessionAllow("external_directory", "/other/project"),
     ];
-    const result = checkTool(
+    const result = checkPath(
       manager,
+      "/other/project",
+      {},
       "external_directory",
-      { path: "/other/project" },
       undefined,
       sessionRules,
     );
@@ -2673,20 +2674,22 @@ permission:
   );
 
   try {
-    const allowed = checkTool(
+    const allowed = checkPath(
       manager,
+      `${homedir()}/Downloads/file.txt`,
+      {},
       "external_directory",
-      { path: `${homedir()}/Downloads/file.txt` },
       "trusted",
     );
     expect(allowed.state).toBe("allow");
     expect(allowed.matchedPattern).toBe("~/Downloads/*");
     expect(allowed.source).toBe("special");
 
-    const denied = checkTool(
+    const denied = checkPath(
       manager,
+      `${homedir()}/Documents/secret.txt`,
+      {},
       "external_directory",
-      { path: `${homedir()}/Documents/secret.txt` },
       "trusted",
     );
     expect(denied.state).toBe("deny");
@@ -2870,10 +2873,11 @@ test("checkPermission returns source 'session' when session rules cover the exte
       },
     ];
 
-    const result = checkTool(
+    const result = checkPath(
       manager,
+      "/other/project/src/foo.ts",
+      {},
       "external_directory",
-      { path: "/other/project/src/foo.ts" },
       undefined,
       sessionRules,
     );
@@ -3003,10 +3007,11 @@ test("session rules override config deny for external_directory", () => {
       },
     ];
 
-    const result = checkTool(
+    const result = checkPath(
       manager,
+      "/other/project/src/foo.ts",
+      {},
       "external_directory",
-      { path: "/other/project/src/foo.ts" },
       undefined,
       sessionRules,
     );

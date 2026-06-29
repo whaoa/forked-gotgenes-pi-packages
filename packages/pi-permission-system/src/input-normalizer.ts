@@ -2,11 +2,7 @@ import type { AccessIntent } from "./access-intent/access-intent";
 import { stripBashCommentLines } from "./bash-arity";
 import { createMcpPermissionTargets } from "./mcp-targets";
 import type { PathNormalizer } from "./path-normalizer";
-import {
-  getPathPolicyValues,
-  PATH_BEARING_TOOLS,
-  PATH_SURFACES,
-} from "./path-utils";
+import { PATH_SURFACES } from "./path-utils";
 import { getNonEmptyString, toRecord } from "./value-guards";
 
 /**
@@ -90,11 +86,15 @@ export interface NormalizedInput {
   resultExtras: Record<string, unknown>;
 }
 
-const SPECIAL_PERMISSION_KEYS = new Set(["external_directory", "path"]);
-
 /**
  * Map a raw tool invocation to the surface/values/extras triple needed by
  * `checkPermission()`.
+ *
+ * Handles bash, skill, mcp, and extension surfaces. Path-bearing tool surfaces
+ * (`path`, `external_directory`, `read`, `write`, `edit`, `grep`, `find`,
+ * `ls`) now route through the access-path gate (#502) and service/RPC builder
+ * (#503) before reaching the manager, so they never arrive here with a real
+ * path value — all fall through to the extension catch-all `["*"]`.
  *
  * @param toolName - Normalized (trimmed) tool name from the tool-call event.
  * @param input    - Raw input payload from the tool-call event.
@@ -105,18 +105,7 @@ export function normalizeInput(
   toolName: string,
   input: unknown,
   configuredMcpServerNames: readonly string[],
-  platform: NodeJS.Platform,
-  cwd?: string,
 ): NormalizedInput {
-  // --- Special surfaces (path, external_directory) ---
-  if (SPECIAL_PERMISSION_KEYS.has(toolName)) {
-    return {
-      surface: toolName,
-      values: normalizePathSurfaceValues(input, platform, cwd),
-      resultExtras: {},
-    };
-  }
-
   // --- Skill ---
   if (toolName === "skill") {
     const record = toRecord(input);
@@ -159,43 +148,13 @@ export function normalizeInput(
     };
   }
 
-  // --- Path-bearing tools (read, write, edit, grep, find, ls) ---
-  if (PATH_BEARING_TOOLS.has(toolName)) {
-    return {
-      surface: toolName,
-      values: normalizePathSurfaceValues(input, platform, cwd),
-      resultExtras: {},
-    };
-  }
-
-  // --- Extension tools (non-path-bearing) ---
+  // --- All other surfaces (path-bearing tools and extension tools) ---
+  // Path-bearing tools with a present path never reach here — the gate emits
+  // an access-path intent (#502). Missing-path and extension-tool cases both
+  // collapse to the surface catch-all.
   return {
     surface: toolName,
     values: ["*"],
     resultExtras: {},
   };
-}
-
-/**
- * Extract and normalize the path lookup values shared by every path surface
- * (`path`, `external_directory`, and the path-bearing tools).
- *
- * Missing, empty, or whitespace-only paths collapse to the surface catch-all
- * `"*"`. When CWD is known, a relative path also produces a normalized
- * absolute policy value and a project-relative alias while keeping its legacy
- * relative value, so values match home- and cwd-anchored patterns
- * symmetrically with how the patterns themselves are expanded (#350).
- *
- * Only `input.path` is read — policy values are never sourced from any other
- * (potentially attacker-controlled) field on the raw tool input.
- */
-function normalizePathSurfaceValues(
-  input: unknown,
-  platform: NodeJS.Platform,
-  cwd?: string,
-): string[] {
-  const path = getNonEmptyString(toRecord(input).path);
-  if (path === null) return ["*"];
-  const values = getPathPolicyValues(path, cwd ? { cwd } : {}, platform);
-  return values.length > 0 ? values : ["*"];
 }
