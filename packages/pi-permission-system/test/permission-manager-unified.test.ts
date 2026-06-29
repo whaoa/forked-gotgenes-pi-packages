@@ -14,6 +14,7 @@ import {
   getProjectAgentsDir,
   getProjectConfigPath,
 } from "#src/config-paths";
+import { getPathPolicyValues } from "#src/path-utils";
 import {
   PermissionManager,
   type ScopedPermissionManager,
@@ -137,6 +138,23 @@ function checkPathValues(
   return manager.check(
     { kind: "path-values", surface, values, agentName },
     sessionRules,
+  );
+}
+
+function checkPath(
+  manager: PermissionManager,
+  path: string,
+  opts: { cwd?: string } = {},
+  surface = "path",
+  agentName?: string,
+  sessionRules?: Ruleset,
+): PermissionCheckResult {
+  return checkPathValues(
+    manager,
+    getPathPolicyValues(path, opts.cwd ? { cwd: opts.cwd } : {}, "linux"),
+    agentName,
+    sessionRules,
+    surface,
   );
 }
 
@@ -266,9 +284,12 @@ describe("checkPermission — source derivation and matchedPattern", () => {
         external_directory: { "/trusted/*": "allow" },
       });
       try {
-        const result = checkTool(manager, "external_directory", {
-          path: "/trusted/repo",
-        });
+        const result = checkPath(
+          manager,
+          "/trusted/repo",
+          {},
+          "external_directory",
+        );
         expect(result.state).toBe("allow");
         expect(result.source).toBe("special");
         expect(result.matchedPattern).toBe("/trusted/*");
@@ -279,9 +300,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
     it("source is 'special' even for a default match (no config rule)", () => {
       const manager = makeManager();
-      const result = checkTool(manager, "external_directory", {
-        path: "/some/path",
-      });
+      const result = checkPath(manager, "/some/path", {}, "external_directory");
       expect(result.state).toBe("ask");
       expect(result.source).toBe("special");
       expect(result.matchedPattern).toBeUndefined();
@@ -289,9 +308,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
     it("matchedPattern is undefined for a default match", () => {
       const manager = makeManager();
-      const result = checkTool(manager, "external_directory", {
-        path: "/unknown",
-      });
+      const result = checkPath(manager, "/unknown", {}, "external_directory");
       expect(result.matchedPattern).toBeUndefined();
     });
   });
@@ -476,9 +493,12 @@ describe("checkPermission — home path expansion in external_directory rules", 
       external_directory: { "~/trusted/*": "allow" },
     });
     try {
-      const result = checkTool(manager, "external_directory", {
-        path: join(homedir(), "trusted/repo"),
-      });
+      const result = checkPath(
+        manager,
+        join(homedir(), "trusted/repo"),
+        {},
+        "external_directory",
+      );
       expect(result.state).toBe("allow");
       expect(result.source).toBe("special");
       expect(result.matchedPattern).toBe("~/trusted/*");
@@ -493,9 +513,12 @@ describe("checkPermission — home path expansion in external_directory rules", 
       external_directory: { "$HOME/trusted/*": "allow" },
     });
     try {
-      const result = checkTool(manager, "external_directory", {
-        path: join(homedir(), "trusted/repo"),
-      });
+      const result = checkPath(
+        manager,
+        join(homedir(), "trusted/repo"),
+        {},
+        "external_directory",
+      );
       expect(result.state).toBe("allow");
       expect(result.source).toBe("special");
       expect(result.matchedPattern).toBe("$HOME/trusted/*");
@@ -510,9 +533,12 @@ describe("checkPermission — home path expansion in external_directory rules", 
       external_directory: { "~/private/*": "deny" },
     });
     try {
-      const result = checkTool(manager, "external_directory", {
-        path: join(homedir(), "private/secrets.txt"),
-      });
+      const result = checkPath(
+        manager,
+        join(homedir(), "private/secrets.txt"),
+        {},
+        "external_directory",
+      );
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("~/private/*");
     } finally {
@@ -526,9 +552,12 @@ describe("checkPermission — home path expansion in external_directory rules", 
       external_directory: { "~/trusted/*": "allow" },
     });
     try {
-      const result = checkTool(manager, "external_directory", {
-        path: "/tmp/not-home/file",
-      });
+      const result = checkPath(
+        manager,
+        "/tmp/not-home/file",
+        {},
+        "external_directory",
+      );
       // Falls back to the "*": "ask" default — no allow from the ~/trusted/* rule.
       expect(result.state).toBe("ask");
       expect(result.matchedPattern).toBeUndefined();
@@ -896,9 +925,12 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
           },
         },
       });
-      const result = checkTool(manager, "external_directory", {
-        path: "/trusted/repo",
-      });
+      const result = checkPath(
+        manager,
+        "/trusted/repo",
+        {},
+        "external_directory",
+      );
       expect(result.state).toBe("allow");
       expect(result.source).toBe("special");
     });
@@ -1075,7 +1107,7 @@ describe("checkPermission — per-tool path patterns", () => {
       read: { "*": "allow", "*.env": "deny" },
     });
     try {
-      const result = checkTool(manager, "read", { path: ".env" });
+      const result = checkPath(manager, ".env", {}, "read");
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("*.env");
     } finally {
@@ -1088,9 +1120,7 @@ describe("checkPermission — per-tool path patterns", () => {
       read: { "*": "allow", "*.env": "deny" },
     });
     try {
-      const result = checkTool(manager, "read", {
-        path: "src/main.ts",
-      });
+      const result = checkPath(manager, "src/main.ts", {}, "read");
       expect(result.state).toBe("allow");
     } finally {
       cleanup();
@@ -1102,9 +1132,7 @@ describe("checkPermission — per-tool path patterns", () => {
       write: { "*": "deny", "src/*": "allow" },
     });
     try {
-      const result = checkTool(manager, "write", {
-        path: "src/main.ts",
-      });
+      const result = checkPath(manager, "src/main.ts", {}, "write");
       expect(result.state).toBe("allow");
       expect(result.matchedPattern).toBe("src/*");
     } finally {
@@ -1117,9 +1145,7 @@ describe("checkPermission — per-tool path patterns", () => {
       write: { "*": "deny", "src/*": "allow" },
     });
     try {
-      const result = checkTool(manager, "write", {
-        path: "vendor/lib.ts",
-      });
+      const result = checkPath(manager, "vendor/lib.ts", {}, "write");
       expect(result.state).toBe("deny");
     } finally {
       cleanup();
@@ -1131,7 +1157,7 @@ describe("checkPermission — per-tool path patterns", () => {
       read: "allow",
     });
     try {
-      const result = checkTool(manager, "read", { path: ".env" });
+      const result = checkPath(manager, ".env", {}, "read");
       expect(result.state).toBe("allow");
     } finally {
       cleanup();
@@ -1143,9 +1169,7 @@ describe("checkPermission — per-tool path patterns", () => {
       read: "deny",
     });
     try {
-      const result = checkTool(manager, "read", {
-        path: "src/main.ts",
-      });
+      const result = checkPath(manager, "src/main.ts", {}, "read");
       expect(result.state).toBe("deny");
     } finally {
       cleanup();
@@ -1158,10 +1182,11 @@ describe("checkPermission — per-tool path patterns", () => {
     });
     try {
       const sessionRules: Ruleset = [sessionAllow("read", ".env")];
-      const result = checkTool(
+      const result = checkPath(
         manager,
+        ".env",
+        {},
         "read",
-        { path: ".env" },
         undefined,
         sessionRules,
       );
@@ -1208,7 +1233,7 @@ describe("cross-cutting path surface", () => {
       read: "allow",
     });
     try {
-      const result = checkTool(manager, "path", { path: ".env" });
+      const result = checkPath(manager, ".env");
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("*.env");
     } finally {
@@ -1222,7 +1247,7 @@ describe("cross-cutting path surface", () => {
       read: "allow",
     });
     try {
-      const result = checkTool(manager, "path", { path: "README.md" });
+      const result = checkPath(manager, "README.md");
       expect(result.state).toBe("allow");
     } finally {
       cleanup();
@@ -1236,14 +1261,10 @@ describe("cross-cutting path surface", () => {
     });
     try {
       // path surface allows, per-tool denies
-      const readResult = checkTool(manager, "read", {
-        path: "data.secret",
-      });
+      const readResult = checkPath(manager, "data.secret", {}, "read");
       expect(readResult.state).toBe("deny");
       // path surface also allows
-      const pathResult = checkTool(manager, "path", {
-        path: "data.secret",
-      });
+      const pathResult = checkPath(manager, "data.secret");
       expect(pathResult.state).toBe("allow");
     } finally {
       cleanup();
@@ -1268,10 +1289,11 @@ describe("cross-cutting path surface", () => {
     });
     try {
       const sessionRules: Ruleset = [sessionAllow("path", "/project/.env")];
-      const result = checkTool(
+      const result = checkPath(
         manager,
+        "/project/.env",
+        {},
         "path",
-        { path: "/project/.env" },
         undefined,
         sessionRules,
       );
@@ -1288,7 +1310,7 @@ describe("cross-cutting path surface", () => {
     });
     try {
       // path surface falls through to universal default
-      const result = checkTool(manager, "path", { path: ".env" });
+      const result = checkPath(manager, ".env");
       expect(result.state).toBe("ask");
     } finally {
       cleanup();
@@ -1304,16 +1326,12 @@ describe("cross-cutting path surface", () => {
     try {
       // No explicit "path" key → matchedPattern must be undefined so the
       // path gate skips (describePathGate returns null).
-      const result = checkTool(manager, "path", {
-        path: "src/main.ts",
-      });
+      const result = checkPath(manager, "src/main.ts");
       expect(result.state).toBe("ask");
       expect(result.matchedPattern).toBeUndefined();
 
       // Meanwhile the tool-level check should allow read.
-      const readResult = checkTool(manager, "read", {
-        path: "src/main.ts",
-      });
+      const readResult = checkPath(manager, "src/main.ts", {}, "read");
       expect(readResult.state).toBe("allow");
       expect(readResult.matchedPattern).toBe("*");
     } finally {
@@ -1362,7 +1380,7 @@ describe("cross-cutting path surface", () => {
       },
     });
     try {
-      const result = checkTool(manager, "read", { path: ".env" });
+      const result = checkPath(manager, ".env", {}, "read");
       expect(result.state).toBe("deny");
       expect(result.reason).toBe("Environment files contain secrets");
       expect(result.matchedPattern).toBe("*.env");
@@ -1394,7 +1412,7 @@ describe("cross-cutting path surface", () => {
       path: { "*.env": "deny", "*": "allow" },
     });
     try {
-      const result = checkTool(manager, "path", { path: ".env" });
+      const result = checkPath(manager, ".env");
       // "*" is last and matches .env → allow (the deny is shadowed)
       expect(result.state).toBe("allow");
     } finally {
@@ -1408,7 +1426,7 @@ describe("cross-cutting path surface", () => {
       path: { "*": "allow", "*.env": "deny" },
     });
     try {
-      const result = checkTool(manager, "path", { path: ".env" });
+      const result = checkPath(manager, ".env");
       expect(result.state).toBe("deny");
     } finally {
       cleanup();
@@ -1427,22 +1445,12 @@ describe("cross-cutting path surface", () => {
       },
     });
     try {
-      expect(checkTool(manager, "path", { path: ".env" }).state).toBe("deny");
-      expect(checkTool(manager, "path", { path: ".env.local" }).state).toBe(
-        "deny",
-      );
-      expect(
-        checkTool(manager, "path", { path: ".env.production" }).state,
-      ).toBe("deny");
-      expect(checkTool(manager, "path", { path: "src/.env" }).state).toBe(
-        "deny",
-      );
-      expect(checkTool(manager, "path", { path: ".env.example" }).state).toBe(
-        "allow",
-      );
-      expect(checkTool(manager, "path", { path: "README.md" }).state).toBe(
-        "allow",
-      );
+      expect(checkPath(manager, ".env").state).toBe("deny");
+      expect(checkPath(manager, ".env.local").state).toBe("deny");
+      expect(checkPath(manager, ".env.production").state).toBe("deny");
+      expect(checkPath(manager, "src/.env").state).toBe("deny");
+      expect(checkPath(manager, ".env.example").state).toBe("allow");
+      expect(checkPath(manager, "README.md").state).toBe("allow");
     } finally {
       cleanup();
     }
@@ -1455,7 +1463,7 @@ describe("cross-cutting path surface", () => {
       "*": "allow",
     });
     try {
-      const result = checkTool(manager, "path", { path: ".env" });
+      const result = checkPath(manager, ".env");
       expect(result.state).toBe("allow");
     } finally {
       cleanup();
@@ -1467,14 +1475,14 @@ describe("cross-cutting path surface", () => {
       "*": "deny",
     });
     try {
-      const result = checkTool(manager, "path", { path: ".env" });
+      const result = checkPath(manager, ".env");
       expect(result.state).toBe("deny");
     } finally {
       cleanup();
     }
   });
 
-  // ── Composition: path allows, per-tool denies ──────────────────────────
+  // ── Composition: path allows, per-tool denies ──────────────────────
 
   it("per-tool deny still blocks even when path surface allows", () => {
     const { manager, cleanup } = makeManagerWithConfig({
@@ -1483,13 +1491,9 @@ describe("cross-cutting path surface", () => {
     });
     try {
       // path gate passes (allow), but tool gate denies
-      const pathResult = checkTool(manager, "path", {
-        path: "secret.txt",
-      });
+      const pathResult = checkPath(manager, "secret.txt");
       expect(pathResult.state).toBe("allow");
-      const readResult = checkTool(manager, "read", {
-        path: "secret.txt",
-      });
+      const readResult = checkPath(manager, "secret.txt", {}, "read");
       expect(readResult.state).toBe("deny");
     } finally {
       cleanup();
@@ -1507,9 +1511,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
       path: { "*": "allow", "~/.ssh/*": "deny" },
     });
     try {
-      const result = checkTool(manager, "path", {
-        path: "~/.ssh/config",
-      });
+      const result = checkPath(manager, "~/.ssh/config");
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("~/.ssh/*");
     } finally {
@@ -1522,9 +1524,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
       path: { "*": "allow", "~/.ssh/*": "deny" },
     });
     try {
-      const result = checkTool(manager, "path", {
-        path: `${homedir()}/.ssh/config`,
-      });
+      const result = checkPath(manager, `${homedir()}/.ssh/config`);
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("~/.ssh/*");
     } finally {
@@ -1537,9 +1537,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
       path: { "*": "allow", "$HOME/.ssh/*": "deny" },
     });
     try {
-      const result = checkTool(manager, "path", {
-        path: "$HOME/.ssh/config",
-      });
+      const result = checkPath(manager, "$HOME/.ssh/config");
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("$HOME/.ssh/*");
     } finally {
@@ -1552,9 +1550,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
       path: { "*": "allow", "~/.ssh/*": "deny" },
     });
     try {
-      const result = checkTool(manager, "path", {
-        path: `${homedir()}/.ssh/config`,
-      });
+      const result = checkPath(manager, `${homedir()}/.ssh/config`);
       expect(result.state).toBe("deny");
     } finally {
       cleanup();
@@ -1566,7 +1562,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
       path: { "*": "allow", "*.env": "deny" },
     });
     try {
-      const result = checkTool(manager, "path", { path: ".env" });
+      const result = checkPath(manager, ".env");
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("*.env");
     } finally {
@@ -1580,9 +1576,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
       read: { "*": "allow", "~/.ssh/*": "deny" },
     });
     try {
-      const result = checkTool(manager, "read", {
-        path: "~/.ssh/config",
-      });
+      const result = checkPath(manager, "~/.ssh/config", {}, "read");
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("~/.ssh/*");
     } finally {
@@ -1664,7 +1658,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
     });
     try {
       const manager = new PermissionManager({ agentDir });
-      const result = checkTool(manager, "read", { path: "foo.txt" });
+      const result = checkPath(manager, "foo.txt", {}, "read");
       expect(result.state).toBe("deny");
     } finally {
       cleanup();
@@ -1679,16 +1673,12 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
     try {
       const manager = new PermissionManager({ agentDir });
       // Before configureForCwd: global policy applies
-      expect(checkTool(manager, "read", { path: "foo.txt" }).state).toBe(
-        "deny",
-      );
+      expect(checkPath(manager, "foo.txt", {}, "read").state).toBe("deny");
 
       manager.configureForCwd(cwd);
 
       // After configureForCwd: project override applies (last-match-wins)
-      expect(checkTool(manager, "read", { path: "foo.txt" }).state).toBe(
-        "allow",
-      );
+      expect(checkPath(manager, "foo.txt", {}, "read").state).toBe("allow");
     } finally {
       cleanup();
     }
@@ -1702,16 +1692,12 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
     try {
       const manager = new PermissionManager({ agentDir });
       manager.configureForCwd(cwd);
-      expect(checkTool(manager, "read", { path: "foo.txt" }).state).toBe(
-        "allow",
-      );
+      expect(checkPath(manager, "foo.txt", {}, "read").state).toBe("allow");
 
       manager.configureForCwd(undefined);
 
       // After reverting: global policy applies again
-      expect(checkTool(manager, "read", { path: "foo.txt" }).state).toBe(
-        "deny",
-      );
+      expect(checkPath(manager, "foo.txt", {}, "read").state).toBe("deny");
     } finally {
       cleanup();
     }
@@ -1724,9 +1710,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
     try {
       const manager = new PermissionManager({ agentDir });
       // Warm the cache
-      expect(checkTool(manager, "read", { path: "foo.txt" }).state).toBe(
-        "allow",
-      );
+      expect(checkPath(manager, "foo.txt", {}, "read").state).toBe("allow");
       // Update global config on disk to deny read
       writeFileSync(
         globalConfigPath,
@@ -1735,9 +1719,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
       // configureForCwd clears cache + rebuilds loader
       manager.configureForCwd(undefined);
       // Should pick up the changed global config
-      expect(checkTool(manager, "read", { path: "foo.txt" }).state).toBe(
-        "deny",
-      );
+      expect(checkPath(manager, "foo.txt", {}, "read").state).toBe("deny");
     } finally {
       cleanup();
     }
@@ -1778,13 +1760,11 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
       manager.configureForCwd(cwd);
 
       // Without an agent name: global allow applies.
-      expect(checkTool(manager, "read", { path: "foo.txt" }).state).toBe(
-        "allow",
-      );
+      expect(checkPath(manager, "foo.txt", {}, "read").state).toBe("allow");
       // With the "coder" agent: project-agent deny overrides global allow.
-      expect(
-        checkTool(manager, "read", { path: "foo.txt" }, "coder").state,
-      ).toBe("deny");
+      expect(checkPath(manager, "foo.txt", {}, "read", "coder").state).toBe(
+        "deny",
+      );
     } finally {
       cleanup();
     }
@@ -2941,16 +2921,20 @@ test("checkPermission with empty session rules is identical to call without sess
   });
 
   try {
-    const withEmpty = checkTool(
+    const withEmpty = checkPath(
       manager,
+      "/other/project/foo.ts",
+      {},
       "external_directory",
-      { path: "/other/project/foo.ts" },
       undefined,
       [],
     );
-    const withoutArg = checkTool(manager, "external_directory", {
-      path: "/other/project/foo.ts",
-    });
+    const withoutArg = checkPath(
+      manager,
+      "/other/project/foo.ts",
+      {},
+      "external_directory",
+    );
     const expected: PermissionCheckResult = {
       toolName: "external_directory",
       state: "deny",
@@ -3299,7 +3283,7 @@ describe("checkPermission — cwd-aware path policy values", () => {
     });
     try {
       manager.configureForCwd(cwd);
-      const result = checkTool(manager, "read", { path: "src/App.jsx" });
+      const result = checkPath(manager, "src/App.jsx", { cwd }, "read");
       expect(result.state).toBe("allow");
       expect(result.matchedPattern).toBe(`${cwd}/*`);
     } finally {
@@ -3313,7 +3297,7 @@ describe("checkPermission — cwd-aware path policy values", () => {
     });
     try {
       manager.configureForCwd(cwd);
-      const result = checkTool(manager, "read", { path: "src/App.jsx" });
+      const result = checkPath(manager, "src/App.jsx", { cwd }, "read");
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("src/*");
     } finally {
@@ -3331,7 +3315,7 @@ describe("checkPermission — cwd-aware path policy values", () => {
     });
     try {
       manager.configureForCwd(cwd);
-      const result = checkTool(manager, "read", { path: "src/App.jsx" });
+      const result = checkPath(manager, "src/App.jsx", { cwd }, "read");
       // The later "src/*" deny wins over the earlier absolute allow.
       expect(result.state).toBe("deny");
       expect(result.matchedPattern).toBe("src/*");
@@ -3346,7 +3330,7 @@ describe("checkPermission — cwd-aware path policy values", () => {
     });
     try {
       manager.configureForCwd(cwd);
-      const result = checkTool(manager, "path", { path: "src/App.jsx" });
+      const result = checkPath(manager, "src/App.jsx", { cwd });
       expect(result.state).toBe("allow");
       expect(result.matchedPattern).toBe(`${cwd}/*`);
     } finally {
