@@ -78,6 +78,36 @@ describe("PathNormalizer", () => {
       expect(normalizer.isOutsideWorkingDirectory("/etc/hosts")).toBe(true);
     });
 
+    test("isOutsideWorkingDirectory expands a home-relative token", () => {
+      expect(normalizer.isOutsideWorkingDirectory("~/secrets")).toBe(true);
+    });
+
+    test("isOutsideWorkingDirectory resolves a relative token inside cwd", () => {
+      expect(normalizer.isOutsideWorkingDirectory("src/index.ts")).toBe(false);
+    });
+
+    test("isOutsideWorkingDirectory follows an in-cwd symlink to an external target", () => {
+      // ./link -> /etc: realpathSync resolves the full token in one call.
+      realpathSync.mockImplementation((p: string) => {
+        if (p === "/projects/my-app/link/hosts") return "/etc/hosts";
+        return p;
+      });
+      expect(normalizer.isOutsideWorkingDirectory("./link/hosts")).toBe(true);
+    });
+
+    test("isOutsideWorkingDirectory keeps a path inside a symlinked cwd", () => {
+      // /tmp -> /private/tmp on macOS; cwd reported as the resolved /private/tmp.
+      realpathSync.mockImplementation((p: string) => {
+        if (p.startsWith("/tmp/")) return `/private/tmp${p.slice(4)}`;
+        if (p === "/tmp") return "/private/tmp";
+        return p;
+      });
+      const symlinkNormalizer = new PathNormalizer("linux", "/private/tmp");
+      expect(
+        symlinkNormalizer.isOutsideWorkingDirectory("/tmp/workspace/file.ts"),
+      ).toBe(false);
+    });
+
     test("comparableValue returns the lexical absolute form (no FS)", () => {
       expect(normalizer.comparableValue("src/foo.ts")).toBe(
         "/projects/my-app/src/foo.ts",

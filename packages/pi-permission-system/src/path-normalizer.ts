@@ -2,6 +2,7 @@ import { posix as posixPath, win32 as winPath } from "node:path";
 
 import { AccessPath } from "./access-intent/access-path";
 import {
+  canonicalNormalizePathForComparison,
   isPathOutsideWorkingDirectory,
   isPathWithinDirectory,
   isPiInfrastructureRead,
@@ -23,12 +24,15 @@ import {
  */
 export class PathNormalizer {
   private readonly impl: typeof posixPath;
+  /** Canonical form of the baked cwd, resolved once (the symlink target is stable per session). */
+  private readonly canonicalCwd: string;
 
   constructor(
     private readonly platform: NodeJS.Platform,
     private readonly cwd: string,
   ) {
     this.impl = platform === "win32" ? winPath : posixPath;
+    this.canonicalCwd = canonicalNormalizePathForComparison(cwd, cwd, platform);
   }
 
   /** Build an AccessPath for a token, resolved against `resolveBase` (default cwd). */
@@ -67,7 +71,16 @@ export class PathNormalizer {
 
   /** Canonical (symlink-resolved) outside-cwd test against the baked cwd. */
   isOutsideWorkingDirectory(pathValue: string): boolean {
-    return isPathOutsideWorkingDirectory(pathValue, this.cwd, this.platform);
+    const canonicalPath = canonicalNormalizePathForComparison(
+      pathValue,
+      this.cwd,
+      this.platform,
+    );
+    return isPathOutsideWorkingDirectory(
+      canonicalPath,
+      this.canonicalCwd,
+      this.platform,
+    );
   }
 
   /**

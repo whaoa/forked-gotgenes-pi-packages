@@ -266,24 +266,25 @@ export function canonicalNormalizePathForComparison(
   return platform === "win32" ? canonical.toLowerCase() : canonical;
 }
 
+/**
+ * Pure geometry: is `canonicalPath` outside `canonicalCwd`?
+ *
+ * Both operands must already be canonical (symlink-resolved, win32-lowercased)
+ * — the caller prepares them (see {@link PathNormalizer.isOutsideWorkingDirectory}).
+ * This predicate touches no filesystem and does no derivation.
+ */
 export function isPathOutsideWorkingDirectory(
-  pathValue: string,
-  cwd: string,
+  canonicalPath: string,
+  canonicalCwd: string,
   platform: NodeJS.Platform,
 ): boolean {
-  const normalizedCwd = canonicalNormalizePathForComparison(cwd, cwd, platform);
-  const normalizedPath = canonicalNormalizePathForComparison(
-    pathValue,
-    cwd,
-    platform,
-  );
-  if (!normalizedCwd || !normalizedPath) {
+  if (!canonicalCwd || !canonicalPath) {
     return false;
   }
-  if (isSafeSystemPath(normalizedPath)) {
+  if (isSafeSystemPath(canonicalPath)) {
     return false;
   }
-  return !isPathWithinDirectory(normalizedPath, normalizedCwd, platform);
+  return !isPathWithinDirectory(canonicalPath, canonicalCwd, platform);
 }
 
 function containsGlobChars(value: string): boolean {

@@ -336,102 +336,82 @@ describe("getToolInputPath", () => {
 });
 
 describe("isPathOutsideWorkingDirectory", () => {
-  const cwd = "/projects/my-app";
+  // Pure geometry over already-canonical operands: the caller (PathNormalizer)
+  // prepares the canonical path and cwd; this predicate never canonicalizes.
+  const canonicalCwd = "/projects/my-app";
 
-  beforeEach(() => {
-    // Reset then restore the identity default so symlink tests don't bleed.
-    realpathSync.mockReset();
-    realpathSync.mockImplementation((p: string) => p);
+  test("does not canonicalize its operands (no filesystem access)", () => {
+    realpathSync.mockClear();
+    isPathOutsideWorkingDirectory(
+      "/projects/my-app/src",
+      canonicalCwd,
+      "linux",
+    );
+    expect(realpathSync).not.toHaveBeenCalled();
   });
 
   test("returns false when path is inside cwd", () => {
     expect(
-      isPathOutsideWorkingDirectory("/projects/my-app/src", cwd, "linux"),
+      isPathOutsideWorkingDirectory(
+        "/projects/my-app/src",
+        canonicalCwd,
+        "linux",
+      ),
     ).toBe(false);
   });
 
   test("returns false when path equals cwd", () => {
     expect(
-      isPathOutsideWorkingDirectory("/projects/my-app", cwd, "linux"),
+      isPathOutsideWorkingDirectory("/projects/my-app", canonicalCwd, "linux"),
     ).toBe(false);
   });
 
   test("returns true when path is outside cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/etc/passwd", cwd, "linux")).toBe(
-      true,
-    );
+    expect(
+      isPathOutsideWorkingDirectory("/etc/passwd", canonicalCwd, "linux"),
+    ).toBe(true);
   });
 
-  test("returns true for home directory when outside cwd", () => {
-    expect(isPathOutsideWorkingDirectory("~/secrets", cwd, "linux")).toBe(true);
-  });
-
-  test("returns false for relative path resolving inside cwd", () => {
-    expect(isPathOutsideWorkingDirectory("src/index.ts", cwd, "linux")).toBe(
+  test("returns false for an empty canonical path", () => {
+    expect(isPathOutsideWorkingDirectory("", canonicalCwd, "linux")).toBe(
       false,
     );
   });
 
-  test("returns false for empty path (normalizes to empty string)", () => {
-    expect(isPathOutsideWorkingDirectory("", cwd, "linux")).toBe(false);
-  });
-
-  test("returns false for /dev/null regardless of cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/null", cwd, "linux")).toBe(
+  test("returns false for an empty canonical cwd", () => {
+    expect(isPathOutsideWorkingDirectory("/etc/passwd", "", "linux")).toBe(
       false,
     );
   });
 
-  test("returns false for /dev/stdin regardless of cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/stdin", cwd, "linux")).toBe(
-      false,
-    );
+  test("returns false for /dev/null (safe system path)", () => {
+    expect(
+      isPathOutsideWorkingDirectory("/dev/null", canonicalCwd, "linux"),
+    ).toBe(false);
   });
 
-  test("returns false for /dev/stdout regardless of cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/stdout", cwd, "linux")).toBe(
-      false,
-    );
+  test("returns false for /dev/stdin (safe system path)", () => {
+    expect(
+      isPathOutsideWorkingDirectory("/dev/stdin", canonicalCwd, "linux"),
+    ).toBe(false);
   });
 
-  test("returns false for /dev/stderr regardless of cwd", () => {
-    expect(isPathOutsideWorkingDirectory("/dev/stderr", cwd, "linux")).toBe(
-      false,
-    );
+  test("returns false for /dev/stdout (safe system path)", () => {
+    expect(
+      isPathOutsideWorkingDirectory("/dev/stdout", canonicalCwd, "linux"),
+    ).toBe(false);
+  });
+
+  test("returns false for /dev/stderr (safe system path)", () => {
+    expect(
+      isPathOutsideWorkingDirectory("/dev/stderr", canonicalCwd, "linux"),
+    ).toBe(false);
   });
 
   test("returns true for /dev/null/subdir (not a safe path)", () => {
     expect(
-      isPathOutsideWorkingDirectory("/dev/null/subdir", cwd, "linux"),
+      isPathOutsideWorkingDirectory("/dev/null/subdir", canonicalCwd, "linux"),
     ).toBe(true);
-  });
-
-  test("returns true for in-cwd symlink that resolves to external path", () => {
-    // ./link -> /etc: realpathSync resolves the full token in one call.
-    realpathSync.mockImplementation((p: string) => {
-      if (p === "/projects/my-app/link/hosts") return "/etc/hosts";
-      return p;
-    });
-    expect(isPathOutsideWorkingDirectory("./link/hosts", cwd, "linux")).toBe(
-      true,
-    );
-  });
-
-  test("returns false for path inside a symlinked cwd", () => {
-    // /tmp -> /private/tmp on macOS; cwd reported as /private/tmp.
-    const symlinkCwd = "/private/tmp";
-    realpathSync.mockImplementation((p: string) => {
-      if (p.startsWith("/tmp/")) return `/private/tmp${p.slice(4)}`;
-      if (p === "/tmp") return "/private/tmp";
-      return p;
-    });
-    expect(
-      isPathOutsideWorkingDirectory(
-        "/tmp/workspace/file.ts",
-        symlinkCwd,
-        "linux",
-      ),
-    ).toBe(false);
   });
 });
 
