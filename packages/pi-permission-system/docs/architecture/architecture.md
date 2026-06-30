@@ -765,7 +765,7 @@ src/
 └── types.ts                   Core type definitions (PermissionState, FlatPermissionConfig, etc.)
 ```
 
-## Improvement roadmap — Phase 7: AccessPath as the universal internal path representation
+## Improvement roadmap — Phase 7: AccessPath as the universal internal path representation (complete)
 
 Phase 7 finishes the direction opened by [#487]: make `AccessPath` the one internal representation for every concrete path the system handles.
 Phase 6 introduced `AccessPath` for the `external_directory` surface; follow-on [#486] brought the `path` surface and the bash-path tokens to lexical ∪ canonical parity and collapsed the gate-emitted `path-values` variant.
@@ -779,19 +779,19 @@ This is a direction-driven phase: [#487] sets the framing, and the discovery con
 Health score 76 (B); no dead code; duplication 6.6% overall (3.6% in tests); maintainability 91.2.
 The single relevant structural signal is `path-utils.ts` — an accelerating churn hotspot (266 churn over 6 months, 13 fan-in, ▲), the ad-hoc path-derivation grab-bag the [#487] vision exists to consolidate.
 
-| Metric                            | Before                                        | Target after Phase 7                                |
-| --------------------------------- | --------------------------------------------- | --------------------------------------------------- |
-| `path-utils.ts` fan-in            | 13 (one grab-bag)                             | ✅ distributed across six cohesive modules ([#505]) |
-| Lexical-only path normalizers     | 2 (per-tool gate, service/RPC)                | 0 (single `AccessPath` derivation)                  |
-| Symlink-resistant path surfaces   | `path`, `external_directory`, bash            | all path surfaces incl. per-tool and RPC            |
-| Emitted/internal path-value forms | `access-path` emitted, `path-values` internal | `path-values` boundary decided and documented       |
+| Metric                            | Before                                        | Target after Phase 7                                      |
+| --------------------------------- | --------------------------------------------- | --------------------------------------------------------- |
+| `path-utils.ts` fan-in            | 13 (one grab-bag)                             | ✅ distributed across six cohesive modules ([#505])       |
+| Lexical-only path normalizers     | 2 (per-tool gate, service/RPC)                | 0 (single `AccessPath` derivation)                        |
+| Symlink-resistant path surfaces   | `path`, `external_directory`, bash            | all path surfaces incl. per-tool and RPC                  |
+| Emitted/internal path-value forms | `access-path` emitted, `path-values` internal | ✅ `path-values` formalized as the string seam (ADR-0002) |
 
 The residual ad-hoc path handling (the "re-derive their representations ad hoc" [#487] names):
 
 - Per-tool path-bearing gate: `ToolCallGatePipeline` emits `kind: "tool"` → `normalizeInput` → `normalizePathSurfaceValues` → `getPathPolicyValues` (lexical only) — closed by Steps 1–3 ([#502], [#504]): Step 1 migrated the gate to emit `access-path`; Step 3 removed `normalizePathSurfaceValues` and the path branches from `normalizeInput`.
 - Service/RPC queries: `permissions-service.ts` / `permission-event-rpc.ts` — closed by Step 2 ([#503]): both build an `AccessPath` via `buildAccessIntentForSurface` and route an `access-path` intent through the resolver (was a lexical `tool` intent for `path` / `external_directory`).
 - `path-utils.ts`: the loose `getPathPolicyValues` / `normalizePathForComparison` / `normalizePathPolicyLiteral` derivations that `AccessPath` should own — ✅ closed by Step 4 ([#505]): relocated into `access-intent/path-normalization.ts` and the grab-bag dissolved into focused modules.
-- `path-values`: survives as the manager's deliberate string boundary (the manager stays string-based and never imports `AccessPath`).
+- ✅ `path-values`: formalized as the manager's deliberate string boundary by Step 5 ([#506], ADR-0002) — the manager stays string-based and never imports `AccessPath`, now guarded by a `no-restricted-imports` lint rule on `permission-manager.ts`.
 
 ### Steps
 
@@ -825,12 +825,12 @@ The residual ad-hoc path handling (the "re-derive their representations ad hoc" 
    Outcome: `path-utils.ts` dissolved into cohesive modules; path derivation owned by the access-intent domain; non-breaking.
    Release: independent
 
-5. **Decide and formalize the `path-values` boundary.**
+5. ✅ **Decide and formalize the `path-values` boundary.**
    ([#506]) Target: `src/access-intent/access-intent.ts`, `src/permission-resolver.ts`, `src/permission-manager.ts`.
    With the resolver the sole `path-values` producer after Steps 1 and 2, decide between formalizing `path-values` as the manager's intentional string seam (document why the manager stays string-based) and moving the `matchValues()` unwrap into the manager (the manager imports `AccessPath`, dropping the string-boundary invariant).
    This is the [#487] "collapse the `path-values` variant" item, resolved as an explicit decision rather than a pre-committed mechanical change.
    Smell: Category C (clarify boundary).
-   Outcome: the `path-values` boundary is intentional and documented (an architecture note or ADR); non-breaking.
+   Decided: **formalize** — kept `path-values` as the string seam, recorded in ADR-0002 (`docs/decisions/0002-path-values-string-boundary.md`), and guarded the invariant with a `no-restricted-imports` lint rule on `permission-manager.ts`; non-breaking.
    Release: independent
 
 ### Step dependency diagram
@@ -841,7 +841,7 @@ flowchart TD
     S2["✅ Step 2 (#503)<br/>Service/RPC to AccessPath<br/>(breaking)"]
     S3["✅ Step 3 (#504)<br/>Retire input-normalizer path normalization"]
     S4["✅ Step 4 (#505)<br/>Dissolve path-utils grab-bag"]
-    S5["Step 5 (#506)<br/>Decide path-values boundary"]
+    S5["✅ Step 5 (#506)<br/>Decide path-values boundary"]
 
     S1 --> S3
     S2 --> S3
