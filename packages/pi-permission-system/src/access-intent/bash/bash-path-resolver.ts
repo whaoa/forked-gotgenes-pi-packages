@@ -14,8 +14,8 @@ import {
   collectRedirectTokens,
   extractCommandName,
 } from "#src/access-intent/bash/token-collection";
+import { normalizePathPolicyLiteral } from "#src/access-intent/path-normalization";
 import type { PathNormalizer } from "#src/path-normalizer";
-import { normalizePathPolicyLiteral } from "#src/path-utils";
 import { isSafeSystemPath } from "#src/safe-system-paths";
 
 // ── Internal types ───────────────────────────────────────────────────────────

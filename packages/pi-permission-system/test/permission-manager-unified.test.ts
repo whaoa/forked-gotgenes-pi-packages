@@ -9,12 +9,12 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, test } from "vitest";
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
+import { getPathPolicyValues } from "#src/access-intent/path-normalization";
 import {
   getGlobalConfigPath,
   getProjectAgentsDir,
   getProjectConfigPath,
 } from "#src/config-paths";
-import { getPathPolicyValues } from "#src/path-utils";
 import {
   PermissionManager,
   type ScopedPermissionManager,

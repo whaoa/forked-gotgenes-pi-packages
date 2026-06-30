@@ -2,7 +2,7 @@ import {
   canonicalNormalizePathForComparison,
   getPathPolicyValues,
   normalizePathForComparison,
-} from "#src/path-utils";
+} from "./path-normalization";
 
 /**
  * A path's two representations held behind type-distinct accessors.

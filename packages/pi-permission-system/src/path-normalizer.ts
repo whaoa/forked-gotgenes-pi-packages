@@ -3,9 +3,11 @@ import { posix as posixPath, win32 as winPath } from "node:path";
 import { AccessPath } from "./access-intent/access-path";
 import {
   canonicalNormalizePathForComparison,
+  normalizePathForComparison,
+} from "./access-intent/path-normalization";
+import {
   isPathOutsideWorkingDirectory,
   isPathWithinDirectory,
-  normalizePathForComparison,
 } from "./path-utils";
 import { isPiInfrastructureRead } from "./pi-infrastructure-read";
 
