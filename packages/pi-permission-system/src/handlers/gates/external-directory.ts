@@ -1,9 +1,9 @@
 import type { PathNormalizer } from "#src/path-normalizer";
-import { getToolInputPath } from "#src/path-utils";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
+import { getToolInputPath } from "#src/tool-input-path";
 import type { GateResult } from "./descriptor";
 import { formatExternalDirectoryAskPrompt } from "./external-directory-messages";
 import { resolveExternalDirectoryPolicy } from "./external-directory-policy";

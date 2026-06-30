@@ -2,13 +2,8 @@ import { join, posix as posixPath, win32 as winPath } from "node:path";
 
 import { canonicalizePath } from "./canonicalize-path";
 import { expandHomePath } from "./expand-home";
-import {
-  PATH_BEARING_TOOLS,
-  READ_ONLY_PATH_BEARING_TOOLS,
-} from "./path-surfaces";
+import { READ_ONLY_PATH_BEARING_TOOLS } from "./path-surfaces";
 import { isSafeSystemPath } from "./safe-system-paths";
-import type { ToolAccessExtractorLookup } from "./tool-access-extractor-registry";
-import { getNonEmptyString, toRecord } from "./value-guards";
 import { wildcardMatch } from "./wildcard-matcher";
 
 export function normalizePathForComparison(
@@ -152,57 +147,6 @@ function getCwdRelativePathPolicyValues(
   const impl = platform === "win32" ? winPath : posixPath;
   const relativeValue = impl.relative(normalizedCwd, absolute);
   return relativeValue ? [relativeValue] : [];
-}
-
-export function getPathBearingToolPath(
-  toolName: string,
-  input: unknown,
-): string | null {
-  if (!PATH_BEARING_TOOLS.has(toolName)) {
-    return null;
-  }
-
-  return getNonEmptyString(toRecord(input).path);
-}
-
-/**
- * Extract the filesystem path a tool will access, for the cross-cutting `path`
- * and `external_directory` gates.
- *
- * Unlike {@link getPathBearingToolPath} (built-in tools only), this recognizes
- * extension and MCP tools so they are no longer exempt from path gating:
- *
- * - `bash` → `null` (bash has its own token-based path gates).
- * - Built-in path-bearing tools → `input.path`.
- * - `mcp` → `input.arguments.path`.
- * - Any other tool → a registered {@link ToolAccessExtractor}'s path, else the
- *   default `input.path` convention.
- */
-export function getToolInputPath(
-  toolName: string,
-  input: unknown,
-  extractors?: ToolAccessExtractorLookup,
-): string | null {
-  if (toolName === "bash") {
-    return null;
-  }
-
-  const record = toRecord(input);
-
-  if (PATH_BEARING_TOOLS.has(toolName)) {
-    return getNonEmptyString(record.path);
-  }
-
-  if (toolName === "mcp") {
-    return getNonEmptyString(toRecord(record.arguments).path);
-  }
-
-  const custom = extractors?.get(toolName);
-  if (custom) {
-    return getNonEmptyString(custom(record));
-  }
-
-  return getNonEmptyString(record.path);
 }
 
 /**

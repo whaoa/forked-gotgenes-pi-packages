@@ -1,9 +1,9 @@
 import type { AccessPath } from "#src/access-intent/access-path";
 import { PATH_BEARING_TOOLS } from "#src/path-surfaces";
-import { getPathBearingToolPath } from "#src/path-utils";
 import { suggestSessionPattern } from "#src/pattern-suggest";
 import { formatAskPrompt } from "#src/permission-prompts";
 import { SessionApproval } from "#src/session-approval";
+import { getPathBearingToolPath } from "#src/tool-input-path";
 import type { ToolPreviewFormatter } from "#src/tool-preview-formatter";
 import type { PermissionCheckResult } from "#src/types";
 import type { GateDescriptor } from "./descriptor";
