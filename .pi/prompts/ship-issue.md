@@ -62,7 +62,8 @@ If either fails, fix the issues and commit before pushing.
 
 First check the unreleased range for a releasing commit: `git log --oneline <last-tag>..HEAD`.
 If every commit is a non-releasing type — the `hidden: true` changelog sections in `release-please-config.json` (`refactor:`/`style:`/`test:`/`build:`/`ci:`) — release-please will cut nothing now; the work auto-batches until a releasing commit lands.
-A `docs:` commit on a non-excluded path **does** cut a patch (it is a visible changelog section); only `exclude-paths` commits (`docs/plans`, `docs/retro`) are inert.
+A `docs:` commit cuts a patch only when it touches a file under `packages/<pkg>/` that is **not** in `exclude-paths`.
+Files outside the package tree (`.pi/skills/`, root `AGENTS.md`/`README.md`) are attributed to no package; together with `exclude-paths` files (`docs/plans`, `docs/retro`, a package's `docs/architecture`) they cut nothing now and auto-batch (Refs #505).
 Say so in the final report and skip the batch-vs-release question.
 
 Then apply the decision recorded in the early "Release coordination" section.
