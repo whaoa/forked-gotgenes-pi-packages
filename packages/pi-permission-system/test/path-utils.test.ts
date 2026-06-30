@@ -31,8 +31,6 @@ import {
   isSafeSystemPath,
   normalizePathForComparison,
   normalizePathPolicyLiteral,
-  PATH_BEARING_TOOLS,
-  READ_ONLY_PATH_BEARING_TOOLS,
   SAFE_SYSTEM_PATHS,
 } from "#src/path-utils";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
@@ -182,32 +180,6 @@ describe("isPathWithinDirectory", () => {
 
   test("posix platform stays case-sensitive", () => {
     expect(isPathWithinDirectory("/a/B/c", "/a/b", "linux")).toBe(false);
-  });
-});
-
-describe("PATH_BEARING_TOOLS", () => {
-  test("contains the expected tool names", () => {
-    for (const tool of ["read", "write", "edit", "find", "grep", "ls"]) {
-      expect(PATH_BEARING_TOOLS.has(tool)).toBe(true);
-    }
-  });
-
-  test("does not contain bash or mcp", () => {
-    expect(PATH_BEARING_TOOLS.has("bash")).toBe(false);
-    expect(PATH_BEARING_TOOLS.has("mcp")).toBe(false);
-  });
-});
-
-describe("READ_ONLY_PATH_BEARING_TOOLS", () => {
-  test("contains read, find, grep, ls", () => {
-    for (const tool of ["read", "find", "grep", "ls"]) {
-      expect(READ_ONLY_PATH_BEARING_TOOLS.has(tool)).toBe(true);
-    }
-  });
-
-  test("does not contain write or edit", () => {
-    expect(READ_ONLY_PATH_BEARING_TOOLS.has("write")).toBe(false);
-    expect(READ_ONLY_PATH_BEARING_TOOLS.has("edit")).toBe(false);
   });
 });
 

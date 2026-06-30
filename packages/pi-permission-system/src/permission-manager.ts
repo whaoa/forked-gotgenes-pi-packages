@@ -7,7 +7,7 @@ import {
 } from "./config-paths";
 import { normalizeInput } from "./input-normalizer";
 import { normalizeFlatConfig } from "./normalize";
-import { PATH_SURFACES } from "./path-utils";
+import { PATH_SURFACES } from "./path-surfaces";
 import {
   FilePolicyLoader,
   type PolicyLoader,

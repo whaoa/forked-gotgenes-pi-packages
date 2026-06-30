@@ -1,4 +1,4 @@
-import { PATH_SURFACES } from "./path-utils";
+import { PATH_SURFACES } from "./path-surfaces";
 import type { PermissionState } from "./types";
 import { wildcardMatch } from "./wildcard-matcher";
 

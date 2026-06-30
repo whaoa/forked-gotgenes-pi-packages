@@ -2,7 +2,7 @@ import type { AccessIntent } from "./access-intent/access-intent";
 import { stripBashCommentLines } from "./bash-arity";
 import { createMcpPermissionTargets } from "./mcp-targets";
 import type { PathNormalizer } from "./path-normalizer";
-import { PATH_SURFACES } from "./path-utils";
+import { PATH_SURFACES } from "./path-surfaces";
 import { getNonEmptyString, toRecord } from "./value-guards";
 
 /**

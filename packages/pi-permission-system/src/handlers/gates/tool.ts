@@ -1,5 +1,6 @@
 import type { AccessPath } from "#src/access-intent/access-path";
-import { getPathBearingToolPath, PATH_BEARING_TOOLS } from "#src/path-utils";
+import { PATH_BEARING_TOOLS } from "#src/path-surfaces";
+import { getPathBearingToolPath } from "#src/path-utils";
 import { suggestSessionPattern } from "#src/pattern-suggest";
 import { formatAskPrompt } from "#src/permission-prompts";
 import { SessionApproval } from "#src/session-approval";

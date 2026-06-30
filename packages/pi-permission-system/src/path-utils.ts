@@ -2,6 +2,10 @@ import { join, posix as posixPath, win32 as winPath } from "node:path";
 
 import { canonicalizePath } from "./canonicalize-path";
 import { expandHomePath } from "./expand-home";
+import {
+  PATH_BEARING_TOOLS,
+  READ_ONLY_PATH_BEARING_TOOLS,
+} from "./path-surfaces";
 import type { ToolAccessExtractorLookup } from "./tool-access-extractor-registry";
 import { getNonEmptyString, toRecord } from "./value-guards";
 import { wildcardMatch } from "./wildcard-matcher";
@@ -167,37 +171,6 @@ export const SAFE_SYSTEM_PATHS: ReadonlySet<string> = new Set([
 export function isSafeSystemPath(normalizedPath: string): boolean {
   return SAFE_SYSTEM_PATHS.has(normalizedPath);
 }
-
-/**
- * File tools that only read — never write — the filesystem.
- * Only these tools are eligible for the Pi infrastructure auto-allow.
- */
-export const READ_ONLY_PATH_BEARING_TOOLS: ReadonlySet<string> = new Set([
-  "read",
-  "find",
-  "grep",
-  "ls",
-]);
-
-export const PATH_BEARING_TOOLS = new Set([
-  "read",
-  "write",
-  "edit",
-  "find",
-  "grep",
-  "ls",
-]);
-
-/**
- * Surfaces whose patterns are matched against filesystem paths and therefore
- * fold case (and separators) on Windows: the path-bearing tools plus the
- * cross-cutting `path` gate and the `external_directory` boundary gate.
- */
-export const PATH_SURFACES: ReadonlySet<string> = new Set([
-  ...PATH_BEARING_TOOLS,
-  "external_directory",
-  "path",
-]);
 
 export function getPathBearingToolPath(
   toolName: string,
