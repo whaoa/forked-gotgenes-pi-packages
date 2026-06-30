@@ -15,7 +15,8 @@ import {
   extractCommandName,
 } from "#src/access-intent/bash/token-collection";
 import type { PathNormalizer } from "#src/path-normalizer";
-import { isSafeSystemPath, normalizePathPolicyLiteral } from "#src/path-utils";
+import { normalizePathPolicyLiteral } from "#src/path-utils";
+import { isSafeSystemPath } from "#src/safe-system-paths";
 
 // ── Internal types ───────────────────────────────────────────────────────────
 

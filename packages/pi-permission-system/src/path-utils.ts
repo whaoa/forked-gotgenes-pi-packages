@@ -6,6 +6,7 @@ import {
   PATH_BEARING_TOOLS,
   READ_ONLY_PATH_BEARING_TOOLS,
 } from "./path-surfaces";
+import { isSafeSystemPath } from "./safe-system-paths";
 import type { ToolAccessExtractorLookup } from "./tool-access-extractor-registry";
 import { getNonEmptyString, toRecord } from "./value-guards";
 import { wildcardMatch } from "./wildcard-matcher";
@@ -151,25 +152,6 @@ function getCwdRelativePathPolicyValues(
   const impl = platform === "win32" ? winPath : posixPath;
   const relativeValue = impl.relative(normalizedCwd, absolute);
   return relativeValue ? [relativeValue] : [];
-}
-
-/**
- * Paths that are universally safe and should never trigger external-directory checks.
- * These are OS device files: read returns EOF or process streams, write discards or goes to process streams.
- */
-export const SAFE_SYSTEM_PATHS: ReadonlySet<string> = new Set([
-  "/dev/null",
-  "/dev/stdin",
-  "/dev/stdout",
-  "/dev/stderr",
-]);
-
-/**
- * Returns true if the given normalized path is a safe OS device file
- * that should never trigger external-directory checks.
- */
-export function isSafeSystemPath(normalizedPath: string): boolean {
-  return SAFE_SYSTEM_PATHS.has(normalizedPath);
 }
 
 export function getPathBearingToolPath(
