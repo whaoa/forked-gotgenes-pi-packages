@@ -12,7 +12,7 @@ vi.mock("node:fs", () => ({
 import {
   isPathOutsideWorkingDirectory,
   isPathWithinDirectory,
-} from "#src/path-utils";
+} from "#src/path-containment";
 
 describe("isPathWithinDirectory", () => {
   test("returns true when path equals directory", () => {

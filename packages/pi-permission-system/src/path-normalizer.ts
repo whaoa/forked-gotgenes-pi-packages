@@ -8,7 +8,7 @@ import {
 import {
   isPathOutsideWorkingDirectory,
   isPathWithinDirectory,
-} from "./path-utils";
+} from "./path-containment";
 import { isPiInfrastructureRead } from "./pi-infrastructure-read";
 
 /**
@@ -22,7 +22,7 @@ import { isPiInfrastructureRead } from "./pi-infrastructure-read";
  * prepared {@link AccessPath} values, instead of reading `process.platform`
  * ambiently or threading `cwd` through every call. Internally it selects the
  * `win32`/`posix` path flavor once and delegates to the platform-parameterized
- * `path-utils` / `AccessPath` primitives.
+ * `path-containment` / `path-normalization` / `AccessPath` primitives.
  */
 export class PathNormalizer {
   private readonly impl: typeof posixPath;

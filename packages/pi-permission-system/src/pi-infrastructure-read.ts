@@ -1,8 +1,8 @@
 import { join } from "node:path";
 
 import { expandHomePath } from "./expand-home";
+import { isPathWithinDirectory } from "./path-containment";
 import { READ_ONLY_PATH_BEARING_TOOLS } from "./path-surfaces";
-import { isPathWithinDirectory } from "./path-utils";
 import { wildcardMatch } from "./wildcard-matcher";
 
 function containsGlobChars(value: string): boolean {

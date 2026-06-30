@@ -2,7 +2,7 @@ import { posix as posixPath, win32 as winPath } from "node:path";
 
 import { canonicalizePath } from "#src/canonicalize-path";
 import { expandHomePath } from "#src/expand-home";
-import { isPathWithinDirectory } from "#src/path-utils";
+import { isPathWithinDirectory } from "#src/path-containment";
 
 /**
  * Representation derivation backing {@link AccessPath}: turn an accessed path
