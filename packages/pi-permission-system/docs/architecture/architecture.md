@@ -672,10 +672,11 @@ src/
 ├── session-approval-recorder.ts `SessionApprovalRecorder` interface - records a granted session-scoped approval into the session ruleset; implemented by `SessionRules` (#323, #341)
 │
 ├── permission-session.ts     `PermissionSession` class - state/lifecycle owner: owns context lifecycle, session-rule lifecycle (`reset`/`shutdown`/`reload`), skill entries, agent-name resolution, the config gateway, the Tell-Don't-Ask gate inputs, and `notify(message)` (Tell-Don't-Ask UI warn over the owned context, no-op before activation — dissolves the `index.ts` forward-reference cycle, #363); `implements ToolCallGateInputs` (the pipeline's input contract); the resolve role moved to `PermissionResolver` (#340), the recorder role to `SessionRules`, and the three fig-leaf handler role interfaces (`GateHandlerSession` / `AgentPrepSession` / `SessionLifecycleSession`) were retired — handlers depend on the concrete class + `PermissionResolver` (#341)
-├── path-normalizer.ts        `PathNormalizer` class - the path-interpretation collaborator constructed once at the session edge with the host `platform` and session `cwd` baked in (#510); hands raw tokens, returns prepared values: `forPath`/`forLiteral` (build `AccessPath`s), `isAbsolute`/`resolveBase`/`joinBase` (platform-aware `cd`-fold routing the `BashPathResolver` asks), `isWithinDirectory`/`isOutsideWorkingDirectory` (containment), `comparableValue` (lexical comparison value for skill-prompt matching, [#511]), `isInfrastructureRead` (Pi infra-read containment over an `AccessPath`, [#511]); selects the `win32`/`posix` flavor once and delegates to the platform-parameterized `path-utils`/`AccessPath` primitives, so no consumer reads `process.platform` or threads `cwd`; a facade over (not a relocation of) those primitives — Phase 7 [#505] can later move them behind it
-├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473); bash sub-domain completed by Phase 6 Step 3 (#475); `AccessPath` value object added by Phase 6 Step 4 (#476); `AccessIntent` union added by Phase 6 Step 6 (#478)
+├── path-normalizer.ts        `PathNormalizer` class - the path-interpretation collaborator constructed once at the session edge with the host `platform` and session `cwd` baked in (#510); hands raw tokens, returns prepared values: `forPath`/`forLiteral` (build `AccessPath`s), `isAbsolute`/`resolveBase`/`joinBase` (platform-aware `cd`-fold routing the `BashPathResolver` asks), `isWithinDirectory`/`isOutsideWorkingDirectory` (containment), `comparableValue` (lexical comparison value for skill-prompt matching, [#511]), `isInfrastructureRead` (Pi infra-read containment over an `AccessPath`, [#511]); selects the `win32`/`posix` flavor once and delegates to the platform-parameterized `path-containment` / `path-normalization` / `pi-infrastructure-read` / `AccessPath` primitives, so no consumer reads `process.platform` or threads `cwd`; a facade over those primitives — [#505] dissolved `path-utils.ts` into those cohesive modules, and `isOutsideWorkingDirectory` now canonicalizes its operands here before the pure containment check
+├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473); bash sub-domain completed by Phase 6 Step 3 (#475); `AccessPath` value object added by Phase 6 Step 4 (#476); `AccessIntent` union added by Phase 6 Step 6 (#478); path representation (`path-normalization.ts`) relocated here by Phase 7 Step 4 (#505)
+│   ├── path-normalization.ts `AccessPath`'s representation backing (relocated from `path-utils.ts`, [#505]): `normalizePathForComparison` (lexical absolute), `canonicalNormalizePathForComparison` (symlink-resolved + win32-lowercased, [#382]), `normalizePathPolicyLiteral` (literal cleanup), `getPathPolicyValues` (lexical ∪ relative match set) + `PathPolicyValueOptions`; pure derivation, injected `platform`, calls `isPathWithinDirectory` (from `path-containment.ts`) downward for the cwd-relative alias
 │   ├── access-intent.ts     `AccessIntent` discriminated union each gate emits: `tool` (raw input the manager normalizes) and `access-path` (an `AccessPath` for every path gate — `path`, `external_directory`, and the per-tool path-bearing surfaces `read`/`write`/`edit`/`grep`/`find`/`ls`, #486, #502); `ResolvedAccessIntent` (`tool | path-values`) is what the manager consumes after the resolver unwraps `access-path` via `matchValues()`, keeping the manager string-based — `path-values` is resolver-internal, not gate-emitted, since #486 (#478, #486)
-│   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form); the surface-neutral `forPath(pathValue, { cwd, resolveBase?, platform })` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison` (resolveBase defaults to cwd; `platform` injected, not read ambiently, #510; serves every path surface, #486), and `forLiteral(literal)` builds a literal-only path with no canonical for the unknown-base bash case ([#393]); type-distinct accessors make the lexical/canonical conflation a compile error (#476)
+│   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form); the surface-neutral `forPath(pathValue, { cwd, resolveBase?, platform })` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison` (all from `path-normalization.ts`, [#505]) (resolveBase defaults to cwd; `platform` injected, not read ambiently, #510; serves every path surface, #486), and `forLiteral(literal)` builds a literal-only path with no canonical for the unknown-base bash case ([#393]); type-distinct accessors make the lexical/canonical conflation a compile error (#476)
 │   └── bash/
 │       ├── parser.ts           Lazy tree-sitter-bash parser: `TSNode` interface (exported), `TSParser` interface (private), `initParser` (private), `getParser = memoizeAsyncWithRetry(initParser)` (exported); dropped from `bash-program.ts` (#473)
 │       ├── node-text.ts        Quote-aware AST node-text resolver: `resolveNodeText` (pure; handles `word`, `raw_string`, `string`, `concatenation`, expansions, default fallback), `SKIP_SUBTREE_TYPES` (heredoc/comment sentinel set), `ARG_NODE_TYPES` (argument-value node-type set; peer of `SKIP_SUBTREE_TYPES`); dropped from `bash-program.ts` (#473, #474)
@@ -729,7 +730,11 @@ src/
 ├── permission-merge.ts        Deep-shallow merge for flat permission configs
 ├── async-cache.ts             `memoizeAsyncWithRetry` - memoizes an async factory but drops a rejected result so the next call retries; used by `access-intent/bash/parser.ts` for resilient tree-sitter parser init (#452)
 ├── canonicalize-path.ts       Best-effort symlink resolution via `realpathSync` — walks up to longest existing ancestor and re-appends non-existent tail; ENOENT/ENOTDIR safe, EACCES/ELOOP fall back to lexical form
-├── path-utils.ts              Path normalization, within-directory (case-insensitive on Windows via `path.relative`), outside-CWD (canonical), safe-system-path, path-bearing-tool, Pi infrastructure read; `canonicalNormalizePathForComparison` for containment decisions only (never pattern matching); `getExternalDirectoryPolicyValues` was removed in [#476] — its logic now lives in `AccessPath.matchValues()`
+├── path-containment.ts        Pure path geometry over already-canonical operands ([#505], dissolved from `path-utils.ts`): `isPathWithinDirectory` (case-insensitive on Windows via `path.relative`; the foundational primitive representation, containment, and infra-read all call) and `isPathOutsideWorkingDirectory` (operands prepared by `PathNormalizer`; no derivation, no filesystem)
+├── safe-system-paths.ts       `SAFE_SYSTEM_PATHS` (OS device files: `/dev/null`, `/dev/std{in,out,err}`) + `isSafeSystemPath` ([#505], dissolved from `path-utils.ts`)
+├── pi-infrastructure-read.ts  `isPiInfrastructureRead` - read-only-tool auto-allow within infra dirs / project-local `.pi/{npm,git}` ([#505], dissolved from `path-utils.ts`); takes an already-canonical path, calls `isPathWithinDirectory` + `wildcardMatch`
+├── tool-input-path.ts         `getToolInputPath` (built-in / MCP / extension path extraction) + `getPathBearingToolPath` (built-in-only) ([#505], dissolved from `path-utils.ts`)
+├── path-surfaces.ts           Static surface/tool lookup sets: `PATH_BEARING_TOOLS`, `READ_ONLY_PATH_BEARING_TOOLS`, `PATH_SURFACES` ([#505], dissolved from `path-utils.ts`)
 ├── node-modules-discovery.ts  Global node_modules resolution (walk-up + npm root -g fallback)
 ├── system-prompt-sanitizer.ts Narrow Available tools section + filter guidelines to the active set (#437)
 ├── skill-prompt-sanitizer.ts  Skill prompt filtering by policy
@@ -774,18 +779,18 @@ This is a direction-driven phase: [#487] sets the framing, and the discovery con
 Health score 76 (B); no dead code; duplication 6.6% overall (3.6% in tests); maintainability 91.2.
 The single relevant structural signal is `path-utils.ts` — an accelerating churn hotspot (266 churn over 6 months, 13 fan-in, ▲), the ad-hoc path-derivation grab-bag the [#487] vision exists to consolidate.
 
-| Metric                            | Before                                        | Target after Phase 7                                 |
-| --------------------------------- | --------------------------------------------- | ---------------------------------------------------- |
-| `path-utils.ts` fan-in            | 13 (one grab-bag)                             | distributed across cohesive `access-intent/` modules |
-| Lexical-only path normalizers     | 2 (per-tool gate, service/RPC)                | 0 (single `AccessPath` derivation)                   |
-| Symlink-resistant path surfaces   | `path`, `external_directory`, bash            | all path surfaces incl. per-tool and RPC             |
-| Emitted/internal path-value forms | `access-path` emitted, `path-values` internal | `path-values` boundary decided and documented        |
+| Metric                            | Before                                        | Target after Phase 7                                |
+| --------------------------------- | --------------------------------------------- | --------------------------------------------------- |
+| `path-utils.ts` fan-in            | 13 (one grab-bag)                             | ✅ distributed across six cohesive modules ([#505]) |
+| Lexical-only path normalizers     | 2 (per-tool gate, service/RPC)                | 0 (single `AccessPath` derivation)                  |
+| Symlink-resistant path surfaces   | `path`, `external_directory`, bash            | all path surfaces incl. per-tool and RPC            |
+| Emitted/internal path-value forms | `access-path` emitted, `path-values` internal | `path-values` boundary decided and documented       |
 
 The residual ad-hoc path handling (the "re-derive their representations ad hoc" [#487] names):
 
 - Per-tool path-bearing gate: `ToolCallGatePipeline` emits `kind: "tool"` → `normalizeInput` → `normalizePathSurfaceValues` → `getPathPolicyValues` (lexical only) — closed by Steps 1–3 ([#502], [#504]): Step 1 migrated the gate to emit `access-path`; Step 3 removed `normalizePathSurfaceValues` and the path branches from `normalizeInput`.
 - Service/RPC queries: `permissions-service.ts` / `permission-event-rpc.ts` — closed by Step 2 ([#503]): both build an `AccessPath` via `buildAccessIntentForSurface` and route an `access-path` intent through the resolver (was a lexical `tool` intent for `path` / `external_directory`).
-- `path-utils.ts`: the loose `getPathPolicyValues` / `normalizePathForComparison` / `normalizePathPolicyLiteral` derivations that `AccessPath` should own.
+- `path-utils.ts`: the loose `getPathPolicyValues` / `normalizePathForComparison` / `normalizePathPolicyLiteral` derivations that `AccessPath` should own — ✅ closed by Step 4 ([#505]): relocated into `access-intent/path-normalization.ts` and the grab-bag dissolved into focused modules.
 - `path-values`: survives as the manager's deliberate string boundary (the manager stays string-based and never imports `AccessPath`).
 
 ### Steps
@@ -813,8 +818,9 @@ The residual ad-hoc path handling (the "re-derive their representations ad hoc" 
    Outcome: `normalizeInput` handles only bash / skill / mcp / extension surfaces; a single `AccessPath` path-derivation entry remains.
    Release: batch "symlink-resistant-path-matching"
 
-4. **Consolidate path derivation behind `AccessPath`: dissolve the `path-utils.ts` grab-bag.**
-   ([#505]) Target: relocate the lexical/canonical/policy-value derivation (`normalizePathForComparison`, `canonicalNormalizePathForComparison`, `getPathPolicyValues`, `normalizePathPolicyLiteral`, and the two private absolute/relative helpers) into the `access-intent/` domain as `AccessPath`'s backing (e.g. `src/access-intent/path-normalization.ts`); keep containment (`isPathWithinDirectory`, `isPathOutsideWorkingDirectory`), infra-read (`isPiInfrastructureRead`), tool-input extraction (`getToolInputPath`, `getPathBearingToolPath`), safe-system paths, and the surface/tool sets in focused modules.
+4. ✅ **Consolidate path derivation behind `AccessPath`: dissolve the `path-utils.ts` grab-bag.**
+   ([#505]) Relocated the lexical/canonical/policy-value derivation (`normalizePathForComparison`, `canonicalNormalizePathForComparison`, `getPathPolicyValues`, `normalizePathPolicyLiteral`, and the two private absolute/relative helpers) into `src/access-intent/path-normalization.ts` as `AccessPath`'s backing; kept containment (`isPathWithinDirectory`, `isPathOutsideWorkingDirectory`) together in `src/path-containment.ts`, and split infra-read (`pi-infrastructure-read.ts`), tool-input extraction (`tool-input-path.ts`), safe-system paths (`safe-system-paths.ts`), and the surface/tool sets (`path-surfaces.ts`) into focused modules.
+   A "tidy first" prep refactor made `isPathOutsideWorkingDirectory` pure geometry over prepared operands (canonicalization moved up to `PathNormalizer`), which dissolved the apparent representation↔containment cycle so the literal grouping held.
    Smell: Category B / E (god module, accelerating churn hotspot).
    Outcome: `path-utils.ts` dissolved into cohesive modules; path derivation owned by the access-intent domain; non-breaking.
    Release: independent
@@ -834,7 +840,7 @@ flowchart TD
     S1["✅ Step 1 (#502)<br/>Per-tool gate to AccessPath<br/>(breaking)"]
     S2["✅ Step 2 (#503)<br/>Service/RPC to AccessPath<br/>(breaking)"]
     S3["✅ Step 3 (#504)<br/>Retire input-normalizer path normalization"]
-    S4["Step 4 (#505)<br/>Dissolve path-utils grab-bag"]
+    S4["✅ Step 4 (#505)<br/>Dissolve path-utils grab-bag"]
     S5["Step 5 (#506)<br/>Decide path-values boundary"]
 
     S1 --> S3
@@ -871,25 +877,25 @@ flowchart TD
 
 A precursor refactor (not one of the five steps above) threaded a single injected `PathNormalizer` collaborator through the bash path pipeline, completing the half-built platform seam behind the recurring Windows-path bugs ([#382], [#345], [#418], [#508]).
 The host `platform` is read once at the composition root (`index.ts`) and injected: into `PermissionManager` (rule-matching case-fold), into `PermissionSession` (which builds the `PathNormalizer` from `platform` + the session `cwd` and exposes it via `getPathNormalizer()`), and into the subagent-context detection.
-No interior `src/` module reads `process.platform` — an ESLint `no-restricted-syntax` guard scoped to `pi-permission-system/src` (exempting `index.ts`) enforces this, so every path-utils / canonicalize / rule / subagent-context leaf takes an injected `platform` rather than a `= process.platform` default.
-`PathNormalizer` is a facade *over* the platform-parameterized `path-utils` / `AccessPath` primitives, not a relocation: Phase 7 Step 4 ([#505]) can later move those internals behind it without re-touching the seam.
+No interior `src/` module reads `process.platform` — an ESLint `no-restricted-syntax` guard scoped to `pi-permission-system/src` (exempting `index.ts`) enforces this, so every `path-containment` / `path-normalization` / canonicalize / rule / subagent-context leaf takes an injected `platform` rather than a `= process.platform` default.
+`PathNormalizer` is a facade *over* the platform-parameterized `path-containment` / `path-normalization` / `AccessPath` primitives: Phase 7 Step 4 ([#505]) dissolved `path-utils.ts` into those cohesive modules (the seam was untouched — the facade kept the same leaf calls under new module names).
 The change is behavior-preserving on POSIX (every converted op already used the host `node:path`); the `win32` flavor is newly exercised by injected-platform unit tests, and [#508] then lands the drive-letter routing fix on the seam.
 
 #### Residual `getPlatform()` threading (follow-up [#511])
 
-The seam left five call sites threading `platform` *directly* rather than through `PathNormalizer`, because they call raw `path-utils` functions that are not `AccessPath` operations.
-`PermissionSession.getPlatform()` (and the `ToolCallGateInputs.getPlatform()` it backed) existed only to feed them; it has been retired now that every consumer is folded, while the leaf `platform` parameters in `path-utils.ts` persist.
+The seam left five call sites threading `platform` *directly* rather than through `PathNormalizer`, because they call raw path-leaf functions that are not `AccessPath` operations.
+`PermissionSession.getPlatform()` (and the `ToolCallGateInputs.getPlatform()` it backed) existed only to feed them; it has been retired now that every consumer is folded, while the leaf `platform` parameters in the relocated path modules (`path-containment.ts`, `path-normalization.ts`, `pi-infrastructure-read.ts`) persist.
 How each relates to the Phase 7 steps above:
 
 - **Per-tool gate suggestion value** (`handlers/gates/tool.ts` `deriveSuggestionValue` → `normalizePathForComparison`) — ✅ retired by **Step 1 ([#502])**: `deriveSuggestionValue` now derives the session-approval value from `accessPath.value()`, dropping the `platform` thread into `describeToolGate`.
 - **`input-normalizer` path-policy values** (`normalizePathSurfaceValues` → `getPathPolicyValues`) — ✅ retired by **Steps 2–3 ([#503], [#504])**: Step 2 migrated the service/RPC path queries onto `AccessPath`; Step 3 removed the path-bearing/special-surface branches from `normalizeInput` entirely (#504).
 - **Infra-read containment** (`handlers/gates/external-directory.ts`) — ✅ routed through `PathNormalizer.isInfrastructureRead` ([#511]): the gate already holds the normalizer, which now answers the containment question over the already-built `AccessPath`.
-  Step 4 ([#505]) still keeps `isPiInfrastructureRead` (and `isPathWithinDirectory` / `isPathOutsideWorkingDirectory`) as platform-taking leaf predicates that the normalizer delegates to.
+  Step 4 ([#505]) still keeps `isPiInfrastructureRead` (`pi-infrastructure-read.ts`) and `isPathWithinDirectory` / `isPathOutsideWorkingDirectory` (`path-containment.ts`) as platform-taking leaf predicates that the normalizer delegates to.
 - **Skill-prompt sanitization** (`skill-prompt-sanitizer.ts` `createResolvedSkillEntry` / `findSkillPathMatch`; reached from `before-agent-start.ts` and `handlers/gates/skill-read.ts`) — ✅ routed through `PathNormalizer.comparableValue` / `isWithinDirectory` ([#511]).
   Skill entries still cache `normalizedLocation` / `normalizedBaseDir` as lexical strings (matching stays lexical, no new filesystem access), but they are now computed by the normalizer rather than by direct `normalizePathForComparison` calls.
 
 ✅ `getPlatform()` has been removed: with both [#511] and Step 1 ([#502]) landed, `ToolCallGatePipeline.evaluate` no longer reads it, so `PermissionSession.getPlatform()` and `ToolCallGateInputs.getPlatform()` were dropped ([#513] resolved).
-The leaf `platform` parameters in `path-utils.ts` persist (the containment / infra-read predicates still take it).
+The leaf `platform` parameters in `path-containment.ts` / `pi-infrastructure-read.ts` persist (the containment / infra-read predicates still take it).
 
 ## Improvement roadmap — Phase 6: Access-intent extraction (complete)
 
