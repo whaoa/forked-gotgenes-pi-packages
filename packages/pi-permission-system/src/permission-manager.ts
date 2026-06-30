@@ -249,6 +249,12 @@ export class PermissionManager implements ScopedPermissionManager {
    * extension surfaces). Path-bearing surfaces arrive as `"path-values"` via
    * the access-path gate (#502) or service/RPC builder (#503).
    * `"path-values"` → evaluates the precomputed values directly.
+   *
+   * The manager stays string-based by design: it consumes `ResolvedAccessIntent`
+   * (`tool | path-values`) and never imports `AccessPath`. This deliberate
+   * boundary is formalized in ADR-0002
+   * (`docs/decisions/0002-path-values-string-boundary.md`) and guarded by a
+   * `no-restricted-imports` lint rule on this file.
    */
   check(
     intent: ResolvedAccessIntent,

@@ -26,6 +26,11 @@ export interface ScopedPermissionResolver {
  *
  * Tell-Don't-Ask: the resolver asks an `AccessPath` for its `matchValues()`,
  * so the low-level manager never imports the value object.
+ *
+ * This is the sole `matchValues()` unwrap site — the single place the lexical ∪
+ * canonical alias set (#418) is derived. Keeping it here (not in the manager)
+ * is the deliberate boundary formalized in ADR-0002
+ * (`docs/decisions/0002-path-values-string-boundary.md`).
  */
 function toResolvedIntent(intent: AccessIntent): ResolvedAccessIntent {
   if (intent.kind === "access-path") {

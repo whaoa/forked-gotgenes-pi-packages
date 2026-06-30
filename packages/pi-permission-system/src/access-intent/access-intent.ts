@@ -20,6 +20,10 @@ export interface ToolAccessIntent {
  * Not gate-emitted: the resolver produces it internally by unwrapping an
  * `access-path` intent via `matchValues()`, keeping the low-level manager
  * string-based (it never imports `AccessPath`). See {@link ResolvedAccessIntent}.
+ *
+ * This string seam is a deliberate, formalized boundary — not transitional
+ * scaffolding to collapse into the manager (ADR-0002,
+ * `docs/decisions/0002-path-values-string-boundary.md`).
  */
 export interface PathValuesAccessIntent {
   kind: "path-values";
@@ -53,6 +57,9 @@ export type AccessIntent = ToolAccessIntent | AccessPathAccessIntent;
  * What the manager consumes — the `access-path` variant has already been
  * unwrapped to `path-values` by the resolver via `path.matchValues()`.
  *
- * The manager stays string-based and never imports `AccessPath`.
+ * The manager stays string-based and never imports `AccessPath`: this is the
+ * deliberate boundary formalized in ADR-0002
+ * (`docs/decisions/0002-path-values-string-boundary.md`), guarded by a
+ * `no-restricted-imports` lint rule on `permission-manager.ts`.
  */
 export type ResolvedAccessIntent = ToolAccessIntent | PathValuesAccessIntent;

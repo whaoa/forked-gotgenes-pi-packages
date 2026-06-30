@@ -180,4 +180,32 @@ export default tseslint.config(
       ],
     },
   },
+
+  // ---------------------------------------------------------------------------
+  // pi-permission-system: keep permission-manager string-based (ADR-0002).
+  // The manager consumes ResolvedAccessIntent (path-values) and must not import
+  // AccessPath — the resolver is the sole matchValues() unwrap site. Collapsing
+  // that boundary requires an explicit, reviewed exception, not an unremarked
+  // import. See docs/decisions/0002-path-values-string-boundary.md.
+  // ---------------------------------------------------------------------------
+  {
+    files: ["packages/pi-permission-system/src/permission-manager.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/access-intent/access-path",
+                "#src/access-intent/access-path",
+              ],
+              message:
+                "permission-manager stays string-based: it consumes ResolvedAccessIntent (path-values) and must not import AccessPath. See docs/decisions/0002-path-values-string-boundary.md.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
