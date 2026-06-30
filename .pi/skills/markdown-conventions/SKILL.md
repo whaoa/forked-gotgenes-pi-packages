@@ -48,6 +48,8 @@ Rules below are named by their markdownlint `MDxxx` IDs because `rumdl` implemen
   Write `[#N]` as plain text, including inside other formatting (`**[#N] label:**`).
   Do not add a definition for the doc's own issue number — it lives in frontmatter, not as a body link.
   Link reference definitions are file-scoped: when appending a stage entry to a retro that already defines `[#N]:`, reference it without re-adding the definition — a duplicate trips MD053.
+- ADR numbering is per-package, but `[ADR-NNNN]` reference-link definitions are file-scoped and may already point to another package's ADR (e.g. pi-subagents' `[ADR-0002]`).
+  When citing this package's own ADR in such a doc, reference it by path (`docs/decisions/NNNN-<slug>.md`), not a bare `ADR-NNNN` token (Refs #506).
 
 ## Documentation frontmatter
 

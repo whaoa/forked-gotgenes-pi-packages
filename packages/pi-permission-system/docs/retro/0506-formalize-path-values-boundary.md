@@ -44,3 +44,54 @@ Four commits total (three plan steps + one reviewer-WARN fixup); non-breaking, r
 - Lesson for future package ADRs: the `NNNN` numbering is per-package, but reference-link tokens like `[ADR-0002]` are file-scoped and already taken by cross-package citations — refer to a local ADR by path, not a bare `ADR-NNNN` token, in any doc that also cites another package's ADR.
 - Phase 7 is now fully closed (Steps 1–5 all ✅); the heading carries `(complete)` matching Phase 6's convention.
   Did not archive the Phase 7 detail to a `history/` file (Phase 6 was condensed when complete) — that was out of this plan's scope; flag as a possible follow-up tidy if the roadmap section grows unwieldy.
+
+## Stage: Final Retrospective (2026-06-30T16:00:00Z)
+
+### Session summary
+
+One continuous session carried #506 through plan → build → ship → retro: a decide-and-document issue (Phase 7 Step 5) that formalized the resolver-internal `path-values` string boundary via ADR-0002, tightened JSDoc, and added a `no-restricted-imports` lint guard.
+Shipped cleanly as `pi-permission-system-v18.0.1` (patch), closing #506 and the stacked #505, and completing Phase 7.
+Execution was notably clean — no rework loops, no instruction violations, two reviewer WARNs both resolved in one follow-up commit.
+
+### Observations
+
+#### What went well
+
+- **Guard-fires-before-trust verification.**
+  The whole point of the `no-restricted-imports` guard is to catch a future erosion of the string boundary, so before committing it the build stage temporarily added an `AccessPath` import to `permission-manager.ts`, confirmed `eslint` flagged it, then reverted.
+  A false-green guard is worse than none; actively proving it fires is the correct validation for any "guard against future regression" mechanism.
+- **Code-tour-before-deciding.**
+  For the genuine formalize-vs-collapse design choice, the operator asked for a walkthrough document first; the scratch tour (`docs/0506-path-values-boundary-tour.md`) traced the gate → resolver → manager flow, read "what the system wants," then folded verbatim into the ADR's Context/Alternatives and was deleted.
+  The scratch-doc-that-becomes-the-ADR pattern kept the rationale durable without leaving a second artifact.
+- **Incremental verification with no gaps.**
+  Baseline `check`/`lint` before any edit, `lint` after each build step, then full `test` (2194) + `tsc` + `fallow dead-code` at the end — verification was continuous, not end-loaded.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the plan's Module-Level Changes grepped for `path-values` references but did not anticipate two doc-hygiene items the pre-completion reviewer caught: the two Steps 1–3 metric rows still lacking ✅ at phase close, and the `[ADR-0002]` reference-link collision with pi-subagents' ADR.
+  Impact: one follow-up commit (`cef7cccf`); no rework, both fixed cleanly.
+  Reviewer-caught, not self-identified.
+- `missing-context` — used an invalid `gh pr view --json mergeStateEstimate` field during the ship stage (the field does not exist on the PR view schema).
+  Impact: one wasted tool call, self-corrected on the next call with the valid `mergeStateStatus`.
+  No rework.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's one substantive intervention — requesting a code tour before the formalize-vs-collapse decision — was strategic and improved the outcome (it became the ADR's spine).
+
+### Diagnostic details
+
+- **Model-performance correlation** — the planning and build stages (judgment-heavy: the formalize-vs-collapse decision, the code tour, the design review) ran on `claude-opus-4-8` / `claude-sonnet-4-6`; the pre-completion-reviewer subagent ran on its configured `claude-sonnet-4-6` (appropriate for review).
+  The **entire `/ship-issue` stage ran on `opencode-go/deepseek-v4-flash`** (an operator model switch).
+  Ship is scripted but not purely mechanical — it carries the step-4b exclude-paths release analysis and the step-6.4 `UNSTABLE`-no-checks vs `IN_PROGRESS`-check distinction.
+  The weak model executed both correctly (waited 6 poll cycles for the `IN_PROGRESS` check rather than falling back to `gh pr merge` prematurely, then merged via `release_pr_merge`), which suggests the ship prompt's determinism carried the reasoning.
+  Flag, not alarm: a reasoning-weak model on the ship stage is a latent risk if the prompt's branch logic is ever less explicit than it is today.
+- **Escalation-delay tracking** — no rabbit-holes; longest repeated-call sequence was the legitimate 6-cycle CI-check poll (waiting, not error-chasing).
+  The `mergeStateEstimate` field error self-corrected in one retry.
+- **Feedback-loop gap analysis** — no gap; verification was incremental (baseline → per-step lint → full suite + tsc + fallow at close), plus the active guard-fires check.
+
+### Changes made
+
+1. `.pi/skills/markdown-conventions/SKILL.md` — added a rule (after the file-scoped reference-definition bullet) that per-package ADR numbering collides with cross-package `[ADR-NNNN]` reference-link definitions; cite a local ADR by path, not a bare `ADR-NNNN` token (Refs #506).
+2. `packages/pi-permission-system/docs/retro/0506-formalize-path-values-boundary.md` — this Final Retrospective stage entry.
