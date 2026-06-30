@@ -16,7 +16,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { discoverGlobalNodeModulesRoot } from "#src/node-modules-discovery";
-import { isPiInfrastructureRead } from "#src/path-utils";
+import { isPiInfrastructureRead } from "#src/pi-infrastructure-read";
 
 // ── discoverGlobalNodeModulesRoot ──────────────────────────────────────────
 
@@ -386,6 +386,46 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         ["/opt/homebrew/**/@earendil-works/pi-coding-agent/**"],
         CWD,
         "linux",
+      ),
+    ).toBe(false);
+  });
+});
+
+// ── isPiInfrastructureRead — win32 case-insensitive matching ───────────────
+
+describe("isPiInfrastructureRead on win32", () => {
+  test("plain infra dir matches a case-different path", () => {
+    expect(
+      isPiInfrastructureRead(
+        "read",
+        "c:\\users\\foo\\.pi\\agent\\config.json",
+        ["C:\\Users\\Foo\\.pi\\agent"],
+        "C:\\proj",
+        "win32",
+      ),
+    ).toBe(true);
+  });
+
+  test("glob infra dir matches case-insensitively", () => {
+    expect(
+      isPiInfrastructureRead(
+        "read",
+        "c:\\users\\foo\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\skill.md",
+        ["C:\\Users\\Foo\\**\\pi-coding-agent\\**"],
+        "C:\\proj",
+        "win32",
+      ),
+    ).toBe(true);
+  });
+
+  test("rejects a path outside every infra dir", () => {
+    expect(
+      isPiInfrastructureRead(
+        "read",
+        "c:\\windows\\system32\\drivers\\etc\\hosts",
+        ["C:\\Users\\Foo\\.pi\\agent"],
+        "C:\\proj",
+        "win32",
       ),
     ).toBe(false);
   });

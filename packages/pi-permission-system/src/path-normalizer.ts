@@ -5,9 +5,9 @@ import {
   canonicalNormalizePathForComparison,
   isPathOutsideWorkingDirectory,
   isPathWithinDirectory,
-  isPiInfrastructureRead,
   normalizePathForComparison,
 } from "./path-utils";
+import { isPiInfrastructureRead } from "./pi-infrastructure-read";
 
 /**
  * Path-interpretation collaborator, constructed once at the session edge with
