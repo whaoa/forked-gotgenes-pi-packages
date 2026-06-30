@@ -26,3 +26,21 @@ The plan is docs + JSDoc + one ESLint `no-restricted-imports` guard; non-breakin
   Historical `docs/plans/05xx` and `docs/retro/05xx` that mention `path-values` are point-in-time records — left untouched.
 - The scratch tour file is deliberately uncommitted; the plan's Step 1 deletes it once the ADR supersedes its rationale.
 - Release marker: `**Release:** ship independently` — `docs:` commit auto-batches; the Release Recommendation explicitly avoids claiming it cuts a release on its own (Refs #479).
+
+## Stage: Implementation — Build (2026-06-30T14:00:00Z)
+
+### Session summary
+
+Executed all three plan steps as docs/config changes: wrote ADR `decisions/0002` (formalize decision + rejected collapse alternative), tightened the JSDoc on `access-intent.ts` / `permission-resolver.ts` / `permission-manager.ts`, added the `no-restricted-imports` ESLint guard on `permission-manager.ts`, and marked Phase 7 Step 5 complete in `architecture.md` (heading, S5 Mermaid node, metric row, residual bullet) plus a `SKILL.md` pointer.
+Four commits total (three plan steps + one reviewer-WARN fixup); non-breaking, runtime untouched, 2194 tests green.
+
+### Observations
+
+- Verified the ESLint guard actually fires before trusting it: temporarily added an `AccessPath` import to `permission-manager.ts`, confirmed `eslint` flagged `no-restricted-imports`, then reverted — avoids a false-green guard, which was the whole point of the durability mechanism.
+- The scratch tour file was never committed in planning, so "delete" was just an `rm` of an untracked file (no `git rm`).
+- Pre-completion reviewer returned **WARN** (no blocking failures), two findings, both addressed in commit `cef7cccf`:
+  - WARN 1: the two metric rows for Steps 1–3 achievements (`Lexical-only path normalizers`, `Symlink-resistant path surfaces`) had never been marked ✅ by the issues that shipped those steps; with Phase 7 now closed there is no later issue to add them, so I added the ✅ marks now.
+  - WARN 2: both `SKILL.md` and `architecture.md` already define `[ADR-0002]` as a reference link to **pi-subagents'** ADR (cross-package context), so this package's plain-text "ADR-0002" collided nominally; disambiguated by referencing the local ADR by its path (`docs/decisions/0002-path-values-string-boundary.md`) instead of the bare token.
+- Lesson for future package ADRs: the `NNNN` numbering is per-package, but reference-link tokens like `[ADR-0002]` are file-scoped and already taken by cross-package citations — refer to a local ADR by path, not a bare `ADR-NNNN` token, in any doc that also cites another package's ADR.
+- Phase 7 is now fully closed (Steps 1–5 all ✅); the heading carries `(complete)` matching Phase 6's convention.
+  Did not archive the Phase 7 detail to a `history/` file (Phase 6 was condensed when complete) — that was out of this plan's scope; flag as a possible follow-up tidy if the roadmap section grows unwieldy.
