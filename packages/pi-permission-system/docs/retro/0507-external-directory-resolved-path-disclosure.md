@@ -23,3 +23,24 @@ Filed as `packages/pi-permission-system/docs/plans/0507-external-directory-resol
   Kept all commits `fix:` (including the internal `resolvedAlias()` enabler) so the issue ships as one patch, not a minor bump.
 - Type coupling drove the cycle boundaries: changing `DenialContext.bash_external_directory.externalPaths` to `ExternalPathDisclosure[]` breaks its sole producer + consumer + inline test constructions together, so the bash prompt/denial/gate/tests land in one commit.
 - Not a roadmap step (Phase 7 complete); surfaced while investigating #493 (closed — the bypass concern was already handled by dual-match).
+
+## Stage: Implementation — TDD (2026-06-30T20:36:00Z)
+
+### Session summary
+
+Implemented all four TDD cycles from the plan: added `AccessPath.resolvedAlias()`, threaded it through the tool `external_directory` gate and all three denial-message bodies, then through the bash `external_directory` gate and its bash-list rendering, and updated `architecture.md`.
+Test count went from 2194 to 2207 (+13) in `pi-permission-system`; full monorepo suite, `pnpm run check`, `pnpm run lint`, and `pnpm fallow dead-code` all green.
+Pre-completion reviewer returned **PASS**.
+
+### Observations
+
+- Caught and corrected a self-inflicted step-boundary coupling during implementation: my first edit to `external-directory-messages.ts` changed both `formatExternalDirectoryAskPrompt` (Step 2, tool) and `formatBashExternalDirectoryAskPrompt` (Step 3, bash) in one block, since they're colocated in the same file.
+  Reverted the bash function's signature change and its downstream `DenialContext.bash_external_directory` / test literal changes back to `string[]` before committing Step 2, then reapplied them cleanly in Step 3 — keeping each commit's diff scoped to its own TDD cycle per the plan's step boundaries.
+- `MD053` (`rumdl`) flagged `[#507]` as an unused link reference after adding the `[#507]:` definition per the plan: the two `architecture.md` mentions are inside a fenced ` ```text ` code block (the module-layout tree listing, opened at line 648), where reference-style links don't count toward MD053 usage.
+  Matched the file's existing convention for issues cited only within that fence (bare `#476`/`#477`/`#486`-style, no brackets) instead of adding a body-prose usage just to satisfy the linter — dropped the `[#507]:` definition.
+  Deviation flagged by the pre-completion reviewer as cosmetic/non-blocking (PASS).
+- The `bash-external-directory.ts` gate correctly keeps two parallel path lists: `uncoveredPaths` (string values) for `deriveApprovalPattern` / `logContext.externalPaths` (unchanged, invariant-critical), and a new `disclosures` array (`{ path, resolvedPath }`) for the prompt/denial text only — confirmed by the reviewer as the correct separation.
+- Reviewer noted one test-location deviation from the plan: the bash prompt's disclosure test landed in `test/bash-external-directory.test.ts` (alongside the existing `formatBashExternalDirectoryAskPrompt` describe block) rather than in `test/handlers/gates/external-directory-messages.test.ts`; coverage is complete either way, treated as non-blocking.
+- An unrelated commit (`chore: upgrade to Sonnet 5`) landed on `main` from outside this session immediately after the docs commit — noted for the record, not part of this issue's changeset.
+- Pre-completion reviewer: **PASS**.
+  All deterministic checks green; cross-step invariants (#418/#486 dual-match protection, boundary/approval/log values) confirmed untouched — only message text changed.
