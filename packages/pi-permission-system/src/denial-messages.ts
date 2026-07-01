@@ -46,7 +46,7 @@ export type DenialContext =
   | {
       kind: "bash_external_directory";
       command: string;
-      externalPaths: string[];
+      externalPaths: ExternalPathDisclosure[];
       cwd: string;
       agentName?: string;
     }
@@ -107,7 +107,7 @@ function buildDenyBody(ctx: DenialContext): string {
     case "external_directory":
       return `${subject(ctx.agentName)} is not permitted to run tool '${ctx.toolName}' for path '${ctx.pathValue}'${resolvesToSuffix(ctx.resolvedPath)} outside working directory '${ctx.cwd}'.`;
     case "bash_external_directory":
-      return `${subject(ctx.agentName)} is not permitted to run bash command '${ctx.command}' which references path(s) outside working directory '${ctx.cwd}': ${ctx.externalPaths.join(", ")}.`;
+      return `${subject(ctx.agentName)} is not permitted to run bash command '${ctx.command}' which references path(s) outside working directory '${ctx.cwd}': ${formatExternalPathList(ctx.externalPaths)}.`;
     case "bash_path":
       return `${subject(ctx.agentName)} is not permitted to access path '${ctx.pathValue}' via tool 'bash'.`;
     case "skill_read":
@@ -245,4 +245,11 @@ function buildUserDeniedBody(
 
 function isMcpCheck(check: PermissionCheckResult): boolean {
   return (check.source === "mcp" || check.toolName === "mcp") && !!check.target;
+}
+
+/** Render an external-path disclosure list for the bash deny body's path clause. */
+function formatExternalPathList(paths: ExternalPathDisclosure[]): string {
+  return paths
+    .map(({ path, resolvedPath }) => `${path}${resolvesToSuffix(resolvedPath)}`)
+    .join(", ");
 }

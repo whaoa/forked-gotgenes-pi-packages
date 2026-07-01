@@ -924,7 +924,7 @@ describe("formatBashExternalDirectoryAskPrompt", () => {
   test("includes command, external paths, and CWD", () => {
     const result = formatBashExternalDirectoryAskPrompt(
       "cat /etc/hosts",
-      ["/etc/hosts"],
+      [{ path: "/etc/hosts" }],
       "/projects/my-app",
     );
     expect(result).toContain("cat /etc/hosts");
@@ -935,7 +935,7 @@ describe("formatBashExternalDirectoryAskPrompt", () => {
   test("includes agent name when provided", () => {
     const result = formatBashExternalDirectoryAskPrompt(
       "cat /etc/hosts",
-      ["/etc/hosts"],
+      [{ path: "/etc/hosts" }],
       "/projects/my-app",
       "my-agent",
     );
@@ -945,11 +945,25 @@ describe("formatBashExternalDirectoryAskPrompt", () => {
   test("shows multiple external paths", () => {
     const result = formatBashExternalDirectoryAskPrompt(
       "diff /etc/hosts /var/log/syslog",
-      ["/etc/hosts", "/var/log/syslog"],
+      [{ path: "/etc/hosts" }, { path: "/var/log/syslog" }],
       "/projects/my-app",
     );
     expect(result).toContain("/etc/hosts");
     expect(result).toContain("/var/log/syslog");
+  });
+
+  test("discloses the resolved target per path when it differs", () => {
+    const result = formatBashExternalDirectoryAskPrompt(
+      "cat demo-symlink-passwd /etc/hosts",
+      [
+        { path: "demo-symlink-passwd", resolvedPath: "/etc/passwd" },
+        { path: "/etc/hosts" },
+      ],
+      "/projects/my-app",
+    );
+    expect(result).toBe(
+      "Current agent requested bash command 'cat demo-symlink-passwd /etc/hosts' which references path(s) outside working directory '/projects/my-app': demo-symlink-passwd (resolves to '/etc/passwd'), /etc/hosts. Allow this external directory access?",
+    );
   });
 });
 
@@ -996,7 +1010,7 @@ describe("bash external-directory denial messages (centralized)", () => {
     const result = formatDenyReason({
       kind: "bash_external_directory",
       command: "cat /etc/hosts",
-      externalPaths: ["/etc/hosts"],
+      externalPaths: [{ path: "/etc/hosts" }],
       cwd: "/projects/my-app",
     });
     expect(result).toContain("cat /etc/hosts");

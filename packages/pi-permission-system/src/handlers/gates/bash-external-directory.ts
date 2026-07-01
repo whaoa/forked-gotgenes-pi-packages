@@ -67,9 +67,14 @@ export function describeBashExternalDirectoryGate(
   // config-level "deny" is preserved (not downgraded to the catch-all "ask").
   const preCheck = worstCheck ?? uncoveredEntries[0].check;
 
+  const disclosures = uncoveredEntries.map(({ path }) => ({
+    path: path.value(),
+    resolvedPath: path.resolvedAlias(),
+  }));
+
   const bashExtMessage = formatBashExternalDirectoryAskPrompt(
     command,
-    uncoveredPaths,
+    disclosures,
     tcc.cwd,
     tcc.agentName ?? undefined,
   );
@@ -82,7 +87,7 @@ export function describeBashExternalDirectoryGate(
     denialContext: {
       kind: "bash_external_directory",
       command,
-      externalPaths: uncoveredPaths,
+      externalPaths: disclosures,
       cwd: tcc.cwd,
       agentName: tcc.agentName ?? undefined,
     },

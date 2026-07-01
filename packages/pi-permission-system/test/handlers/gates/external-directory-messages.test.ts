@@ -64,7 +64,7 @@ describe("formatBashExternalDirectoryAskPrompt", () => {
   test("includes command, paths, cwd, and agent name", () => {
     const result = formatBashExternalDirectoryAskPrompt(
       "cat /etc/passwd",
-      ["/etc/passwd"],
+      [{ path: "/etc/passwd" }],
       "/projects/my-app",
       "my-agent",
     );
@@ -77,7 +77,7 @@ describe("formatBashExternalDirectoryAskPrompt", () => {
   test("uses 'Current agent' when no agent name provided", () => {
     const result = formatBashExternalDirectoryAskPrompt(
       "ls /tmp",
-      ["/tmp"],
+      [{ path: "/tmp" }],
       "/projects/my-app",
     );
     expect(result).toContain("Current agent");

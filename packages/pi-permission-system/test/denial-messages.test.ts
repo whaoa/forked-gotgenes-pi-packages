@@ -264,7 +264,7 @@ describe("formatDenyReason", () => {
         formatDenyReason({
           kind: "bash_external_directory",
           command: "cat /etc/hosts",
-          externalPaths: ["/etc/hosts"],
+          externalPaths: [{ path: "/etc/hosts" }],
           cwd: "/project",
         }),
       ).toBe(
@@ -277,12 +277,28 @@ describe("formatDenyReason", () => {
         formatDenyReason({
           kind: "bash_external_directory",
           command: "cp /etc/hosts /tmp/out",
-          externalPaths: ["/etc/hosts", "/tmp/out"],
+          externalPaths: [{ path: "/etc/hosts" }, { path: "/tmp/out" }],
           cwd: "/project",
           agentName: "my-agent",
         }),
       ).toBe(
         "[pi-permission-system] Agent 'my-agent' is not permitted to run bash command 'cp /etc/hosts /tmp/out' which references path(s) outside working directory '/project': /etc/hosts, /tmp/out.",
+      );
+    });
+
+    test("discloses resolved targets per path when they differ", () => {
+      expect(
+        formatDenyReason({
+          kind: "bash_external_directory",
+          command: "cat demo-symlink-passwd /etc/hosts",
+          externalPaths: [
+            { path: "demo-symlink-passwd", resolvedPath: "/etc/passwd" },
+            { path: "/etc/hosts" },
+          ],
+          cwd: "/project",
+        }),
+      ).toBe(
+        "[pi-permission-system] Current agent is not permitted to run bash command 'cat demo-symlink-passwd /etc/hosts' which references path(s) outside working directory '/project': demo-symlink-passwd (resolves to '/etc/passwd'), /etc/hosts.",
       );
     });
   });
@@ -436,7 +452,7 @@ describe("formatUnavailableReason", () => {
       formatUnavailableReason({
         kind: "bash_external_directory",
         command: "cat /etc/hosts",
-        externalPaths: ["/etc/hosts"],
+        externalPaths: [{ path: "/etc/hosts" }],
         cwd: "/project",
       }),
     ).toBe(
@@ -589,7 +605,7 @@ describe("formatUserDeniedReason", () => {
         formatUserDeniedReason({
           kind: "bash_external_directory",
           command: "rm /etc/hosts",
-          externalPaths: ["/etc/hosts"],
+          externalPaths: [{ path: "/etc/hosts" }],
           cwd: "/project",
         }),
       ).toBe(
@@ -603,7 +619,7 @@ describe("formatUserDeniedReason", () => {
           {
             kind: "bash_external_directory",
             command: "rm /etc/hosts",
-            externalPaths: ["/etc/hosts"],
+            externalPaths: [{ path: "/etc/hosts" }],
             cwd: "/project",
           },
           "dangerous",
