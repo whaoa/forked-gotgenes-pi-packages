@@ -242,6 +242,20 @@ describe("formatDenyReason", () => {
         "[pi-permission-system] Agent 'sec-agent' is not permitted to run tool 'read' for path '/etc/passwd' outside working directory '/project'.",
       );
     });
+
+    test("discloses the resolved path when it differs from the typed path", () => {
+      expect(
+        formatDenyReason({
+          kind: "external_directory",
+          toolName: "read",
+          pathValue: "demo-symlink-passwd",
+          resolvedPath: "/etc/passwd",
+          cwd: "/project",
+        }),
+      ).toBe(
+        "[pi-permission-system] Current agent is not permitted to run tool 'read' for path 'demo-symlink-passwd' (resolves to '/etc/passwd') outside working directory '/project'.",
+      );
+    });
   });
 
   describe("bash_external_directory context", () => {
@@ -403,6 +417,20 @@ describe("formatUnavailableReason", () => {
     );
   });
 
+  test("external_directory discloses the resolved path when it differs from the typed path", () => {
+    expect(
+      formatUnavailableReason({
+        kind: "external_directory",
+        toolName: "read",
+        pathValue: "demo-symlink-passwd",
+        resolvedPath: "/etc/passwd",
+        cwd: "/project",
+      }),
+    ).toBe(
+      "[pi-permission-system] Accessing 'demo-symlink-passwd' (resolves to '/etc/passwd') outside the working directory requires approval, but no interactive UI is available.",
+    );
+  });
+
   test("bash_external_directory", () => {
     expect(
       formatUnavailableReason({
@@ -537,6 +565,20 @@ describe("formatUserDeniedReason", () => {
         ),
       ).toBe(
         "[pi-permission-system] User denied external directory access for tool 'edit' path '/etc/hosts'. Reason: too risky.",
+      );
+    });
+
+    test("discloses the resolved path when it differs from the typed path", () => {
+      expect(
+        formatUserDeniedReason({
+          kind: "external_directory",
+          toolName: "edit",
+          pathValue: "demo-symlink-hosts",
+          resolvedPath: "/etc/hosts",
+          cwd: "/project",
+        }),
+      ).toBe(
+        "[pi-permission-system] User denied external directory access for tool 'edit' path 'demo-symlink-hosts' (resolves to '/etc/hosts').",
       );
     });
   });

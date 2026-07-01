@@ -67,9 +67,11 @@ export function describeExternalDirectoryGate(
   }
 
   // ── Build descriptor for permission check ───────────────────────────────
+  const resolvedAlias = accessPath.resolvedAlias();
   const extDirMessage = formatExternalDirectoryAskPrompt(
     tcc.toolName,
     externalDirectoryPath,
+    resolvedAlias,
     tcc.cwd,
     tcc.agentName ?? undefined,
   );
@@ -90,6 +92,7 @@ export function describeExternalDirectoryGate(
       kind: "external_directory",
       toolName: tcc.toolName,
       pathValue: externalDirectoryPath,
+      resolvedPath: resolvedAlias,
       cwd: tcc.cwd,
       agentName: tcc.agentName ?? undefined,
     },

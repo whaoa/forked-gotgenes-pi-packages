@@ -1,11 +1,14 @@
+import { resolvesToSuffix } from "#src/denial-messages";
+
 export function formatExternalDirectoryAskPrompt(
   toolName: string,
   pathValue: string,
+  resolvedPath: string | undefined,
   cwd: string,
   agentName?: string,
 ): string {
   const subject = agentName ? `Agent '${agentName}'` : "Current agent";
-  return `${subject} requested tool '${toolName}' for path '${pathValue}' outside working directory '${cwd}'. Allow this external directory access?`;
+  return `${subject} requested tool '${toolName}' for path '${pathValue}'${resolvesToSuffix(resolvedPath)} outside working directory '${cwd}'. Allow this external directory access?`;
 }
 
 export function formatBashExternalDirectoryAskPrompt(

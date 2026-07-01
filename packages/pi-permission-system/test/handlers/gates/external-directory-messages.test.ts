@@ -15,6 +15,7 @@ describe("formatExternalDirectoryAskPrompt", () => {
     const result = formatExternalDirectoryAskPrompt(
       "read",
       "/etc/passwd",
+      undefined,
       "/projects/my-app",
     );
     expect(result).toContain("Current agent");
@@ -27,12 +28,35 @@ describe("formatExternalDirectoryAskPrompt", () => {
     const result = formatExternalDirectoryAskPrompt(
       "write",
       "/tmp/out.txt",
+      undefined,
       "/projects/my-app",
       "my-agent",
     );
     expect(result).toContain("Agent 'my-agent'");
     expect(result).toContain("write");
     expect(result).toContain("/tmp/out.txt");
+  });
+
+  test("discloses the resolved path when it differs from the typed path", () => {
+    const result = formatExternalDirectoryAskPrompt(
+      "read",
+      "demo-symlink-passwd",
+      "/etc/passwd",
+      "/projects/my-app",
+    );
+    expect(result).toBe(
+      "Current agent requested tool 'read' for path 'demo-symlink-passwd' (resolves to '/etc/passwd') outside working directory '/projects/my-app'. Allow this external directory access?",
+    );
+  });
+
+  test("omits the disclosure when resolvedPath is undefined", () => {
+    const result = formatExternalDirectoryAskPrompt(
+      "read",
+      "/etc/passwd",
+      undefined,
+      "/projects/my-app",
+    );
+    expect(result).not.toContain("resolves to");
   });
 });
 

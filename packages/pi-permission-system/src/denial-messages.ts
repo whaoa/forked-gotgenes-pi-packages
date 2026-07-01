@@ -5,6 +5,21 @@ import type { BashCommandContext, PermissionCheckResult } from "./types";
 
 export const EXTENSION_TAG = `[${EXTENSION_ID}]`;
 
+// ── External-path resolved-target disclosure ────────────────────────────────
+
+/** A displayed external path paired with its resolved target, when distinct. */
+export interface ExternalPathDisclosure {
+  /** The path as displayed (typed for tools, lexical-absolute for bash). */
+  path: string;
+  /** The canonical symlink-resolved target; present only when it differs. */
+  resolvedPath?: string;
+}
+
+/** ` (resolves to '<canonical>')` when a distinct target exists, else `""`. */
+export function resolvesToSuffix(resolvedPath?: string): string {
+  return resolvedPath ? ` (resolves to '${resolvedPath}')` : "";
+}
+
 // ── Denial context discriminated union ─────────────────────────────────────
 
 export type DenialContext =
@@ -24,6 +39,7 @@ export type DenialContext =
       kind: "external_directory";
       toolName: string;
       pathValue: string;
+      resolvedPath?: string;
       cwd: string;
       agentName?: string;
     }
@@ -89,7 +105,7 @@ function buildDenyBody(ctx: DenialContext): string {
     case "path":
       return `${subject(ctx.agentName)} is not permitted to access path '${ctx.pathValue}' via tool '${ctx.toolName}'.`;
     case "external_directory":
-      return `${subject(ctx.agentName)} is not permitted to run tool '${ctx.toolName}' for path '${ctx.pathValue}' outside working directory '${ctx.cwd}'.`;
+      return `${subject(ctx.agentName)} is not permitted to run tool '${ctx.toolName}' for path '${ctx.pathValue}'${resolvesToSuffix(ctx.resolvedPath)} outside working directory '${ctx.cwd}'.`;
     case "bash_external_directory":
       return `${subject(ctx.agentName)} is not permitted to run bash command '${ctx.command}' which references path(s) outside working directory '${ctx.cwd}': ${ctx.externalPaths.join(", ")}.`;
     case "bash_path":
@@ -185,7 +201,7 @@ function buildUnavailableBody(ctx: DenialContext): string {
     case "path":
       return `Accessing '${ctx.pathValue}' requires approval, but no interactive UI is available.`;
     case "external_directory":
-      return `Accessing '${ctx.pathValue}' outside the working directory requires approval, but no interactive UI is available.`;
+      return `Accessing '${ctx.pathValue}'${resolvesToSuffix(ctx.resolvedPath)} outside the working directory requires approval, but no interactive UI is available.`;
     case "bash_external_directory":
       return `Bash command '${ctx.command}' references path(s) outside the working directory and requires approval, but no interactive UI is available.`;
     case "bash_path":
@@ -215,7 +231,7 @@ function buildUserDeniedBody(
     case "path":
       return `User denied access to path '${ctx.pathValue}'.${reasonSuffix(denialReason)}`;
     case "external_directory":
-      return `User denied external directory access for tool '${ctx.toolName}' path '${ctx.pathValue}'.${reasonSuffix(denialReason)}`;
+      return `User denied external directory access for tool '${ctx.toolName}' path '${ctx.pathValue}'${resolvesToSuffix(ctx.resolvedPath)}.${reasonSuffix(denialReason)}`;
     case "bash_external_directory":
       return `User denied external directory access for bash command '${ctx.command}'.${reasonSuffix(denialReason)}`;
     case "bash_path":
