@@ -1,5 +1,5 @@
 ---
-model: anthropic/claude-sonnet-4-6
+model: anthropic/claude-sonnet-5
 description: Verify the current improvement phase is complete, update docs, and archive its roadmap to history/
 ---
 
@@ -114,7 +114,7 @@ Do not impose a new format.
    - `grep -c '```mermaid' …` accounts for the dependency diagram (and any others moved).
    - the tracks table and findings table are present.
    - `architecture.md` retains only the concise summary (the `^### Step` count there is now 0).
-   Also confirm the package skill (`.pi/skills/package-$1/SKILL.md`) — note any stale phase-scored numbers it carries (test counts, file/domain counts); flag them in the hand-off but do not necessarily fix them here.
+     Also confirm the package skill (`.pi/skills/package-$1/SKILL.md`) — note any stale phase-scored numbers it carries (test counts, file/domain counts); flag them in the hand-off but do not necessarily fix them here.
 3. Once checks pass, commit and push automatically:
 
 ```bash
