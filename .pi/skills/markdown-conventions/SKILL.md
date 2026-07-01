@@ -45,6 +45,7 @@ Rules below are named by their markdownlint `MDxxx` IDs because `rumdl` implemen
   Bare `#42` auto-links on GitHub but not in other renderers.
   Every `[#N]:` definition must have a matching `[#N]` reference in the body (markdownlint MD053 rejects unused definitions).
   A `[#N]` wrapped in backticks is a code span, not a link reference — it does not count toward the matching-reference requirement, so the `[#N]:` definition still trips MD053.
+  Likewise, a `[#N]` inside a fenced code block (e.g. the `architecture.md` module-layout tree) is not a live reference — cite issues there as bare `#N` with no `[#N]:` definition (matching the block's existing entries), or MD053 rejects the orphaned definition (Refs #507).
   Write `[#N]` as plain text, including inside other formatting (`**[#N] label:**`).
   Do not add a definition for the doc's own issue number — it lives in frontmatter, not as a body link.
   Link reference definitions are file-scoped: when appending a stage entry to a retro that already defines `[#N]:`, reference it without re-adding the definition — a duplicate trips MD053.

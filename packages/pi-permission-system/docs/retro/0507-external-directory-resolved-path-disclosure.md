@@ -44,3 +44,37 @@ Pre-completion reviewer returned **PASS**.
 - An unrelated commit (`chore: upgrade to Sonnet 5`) landed on `main` from outside this session immediately after the docs commit — noted for the record, not part of this issue's changeset.
 - Pre-completion reviewer: **PASS**.
   All deterministic checks green; cross-step invariants (#418/#486 dual-match protection, boundary/approval/log values) confirmed untouched — only message text changed.
+
+## Stage: Final Retrospective (2026-07-01T00:59:26Z)
+
+### Session summary
+
+One session carried #507 through its full lifecycle — plan, four TDD cycles, ship — landing `pi-permission-system-v18.0.2` (three `fix:` commits plus a `docs:` architecture update).
+The same session first ran `/plan-issue #487` and, on finding that #487's vision was already delivered by Phase 7 + #486, closed it as completed instead of fabricating a plan.
+Execution was clean: two minor, self-caught friction points and no post-ship rework.
+
+### Observations
+
+#### What went well
+
+- Incremental verification throughout TDD: each cycle ran its affected test file for red/green, then `pnpm run check` immediately whenever a shared type changed (`DenialContext`, the prompt signatures), then the full package suite before committing — the shared-type break in step 3 surfaced at `check` time, not end-of-session.
+- `/plan-issue #487` correctly produced a non-plan outcome: the `Decide` gate treated the "Proposed change" as a hypothesis, investigation showed the three scope items were already delivered or declared non-goals, and an `ask_user` confirmed closing over fabricating a plan for done work.
+- Step-boundary discipline held under a colocation hazard: `formatExternalDirectoryAskPrompt` (step 2) and `formatBashExternalDirectoryAskPrompt` (step 3) share `external-directory-messages.ts`, and the accidental joint edit was reverted and re-split so each commit's diff matched its TDD cycle.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the plan prescribed adding a `[#507]:` reference-link definition to `architecture.md`, but both mentions live inside the ` ```text ` module-layout tree fence, where `[#N]` is not a live reference, so `MD053` rejected the orphaned definition.
+  Self-identified via the lint gate; resolved in ~3 tool calls by switching to bare `#507` (matching the fence's existing `#476`/`#486` entries) and dropping the definition.
+  Impact: minor in-session rework, no follow-up commit; root cause is a plan-time gap the `markdown-conventions` skill did not yet cover.
+- `scope-drift` — the first edit to `external-directory-messages.ts` changed both the tool (step 2) and bash (step 3) prompt functions in one block.
+  Self-identified before committing; reverted the bash signature and its downstream `DenialContext` / test changes, then reapplied them in step 3.
+  Impact: added friction but no rework past the revert; no follow-up commit.
+
+#### What caused friction (user side)
+
+- None.
+  The two `ask_user` decisions (#507 message scope → all variants; #487 → close as completed) were answered decisively and early, which kept both the plan's `Module-Level Changes` and the #487 outcome unambiguous from the start.
+
+### Changes made
+
+1. `.pi/skills/markdown-conventions/SKILL.md` — added a one-sentence caveat to the "Issue references" section: a `[#N]` inside a fenced code block (e.g. the `architecture.md` module-layout tree) is not a live reference, so cite issues there as bare `#N` with no `[#N]:` definition, or MD053 rejects the orphaned definition.
