@@ -19,6 +19,9 @@ import {
  *   outside-CWD containment and infra-read checks.
  * - {@link value} returns `string` — the lexical absolute form, for display,
  *   approval patterns, decision values, and logs.
+ * - {@link resolvedAlias} returns `string | undefined` — the canonical form
+ *   only when it names a location distinct from the lexical form, for
+ *   disclosing a symlink target in a prompt or denial message.
  *
  * Construct via {@link forPath} (resolved, with optional cd-folded base) or
  * {@link forLiteral} (literal-only, for an unknown base); the constructor is
@@ -64,6 +67,19 @@ export class AccessPath {
    */
   value(): string {
     return this.lexical;
+  }
+
+  /**
+   * The canonical (symlink-resolved) form when it names a location distinct
+   * from the lexical form — for disclosing the resolved target in a prompt or
+   * denial message. `undefined` when the path is not a symlink (canonical
+   * equals lexical) or has no canonical (literal-only / empty input).
+   */
+  resolvedAlias(): string | undefined {
+    if (!this.canonical || this.canonical === this.lexical) {
+      return undefined;
+    }
+    return this.canonical;
   }
 
   /**

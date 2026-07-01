@@ -191,6 +191,67 @@ describe("AccessPath.forPath", () => {
   });
 });
 
+describe("resolvedAlias()", () => {
+  const cwd = "/projects/my-app";
+
+  beforeEach(() => {
+    realpathSync.mockReset();
+    realpathSync.mockImplementation((p: string) => p);
+  });
+
+  test("returns the canonical form when a symlink resolves elsewhere", () => {
+    realpathSync.mockImplementation((p: string) =>
+      p === "/projects/my-app/demo-symlink-passwd" ? "/etc/passwd" : p,
+    );
+    expect(
+      AccessPath.forPath("demo-symlink-passwd", {
+        cwd,
+        platform: "linux",
+      }).resolvedAlias(),
+    ).toBe("/etc/passwd");
+  });
+
+  test("returns undefined when the path has no symlinks (canonical equals lexical)", () => {
+    expect(
+      AccessPath.forPath("/etc/hosts", {
+        cwd,
+        platform: "linux",
+      }).resolvedAlias(),
+    ).toBeUndefined();
+  });
+
+  test("returns undefined for a literal-only path (no canonical)", () => {
+    expect(AccessPath.forLiteral("foo.ts").resolvedAlias()).toBeUndefined();
+  });
+
+  test("returns undefined for empty input", () => {
+    expect(
+      AccessPath.forPath("", { cwd, platform: "linux" }).resolvedAlias(),
+    ).toBeUndefined();
+  });
+
+  test("win32: returns the lowercased canonical form for a real symlink target", () => {
+    realpathSync.mockImplementation((p: string) =>
+      p === "c:\\projects\\app\\link" ? "C:\\Real\\App" : p,
+    );
+    expect(
+      AccessPath.forPath("link", {
+        cwd: "C:\\Projects\\App",
+        platform: "win32",
+      }).resolvedAlias(),
+    ).toBe("c:\\real\\app");
+  });
+
+  test("win32: returns undefined for a case-only difference (both forms lowercased)", () => {
+    expect(
+      AccessPath.forPath("src\\foo.ts", {
+        cwd: "C:\\Projects\\App",
+        platform: "win32",
+      }).resolvedAlias(),
+    ).toBeUndefined();
+  });
+});
+
 describe("AccessPath.forLiteral", () => {
   beforeEach(() => {
     realpathSync.mockReset();
