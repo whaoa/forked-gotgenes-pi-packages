@@ -17,6 +17,17 @@ export interface DenyWithReason {
 export type PatternValue = PermissionState | DenyWithReason;
 
 /**
+ * Predicate deciding whether a bare bash token should be promoted into the
+ * `path` rule-candidate surface.
+ *
+ * Built by `PermissionManager.getPromotablePathTokenMatcher` from the
+ * composed config ruleset (specific, non-`*` `path` deny/ask patterns) and
+ * threaded through to `BashPathResolver` so promotion policy stays in the
+ * manager while the bash layer only asks the predicate.
+ */
+export type PathRuleTokenMatcher = (token: string) => boolean;
+
+/**
  * The on-disk permission shape inside the `"permission"` key.
  * A surface value is a PermissionState string (shorthand for `{ "*": action }`)
  * or a pattern→value map. Pattern values may be a PermissionState string or a

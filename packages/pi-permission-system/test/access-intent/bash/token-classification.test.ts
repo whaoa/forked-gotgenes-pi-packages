@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  classifyPromotedRuleCandidate,
   classifyTokenAsPathCandidate,
   classifyTokenAsRuleCandidate,
 } from "#src/access-intent/bash/token-classification";
@@ -312,5 +313,51 @@ describe("classifyTokenAsRuleCandidate", () => {
         expect(classifyTokenAsPathCandidate(tok)).toBeNull();
       });
     }
+  });
+});
+
+describe("classifyPromotedRuleCandidate", () => {
+  test("shape-eligible bare token promoted when predicate returns true", () => {
+    expect(classifyPromotedRuleCandidate("id_rsa", () => true)).toBe("id_rsa");
+  });
+
+  test("shape-eligible bare token rejected when predicate returns false", () => {
+    expect(classifyPromotedRuleCandidate("id_rsa", () => false)).toBeNull();
+  });
+
+  test("predicate receives the raw token", () => {
+    const isPromotable = (token: string): boolean => token === "key.pem";
+    expect(classifyPromotedRuleCandidate("key.pem", isPromotable)).toBe(
+      "key.pem",
+    );
+    expect(classifyPromotedRuleCandidate("other.pem", isPromotable)).toBeNull();
+  });
+
+  describe("shared rejection still applies regardless of the predicate", () => {
+    test("flag (leading dash) → null", () => {
+      expect(classifyPromotedRuleCandidate("-r", () => true)).toBeNull();
+    });
+
+    test("env assignment → null", () => {
+      expect(classifyPromotedRuleCandidate("FOO=/bar", () => true)).toBeNull();
+    });
+
+    test("URL → null", () => {
+      expect(
+        classifyPromotedRuleCandidate("https://example.com", () => true),
+      ).toBeNull();
+    });
+
+    test("@scope/package → null", () => {
+      expect(classifyPromotedRuleCandidate("@foo/bar", () => true)).toBeNull();
+    });
+
+    test("regex metacharacters → null", () => {
+      expect(classifyPromotedRuleCandidate("foo.*", () => true)).toBeNull();
+    });
+
+    test("empty string → null", () => {
+      expect(classifyPromotedRuleCandidate("", () => true)).toBeNull();
+    });
   });
 });

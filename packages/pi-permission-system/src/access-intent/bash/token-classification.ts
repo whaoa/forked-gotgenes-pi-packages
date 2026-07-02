@@ -1,20 +1,25 @@
 /**
  * Pure, synchronous token-classification helpers for bash path extraction.
  *
- * Exports two classifiers consumed by `bash-path-resolver.ts`:
+ * Exports three classifiers consumed by `bash-path-resolver.ts`:
  *   - `classifyTokenAsPathCandidate` — strict gate for the external-directory guard.
  *   - `classifyTokenAsRuleCandidate` — broader gate for cross-cutting `path` rules.
+ *   - `classifyPromotedRuleCandidate` — rule-driven promotion of a bare filename
+ *     (e.g. `id_rsa`) that `classifyTokenAsRuleCandidate` rejects for shape, but
+ *     which matches an active, specific (non-`*`) `path` deny/ask rule (#509).
  *
- * Both classifiers share the private `rejectNonPathToken` predicate that captures
- * the seven rejection cases common to both (the production clone this module was
- * extracted to eliminate).
+ * All three classifiers share the private `rejectNonPathToken` predicate that
+ * captures the seven rejection cases common to them (the production clone this
+ * module was extracted to eliminate).
  *
- * Both classifiers recognize Windows drive-letter absolute paths (`C:/…`, `C:\…`)
- * unconditionally on all platforms. On POSIX the token resolves as a real in-CWD
- * relative path and is gated by the `path` surface; on Windows the `PathNormalizer`
- * routes it through the absolute-path branch. Shape recognition is platform-independent
- * string matching; the platform-sensitive absoluteness decision belongs to `PathNormalizer`.
+ * Both `classifyTokenAsPathCandidate` and `classifyTokenAsRuleCandidate` recognize
+ * Windows drive-letter absolute paths (`C:/…`, `C:\…`) unconditionally on all
+ * platforms. On POSIX the token resolves as a real in-CWD relative path and is
+ * gated by the `path` surface; on Windows the `PathNormalizer` routes it through
+ * the absolute-path branch. Shape recognition is platform-independent string
+ * matching; the platform-sensitive absoluteness decision belongs to `PathNormalizer`.
  */
+import type { PathRuleTokenMatcher } from "#src/types";
 
 // ── Public classifiers ─────────────────────────────────────────────────────
 
@@ -68,6 +73,31 @@ export function classifyTokenAsRuleCandidate(token: string): string | null {
   if (WINDOWS_DRIVE_PATH_PATTERN.test(token)) return token; // backslash-only drive form
 
   return null;
+}
+
+/**
+ * Rule-driven promotion classifier for bare filenames (#509).
+ *
+ * A bare token (`id_rsa`) has none of the shapes `classifyTokenAsRuleCandidate`
+ * accepts, so it is dropped before rule evaluation by default — most bash
+ * argument tokens are not file paths (subcommands, branch names, search
+ * patterns). This classifier promotes a bare token into the rule-candidate
+ * surface only when the caller-supplied `isPromotable` predicate says it
+ * matches an active, specific `path` deny/ask rule, closing the bypass without
+ * treating every bare argument as a path.
+ *
+ * Still runs the shared `rejectNonPathToken` prelude first, so a flag,
+ * env-assignment, URL, `@scope` token, or regex-shaped token is never
+ * promoted even if it happens to match a configured pattern.
+ *
+ * Returns the raw token string if it qualifies, or `null` to skip.
+ */
+export function classifyPromotedRuleCandidate(
+  token: string,
+  isPromotable: PathRuleTokenMatcher,
+): string | null {
+  if (rejectNonPathToken(token)) return null;
+  return isPromotable(token) ? token : null;
 }
 
 // ── Private rejection predicate ────────────────────────────────────────────
