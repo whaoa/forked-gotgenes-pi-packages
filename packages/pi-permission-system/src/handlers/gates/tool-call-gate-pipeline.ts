@@ -10,7 +10,7 @@ import {
   ToolPreviewFormatter,
   type ToolPreviewFormatterOptions,
 } from "#src/tool-preview-formatter";
-import type { PermissionCheckResult } from "#src/types";
+import type { PathRuleTokenMatcher, PermissionCheckResult } from "#src/types";
 import { getNonEmptyString, toRecord } from "#src/value-guards";
 import { resolveBashCommandCheck } from "./bash-command";
 import { describeBashExternalDirectoryGate } from "./bash-external-directory";
@@ -42,6 +42,11 @@ export interface ToolCallGateInputs {
   getToolPreviewLimits(): ToolPreviewFormatterOptions;
   /** The session's path normalizer (platform + cwd baked in). */
   getPathNormalizer(): PathNormalizer;
+  /**
+   * Predicate deciding whether a bare bash token should be promoted into the
+   * `path` rule-candidate surface (#509), scoped to the given agent.
+   */
+  getPromotablePathTokenMatcher(agentName?: string): PathRuleTokenMatcher;
 }
 
 /**
@@ -73,7 +78,13 @@ export class ToolCallGatePipeline {
     const normalizer = this.inputs.getPathNormalizer();
     const bashProgram =
       tcc.toolName === "bash" && command
-        ? await BashProgram.parse(command, normalizer)
+        ? await BashProgram.parse(
+            command,
+            normalizer,
+            this.inputs.getPromotablePathTokenMatcher(
+              tcc.agentName ?? undefined,
+            ),
+          )
         : null;
 
     const formatter = new ToolPreviewFormatter(

@@ -186,6 +186,7 @@ describe("ToolCallGatePipeline", () => {
       expect(mockBashProgramParse).toHaveBeenCalledWith(
         "echo hello",
         expect.any(PathNormalizer),
+        expect.any(Function),
       );
     });
 
@@ -201,6 +202,31 @@ describe("ToolCallGatePipeline", () => {
       );
 
       expect(mockBashProgramParse).not.toHaveBeenCalled();
+    });
+
+    it("passes the session's promotable path-token matcher into BashProgram.parse (#509)", async () => {
+      const resolver = makeResolver(makeCheckResult());
+      const isPromotable = vi.fn((token: string) => token === "id_rsa");
+      const getPromotablePathTokenMatcher = vi.fn(() => isPromotable);
+      const inputs = makeGateInputs({ getPromotablePathTokenMatcher });
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      await pipeline.evaluate(
+        makeTcc({
+          toolName: "bash",
+          input: { command: "cat id_rsa" },
+          agentName: "my-agent",
+        }),
+        runner,
+      );
+
+      expect(getPromotablePathTokenMatcher).toHaveBeenCalledWith("my-agent");
+      expect(mockBashProgramParse).toHaveBeenCalledWith(
+        "cat id_rsa",
+        expect.any(PathNormalizer),
+        isPromotable,
+      );
     });
   });
 
