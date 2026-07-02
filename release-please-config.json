@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "last-release-sha": "458c1fcdb40ae52afab2a1d571027b0fc45f264c",
+  "last-release-sha": "adafd61fd4c3313257e72b2241db1b39bf9134bb",
   "packages": {
     "packages/pi-autoformat": {
       "component": "pi-autoformat"
