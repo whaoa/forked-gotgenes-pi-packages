@@ -256,6 +256,8 @@ The `ScopedPermissionManager` / `ToolCallGateInputs` interface widenings break t
 ## Open Questions
 
 - Argument-position / per-command file-argument awareness to eliminate the accepted search-pattern false positives — deferred; no issue filed (no concrete design yet).
+  The principled successor is the `ModelTriageAuthorizer` in `docs/architecture/architecture.md` ("Discriminating delegation: a model `Authorizer`"): promotion here produces the `ask` on the ask-*producing* side of `evaluate()`, and a model `Authorizer` dismisses the false positive on the ask-*consuming* side.
+  This plan is compatible with that target by construction — a promoted token emits the same structured descriptor a prefixed path does, so the authority layer needs no promotion-specific knowledge.
 - Backslash-relative Windows tokens (`dir\file`) — deferred and tracked in [#520].
 
 [#58]: https://github.com/gotgenes/pi-packages/issues/58

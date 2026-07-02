@@ -601,6 +601,35 @@ It honors principle 5 (defaults are rules; no side-channel fallbacks): `evaluate
 A future "disable everything" mode — overriding denies too — would be a *different*, deliberately named operation: appending a final `{ surface: "*", pattern: "*", action: "allow" }` rule (last-match-wins).
 It is not built, and it would be requested by name, never conflated with yolo.
 
+### Discriminating delegation: a model `Authorizer`
+
+Nothing constrains an `Authorizer` to be deterministic.
+`LocalUserAuthorizer` is already a non-deterministic oracle — the human — and the determinism principle governs *recorded* authority (`evaluate()`), never the live-authority layer.
+A model (e.g. Claude Haiku) can hold the `Authorizer` role on the same terms: it is live authority, so it never touches `evaluate()` or the deterministic core.
+
+Shape it as a **decorator, not a fourth channel**: `ModelTriageAuthorizer(inner)` wraps whichever selection context produced (`LocalUser` / `Parent` / `Denying`), rules `allow` on the asks it judges to be false positives, and delegates every other ask to `inner`.
+This is the [recursion](#the-recursion) above with the model's parent being the human — "a node's `Authorizer` is its own `ParentAuthorizer`."
+
+```text
+ask -> ModelTriageAuthorizer(inner)
+         ├─ model rules "allow"          -> auto-permit (false positive dismissed)
+         └─ model escalates / uncertain  -> inner.authorize(...)  // human, Parent, or Denying
+```
+
+It is a **discriminating, deny-preserving yolo**, and inherits yolo's safety boundary exactly.
+Denies never reach an `Authorizer` — they are decided by recorded authority — so the model *structurally cannot* grant a hard deny; the safeguard for a sensitive resource is an explicit `deny` rule, which survives the model just as it survives the yolo rewrite.
+Where yolo rewrites every `ask` to `allow`, the model resolves only the asks it is confident about and escalates the rest — a middle rung between prompt-everything and allow-everything.
+
+Three properties keep it reviewable and fail-closed:
+
+- **Audited** — a model grant is tagged `origin: "authorizer:model"` (with model version and the structured intent) so the review log distinguishes it from a human, policy, or yolo allow, mirroring how yolo grants carry `origin: "yolo"`.
+- **Non-persistent** — unlike a human's "for this session" ruling, a model verdict does *not* silently become recorded authority; it stays live-only (or is persisted quarantined for human review), so a probabilistic judgment never hardens into durable config.
+- **Fail-closed** — model unreachable, timeout, or low confidence delegates to `inner` (the human, the `ParentAuthorizer`, or `DenyingAuthorizer`), never an auto-allow; bounded delegation (which surfaces the model may auto-allow) is itself ruleset-expressible, with `external_directory` and secret-shaped `path` rules excluded so they always reach the human.
+
+This is the principled successor to the per-command argument-position work deferred from [#509].
+Rule-driven promotion ([#509]) produces the `ask` for a bare filename that matches a `path` rule and deliberately accepts a fail-safe false positive (`git grep id_rsa` prompts); that false positive lives on the *ask-producing* side of `evaluate()`, and the `ModelTriageAuthorizer` dismisses it on the *ask-consuming* side without hard-coding per-command file-argument tables.
+The two compose cleanly because a promoted token emits the same structured descriptor a prefixed path does, so the `Authorizer` needs no promotion-specific knowledge.
+
 ### Resolved direction
 
 These were the open decisions; they are now settled.
@@ -633,6 +662,19 @@ The fix's `getExternalDirectoryPolicyValues` helper (the union of lexical aliase
 The intent must carry **principal identity** (which agent is requesting) so a forwarded request is evaluable on the serving node, and it must define **path portability across cwds** — a subagent in a `pi-subagents-worktrees` worktree resolves paths against a different root than the parent, so cross-session path evaluation is only well-defined once the intent fixes what a path *means*.
 Sequencing: extract access-intent first — it unblocks correct cross-session path evaluation and kills the false-green class; non-path serving, yolo inheritance, and the escalation unification can land alongside.
 The tractable first slice is the access-path value object seeded by [#418]: it removes the path-representation conflation and the duplicate external-directory gate without waiting on principal identity or cross-session portability.
+
+### Beyond the target: a non-deterministic access-intent classifier
+
+This is a **more distant** direction than the target above — noted as a candidate extension point, not planned work.
+
+Access-intent extraction is deterministic by design: `(toolName, input)` becomes "what is being accessed" through bash decomposition, MCP target derivation, and path rules.
+A second, independent place non-determinism could one day enter is a model that *classifies* access intent **before** `evaluate()` — deciding, for instance, that `id_rsa` in `git grep id_rsa` is a search pattern rather than a file, so no path candidate is emitted at all.
+
+The classifier differs from the [`ModelTriageAuthorizer`](#discriminating-delegation-a-model-authorizer) in *where the model sits*.
+The classifier feeds **recorded** authority — it shapes the intent `evaluate()` rules on — whereas the Authorizer holds **live** authority and answers the `ask`.
+A wrong classifier call is a misread of what is being accessed; a wrong Authorizer call is a mis-granted decision.
+Because the classifier changes the *input* to the deterministic core, it weakens the "same `(toolName, input)` yields the same ruling" property more subtly than the Authorizer does — the model output becomes part of the intent — so it warrants its own decision record and is deliberately out of scope for the current target.
+The access-intent domain the gates emit into is the natural seam for such a pluggable classifier: deterministic today, model-assisted only if and when that trade is made by name.
 
 ### Naming
 
@@ -986,6 +1028,7 @@ Eight steps ([#473]–[#480]), all closed.
 [#505]: https://github.com/gotgenes/pi-packages/issues/505
 [#506]: https://github.com/gotgenes/pi-packages/issues/506
 [#508]: https://github.com/gotgenes/pi-packages/issues/508
+[#509]: https://github.com/gotgenes/pi-packages/issues/509
 [#510]: https://github.com/gotgenes/pi-packages/issues/510
 [#511]: https://github.com/gotgenes/pi-packages/issues/511
 [#513]: https://github.com/gotgenes/pi-packages/issues/513
