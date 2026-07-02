@@ -41,4 +41,35 @@ Pre-completion reviewer verdict: **PASS**.
 - The `getPromotablePathTokenMatcher` unit tests needed an explicit `platform: "win32"`/`"linux"` injected `PermissionManager` (not the `makeInMemoryManager` helper, which doesn't expose a platform override) to pin the Windows case-fold behavior — built directly via `new PermissionManager({ policyLoader: createInMemoryPolicyLoader(...), platform: "win32" })`.
 - No architecture-roadmap step marker to flip — #509 was confirmed in planning to not be part of any roadmap phase.
 
+## Stage: Final Retrospective (2026-07-02T23:51:54Z)
+
+### Session summary
+
+Shipped #509: synced, ran root `pnpm run lint` + `pnpm fallow dead-code` (both clean), pushed `c8be2799`, verified CI green, closed the issue with a per-commit summary, and merged release-please PR #522 to cut `pi-permission-system-v18.1.0`.
+The one non-trivial moment was the release PR sitting at `merge_state: UNSTABLE` with a CI check still `IN_PROGRESS`; waited it out and retried the merge per the ship prompt's step 6.4, no fallback needed.
+Across all three stages (Planning → TDD → Ship) the issue landed with zero rework and a `PASS` from the pre-completion reviewer.
+
+### Observations
+
+#### What went well
+
+- Plan → TDD fidelity was high: the 6-step plan produced 26 tests and shipped with only two minor, tsc-caught deviations (both recorded in the TDD stage entry).
+  The upfront `ask_user` design gate at planning time (rule-driven promotion, defer backslash, Windows case fold) is what kept the later stages surprise-free — the layering decision was settled before any code was written.
+- The release-please `UNSTABLE`-with-`IN_PROGRESS`-check path was handled cleanly on encounter: `release_pr_merge` refused, `statusCheckRollup` showed the in-progress check, `ci_watch` confirmed success, retry merged.
+  This is the ship prompt's documented step 6.4 exception working as designed — no `gh pr merge` fallback while a check was running.
+
+#### What caused friction (agent side)
+
+- `other` (minor efficiency) — when the release PR's check was `IN_PROGRESS`, the first wait was a `sleep 30; gh pr view` poll before switching to `ci_watch` on the run id.
+  Impact: one redundant poll cycle (~30s), no rework — `ci_watch` on the check's run is the more direct wait and could have been used first.
+
+#### What caused friction (user side)
+
+- None — the ship stage was fully autonomous with no user intervention required, consistent with a clean plan and a green pre-completion review.
+
+### Changes made
+
+1. `packages/pi-permission-system/docs/retro/0509-bash-bare-filename-path-surface.md` — appended this Final Retrospective stage entry.
+   No prompt or `AGENTS.md` changes: the two TDD deviations are already covered by existing testing-skill guidance (grep all mocks, not just shared fixtures) and were `tsc`-caught with zero rework, and the lone ship-stage friction was a ~30s redundant poll — too situational to encode.
+
 [#520]: https://github.com/gotgenes/pi-packages/issues/520
