@@ -501,6 +501,79 @@ describe("service path queries evaluate the supplied path (#503)", () => {
   });
 });
 
+describe("bash bare-filename path gating (#509)", () => {
+  // Before #509 a bash bare-filename argument (`cat id_rsa`) bypassed the
+  // `path` surface entirely: the broad classifier only accepted tokens
+  // starting with `.`, containing `/`, containing `..`, or a Windows
+  // drive-letter absolute path. The same file accessed via a prefixed path
+  // (`cat ./id_rsa`) or the `read` tool was already gated. Rule-driven
+  // promotion closes the gap for a bare token matching a specific, non-`*`
+  // `path` deny/ask rule — the literal repro from the issue.
+
+  async function fireBashToolCall(
+    pi: ReturnType<typeof makeFakePi>,
+    ctx: unknown,
+    command: string,
+  ): Promise<{ block?: true; reason?: string }> {
+    return (await pi.fire(
+      "tool_call",
+      { name: "bash", input: { command }, toolCallId: "tc-1" },
+      ctx,
+    )) as { block?: true; reason?: string };
+  }
+
+  it("denies a bare filename matching a specific path deny rule", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-perm-bare-token-cwd-"));
+    writeGlobalConfig({
+      permission: { "*": "allow", path: { id_rsa: "deny" } },
+    });
+
+    const pi = makeFakePi({ events: createEventBus() });
+    piPermissionSystemExtension(pi as unknown as ExtensionAPI);
+    const ctx = makeChildCtx(cwd, "bare-token-session-deny");
+    await fireSessionStart(pi, ctx);
+
+    const result = await fireBashToolCall(pi, ctx, "cat id_rsa");
+    expect(result.block).toBe(true);
+
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it("denies a bare filename matching a wildcard path deny rule", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-perm-bare-token-cwd-"));
+    writeGlobalConfig({
+      permission: { "*": "allow", path: { "*.pem": "deny" } },
+    });
+
+    const pi = makeFakePi({ events: createEventBus() });
+    piPermissionSystemExtension(pi as unknown as ExtensionAPI);
+    const ctx = makeChildCtx(cwd, "bare-token-session-wildcard");
+    await fireSessionStart(pi, ctx);
+
+    const result = await fireBashToolCall(pi, ctx, "cat key.pem");
+    expect(result.block).toBe(true);
+
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it("leaves a bare token that does not match any path rule unaffected", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-perm-bare-token-cwd-"));
+    writeGlobalConfig({
+      permission: { "*": "allow", path: { id_rsa: "deny" } },
+    });
+
+    const pi = makeFakePi({ events: createEventBus() });
+    piPermissionSystemExtension(pi as unknown as ExtensionAPI);
+    const ctx = makeChildCtx(cwd, "bare-token-session-unaffected");
+    await fireSessionStart(pi, ctx);
+
+    const result = await fireBashToolCall(pi, ctx, "git status");
+    expect(result.block).toBeUndefined();
+
+    rmSync(cwd, { recursive: true, force: true });
+  });
+});
+
 describe("multi-instance global service interplay", () => {
   // The fix (#302) scopes the process-global service slot to the publishing
   // instance. The parent publishes at its session_start; an in-process child
