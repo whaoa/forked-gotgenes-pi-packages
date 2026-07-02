@@ -91,6 +91,63 @@ describe("BashProgram", () => {
       expect(fileCandidate?.path.matchValues()).toEqual(["src/foo.ts"]);
       expect(fileCandidate?.path.boundaryValue()).toBe("");
     });
+
+    describe("rule-driven bare-token promotion (#509)", () => {
+      it("promotes a bare token when the matcher says it is promotable", async () => {
+        const isPromotable = (token: string): boolean => token === "id_rsa";
+        const program = await BashProgram.parse(
+          "cat id_rsa",
+          normalizer,
+          isPromotable,
+        );
+        const candidates = program.pathRuleCandidates();
+        expect(candidates.map(({ token }) => token)).toEqual(["id_rsa"]);
+        expect(candidates[0].path.matchValues()).toEqual([
+          "/projects/my-app/id_rsa",
+          "id_rsa",
+        ]);
+      });
+
+      it("does not promote a bare token the matcher rejects", async () => {
+        const isPromotable = (token: string): boolean => token === "id_rsa";
+        const program = await BashProgram.parse(
+          "git status",
+          normalizer,
+          isPromotable,
+        );
+        expect(program.pathRuleCandidates()).toHaveLength(0);
+      });
+
+      it("does not promote any bare token with the default no-op matcher", async () => {
+        const program = await BashProgram.parse("cat id_rsa", normalizer);
+        expect(program.pathRuleCandidates()).toHaveLength(0);
+      });
+
+      it("keeps a promoted token literal-only after an unknown cd (#393)", async () => {
+        const isPromotable = (token: string): boolean => token === "id_rsa";
+        const program = await BashProgram.parse(
+          'cd "$DIR" && cat id_rsa',
+          normalizer,
+          isPromotable,
+        );
+        const candidate = program
+          .pathRuleCandidates()
+          .find((c) => c.token === "id_rsa");
+        expect(candidate?.path.matchValues()).toEqual(["id_rsa"]);
+      });
+
+      it("does not double-promote a token the shape gate already accepts", async () => {
+        // ./id_rsa already passes classifyTokenAsRuleCandidate; the promoted
+        // fallback must not run (and must not duplicate the candidate).
+        const isPromotable = (): boolean => true;
+        const program = await BashProgram.parse(
+          "cat ./id_rsa",
+          normalizer,
+          isPromotable,
+        );
+        expect(program.pathRuleCandidates()).toHaveLength(1);
+      });
+    });
   });
 
   describe("externalPaths", () => {

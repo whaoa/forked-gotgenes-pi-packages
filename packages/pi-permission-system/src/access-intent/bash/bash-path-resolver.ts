@@ -5,6 +5,7 @@ import {
 } from "#src/access-intent/bash/node-text";
 import type { TSNode } from "#src/access-intent/bash/parser";
 import {
+  classifyPromotedRuleCandidate,
   classifyTokenAsPathCandidate,
   classifyTokenAsRuleCandidate,
 } from "#src/access-intent/bash/token-classification";
@@ -17,6 +18,10 @@ import {
 import { normalizePathPolicyLiteral } from "#src/access-intent/path-normalization";
 import type { PathNormalizer } from "#src/path-normalizer";
 import { isSafeSystemPath } from "#src/safe-system-paths";
+import type { PathRuleTokenMatcher } from "#src/types";
+
+/** Default promotion predicate: promotes nothing (#509). */
+const NO_PROMOTION: PathRuleTokenMatcher = () => false;
 
 // ── Internal types ───────────────────────────────────────────────────────────
 
@@ -74,20 +79,29 @@ const UNKNOWN_BASE: EffectiveBase = { kind: "unknown" };
 /**
  * Resolves the filesystem paths a parsed bash program references.
  *
- * Holds a {@link PathNormalizer} (platform + cwd baked in) as its collaborator
- * and answers all platform/cwd-dependent questions through it — `cd`-base
- * folding (`isAbsolute`/`joinBase`), per-candidate resolution (`forPath`/
- * `forLiteral`/`resolveBase`), and the outside-cwd boundary decision — so no
- * walk step re-reads the platform or threads the cwd.
+ * Holds a {@link PathNormalizer} (platform + cwd baked in) as its primary
+ * collaborator and answers all platform/cwd-dependent questions through it —
+ * `cd`-base folding (`isAbsolute`/`joinBase`), per-candidate resolution
+ * (`forPath`/`forLiteral`/`resolveBase`), and the outside-cwd boundary
+ * decision — so no walk step re-reads the platform or threads the cwd.
+ *
+ * Also holds an `isPromotablePathToken` predicate (default: promotes nothing)
+ * deciding whether a bare token that fails the broad rule-candidate shape gate
+ * should still be promoted because it matches an active, specific `path` rule
+ * (#509). The resolver never sees the rules themselves — the predicate is
+ * built and owned by `PermissionManager.getPromotablePathTokenMatcher`.
  *
  * Tell-don't-ask: callers hand it a parsed tree and receive the resolved
  * {@link ResolvedBashPaths} slices in one {@link resolve} call; the AST walk,
  * the `cd`-folding state, and the intermediate path candidates stay private.
  * One instance per parse ({@link BashProgram.parse} constructs it with the
- * session normalizer).
+ * session normalizer and promotion predicate).
  */
 export class BashPathResolver {
-  constructor(private readonly normalizer: PathNormalizer) {}
+  constructor(
+    private readonly normalizer: PathNormalizer,
+    private readonly isPromotablePathToken: PathRuleTokenMatcher = NO_PROMOTION,
+  ) {}
 
   /**
    * Resolve a parsed bash program's path references into its external-path and
@@ -387,8 +401,12 @@ export class BashPathResolver {
    * policy lookup values.
    *
    * Filters candidates through the broad path classifier
-   * (`classifyTokenAsRuleCandidate`) and pairs each qualifying token with its
-   * set of policy values (absolute + project-relative + raw).
+   * (`classifyTokenAsRuleCandidate`), falling back to the rule-driven promoted
+   * classifier (`classifyPromotedRuleCandidate`, #509) for a bare token the
+   * broad classifier rejects for shape — promoted only when the injected
+   * `isPromotablePathToken` predicate matches an active, specific `path` rule.
+   * Pairs each qualifying token with its set of policy values (absolute +
+   * project-relative + raw).
    * A token after a non-literal `cd` keeps only its literal value so no
    * spurious absolute rule can match (#393).
    */
@@ -399,7 +417,9 @@ export class BashPathResolver {
     const result: BashPathRuleCandidate[] = [];
 
     for (const { token, base } of candidates) {
-      const candidate = classifyTokenAsRuleCandidate(token);
+      const candidate =
+        classifyTokenAsRuleCandidate(token) ??
+        classifyPromotedRuleCandidate(token, this.isPromotablePathToken);
       if (!candidate) continue;
 
       const path = this.buildRuleCandidatePath(candidate, base);

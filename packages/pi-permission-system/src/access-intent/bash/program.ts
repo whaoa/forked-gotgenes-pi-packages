@@ -9,6 +9,7 @@ import {
 } from "#src/access-intent/bash/command-enumeration";
 import { getParser } from "#src/access-intent/bash/parser";
 import type { PathNormalizer } from "#src/path-normalizer";
+import type { PathRuleTokenMatcher } from "#src/types";
 
 export type { BashCommand, BashPathRuleCandidate };
 
@@ -37,10 +38,17 @@ export class BashProgram {
    * through the injected {@link PathNormalizer} (platform + cwd baked in).
    * Heredoc bodies, comments, and other non-argument content are skipped. An
    * unparseable command yields an empty program.
+   *
+   * `isPromotablePathToken`, when supplied, promotes a bare filename token
+   * (e.g. `id_rsa`) into `pathRuleCandidates()` when it matches an active,
+   * specific `path` deny/ask rule (#509). Defaults to promoting nothing, so
+   * callers that only read `externalPaths()` (e.g. `bash-path-extractor.ts`)
+   * are unaffected.
    */
   static async parse(
     command: string,
     normalizer: PathNormalizer,
+    isPromotablePathToken?: PathRuleTokenMatcher,
   ): Promise<BashProgram> {
     const parser = await getParser();
     const tree = parser.parse(command);
@@ -49,6 +57,7 @@ export class BashProgram {
     try {
       const { externalPaths, ruleCandidates } = new BashPathResolver(
         normalizer,
+        isPromotablePathToken,
       ).resolve(tree.rootNode);
       return new BashProgram(
         collectCommands(tree.rootNode),
