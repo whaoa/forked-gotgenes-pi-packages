@@ -23,4 +23,22 @@ Wrote a 6-step TDD plan and committed it; filed follow-up [#520] for the deferre
 - Not part of any release batch → ships independently.
 - Docs to touch beyond `src`: `architecture.md` module-tree line, the package `SKILL.md` (which currently documents the bare-token exclusion as intentional), and `configuration.md` `path`-surface prose.
 
+## Stage: Implementation — TDD (2026-07-02T22:14:00Z)
+
+### Session summary
+
+Executed all 6 TDD steps exactly as planned: pure `classifyPromotedRuleCandidate` classifier, `PermissionManager.getPromotablePathTokenMatcher`, `BashPathResolver`/`BashProgram.parse` promotion wiring, `ToolCallGatePipeline` matcher threading, an end-to-end composition-root repro of the issue's literal cases, and docs.
+Test count grew from 2207 to 2233 (26 new tests) in `pi-permission-system`; full monorepo suite, `tsc --noEmit`, root lint, and `pnpm fallow dead-code` all green throughout.
+Pre-completion reviewer verdict: **PASS**.
+
+### Observations
+
+- Two small deviations from the plan's exact Module-Level Changes list, both sensible and noted to the reviewer:
+  1. `src/rule.ts`'s private `pathMatchOptions` had to be exported so `PermissionManager.getPromotablePathTokenMatcher` reuses the exact Windows case/separator fold `evaluate()` uses, instead of re-deriving it — the plan's Design Overview already implied this ("The Windows fold mirrors `pathMatchOptions`") but didn't list `rule.ts` as a changed file.
+  2. `test/permission-resolver.test.ts` has its own inline fake `ScopedPermissionManager` (separate from `test/helpers/session-fixtures.ts`'s `makeFakePermissionManager`) that also needed the new `getPromotablePathTokenMatcher` stub — the plan anticipated only the shared fixture needing the update.
+- The Step 4 pipeline test (`ToolCallGatePipeline` threading) required updating one pre-existing assertion (`toHaveBeenCalledWith("echo hello", expect.any(PathNormalizer))` → add `expect.any(Function)` for the third arg) since `vi.fn().toHaveBeenCalledWith` checks the full argument list — a straightforward, anticipated-by-the-testing-skill breakage from adding an optional parameter that the pipeline now always supplies.
+- Step 5 (the end-to-end composition-root test) passed immediately on first run with no red phase — by design, since the plan sequenced it after all four implementation steps landed; it served as a confirmation/documentation commit rather than a traditional red→green cycle, matching the plan's framing.
+- The `getPromotablePathTokenMatcher` unit tests needed an explicit `platform: "win32"`/`"linux"` injected `PermissionManager` (not the `makeInMemoryManager` helper, which doesn't expose a platform override) to pin the Windows case-fold behavior — built directly via `new PermissionManager({ policyLoader: createInMemoryPolicyLoader(...), platform: "win32" })`.
+- No architecture-roadmap step marker to flip — #509 was confirmed in planning to not be part of any roadmap phase.
+
 [#520]: https://github.com/gotgenes/pi-packages/issues/520
