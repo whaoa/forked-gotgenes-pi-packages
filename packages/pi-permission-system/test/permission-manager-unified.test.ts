@@ -1096,6 +1096,87 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
       ).toBe(true);
     });
   });
+
+  describe("getPromotablePathTokenMatcher (#509)", () => {
+    it("matches a bare token against a specific deny pattern", () => {
+      const manager = makeInMemoryManager({
+        global: { permission: { path: { id_rsa: "deny" } } },
+      });
+      const isPromotable = manager.getPromotablePathTokenMatcher();
+      expect(isPromotable("id_rsa")).toBe(true);
+      expect(isPromotable("other_file")).toBe(false);
+    });
+
+    it("matches a bare token against a specific ask wildcard pattern", () => {
+      const manager = makeInMemoryManager({
+        global: { permission: { path: { "*.pem": "ask" } } },
+      });
+      const isPromotable = manager.getPromotablePathTokenMatcher();
+      expect(isPromotable("key.pem")).toBe(true);
+      expect(isPromotable("key.txt")).toBe(false);
+    });
+
+    it("does not match against the universal '*' path pattern", () => {
+      const manager = makeInMemoryManager({
+        global: { permission: { path: { "*": "ask" } } },
+      });
+      const isPromotable = manager.getPromotablePathTokenMatcher();
+      expect(isPromotable("anything")).toBe(false);
+      expect(isPromotable("status")).toBe(false);
+    });
+
+    it("does not match against an allow-only path pattern", () => {
+      const manager = makeInMemoryManager({
+        global: { permission: { path: { id_rsa: "allow" } } },
+      });
+      const isPromotable = manager.getPromotablePathTokenMatcher();
+      expect(isPromotable("id_rsa")).toBe(false);
+    });
+
+    it("returns a no-op matcher when no path rules exist", () => {
+      const manager = makeInMemoryManager({
+        global: { permission: { read: "allow" } },
+      });
+      const isPromotable = manager.getPromotablePathTokenMatcher();
+      expect(isPromotable("id_rsa")).toBe(false);
+      expect(isPromotable("anything")).toBe(false);
+    });
+
+    it("folds case on an injected win32 platform", () => {
+      const manager = new PermissionManager({
+        policyLoader: createInMemoryPolicyLoader({
+          global: { permission: { path: { id_rsa: "deny" } } },
+        }),
+        platform: "win32",
+      });
+      const isPromotable = manager.getPromotablePathTokenMatcher();
+      expect(isPromotable("ID_RSA")).toBe(true);
+    });
+
+    it("stays case-sensitive on a POSIX platform", () => {
+      const manager = new PermissionManager({
+        policyLoader: createInMemoryPolicyLoader({
+          global: { permission: { path: { id_rsa: "deny" } } },
+        }),
+        platform: "linux",
+      });
+      const isPromotable = manager.getPromotablePathTokenMatcher();
+      expect(isPromotable("ID_RSA")).toBe(false);
+    });
+
+    it("scopes to the requested agent's composed rules", () => {
+      const manager = makeInMemoryManager({
+        global: { permission: { path: { id_rsa: "deny" } } },
+        agent: {
+          coder: { permission: { path: { "secret.key": "deny" } } },
+        },
+      });
+      const globalMatcher = manager.getPromotablePathTokenMatcher();
+      const agentMatcher = manager.getPromotablePathTokenMatcher("coder");
+      expect(globalMatcher("secret.key")).toBe(false);
+      expect(agentMatcher("secret.key")).toBe(true);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

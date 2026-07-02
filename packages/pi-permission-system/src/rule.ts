@@ -74,7 +74,7 @@ export function evaluate(
  * pattern→value match (case and separators) so mixed-case / forward-slash
  * overrides still match. The surface→surface match stays exact.
  */
-function pathMatchOptions(
+export function pathMatchOptions(
   surface: string,
   platform: NodeJS.Platform,
 ): { caseInsensitive: true; windowsSeparators: true } | undefined {
