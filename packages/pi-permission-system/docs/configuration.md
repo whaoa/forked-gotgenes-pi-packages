@@ -360,6 +360,9 @@ For bash commands, the extension extracts path-candidate tokens from the command
 The most restrictive result across all tokens determines the outcome.
 When the current working directory is known, relative bash tokens are matched with cwd-normalized policy values, resolved against the effective directory after literal `cd` commands; a token after a non-literal `cd` (e.g. `cd "$DIR"`) stays conservative and matches only its literal form.
 
+A bare filename with no path shape at all (e.g. `id_rsa` in `cat id_rsa`) is also gated when it matches an active, specific (non-`*`) `path` deny/ask rule — so `"id_rsa": "deny"` or `"*.pem": "deny"` blocks the file whether it is referenced by a bare name, a relative path, or the `read` tool.
+A bare token that matches no specific `path` rule (e.g. `status` in `git status`) is left alone, and this promotion never fires against a `"*"` catch-all — only a config that already declares a specific `path` rule is affected.
+
 Four orthogonal layers compose with most-restrictive-wins:
 
 | Layer                   | Question                                | Applies to       |

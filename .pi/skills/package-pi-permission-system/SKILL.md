@@ -209,8 +209,11 @@ The bash `external_directory` gate only sees tokens that `classifyTokenAsPathCan
 A plain `./relative` token (e.g. `cat ./link/hosts`) is dropped before that gate and is instead gated by the broader `path` surface (`classifyTokenAsRuleCandidate`).
 The broader classifier also recognizes the backslash drive form (`D:\…`) — the forward-slash form is caught by `includes("/")`.
 On POSIX, a drive-shaped token (`C:/foo`) resolves as the real in-CWD path `./C:/foo` and remains gated by the `path` surface; the `PathNormalizer`'s `isAbsolute` decides platform-correct routing.
+A bare filename (`cat id_rsa`), which has none of the broad classifier's accepted shapes, is nonetheless promoted into the `path` surface when it matches an active, specific (non-`*`) `path` deny/ask rule ([#509]) — rule-driven promotion via `classifyPromotedRuleCandidate`, decided by `PermissionManager.getPromotablePathTokenMatcher` (owns the ruleset filter and the Windows case/separator fold) and threaded into `BashPathResolver` as an injected predicate.
+A bare token that matches no specific `path` rule, or any config without `path` rules at all, is still dropped exactly as before — promotion never fires against the universal `"*"` fallback.
 When a plan or test asserts a specific bash repro string, trace the token through the classifier first — an issue's headline repro can describe a symptom whose literal input never reaches the gate being changed.
 
 [#261]: https://github.com/gotgenes/pi-packages/issues/261
 [#296]: https://github.com/gotgenes/pi-packages/issues/296
+[#509]: https://github.com/gotgenes/pi-packages/issues/509
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
