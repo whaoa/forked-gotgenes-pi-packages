@@ -19,6 +19,14 @@ Publishing is automatic — `scripts/publish-released.sh` derives the package li
 
 When adding a new internal docs subdirectory (retro, plans, architecture, decisions, assets), add its path to `exclude-paths` in `release-please-config.json`.
 Commits that only touch excluded paths do not trigger releases.
+
+### Docs-in-distribution convention
+
+The published npm tarball ships user-facing docs and never ships internal working docs.
+Ship the docs the README links to (`docs/*.md` plus referenced subdirectories such as `guides`/`migration`/`assets`); never ship `docs/plans` or `docs/retro`.
+A package with a `files` allowlist in `package.json` lists its user-doc paths explicitly (e.g. `"docs/*.md", "docs/guides"`) rather than a bare `"docs"` entry — an `.npmignore` denylist does **not** prune files inside a directory a `files` allowlist already includes, so exclusion for such a package must narrow the `files` entry itself, not rely on `.npmignore` (Refs #484).
+A package with no `files` allowlist (publishes everything minus defaults) excludes internal docs via a `.npmignore` denylist (`docs/plans`, `docs/retro`) — this works because there is no allowlist in the way.
+Verify either mechanism with `pnpm --filter <pkg> exec pnpm pack --pack-destination /tmp` and inspect `tar tzf` for the expected file set.
 Run `pnpm fallow dead-code` locally before pushing a new or dependency-changed package — CI gates on it, and `devDependencies` copied from a sibling package often include unused entries.
 
 ## Workflow
