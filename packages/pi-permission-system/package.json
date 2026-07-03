@@ -15,6 +15,10 @@
     "test",
     "config/config.example.json",
     "schemas/permissions.schema.json",
+    "docs/*.md",
+    "docs/guides",
+    "docs/migration",
+    "docs/assets",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
