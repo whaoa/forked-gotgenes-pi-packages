@@ -22,12 +22,13 @@ Commits that only touch excluded paths do not trigger releases.
 
 ### Docs-in-distribution convention
 
-The published npm tarball ships user-facing docs and never ships internal working docs.
-Ship the docs the README links to (`docs/*.md` plus referenced subdirectories such as `guides`/`migration`/`assets`); never ship `docs/plans` or `docs/retro`.
-A package with a `files` allowlist in `package.json` lists its user-doc paths explicitly (e.g. `"docs/*.md", "docs/guides"`), not a bare `"docs"` entry.
-An `.npmignore` denylist does **not** prune files inside a directory a `files` allowlist already includes, so such a package excludes internal docs by narrowing the `files` entry itself (Refs #484).
-A package with no `files` allowlist excludes internal docs via an `.npmignore` denylist (`docs/plans`, `docs/retro`) instead — with no allowlist in the way, the denylist takes effect.
-Verify either mechanism with `pnpm --filter <pkg> exec pnpm pack --pack-destination /tmp` and inspect `tar tzf` for the expected file set.
+The published npm tarball ships runtime code, user-facing docs, and nothing else — no dev files (`test/`, `tsconfig.json`, `vitest.config.ts`, `AGENTS.md`, `.pi/`, `.prettierignore`) and no internal working docs.
+Every package uses a `files` allowlist in `package.json`; no package uses `.npmignore` (Refs #484, #523).
+A bare directory entry (e.g. `"src"`) is recursive, so runtime code ships without allowlist edits as it grows; npm always auto-includes `package.json`, `README*`, and `LICENSE*` regardless of the allowlist.
+List only the additional top-level ship targets explicitly: `dist` (built type bundles), `schemas`, `config/*.example.json`, and user-doc paths.
+Ship the docs the README links to (`docs/*.md` plus referenced subdirectories such as `guides`/`migration`/`assets`/`architecture`/`decisions`), never a bare `"docs"` entry — that would also ship `docs/plans` and `docs/retro`.
+A package with no user-facing docs omits any `docs` entry from its allowlist entirely.
+Verify the allowlist with `pnpm --filter <pkg> exec pnpm pack --pack-destination /tmp` and inspect `tar tzf` for the expected file set — confirm it contains runtime code and user docs, and excludes `test/`, dev config, and internal docs.
 Run `pnpm fallow dead-code` locally before pushing a new or dependency-changed package — CI gates on it, and `devDependencies` copied from a sibling package often include unused entries.
 
 ## Workflow
