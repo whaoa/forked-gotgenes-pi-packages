@@ -15,7 +15,9 @@
   "files": [
     "src",
     "dist",
-    "docs",
+    "docs/*.md",
+    "docs/architecture",
+    "docs/decisions",
     "vitest.config.ts",
     "AGENTS.md",
     "CHANGELOG.md",
