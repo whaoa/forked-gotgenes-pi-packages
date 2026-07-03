@@ -29,6 +29,12 @@
     "node": ">=22"
   },
   "type": "module",
+  "files": [
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "pi": {
     "extensions": [
       "./src/index.ts"
