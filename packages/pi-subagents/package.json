@@ -18,10 +18,7 @@
     "docs/*.md",
     "docs/architecture",
     "docs/decisions",
-    "vitest.config.ts",
-    "AGENTS.md",
-    "CHANGELOG.md",
-    ".prettierignore"
+    "CHANGELOG.md"
   ],
   "imports": {
     "#src/*": "./src/*",
