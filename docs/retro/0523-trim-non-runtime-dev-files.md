@@ -24,4 +24,20 @@ Plan is packaging-only: seven commits (six `build(<pkg>):`, one `docs:` for AGEN
 - No architecture-roadmap, README, or package-skill references to `#523` need updating; only AGENTS.md's docs-in-distribution convention changes.
 - Next stage is `/build-plan` (no test cycles — packaging config and docs only).
 
+## Stage: Implementation — Build (2026-07-03T00:30:00Z)
+
+### Session summary
+
+Executed all 7 build steps from the plan: added `files` allowlists to `pi-autoformat`, `pi-nocd`, `pi-session-tools`, and `pi-subagents-worktrees`; trimmed the `test` entry from `pi-permission-system` and the dev-file entries (`vitest.config.ts`, `AGENTS.md`, `.prettierignore`) from `pi-subagents`; deleted all six now-redundant `.npmignore` files; rewrote AGENTS.md's docs-in-distribution convention for the single-mechanism end state.
+Each step was verified with `pnpm pack` + `tar tzf` before committing, matching the plan's target `files` arrays exactly.
+
+### Observations
+
+- No deviations from the plan — every tarball matched the Design Overview's target `files` arrays on the first attempt.
+- `pi-subagents`' `pnpm run verify:public-types` (packs the tarball, type-checks an external consumer against both public entries) passed after trimming its allowlist, confirming the `dist/*.d.ts` bundles still ship correctly.
+- No `src/`/`test/` files were touched, so the full test suite was not required by the build-plan protocol; `pnpm run check` and `pnpm run lint` were run after every step regardless.
+- Pre-completion reviewer: **PASS** — all deterministic checks green, all 6 tarballs independently re-verified via `pnpm pack`/`tar tzf` to exclude `test/`, `tsconfig.json`, `vitest.config.ts`, `AGENTS.md`, `.pi/`, `.prettierignore`, `docs/plans/`, `docs/retro/` while retaining runtime code, `dist/` type bundles, and user docs; commit messages and AGENTS.md rewrite confirmed accurate.
+  No WARN findings.
+- Next stage: `/ship-issue`.
+
 [#484]: https://github.com/gotgenes/pi-packages/issues/484
