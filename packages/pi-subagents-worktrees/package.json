@@ -36,6 +36,12 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "imports": {
     "#src/*": "./src/*",
     "#test/*": "./test/*"
