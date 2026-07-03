@@ -37,6 +37,15 @@
     "node": ">=22"
   },
   "type": "module",
+  "files": [
+    "src",
+    "schemas",
+    "docs/*.md",
+    "docs/assets",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "pi": {
     "extensions": [
       "./src/extension.ts"
