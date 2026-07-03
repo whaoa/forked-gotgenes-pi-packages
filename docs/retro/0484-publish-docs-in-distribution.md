@@ -31,3 +31,24 @@ The operator broadened scope to a repo-wide convention — ship user-facing docs
 - **Release:** ship independently — `pi-permission-system` cuts a `fix:` patch; the other packages' `build:`/`docs:` commits are hidden and batch.
 - **Filed follow-up #523** for the separate over-publishing of non-runtime dev files (`test/`, `tsconfig.json`, `vitest.config.ts`, `AGENTS.md`, `.pi/`), explicitly out of scope here.
 - **Open risk to watch in build:** whether `.npmignore` prunes inside `pi-subagents`'s `files`-allowlisted `docs` dir; plan documents a fallback (narrow the `docs` entry) arbitrated by the pack diff.
+
+## Stage: Implementation — Build (2026-07-03T01:05:00Z)
+
+### Session summary
+
+Executed all 7 plan steps as 7 commits: fixed `pi-permission-system`'s `files` allowlist to publish user-facing docs (the reported bug), added `.npmignore`/narrowed-allowlist exclusions for internal `docs/plans`/`docs/retro` across `pi-subagents`, `pi-autoformat`, `pi-nocd`, `pi-session-tools`, `pi-subagents-worktrees`, and documented the convention in root `AGENTS.md`.
+Every step was verified with a `pnpm pack` + `tar tzf` tarball diff rather than Vitest, per the plan's build-only design.
+A final cross-package sweep confirmed zero `docs/plans`/`docs/retro` files in any of the 8 packages' tarballs.
+
+### Observations
+
+- **The plan's flagged risk materialized exactly as anticipated.**
+  `.npmignore` does **not** prune files inside a directory a `files` allowlist already includes — verified empirically on `pi-subagents` (245 `plans`/`retro` files still shipped after adding the denylist).
+  Applied the plan's own documented fallback: narrowed the `files` `docs` entry to `"docs/*.md", "docs/architecture", "docs/decisions"` instead, folded into the same commit per the deviation-handling instructions.
+  Confirmed by contrast that `.npmignore` works correctly for packages with **no** `files` allowlist (`pi-autoformat` first, then the rest) — the two mechanisms really are asymmetric as designed.
+- **AGENTS.md convention updated to state the caveat explicitly**, not just the two mechanisms, so a future package author hits documented guidance instead of rediscovering the same empirical surprise.
+- **No `src/`/`test/` changes** — this was a pure packaging-metadata change (`package.json` `files` fields, `.npmignore` files, one `AGENTS.md` section).
+  `pnpm run check`/`lint`/`test`/`fallow dead-code` all pass; test/dead-code are unaffected by the diff as expected.
+- **Pre-completion reviewer: PASS.**
+  No findings; reviewer independently re-verified all 8 packages' tarball contents and confirmed follow-up #523 is correctly filed and referenced.
+- All 7 steps completed in this session; nothing deferred to a future build session.
