@@ -12,7 +12,6 @@
   },
   "files": [
     "src",
-    "test",
     "config/config.example.json",
     "schemas/permissions.schema.json",
     "docs/*.md",
