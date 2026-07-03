@@ -24,8 +24,9 @@ Commits that only touch excluded paths do not trigger releases.
 
 The published npm tarball ships user-facing docs and never ships internal working docs.
 Ship the docs the README links to (`docs/*.md` plus referenced subdirectories such as `guides`/`migration`/`assets`); never ship `docs/plans` or `docs/retro`.
-A package with a `files` allowlist in `package.json` lists its user-doc paths explicitly (e.g. `"docs/*.md", "docs/guides"`) rather than a bare `"docs"` entry — an `.npmignore` denylist does **not** prune files inside a directory a `files` allowlist already includes, so exclusion for such a package must narrow the `files` entry itself, not rely on `.npmignore` (Refs #484).
-A package with no `files` allowlist (publishes everything minus defaults) excludes internal docs via a `.npmignore` denylist (`docs/plans`, `docs/retro`) — this works because there is no allowlist in the way.
+A package with a `files` allowlist in `package.json` lists its user-doc paths explicitly (e.g. `"docs/*.md", "docs/guides"`), not a bare `"docs"` entry.
+An `.npmignore` denylist does **not** prune files inside a directory a `files` allowlist already includes, so such a package excludes internal docs by narrowing the `files` entry itself (Refs #484).
+A package with no `files` allowlist excludes internal docs via an `.npmignore` denylist (`docs/plans`, `docs/retro`) instead — with no allowlist in the way, the denylist takes effect.
 Verify either mechanism with `pnpm --filter <pkg> exec pnpm pack --pack-destination /tmp` and inspect `tar tzf` for the expected file set.
 Run `pnpm fallow dead-code` locally before pushing a new or dependency-changed package — CI gates on it, and `devDependencies` copied from a sibling package often include unused entries.
 

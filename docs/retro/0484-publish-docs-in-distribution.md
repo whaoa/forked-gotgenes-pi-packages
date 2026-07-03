@@ -52,3 +52,49 @@ A final cross-package sweep confirmed zero `docs/plans`/`docs/retro` files in an
 - **Pre-completion reviewer: PASS.**
   No findings; reviewer independently re-verified all 8 packages' tarball contents and confirmed follow-up #523 is correctly filed and referenced.
 - All 7 steps completed in this session; nothing deferred to a future build session.
+
+## Stage: Final Retrospective (2026-07-03T01:20:57Z)
+
+### Session summary
+
+Shipped #484 across all four workflow stages (plan → build → ship → retro): the `pi-permission-system` `files`-allowlist fix cut `pi-permission-system-v18.1.1`, and the repo-wide docs-in-distribution convention landed as `build:`/`docs:` commits that batch into each sibling package's next release.
+Execution was clean end-to-end — no rework, no failed CI, no reopened work — with the plan's one flagged risk resolving mechanically via its own documented fallback.
+
+### Observations
+
+#### What went well
+
+1. **Plan foresight converted a mid-build surprise into a checklist item.**
+   The plan's `Risks and Mitigations` pre-identified that an `.npmignore` denylist might not prune inside `pi-subagents`'s `files`-allowlisted `docs` dir, and named the fallback (narrow the `files` entry).
+   In the build the risk materialized exactly — 245 `plans`/`retro` files still shipped after the denylist — and the fallback applied without any re-planning or stall.
+   This is the standout: a `Risks` entry with a concrete mitigation turned a would-be dead end into a one-line pivot.
+2. **Incremental verification cadence.**
+   `pnpm run lint` plus a `pnpm pack` + `tar tzf` tarball diff ran after every one of the 7 build steps, and a final cross-package sweep confirmed zero internal-doc files in all 8 tarballs — the feedback loop was per-step, not deferred to the end.
+3. **Ship-stage `UNSTABLE` handled correctly.**
+   The release-please PR reported `merge_state: UNSTABLE` with a `check` still `IN_PROGRESS` (a non-empty rollup), so I waited for it to complete rather than falling back to `gh pr merge` — exactly the distinction the ship prompt draws between the no-checks `GITHUB_TOKEN` case and a running check.
+
+#### What caused friction (agent side)
+
+1. `other` (tool-call syntax) — in the build stage, the first `pi-permission-system` `package.json` edit was emitted twice as a malformed `Edit` call (`oldText: "  "` with no `newText`), rejected by validation both times before the third, correct attempt.
+   Impact: 2 wasted tool calls, self-identified, no file rework.
+2. `other` (tool-call syntax) — in the retro stage, a `git pull` step was emitted as a garbled block (literal `court` and `<invoke>` text instead of a valid tool call), which the user flagged ("I'm not sure what happened there").
+   Impact: one wasted round-trip and brief user confusion, user-caught, no rework.
+   Both are model output glitches, not process gaps — no `AGENTS.md`/prompt rule would prevent them.
+
+#### What caused friction (user side)
+
+1. None material.
+   The mid-plan steer toward a denylist ("If you believe a deny-list is more effective, we should use that") was well-timed collaborative refinement, not friction — it produced the final asymmetric two-mechanism design.
+   A minor opportunity: the first `ask_user`'s mechanism options framed allowlist-vs-`.npmignore` as either/or, when the landing design used both (allowlist to *include* the missing docs, denylist to *exclude* internal docs); surfacing the hybrid as an explicit option could have reached the same place one turn sooner.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the sole subagent dispatch (`pre-completion-reviewer`) ran on `anthropic/claude-sonnet-5`, appropriate for judgment-heavy packaging review; it independently re-verified all 8 packages' tarball contents and the #523 follow-up filing.
+  No mismatch.
+- **Feedback-loop gap analysis** — no gap: verification ran incrementally after each build step (see What went well #2), not batched at session end.
+- **Escalation-delay tracking** — the malformed `Edit` was 2 consecutive failed calls before recovery, under the 5-call threshold; no subagent escalation warranted.
+
+### Changes made
+
+1. `AGENTS.md` — split the long (~50-word) "Docs-in-distribution convention" sentence into a tighter rule + caveat: the explicit-`files`-paths rule, then the `.npmignore`-can't-prune-inside-an-allowlist caveat (`Refs #484`), then the no-allowlist denylist case as its own line.
+   No semantic change; scannability only.
