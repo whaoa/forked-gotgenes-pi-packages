@@ -15,9 +15,22 @@ It codifies the patterns, smell categories, and analysis workflow that have prov
 ## Analysis workflow
 
 Follow this order — each step builds context for the next.
+Lead with the cause hypothesis, not the tool: fallow finds symptoms by construction (it is syntactic), so running it first frames the whole analysis around symptoms.
 
-### 1. Run fallow
+### 1. Read the architecture document and form a cause hypothesis
 
+Load `docs/architecture/architecture.md` for the current domain model, health metrics table, and dependency bag inventory.
+Check which bags/hotspots have already been addressed vs. remain open.
+Before touching any tool, write down a **cause hypothesis** — the first-principles structural problem the next phase should dissolve (structural fusion, a coupling/boundary flaw, a dead subsystem).
+The later steps corroborate, refine, or refute it.
+
+### 2. Sweep open issues
+
+Run `gh issue list --label "pkg:<PKG>" --state open` and cross-check it against the architecture doc's claims about which issues remain open — doc/tracker drift otherwise causes re-planning filed work or missing a parked candidate.
+
+### 3. Run fallow for corroboration and baseline
+
+Fallow **corroborates** the cause hypothesis and supplies outcome baselines — it does not set the agenda.
 Run from the repo root — the `fallow:*` scripts exist only in the root `package.json`, and `--workspace` scopes the analysis:
 
 ```bash
@@ -27,13 +40,9 @@ pnpm fallow dupes --workspace @gotgenes/<PKG> 2>&1 || true
 ```
 
 Capture: health score, dead exports, duplication (production vs. test), hotspots, refactoring targets.
+The phase spine must not be fallow-sourced-only: at least the primary cause must trace to the Step 1 reading, with fallow signals cited as symptoms of that cause, not as a step's motivation.
 
-### 2. Read the architecture document
-
-Load `docs/architecture/architecture.md` for the current domain model, health metrics table, and dependency bag inventory.
-Check which bags/hotspots have already been addressed vs. remain open.
-
-### 3. Start from the entry point and work inward
+### 4. Start from the entry point and work inward
 
 Begin at `src/index.ts` (or the package's composition root) and trace the dependency graph outward.
 This "outside-in" traversal reveals:
@@ -50,11 +59,15 @@ For each imported module, note:
 - How deep it goes (fan-out)
 - Whether it's a pure function, stateful class, or adapter
 
-### 4. Identify smells using the taxonomy below
+### 5. Identify smells using the taxonomy below
 
-### 5. Prioritize using the severity framework
+### 6. Prioritize using the severity framework
 
-### 6. Group into issue-sized steps with a dependency graph
+### 7. Group into issue-sized steps with a dependency graph
+
+Nine steps is a ceiling, not a target — a phase may have one step, or none.
+If discovery surfaced no cause-level finding (Category A–C) and the candidates are polish-only (Category B unit-size, D, E symptoms), say so and present **defer** and **lean phase** as first-class `ask_user` options rather than manufacturing a full phase.
+Before committing any step whose outcome depends on the SDK/type surface, feasibility-probe it — confirm the named type or export exists in the real surface before promising the outcome.
 
 ## Smell taxonomy
 
