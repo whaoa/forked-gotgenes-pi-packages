@@ -252,6 +252,19 @@ describe("resolvedAlias()", () => {
   });
 });
 
+describe("AccessPath.forDevice", () => {
+  test("lexical, boundary, and match values are all the device path", () => {
+    const ap = AccessPath.forDevice("/dev/null");
+    expect(ap.value()).toBe("/dev/null");
+    expect(ap.boundaryValue()).toBe("/dev/null");
+    expect(ap.matchValues()).toEqual(["/dev/null"]);
+  });
+
+  test("resolvedAlias is undefined (canonical equals lexical)", () => {
+    expect(AccessPath.forDevice("/dev/null").resolvedAlias()).toBeUndefined();
+  });
+});
+
 describe("AccessPath.forLiteral", () => {
   beforeEach(() => {
     realpathSync.mockReset();

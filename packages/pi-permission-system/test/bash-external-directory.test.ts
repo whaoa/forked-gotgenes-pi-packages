@@ -1005,6 +1005,29 @@ describe("Windows drive-letter paths (win32 semantics)", () => {
   });
 });
 
+describe("Git Bash POSIX device paths (win32 semantics)", () => {
+  const windowsCwd = "C:/projects/app";
+
+  async function extractWin32(command: string): Promise<string[]> {
+    return extractWithNormalizer(
+      command,
+      new PathNormalizer("win32", windowsCwd),
+    );
+  }
+
+  test("a /dev/null redirect target is not flagged", async () => {
+    const result = await extractWin32("echo hi > /dev/null");
+    expect(result).toHaveLength(0);
+  });
+
+  test("all four safe device paths are excluded", async () => {
+    const result = await extractWin32(
+      "cat /dev/stdin /dev/stdout /dev/stderr /dev/null",
+    );
+    expect(result).toHaveLength(0);
+  });
+});
+
 describe("bash external-directory denial messages (centralized)", () => {
   test("denial message includes command, paths, and extension tag", () => {
     const result = formatDenyReason({

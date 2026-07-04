@@ -376,16 +376,21 @@ export class BashPathResolver {
         base.kind === "known"
           ? this.normalizer.resolveBase(base.offset)
           : undefined;
-      const accessPath = this.normalizer.forPath(candidate, { resolveBase });
+      const accessPath = this.normalizer.forBashToken(candidate, {
+        resolveBase,
+      });
       const lexical = accessPath.value();
       if (!lexical) continue;
       // The boundary decision and dedup identity use the canonical
-      // (symlink-resolved) form, but the returned value is the lexical form so
-      // config patterns match the path as the user typed it (#418).
+      // (symlink-resolved) form the AccessPath already derived, but the returned
+      // value is the lexical form so config patterns match the path as the user
+      // typed it (#418). A win32 device path preserves `/dev/null` as its
+      // boundary value, so `isBoundaryOutsideWorkingDirectory` reaches the
+      // safe-path exclusion (#533).
       const canonical = accessPath.boundaryValue();
 
       if (
-        this.normalizer.isOutsideWorkingDirectory(lexical) &&
+        this.normalizer.isBoundaryOutsideWorkingDirectory(canonical) &&
         !seen.has(canonical)
       ) {
         seen.add(canonical);

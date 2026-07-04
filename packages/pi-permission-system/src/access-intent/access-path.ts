@@ -124,4 +124,20 @@ export class AccessPath {
   static forLiteral(literal: string): AccessPath {
     return new AccessPath(literal, literal ? [literal] : [], "");
   }
+
+  /**
+   * Build an `AccessPath` for a Git Bash/MSYS device path (`/dev/null`,
+   * `/dev/std{in,out,err}`) seen in a bash command on a win32 host.
+   *
+   * The token names an MSYS runtime device, not a filesystem path, so it is
+   * preserved verbatim across all three representations — `value()`,
+   * `boundaryValue()`, and `matchValues()` are the device path itself, never
+   * `win32.resolve`-mangled into `c:\dev\null`. The identical lexical and
+   * canonical forms let the boundary check reach `isSafeSystemPath` (so the
+   * device never triggers `external_directory`) while a config rule still
+   * matches the path as typed.
+   */
+  static forDevice(devicePath: string): AccessPath {
+    return new AccessPath(devicePath, [devicePath], devicePath);
+  }
 }

@@ -114,6 +114,26 @@ describe("PathNormalizer", () => {
       );
       expect(normalizer.comparableValue("/etc/hosts")).toBe("/etc/hosts");
     });
+
+    test("forBashToken delegates to forPath on posix", () => {
+      const ap = normalizer.forBashToken("src/foo.ts");
+      expect(ap.value()).toBe("/projects/my-app/src/foo.ts");
+    });
+
+    test("isBoundaryOutsideWorkingDirectory tests a canonical path against cwd", () => {
+      expect(
+        normalizer.isBoundaryOutsideWorkingDirectory("/projects/my-app/src"),
+      ).toBe(false);
+      expect(normalizer.isBoundaryOutsideWorkingDirectory("/etc/hosts")).toBe(
+        true,
+      );
+    });
+
+    test("isBoundaryOutsideWorkingDirectory excludes a safe device path", () => {
+      expect(normalizer.isBoundaryOutsideWorkingDirectory("/dev/null")).toBe(
+        false,
+      );
+    });
   });
 
   describe("win32 flavor", () => {
@@ -161,6 +181,35 @@ describe("PathNormalizer", () => {
       expect(normalizer.comparableValue("src\\foo.ts")).toBe(
         "c:\\projects\\app\\src\\foo.ts",
       );
+    });
+
+    test("forBashToken preserves a POSIX device path as a safe device", () => {
+      const ap = normalizer.forBashToken("/dev/null");
+      expect(ap.value()).toBe("/dev/null");
+      expect(ap.boundaryValue()).toBe("/dev/null");
+      expect(
+        normalizer.isBoundaryOutsideWorkingDirectory(ap.boundaryValue()),
+      ).toBe(false);
+    });
+
+    test("forBashToken preserves all four safe device paths", () => {
+      for (const device of [
+        "/dev/null",
+        "/dev/stdin",
+        "/dev/stdout",
+        "/dev/stderr",
+      ]) {
+        expect(normalizer.forBashToken(device).boundaryValue()).toBe(device);
+      }
+    });
+
+    test("isBoundaryOutsideWorkingDirectory case-folds against the baked cwd", () => {
+      expect(
+        normalizer.isBoundaryOutsideWorkingDirectory("c:\\projects\\app\\src"),
+      ).toBe(false);
+      expect(
+        normalizer.isBoundaryOutsideWorkingDirectory("c:\\other\\dir"),
+      ).toBe(true);
     });
   });
 

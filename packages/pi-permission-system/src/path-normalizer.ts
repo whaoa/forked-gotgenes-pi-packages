@@ -10,6 +10,7 @@ import {
   isPathWithinDirectory,
 } from "./path-containment";
 import { isPiInfrastructureRead } from "./pi-infrastructure-read";
+import { isSafeSystemPath } from "./safe-system-paths";
 
 /**
  * Path-interpretation collaborator, constructed once at the session edge with
@@ -51,6 +52,24 @@ export class PathNormalizer {
     return AccessPath.forLiteral(literal);
   }
 
+  /**
+   * Build an AccessPath for a bash-command token, applying Git Bash/MSYS
+   * semantics on a win32 host.
+   *
+   * Pi core always executes bash through Git Bash on Windows, so a POSIX-shaped
+   * absolute token carries MSYS semantics, not `node:path.win32` semantics. On
+   * win32 the recognized safe device paths (`/dev/null`, `/dev/std{in,out,err}`)
+   * are preserved verbatim as devices instead of being resolved into
+   * `c:\dev\null`; every other token delegates to {@link forPath}. On POSIX
+   * this is a straight delegation to {@link forPath}.
+   */
+  forBashToken(token: string, options?: { resolveBase?: string }): AccessPath {
+    if (this.platform === "win32" && isSafeSystemPath(token)) {
+      return AccessPath.forDevice(token);
+    }
+    return this.forPath(token, options);
+  }
+
   /** Platform-aware absoluteness (`win32` vs `posix` rules). */
   isAbsolute(pathValue: string): boolean {
     return this.impl.isAbsolute(pathValue);
@@ -78,6 +97,23 @@ export class PathNormalizer {
       this.cwd,
       this.platform,
     );
+    return isPathOutsideWorkingDirectory(
+      canonicalPath,
+      this.canonicalCwd,
+      this.platform,
+    );
+  }
+
+  /**
+   * Outside-cwd test for an already-canonical boundary value (from
+   * {@link AccessPath.boundaryValue}), against the baked cwd.
+   *
+   * Unlike {@link isOutsideWorkingDirectory}, it does not re-derive the
+   * canonical form — the caller passes a value the {@link AccessPath} already
+   * canonicalized, so a device's preserved `/dev/null` reaches the pure check's
+   * `isSafeSystemPath` exclusion intact.
+   */
+  isBoundaryOutsideWorkingDirectory(canonicalPath: string): boolean {
     return isPathOutsideWorkingDirectory(
       canonicalPath,
       this.canonicalCwd,
