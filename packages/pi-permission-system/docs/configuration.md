@@ -505,6 +505,17 @@ On Windows, path matching for `external_directory`, `path`, and the path-bearing
 A mixed-case allow override such as `~/AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent/*` therefore matches a lowercased, backslash-normalized path value.
 POSIX matching remains case-sensitive.
 
+#### Git Bash / MSYS paths on Windows
+
+On Windows, Pi executes bash commands through Git Bash, so a bash token that looks like a POSIX absolute path carries MSYS mount semantics rather than native `node:path.win32` semantics.
+The `external_directory` and `path` gates interpret bash tokens accordingly (tool-input paths for `read`/`write`/`edit` keep native Windows semantics, since those tools resolve them through Node's filesystem):
+
+- The safe device paths (`/dev/null`, `/dev/stdin`, `/dev/stdout`, `/dev/stderr`) are recognized as MSYS devices and never trigger the gate — the same exclusion that holds on POSIX, so `echo hi > /dev/null` does not prompt.
+- MSYS drive mounts (`/c/…`, `/d/…`) are translated to their Windows equivalent (`C:\…`), so a project file referenced through a mount is matched against its real Windows path and an in-CWD mount is not flagged.
+- Every other POSIX-absolute token (`/tmp/foo`, `/usr/bin`) has an install-dependent target this extension cannot resolve deterministically (Git Bash mounts `/tmp` to `%TEMP%`, MSYS2 to its own root), so it is treated as an external path matched and displayed exactly as typed, never rewritten to `C:\tmp\foo`.
+
+To allow-list such a path, write the rule using the path as typed — for example `external_directory: { "/tmp/*": "allow" }` — and the Windows separator folding above makes the forward-slash rule match the Git Bash token.
+
 ### Home Directory Expansion in Patterns
 
 Pattern keys in any permission surface can start with `~/` or `$HOME/` (or be exactly `~` / `$HOME`).
