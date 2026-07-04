@@ -315,23 +315,34 @@ export class BashPathResolver {
    * Returns `base` unchanged unless the command is `cd`:
    *
    * - `cd /abs` (absolute literal) → a fresh known base, recovering from an
-   *   earlier unknown base.
+   *   earlier unknown base. On win32 a drive-mount target (`cd /c/x`) folds to
+   *   its translated Windows base, while a non-mount POSIX absolute
+   *   (`cd /tmp`) is not deterministically resolvable and yields unknown (#533).
    * - `cd rel` (relative literal) → fold into a known base, or stay unknown if
    *   the base was already unknown.
    * - `cd "$DIR"` / `cd $(…)` / `cd -` / bare `cd` / `cd ~…` (non-literal) →
    *   unknown.
+   *
+   * The target's platform/MSYS interpretation is delegated to the
+   * {@link PathNormalizer}; this method owns only the base-folding state.
    */
   private foldCd(commandNode: TSNode, base: EffectiveBase): EffectiveBase {
     if (extractCommandName(commandNode) !== "cd") return base;
     const target = cdLiteralTarget(commandNode);
     if (target === null) return UNKNOWN_BASE;
-    if (this.normalizer.isAbsolute(target))
-      return { kind: "known", offset: target };
-    if (base.kind === "unknown") return UNKNOWN_BASE;
-    return {
-      kind: "known",
-      offset: this.normalizer.joinBase(base.offset, target),
-    };
+    const interpreted = this.normalizer.interpretBashCdTarget(target);
+    switch (interpreted.kind) {
+      case "absolute":
+        return { kind: "known", offset: interpreted.value };
+      case "unknown":
+        return UNKNOWN_BASE;
+      case "relative":
+        if (base.kind === "unknown") return UNKNOWN_BASE;
+        return {
+          kind: "known",
+          offset: this.normalizer.joinBase(base.offset, target),
+        };
+    }
   }
 
   // ── Projection ─────────────────────────────────────────────────────────

@@ -14,6 +14,22 @@ import {
 import { isPiInfrastructureRead } from "./pi-infrastructure-read";
 
 /**
+ * The interpreted effect of a literal `cd` target on the effective base, under
+ * the host platform's (and, on win32, Git Bash's) semantics.
+ *
+ * - `absolute` — the target names a resolvable absolute base (`value`); an
+ *   earlier unknown base is recovered.
+ * - `relative` — the target folds into the current base.
+ * - `unknown` — the target is not deterministically resolvable (a win32
+ *   non-mount POSIX absolute like `cd /tmp`, or a device), so the base becomes
+ *   conservatively unknown.
+ */
+export type BashCdTarget =
+  | { readonly kind: "absolute"; readonly value: string }
+  | { readonly kind: "relative" }
+  | { readonly kind: "unknown" };
+
+/**
  * Path-interpretation collaborator, constructed once at the session edge with
  * the two ambient inputs — the host `platform` and the session `cwd` — baked
  * in, and handed raw path tokens thereafter.
@@ -89,6 +105,36 @@ export class PathNormalizer {
   /** Platform-aware absoluteness (`win32` vs `posix` rules). */
   isAbsolute(pathValue: string): boolean {
     return this.impl.isAbsolute(pathValue);
+  }
+
+  /**
+   * Interpret a literal `cd` target's effect on the effective base.
+   *
+   * On win32 the target carries Git Bash/MSYS semantics: a drive mount
+   * (`cd /c/x`) resolves to a translated Windows base (`C:\x`), a non-mount
+   * POSIX absolute (`cd /tmp`) is not deterministically resolvable and yields an
+   * `unknown` base, and a native/relative target is handled as usual. On POSIX
+   * an absolute target is absolute and everything else is relative.
+   */
+  interpretBashCdTarget(target: string): BashCdTarget {
+    if (this.platform !== "win32") {
+      return this.impl.isAbsolute(target)
+        ? { kind: "absolute", value: target }
+        : { kind: "relative" };
+    }
+
+    const shape = classifyWin32BashToken(target);
+    switch (shape.kind) {
+      case "drive-mount":
+        return { kind: "absolute", value: shape.windowsPath };
+      case "device":
+      case "posix-absolute":
+        return { kind: "unknown" };
+      case "plain":
+        return this.impl.isAbsolute(target)
+          ? { kind: "absolute", value: target }
+          : { kind: "relative" };
+    }
   }
 
   /** Resolve a `cd`-folded offset against the baked cwd (platform-aware). */

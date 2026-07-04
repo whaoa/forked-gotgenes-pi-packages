@@ -134,6 +134,19 @@ describe("PathNormalizer", () => {
         false,
       );
     });
+
+    test("interpretBashCdTarget maps an absolute target to absolute (posix)", () => {
+      expect(normalizer.interpretBashCdTarget("/etc")).toEqual({
+        kind: "absolute",
+        value: "/etc",
+      });
+    });
+
+    test("interpretBashCdTarget maps a relative target to relative (posix)", () => {
+      expect(normalizer.interpretBashCdTarget("sub")).toEqual({
+        kind: "relative",
+      });
+    });
   });
 
   describe("win32 flavor", () => {
@@ -224,6 +237,32 @@ describe("PathNormalizer", () => {
       expect(ap.value()).toBe("/tmp/foo");
       expect(ap.boundaryValue()).toBe("");
       expect(ap.matchValues()).toEqual(["/tmp/foo"]);
+    });
+
+    test("interpretBashCdTarget translates a drive-mount target to absolute", () => {
+      expect(normalizer.interpretBashCdTarget("/c/Other")).toEqual({
+        kind: "absolute",
+        value: "C:\\Other",
+      });
+    });
+
+    test("interpretBashCdTarget maps a non-mount POSIX absolute to unknown", () => {
+      expect(normalizer.interpretBashCdTarget("/tmp")).toEqual({
+        kind: "unknown",
+      });
+    });
+
+    test("interpretBashCdTarget maps a native drive path to absolute", () => {
+      expect(normalizer.interpretBashCdTarget("C:\\Other")).toEqual({
+        kind: "absolute",
+        value: "C:\\Other",
+      });
+    });
+
+    test("interpretBashCdTarget maps a relative target to relative (win32)", () => {
+      expect(normalizer.interpretBashCdTarget("sub")).toEqual({
+        kind: "relative",
+      });
     });
 
     test("isBoundaryOutsideWorkingDirectory case-folds against the baked cwd", () => {

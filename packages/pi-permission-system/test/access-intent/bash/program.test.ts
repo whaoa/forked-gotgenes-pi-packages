@@ -193,6 +193,33 @@ describe("BashProgram", () => {
         expect(candidate.path.matchValues()).toEqual(["/tmp/foo"]);
       });
 
+      it("folds a drive-mount cd so a following traversal resolves under it", async () => {
+        // cd /c/Other → base C:\Other; ../x resolves to C:\x (not C:\c\x).
+        // The cd argument itself is also collected and translated (c:\other).
+        const program = await BashProgram.parse(
+          "cd /c/Other && cat ../x",
+          winNormalizer,
+        );
+        expect(program.externalPaths().map((p) => p.value())).toEqual([
+          "c:\\other",
+          "c:\\x",
+        ]);
+      });
+
+      it("degrades a non-mount POSIX absolute cd to a conservative unknown base", async () => {
+        // Git Bash's /tmp is install-dependent, so `cd /tmp` makes the base
+        // unresolvable; a following traversal is flagged conservatively against
+        // cwd for display, and /tmp itself is a literal external path (#533).
+        const program = await BashProgram.parse(
+          "cd /tmp && cat ../x",
+          winNormalizer,
+        );
+        expect(program.externalPaths().map((p) => p.value())).toEqual([
+          "/tmp",
+          "c:\\projects\\x",
+        ]);
+      });
+
       it("flags a ..-traversal escaping cwd under win32 rules", async () => {
         const program = await BashProgram.parse(
           "cat ../sibling/x",
