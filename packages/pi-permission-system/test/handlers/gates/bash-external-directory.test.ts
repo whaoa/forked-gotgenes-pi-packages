@@ -266,3 +266,41 @@ describe("describeBashExternalDirectoryGate", () => {
     expect(desc.sessionApproval.patterns.length).toBe(1);
   });
 });
+
+describe("describeBashExternalDirectoryGate — Git Bash semantics (win32)", () => {
+  async function describeGateWin32(
+    tcc: ToolCallContext,
+    resolver: ScopedPermissionResolver,
+  ): Promise<GateResult> {
+    const command = getNonEmptyString(toRecord(tcc.input).command);
+    const bashProgram =
+      tcc.toolName === "bash" && command
+        ? await BashProgram.parse(command, new PathNormalizer("win32", tcc.cwd))
+        : null;
+    return describeBashExternalDirectoryGate(tcc, bashProgram, resolver);
+  }
+
+  const winTcc = (command: string): ToolCallContext =>
+    makeTcc({ cwd: "C:/projects/app", input: { command } });
+
+  it("does not prompt for a /dev/null redirect target", async () => {
+    const result = await describeGateWin32(
+      winTcc("echo hi > /dev/null"),
+      makeResolver(makeCheckResult("ask")),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("prompts for a /tmp path displayed as typed, not as C:\\tmp", async () => {
+    const result = await describeGateWin32(
+      winTcc("ls /tmp"),
+      makeResolver(makeCheckResult("ask")),
+    );
+    expect(isGateDescriptor(result)).toBe(true);
+    const desc = result as GateDescriptor;
+    expect(desc.denialContext).toMatchObject({
+      kind: "bash_external_directory",
+      externalPaths: [{ path: "/tmp" }],
+    });
+  });
+});

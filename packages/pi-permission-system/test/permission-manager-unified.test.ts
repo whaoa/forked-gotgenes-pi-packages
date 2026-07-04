@@ -9,12 +9,14 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, test } from "vitest";
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
+import { BashProgram } from "#src/access-intent/bash/program";
 import { getPathPolicyValues } from "#src/access-intent/path-normalization";
 import {
   getGlobalConfigPath,
   getProjectAgentsDir,
   getProjectConfigPath,
 } from "#src/config-paths";
+import { PathNormalizer } from "#src/path-normalizer";
 import {
   PermissionManager,
   type ScopedPermissionManager,
@@ -109,6 +111,35 @@ describe("PermissionManager — injected platform (#510)", () => {
       winAllow,
     );
     expect(result.state).not.toBe("allow");
+  });
+
+  it("win32: a /tmp* allow rule suppresses a Git Bash /tmp path (#533)", async () => {
+    // End to end: parse `ls /tmp` under win32, take the token's match values,
+    // and confirm a natural `/tmp*` external_directory allow rule matches them.
+    // The win32 matcher folds the rule's separators (/ -> \), so the literal
+    // carries a backslash match alias for this to resolve.
+    const program = await BashProgram.parse(
+      "ls /tmp",
+      new PathNormalizer("win32", "C:/projects/app"),
+    );
+    const values = program.externalPaths()[0].matchValues();
+    const manager = new PermissionManager({
+      globalConfigPath: "/nonexistent/config.json",
+      agentsDir: "/nonexistent/agents",
+      platform: "win32",
+    });
+
+    const allowed = manager.check(
+      { kind: "path-values", surface: "external_directory", values },
+      [sessionAllow("external_directory", "/tmp*")],
+    );
+    expect(allowed.state).toBe("allow");
+
+    const noRule = manager.check(
+      { kind: "path-values", surface: "external_directory", values },
+      [],
+    );
+    expect(noRule.state).not.toBe("allow");
   });
 });
 
