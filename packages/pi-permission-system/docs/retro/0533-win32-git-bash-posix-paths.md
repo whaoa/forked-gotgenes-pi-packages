@@ -25,3 +25,28 @@ The plan introduces a bash-surface-only POSIX-token interpretation layer on win3
 - **Evidence for `fix:` classification:** `docs/configuration.md` line ~469 already promises "OS device paths (`/dev/null`, …) are always excluded" — current win32 behavior violates the package's own documented contract.
 - Third-party issue (author `ThreeIce`); the `ask_user` direction gate was applied as required, and the operator's answers (not the issue body) drove the Goals.
 - No follow-up issues filed — the deferred alternatives (cygpath, `%TEMP%` mapping) were declined, not deferred.
+
+## Stage: Implementation — TDD (2026-07-04T19:05:00Z)
+
+### Session summary
+
+Implemented all 6 planned TDD cycles: `AccessPath.forDevice`, the pure `msys-bash-tokens.ts` classifier, `PathNormalizer.forBashToken`/`interpretBashCdTarget`/`isBoundaryOutsideWorkingDirectory`, the `BashPathResolver` projection/`foldCd` switch to `forBashToken`, gate-level integration, and docs (configuration, architecture, new ADR `0003`, skill).
+Test count went from 2233 to 2283 (+50); `check`, root `lint`, `test`, and `fallow dead-code` all green; lockfile untouched.
+Pre-completion reviewer returned PASS.
+
+### Observations
+
+- **Deviation 1 — `literalAliases` dropped from `path-normalization.ts`.**
+  The plan added an optional `literalAliases` to `getPathPolicyValues`/`forPath` for drive mounts.
+  An empirical probe (`wildcardMatch` with `{caseInsensitive, windowsSeparators}`) showed the win32 path matcher folds a rule's separators (`/` → `\`), so a forward-slash alias in a match value is unmatchable by any win32 pattern.
+  For drive mounts the translation to `C:\…` already yields backslashes, so the alias was dead weight and was dropped.
+  `path-normalization.ts` was left untouched.
+- **Deviation 2 — cycle 5 became a `fix:`, not `test:`.**
+  Gate-level integration exposed that a forward-slash `/tmp` literal value could not be allow-listed by any `external_directory` rule (same separator-folding cause).
+  To honor the plan's scenario 3 (a `/tmp/*` allow rule suppresses the prompt) and the operator's stated intent, the win32 posix-absolute literal now carries a backslash **match alias** (`\tmp\foo`) while `value()` (display) stays as typed.
+  `AccessPath.forLiteral` gained an optional `matchAliases` param (the alias mechanism the plan had placed on `forPath`, relocated to where it is actually load-bearing).
+  Pinned end-to-end by a new `permission-manager-unified.test.ts` case (parse `ls /tmp` → matchValues → win32 manager + `/tmp*` allow → allow).
+- **Test-assumption corrections during cycle 4:** a bare `cat x` token is not an external-directory path candidate, and a `cd` argument is itself collected as a candidate — so the cd-fold tests were rewritten to use parent-traversal tokens (`cat ../x`) that actually exercise the folded base.
+- **One existing test intentionally updated:** `program.test.ts` win32 `cat /etc/hosts` flipped from `c:\etc\hosts` to the literal `/etc/hosts` — the intended behavior change (a non-mount POSIX absolute is install-root-relative in Git Bash, matched as typed).
+- **Latent dedup bug fixed (cycle 3):** `projectExternalPaths` dedup key changed to `canonical || lexical` so two distinct literal-only paths no longer collapse on an empty boundary value.
+- Pre-completion reviewer: PASS (no blocking or non-blocking findings beyond the two documented deviations, both test-covered).
