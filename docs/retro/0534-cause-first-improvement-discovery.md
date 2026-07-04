@@ -23,3 +23,20 @@ Filed the plan at `docs/plans/0534-cause-first-improvement-discovery.md` (repo-r
   Chose a standalone phase-scoped retro at `packages/<PKG>/docs/retro/phase-N-<slug>.md` with inlined frontmatter (`package` / `phase`), following the pattern where `/plan-issue` inlines its own retro frontmatter — this keeps scope to the two files named in the issue and leaves `/finish-phase` (which owns the `history/` archive) untouched.
 - No follow-up issues filed — the retro hook was folded in per the operator's answer, and cross-reference checks confirmed the `Release:` mechanism in `AGENTS.md` / `plan-issue.md` is untouched, so no edits propagate outside the two files.
 - Next stage is `/build-plan` (docs-only, no TDD cycles).
+
+## Stage: Implementation — Build (2026-07-04T15:05:00Z)
+
+### Session summary
+
+Executed the docs-only build plan across five commits, editing the two repo-root workflow files.
+`.pi/prompts/plan-improvements.md` gained the cause-first reorder (architecture doc + cause hypothesis → open-issue sweep → demoted/trimmed fallow), the deferral gate, feasibility probe, conditional directory-org guard, "max 9" ceiling reframe, and a phase-scoped retro hook.
+`.pi/skills/improvement-discovery/SKILL.md` gained per-step cause attribution, published Impact/Risk/Priority scores, and the fallow-CRAP gotcha — and its own "Analysis workflow" section was resynced to the cause-first order.
+
+### Observations
+
+- All nine issue-checklist items plus the operator-approved retro hook landed; no package code, tests, or TypeScript touched, so `pnpm run check`/`test`/`fallow` were N/A — verification was `rumdl` lint only.
+- Step numbering in `plan-improvements.md` was fully renumbered (1–8) when the open-issue sweep was inserted; the Output section's `(Step 5)` → `(Step 6)` directory-org back-reference was updated to match, and a final grep confirmed no dangling `Step N` references.
+- Deviation from the plan's Module-Level Changes: the plan scoped the skill to "Output-format / rule additions, no restructure," but the pre-completion reviewer (WARN) caught that the skill's own top-level "Analysis workflow" numbered list still described the old fallow-first order — directly contradicting this issue's fix.
+  Fixed inline as a sixth commit (`1d3efa0b`) rather than deferring, since it is low-risk and central to the issue's goal.
+- Pre-completion reviewer: WARN — sole substantive finding (stale skill "Analysis workflow" ordering) resolved inline; the second WARN item (no filed issue for that gap) is moot now that it is fixed.
+  No FAIL findings; the `Release:` tag Output contract and Phase N−1 archive hard gate were verified preserved.
