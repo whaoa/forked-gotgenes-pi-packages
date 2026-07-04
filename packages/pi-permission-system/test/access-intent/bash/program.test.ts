@@ -175,14 +175,22 @@ describe("BashProgram", () => {
     describe("win32 projection (injected platform, no vi.mock node:path)", () => {
       const winNormalizer = new PathNormalizer("win32", "C:\\Projects\\App");
 
-      it("resolves and case-folds a rooted path outside cwd", async () => {
+      it("keeps a non-mount POSIX absolute literal (Git Bash semantics)", async () => {
+        // On win32, Pi core runs Git Bash: /etc is an MSYS install-root path,
+        // not C:\etc, so it is matched and displayed as typed (#533).
         const program = await BashProgram.parse(
           "cat /etc/hosts",
           winNormalizer,
         );
         expect(program.externalPaths().map((p) => p.value())).toEqual([
-          "c:\\etc\\hosts",
+          "/etc/hosts",
         ]);
+      });
+
+      it("keeps a non-mount POSIX absolute as a literal rule candidate", async () => {
+        const program = await BashProgram.parse("cat /tmp/foo", winNormalizer);
+        const candidate = program.pathRuleCandidates()[0];
+        expect(candidate.path.matchValues()).toEqual(["/tmp/foo"]);
       });
 
       it("flags a ..-traversal escaping cwd under win32 rules", async () => {

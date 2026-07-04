@@ -388,12 +388,17 @@ export class BashPathResolver {
       // boundary value, so `isBoundaryOutsideWorkingDirectory` reaches the
       // safe-path exclusion (#533).
       const canonical = accessPath.boundaryValue();
+      // A literal-only bash token (a win32 non-mount POSIX absolute like `/tmp`)
+      // has no canonical form; it is foreign to the win32 cwd, so it is always
+      // external. Its lexical value is the dedup identity so two distinct
+      // literal-only paths do not collapse (#533).
+      const isExternal = canonical
+        ? this.normalizer.isBoundaryOutsideWorkingDirectory(canonical)
+        : true;
+      const dedupKey = canonical || lexical;
 
-      if (
-        this.normalizer.isBoundaryOutsideWorkingDirectory(canonical) &&
-        !seen.has(canonical)
-      ) {
-        seen.add(canonical);
+      if (isExternal && !seen.has(dedupKey)) {
+        seen.add(dedupKey);
         externalPaths.push(accessPath);
       }
     }
@@ -455,7 +460,7 @@ export class BashPathResolver {
       base.kind === "known"
         ? this.normalizer.resolveBase(base.offset)
         : undefined;
-    return this.normalizer.forPath(candidate, { resolveBase });
+    return this.normalizer.forBashToken(candidate, { resolveBase });
   }
 
   /**

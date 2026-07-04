@@ -5,6 +5,7 @@ import { classifyWin32BashToken } from "./access-intent/bash/msys-bash-tokens";
 import {
   canonicalNormalizePathForComparison,
   normalizePathForComparison,
+  normalizePathPolicyLiteral,
 } from "./access-intent/path-normalization";
 import {
   isPathOutsideWorkingDirectory,
@@ -75,6 +76,11 @@ export class PathNormalizer {
       case "drive-mount":
         return this.forPath(shape.windowsPath, options);
       case "posix-absolute":
+        // A non-mount POSIX absolute (`/tmp`, `/usr`) has an install-dependent
+        // Windows target this package cannot know, so it is kept literal: always
+        // external, matched and displayed as typed, never fabricated into
+        // `c:\tmp` (#533).
+        return this.forLiteral(normalizePathPolicyLiteral(token));
       case "plain":
         return this.forPath(token, options);
     }

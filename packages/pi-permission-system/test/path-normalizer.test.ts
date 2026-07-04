@@ -219,6 +219,13 @@ describe("PathNormalizer", () => {
       ).toBe(false);
     });
 
+    test("forBashToken keeps a non-mount POSIX absolute as a literal", () => {
+      const ap = normalizer.forBashToken("/tmp/foo");
+      expect(ap.value()).toBe("/tmp/foo");
+      expect(ap.boundaryValue()).toBe("");
+      expect(ap.matchValues()).toEqual(["/tmp/foo"]);
+    });
+
     test("isBoundaryOutsideWorkingDirectory case-folds against the baked cwd", () => {
       expect(
         normalizer.isBoundaryOutsideWorkingDirectory("c:\\projects\\app\\src"),

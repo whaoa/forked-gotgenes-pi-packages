@@ -1054,6 +1054,32 @@ describe("Git Bash MSYS drive mounts (win32 semantics)", () => {
   });
 });
 
+describe("Git Bash POSIX absolute paths (win32 semantics)", () => {
+  const windowsCwd = "C:/projects/app";
+
+  async function extractWin32(command: string): Promise<string[]> {
+    return extractWithNormalizer(
+      command,
+      new PathNormalizer("win32", windowsCwd),
+    );
+  }
+
+  test("a /tmp path is flagged as typed, not fabricated into C:\\tmp", async () => {
+    const result = await extractWin32("ls /tmp");
+    expect(result).toEqual(["/tmp"]);
+  });
+
+  test("a /usr path is flagged as typed", async () => {
+    const result = await extractWin32("cat /usr/bin/tool");
+    expect(result).toEqual(["/usr/bin/tool"]);
+  });
+
+  test("distinct literal-only POSIX absolutes are not deduplicated together", async () => {
+    const result = await extractWin32("cat /tmp/a /tmp/b");
+    expect(result).toEqual(["/tmp/a", "/tmp/b"]);
+  });
+});
+
 describe("bash external-directory denial messages (centralized)", () => {
   test("denial message includes command, paths, and extension tag", () => {
     const result = formatDenyReason({
