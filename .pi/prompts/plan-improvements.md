@@ -52,6 +52,10 @@ Note:
 
 Determine the next phase number N (last completed phase + 1), then immediately call `set_session_name` with `$1 — Phase N Planning` so the session is labelled for the rest of the work.
 
+**Hard gate — the previous phase must be archived first.**
+If Phase N−1's full detailed roadmap (numbered steps with `Outcome:` lines and a dependency diagram) is still inline in `architecture.md` rather than condensed to a completion summary linking a `history/phase-(N−1)-<slug>.md` file, stop and tell the user to run `/finish-phase $1` first, then resume `/plan-improvements $1`.
+Archiving the prior phase — with its step-completion gate and doc reconciliation — is `/finish-phase`'s job; do not do it inline here.
+
 If the architecture document already declares a direction for Phase N (e.g. a deferred phase), treat it as a hypothesis, not a commitment — confirm the focus with the user (`ask_user`) before deep-tracing in that direction, and let the discovery findings decide.
 
 ### Step 3: Trace from entry point outward
