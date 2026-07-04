@@ -162,4 +162,40 @@ After the plan is committed, ask whether to file the issues now; if confirmed:
 4. Commit with `docs($1): link Phase N roadmap steps to issues #A-#B` and push.
 
 Finally, restate the recommended working sequence: list the issues as `#N — title` lines in dependency order (a topological order of the step diagram), noting which can proceed in parallel and which are blocked until an earlier one lands.
+
+## Write planning notes
+
+Before stopping, persist planning observations for cross-session continuity — `/plan-improvements` is phase-scoped, not issue-scoped, so it uses a **phase retro** file rather than the issue-keyed `NNNN-<slug>.md` convention.
+
+1. Write `packages/$1/docs/retro/phase-N-<slug>.md` (create `packages/$1/docs/retro/` if needed), using the phase number N and slug from Step 1.
+   This is distinct from the `history/phase-N-<slug>.md` archive `/finish-phase` owns — do not touch that.
+2. If the file does not exist, create it with this frontmatter (a phase-scoped variant — `package`/`phase` keys, not the issue-keyed schema):
+
+   ```markdown
+   ---
+   package: $1
+   phase: N
+   ---
+
+   # Retro: $1 — Phase N Planning (<slug>)
+   ```
+
+3. Append a stage entry:
+
+   ```markdown
+   ## Stage: Improvement Planning (<ISO 8601 timestamp>)
+
+   ### Session summary
+
+   2–3 sentences: the cause hypothesis (Step 1) and the phase shape chosen (full / lean / deferred).
+
+   ### Observations
+
+   The cause the phase dissolves, alternatives or deferrals considered, the deferral-gate outcome, and any feasibility-probe results that reshaped a step.
+   ```
+
+4. Commit with `docs($1): add Phase N planning retro notes` and push.
+
+Wrap code identifiers, filenames, and underscore-bearing text in backticks.
+Append with the `Edit`/`Write` tools, not a shell heredoc.
 Then stop.
