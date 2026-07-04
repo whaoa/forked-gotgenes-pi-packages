@@ -807,163 +807,172 @@ src/
 └── types.ts                   Core type definitions (PermissionState, FlatPermissionConfig, etc.)
 ```
 
-## Improvement roadmap — Phase 7: AccessPath as the universal internal path representation (complete)
+## Improvement roadmap — Phase 8: Tidy first for the authority spine
 
-Phase 7 finishes the direction opened by [#487]: make `AccessPath` the one internal representation for every concrete path the system handles.
-Phase 6 introduced `AccessPath` for the `external_directory` surface; follow-on [#486] brought the `path` surface and the bash-path tokens to lexical ∪ canonical parity and collapsed the gate-emitted `path-values` variant.
-Two ad-hoc path-derivation paths once normalized lexically only — the per-tool path-bearing gate (`read`/`write`/`edit`/`grep`/`find`/`ls`) and the service/RPC policy-query path — so a per-tool rule (`read: deny *.env`) was symlink-evadable while the cross-cutting `path` rule was not.
-Steps 1 ([#502]) and 2 ([#503]) routed both onto `AccessPath` (closing the asymmetry, a breaking change); Phase 7 still retires the now-dead lexical-only normalization, consolidates the `path-utils.ts` derivation hub behind the value object, and formalizes the resolver-internal `path-values` boundary.
-
-This is a direction-driven phase: [#487] sets the framing, and the discovery confirmed the residual surface rather than proposing an unrelated health sweep.
+The [authority model](#target-the-authority-model) is the declared target: an `Authorizer` role selected once per session, yolo as recorded authority, and `PermissionForwarder` split by direction of authority flow.
+Phase 8 does not build the spine.
+It makes the spine change easy — Kent Beck's "make the change that makes the change easy, then make the easy change" — by landing the preparatory refactorings the discovery trace found between `GateRunner` and the UI/file transport.
+The spine itself (the `Authorizer` interface and its three implementations, `canConfirm()` dissolution, serving-as-resolution, grant-scope selection) is Phase 9, and the case-by-case model judge requested in [#472] rides on that spine as the `ModelTriageAuthorizer`, not on this phase.
 
 ### Findings
 
-Health score 76 (B); no dead code; duplication 6.6% overall (3.6% in tests); maintainability 91.2.
-The single relevant structural signal is `path-utils.ts` — an accelerating churn hotspot (266 churn over 6 months, 13 fan-in, ▲), the ad-hoc path-derivation grab-bag the [#487] vision exists to consolidate.
+Health score 76 (B); no dead code; average cyclomatic complexity 1.4; maintainability 91.1.
+The score deductions are large *test* arrow functions and test-tree duplication — production functions are small, so the remaining debt is structural, not syntactic.
+The trace from `GateRunner` down to the UI dialog and forwarding files confirmed the elicitation thicket exactly as the target section describes it, plus the friction that would make the spine diff large:
 
-| Metric                            | Before                                        | Target after Phase 7                                              |
-| --------------------------------- | --------------------------------------------- | ----------------------------------------------------------------- |
-| `path-utils.ts` fan-in            | 13 (one grab-bag)                             | ✅ distributed across six cohesive modules ([#505])               |
-| Lexical-only path normalizers     | 2 (per-tool gate, service/RPC)                | ✅ 0 (single `AccessPath` derivation)                             |
-| Symlink-resistant path surfaces   | `path`, `external_directory`, bash            | ✅ all path surfaces incl. per-tool and RPC                       |
-| Emitted/internal path-value forms | `access-path` emitted, `path-values` internal | ✅ `path-values` formalized as the string seam (`decisions/0002`) |
+- **yolo is smeared across the ask path.**
+  `shouldAutoApprovePermissionState` is checked in `PermissionPrompter.prompt` and again in the forwarded-inbox serve arm; `canResolveAskPermissionRequest`'s yolo arm sits in `PromptingGateway.canConfirm()`.
+  Three modules know about yolo on the decision path; the target says the ruleset should be the only one.
+- **The three `Authorizer`s already exist as anonymous branches.**
+  `PermissionForwarder.requestApproval` dispatches hasUI → direct dialog (the future `LocalUserAuthorizer`), not-a-subagent → deny (`DenyingAuthorizer`), else → forward (`ParentAuthorizer`) — inside a 591-LOC class that also owns the opposite-direction serving role (`processInbox`).
+- **Subagent detection is threaded as a dep triple.**
+  (`subagentSessionsDir`, `platform`, `registry`) is threaded into three constructors (`PromptingGateway`, `PermissionForwarder`, `ForwardingManager`), and `isSubagentExecutionContext` is re-evaluated up to three times per ask; the spine's "selected once per session" needs one owner for this predicate.
+- **A third elicitation path.**
+  The deprecated `permissions:rpc:prompt` event-bus handler is a parallel prompt path (own hasUI check, own review-log entry, own UI-prompt event) the spine would otherwise have to adapt.
+- **The test scaffolding the spine will rewrite is duplicated.**
+  `permission-manager-unified.test.ts` carries 24 clone groups (305 lines, accelerating churn); `permission-forwarder.test.ts` carries 6 groups including a 43-line clone ×2.
 
-The residual ad-hoc path handling (the "re-derive their representations ad hoc" [#487] names):
-
-- Per-tool path-bearing gate: `ToolCallGatePipeline` emits `kind: "tool"` → `normalizeInput` → `normalizePathSurfaceValues` → `getPathPolicyValues` (lexical only) — closed by Steps 1–3 ([#502], [#504]): Step 1 migrated the gate to emit `access-path`; Step 3 removed `normalizePathSurfaceValues` and the path branches from `normalizeInput`.
-- Service/RPC queries: `permissions-service.ts` / `permission-event-rpc.ts` — closed by Step 2 ([#503]): both build an `AccessPath` via `buildAccessIntentForSurface` and route an `access-path` intent through the resolver (was a lexical `tool` intent for `path` / `external_directory`).
-- `path-utils.ts`: the loose `getPathPolicyValues` / `normalizePathForComparison` / `normalizePathPolicyLiteral` derivations that `AccessPath` should own — ✅ closed by Step 4 ([#505]): relocated into `access-intent/path-normalization.ts` and the grab-bag dissolved into focused modules.
-- ✅ `path-values`: formalized as the manager's deliberate string boundary by Step 5 ([#506]; `docs/decisions/0002-path-values-string-boundary.md`) — the manager stays string-based and never imports `AccessPath`, now guarded by a `no-restricted-imports` lint rule on `permission-manager.ts`.
+| Metric                                     | Phase 7 close                                | Target after Phase 8                                                 |
+| ------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------- |
+| Health score                               | 76 (B)                                       | ≥ 76 (B)                                                             |
+| yolo checks on the ask path                | 3 (prompter, gateway, serve arm)             | 1 (composition-stage rewrite) + serve arm (dissolves with the spine) |
+| `canConfirm()` predicates                  | hasUI ∨ isSubagent ∨ yolo                    | hasUI ∨ isSubagent (selection-ready)                                 |
+| Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | 2                                                                    |
+| `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | 1 each (two classes under `src/authority/`)                          |
+| Subagent-detection dep-triple constructors | 3                                            | 1 (`SubagentDetection`)                                              |
+| fallow refactoring targets                 | 1 (`value-guards.ts`)                        | 0                                                                    |
+| Duplication                                | 6.7% (3,129 lines)                           | ≤ 5.5%                                                               |
 
 ### Steps
 
-1. ✅ **Migrate the per-tool path-bearing tool gate onto `AccessPath` (canonical parity).**
-   ([#502]) Target: `src/handlers/gates/tool-call-gate-pipeline.ts` (build `AccessPath.forPath` and emit `kind: "access-path"` with `surface: toolName` for path-bearing tools, keeping non-path tools on the `tool` intent), `src/handlers/gates/tool.ts` (derive the session-approval value from `accessPath.value()`).
-   The resolver already unwraps `access-path` → `path-values` and the manager's path-value branch already routes `PATH_BEARING_TOOLS` through `evaluateAnyValue`, so the only behavior change is the canonical alias joining the match set — mechanically parallel to [#486].
-   Smell: Category C (coupling / match asymmetry).
-   Outcome: `read`/`write`/`edit`/`grep`/`find`/`ls` per-tool rules match lexical ∪ canonical (symlink-resistant); **breaking**.
-   Release: batch "symlink-resistant-path-matching"
-
-2. ✅ **Migrate the service/RPC path queries onto `AccessPath` (canonical parity).**
-   ([#503]) Target: `src/permissions-service.ts`, `src/permission-event-rpc.ts`, `src/input-normalizer.ts` (`buildAccessIntentForSurface`).
-   For `path` / `external_directory` / path-bearing surface queries, build an `AccessPath` and route an `access-path` intent through the resolver instead of a lexical `tool` intent to the manager; non-path surfaces keep the existing path.
-   Routing through the resolver (not a second `path-values` producer) keeps it the sole `matchValues()` unwrap site, the premise Step 5 ([#506]) decides against.
-   Also fixed a latent gap: the `path` and path-bearing service/RPC queries dropped their value (collapsing to `["*"]`) and now evaluate the supplied path.
-   Smell: Category C (coupling / match asymmetry).
-   Outcome: external policy queries match the same lexical ∪ canonical set the gates do; **breaking** for external consumers.
-   Release: batch "symlink-resistant-path-matching"
-
-3. ✅ **Retire `input-normalizer`'s path normalization.**
-   ([#504]) Removed `normalizePathSurfaceValues`, the special-surface (`path` / `external_directory`) branch, and the `PATH_BEARING_TOOLS` branch from `normalizeInput`; dropped the `platform` / `cwd` parameters; removed the `currentCwd` field from `PermissionManager`.
-   After Steps 1 and 2, these branches had no callers; the missing-path case falls through to the generic `["*"]` branch.
-   Smell: Category A (dead / redundant code).
-   Outcome: `normalizeInput` handles only bash / skill / mcp / extension surfaces; a single `AccessPath` path-derivation entry remains.
-   Release: batch "symlink-resistant-path-matching"
-
-4. ✅ **Consolidate path derivation behind `AccessPath`: dissolve the `path-utils.ts` grab-bag.**
-   ([#505]) Relocated the lexical/canonical/policy-value derivation (`normalizePathForComparison`, `canonicalNormalizePathForComparison`, `getPathPolicyValues`, `normalizePathPolicyLiteral`, and the two private absolute/relative helpers) into `src/access-intent/path-normalization.ts` as `AccessPath`'s backing; kept containment (`isPathWithinDirectory`, `isPathOutsideWorkingDirectory`) together in `src/path-containment.ts`, and split infra-read (`pi-infrastructure-read.ts`), tool-input extraction (`tool-input-path.ts`), safe-system paths (`safe-system-paths.ts`), and the surface/tool sets (`path-surfaces.ts`) into focused modules.
-   A "tidy first" prep refactor made `isPathOutsideWorkingDirectory` pure geometry over prepared operands (canonicalization moved up to `PathNormalizer`), which dissolved the apparent representation↔containment cycle so the literal grouping held.
-   Smell: Category B / E (god module, accelerating churn hotspot).
-   Outcome: `path-utils.ts` dissolved into cohesive modules; path derivation owned by the access-intent domain; non-breaking.
+1. **Extract shared fixtures from `permission-manager-unified.test.ts`.**
+   Target: `test/permission-manager-unified.test.ts` (3,714 LOC, 24 clone groups / 305 duplicated lines, accelerating churn) — extract the repeated config-harness blocks into `test/helpers/manager-harness.ts` (or a sibling fixture module).
+   No production change; tidies the ground Step 2's manager tests land on.
+   Smell: Category D (test duplication).
+   Outcome: the file's clone groups drop to near zero; test-tree duplication falls measurably.
    Release: independent
 
-5. ✅ **Decide and formalize the `path-values` boundary.**
-   ([#506]) Target: `src/access-intent/access-intent.ts`, `src/permission-resolver.ts`, `src/permission-manager.ts`.
-   With the resolver the sole `path-values` producer after Steps 1 and 2, decide between formalizing `path-values` as the manager's intentional string seam (document why the manager stays string-based) and moving the `matchValues()` unwrap into the manager (the manager imports `AccessPath`, dropping the string-boundary invariant).
-   This is the [#487] "collapse the `path-values` variant" item, resolved as an explicit decision rather than a pre-committed mechanical change.
-   Smell: Category C (clarify boundary).
-   Decided: **formalize** — kept `path-values` as the string seam, recorded in `docs/decisions/0002-path-values-string-boundary.md`, and guarded the invariant with a `no-restricted-imports` lint rule on `permission-manager.ts`; non-breaking.
+2. **Move yolo into recorded authority: composition-stage `ask` → `allow` rewrite.**
+   Target: `src/permission-manager.ts` (apply the rewrite over the composed ruleset at check time, keyed off an injected yolo reader; yolo state must join the `resolvedPermissionsCache` key or be applied post-cache), `src/rule.ts` (`RuleOrigin` gains `"yolo"`; update this doc's inline `Rule` listing), `src/handlers/gates/helpers.ts` + `runner.ts` (a yolo-origin `allow` derives resolution `auto_approved`, and the runner writes the `permission_request.auto_approved` review entry so review-log parity holds).
+   Display must not change: `getComposedConfigRules` / `/permission-system show` keep showing the configured actions, not the rewrite.
+   Faithful to current behavior: explicit `deny` is not `ask`, so yolo suppresses prompts but preserves hard denies (see [yolo is recorded authority](#yolo-is-recorded-authority)).
+   Smell: Category C (policy smeared across the prompt path).
+   Outcome: `evaluate()` is the only yolo decision point; the prompter and gateway yolo arms become unreachable; review log and decision events keep reporting `auto_approved`.
+   Release: batch "yolo-recorded-authority"
+
+3. **Delete the dead yolo arms from the prompt path; dissolve `yolo-mode.ts`.**
+   Target: `src/permission-prompter.ts` (drop the auto-approve arm), `src/prompting-gateway.ts` (`canConfirm()` = hasUI ∨ isSubagent; `canResolveAskPermissionRequest` deleted), `src/yolo-mode.ts` (dissolved — `isYoloModeEnabled` and the serve arm's check move next to their config in `extension-config.ts`).
+   The forwarded-inbox serve arm keeps its yolo check for now — it dissolves when serving becomes resolution (Phase 9), and is documented as such.
+   Smell: Category A (dead code after Step 2).
+   Outcome: no yolo knowledge on the prompt path; `canConfirm()` is reduced to the two Authorizer-selection predicates.
+   Release: batch "yolo-recorded-authority"
+
+4. **Extract a shared forwarded-permission test harness.**
+   Target: `test/permission-forwarder.test.ts` (43-line clone ×2 plus 6 groups / 110 lines), `test/forwarding-manager.test.ts`, `test/permission-forwarding.test.ts` — extract request/response builders, temp forwarding-dir setup, and a fake `ForwarderContext` into `test/helpers/forwarding-fixtures.ts`.
+   Smell: Category D (test duplication).
+   Outcome: forwarder-family clone groups drop to near zero; Step 6 migrates its per-class tests onto the harness instead of copying scaffolding again.
+   Release: independent
+
+5. **Extract a `SubagentDetection` collaborator; seed `src/authority/`.**
+   Target: new `src/authority/subagent-detection.ts` — a class constructed once in `index.ts` with (`subagentSessionsDir`, `platform`, `registry`), exposing `isSubagent(ctx)`; move `src/subagent-context.ts` → `src/authority/subagent-context.ts` (its consumers are all rewired by this step anyway).
+   `PromptingGateway`, `ForwardingManager`, and `PermissionForwarder` drop the threaded dep triple and take the collaborator.
+   Smell: Category C (dep triple threaded through three constructors) + Category E (seeds the authority domain directory).
+   Outcome: one construction site for subagent detection — the input the Phase 9 Authorizer selection consumes; `src/authority/` exists.
+   Release: independent
+
+6. **Split `PermissionForwarder` by direction of authority flow.**
+   Target: `src/forwarded-permissions/permission-forwarder.ts` (591 LOC, both roles) → `src/authority/approval-escalator.ts` (`ApprovalEscalator implements ApprovalRequester` — keeps the three-way dispatch with each branch a named method, plus the request-write/poll machinery) and `src/authority/forwarded-request-server.ts` (`ForwardedRequestServer implements InboxProcessor` — `processInbox` and the per-request serve flow); `src/forwarded-permissions/io.ts` → `src/authority/forwarding-io.ts`; the `forwarded-permissions/` directory dissolves.
+   Callers are unchanged: `PermissionPrompter` keeps depending on `ApprovalRequester`, `ForwardingManager` on `InboxProcessor`.
+   Smell: Category B/C (dual-role class; the target's declared split).
+   Outcome: each class constructs with only its own dependencies; Phase 9 turns the escalator's three named branches into the three `Authorizer`s branch-by-branch instead of dissecting a god class.
+   Release: independent
+
+7. **Remove the deprecated `permissions:rpc:check` / `permissions:rpc:prompt` event-bus channel.**
+   Target: delete `src/permission-event-rpc.ts` and `test/permission-event-rpc.test.ts`; remove the deprecated request/reply payload types and channel constants from `src/permission-events.ts`; unwire from `index.ts` / `PermissionServiceLifecycle`; update the cross-extension docs to point exclusively at the `Symbol.for()` service accessor.
+   Before writing the migration note, verify the named replacement methods on the real `PermissionsService` type.
+   Narrows [#309] to the service path only — leave a comment on that issue.
+   Smell: Category A (deprecated subsystem) / Category F (duplicate cross-extension surface).
+   Outcome: one cross-extension policy/prompt surface; the spine adapts two elicitation paths instead of three; **breaking** for event-bus RPC consumers.
+   Release: independent
+
+8. **Split `value-guards.ts` by cohesion.**
+   Target: `src/value-guards.ts` (56 LOC, 22 dependents — fallow's sole refactoring target, priority 28.8): keep the generic parsing guards (`toRecord`, `getNonEmptyString`, `normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`); move the domain guards (`isPermissionState`, `isDenyWithReason`) next to the types they guard (`src/types.ts`).
+   Smell: Category B (high-impact file) / Category E (mixed cohesion).
+   Outcome: fallow refactoring targets 1 → 0; domain guards co-located with their types.
    Release: independent
 
 ### Step dependency diagram
 
 ```mermaid
 flowchart TD
-    S1["✅ Step 1 (#502)<br/>Per-tool gate to AccessPath<br/>(breaking)"]
-    S2["✅ Step 2 (#503)<br/>Service/RPC to AccessPath<br/>(breaking)"]
-    S3["✅ Step 3 (#504)<br/>Retire input-normalizer path normalization"]
-    S4["✅ Step 4 (#505)<br/>Dissolve path-utils grab-bag"]
-    S5["✅ Step 5 (#506)<br/>Decide path-values boundary"]
+    S1["Step 1<br/>Manager-unified test fixtures"]
+    S2["Step 2<br/>yolo into the composed ruleset"]
+    S3["Step 3<br/>Delete dead yolo arms"]
+    S4["Step 4<br/>Forwarding test harness"]
+    S5["Step 5<br/>SubagentDetection + seed authority/"]
+    S6["Step 6<br/>Split PermissionForwarder by direction"]
+    S7["Step 7<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
+    S8["Step 8<br/>Split value-guards.ts"]
 
-    S1 --> S3
+    S1 --> S2
     S2 --> S3
-    S3 --> S4
-    S1 --> S5
-    S2 --> S5
+    S4 --> S6
+    S5 --> S6
 ```
 
 ### Parallel tracks
 
-- **Track A — access-side canonical parity:** Steps 1 and 2 proceed in parallel (different consumers), both feed Step 3 (dead-code removal), and both unblock Step 5 (the boundary decision).
-- **Track B — structural consolidation:** Step 4 follows Step 3 (fewer loose `path-utils.ts` consumers makes the relocation mechanical) and is otherwise independent.
+- **Track A — yolo becomes recorded authority:** Steps 1 → 2 → 3.
+- **Track B — escalation machinery:** Steps 4 and 5 in parallel, then Step 6.
+- **Track C — cross-extension surface reduction:** Step 7, independent.
+- **Track D — health:** Step 8, independent.
 
 ### Release batches
 
-- **Batch "symlink-resistant-path-matching":** Steps 1, 2, 3 (ship together; tail = Step 3).
-  Steps 1 and 2 are breaking parity changes and Step 3 is their cleanup — they form one coherent "paths now match symlink-resistantly on every surface" major-bump release.
-- Independently releasable: Step 4 (a refactor that auto-batches into the next release), Step 5 (a decision / docs change).
+- **Batch "yolo-recorded-authority":** Steps 2, 3 (ship together; tail = Step 3).
+  Step 2 relocates the yolo decision with observable review-log/decision-event field changes and Step 3 is its cleanup.
+- Independently releasable: Steps 1, 4 (test-only; hidden changelog type), Steps 5, 6, 8 (refactors; auto-batch into the next release), Step 7 (**breaking** — ships as its own major-bump release).
 
 ### Non-goals
 
-- **Config patterns onto `AccessPath`.**
-  Patterns are matched as pure regex (`*` compiles to `.*` with the dotall flag and crosses path segments — `wildcard-matcher.ts`), so a glob is a matching *mode*, not a *value* with a canonical form.
-  The symlink protection [#487] wants is delivered on the access side: an accessed path's `matchValues()` carries both its lexical "source" and canonical "target", and a rule fires on either — so a rule on the symlink path or on the real file both match.
-  The only uncovered case is a glob pattern whose directory *prefix* is a symlink (e.g. `~/linkdir/*` accessed via the real target): not closable on the pattern side, because `*` crossing segments leaves no reliable resolvable-prefix decomposition.
-  Documented guidance: key glob rules on the real location, not a symlink-dir alias.
-- **Canonicalizing concrete symlink patterns at rule-load.**
-  Feasible only for fully-concrete (non-glob) patterns and a narrow case; evaluated and dropped (the high-value protective patterns are globs, which this cannot help).
+- **The spine itself.**
+  The `Authorizer` interface and its three implementations, `canConfirm()` dissolution, serving-as-resolution, the one-hop canary, grant-scope selection, and yolo inheritance are Phase 9 — this phase only removes the friction in their way.
+- **The serve-arm yolo check.**
+  It survives Phase 8 (one isolated `if`) and dissolves when `processInbox` is refactored onto `evaluate()` plus Authorizer selection.
 - **Principal identity and cross-session path portability.**
-  Still deferred (the broader access-intent design work), out of Phase 7 scope.
+  Still the deferred access-intent design work; the forwarded request keeps carrying display fields, not a re-evaluable intent, until then.
+- **A big-bang `src/` reorganization.**
+  Only the files Phase 8 already rewrites move into `src/authority/`; see the directory sketch below.
 
-### Related: PathNormalizer platform seam ([#510])
+### Directory sketch (forward-looking)
 
-A precursor refactor (not one of the five steps above) threaded a single injected `PathNormalizer` collaborator through the bash path pipeline, completing the half-built platform seam behind the recurring Windows-path bugs ([#382], [#345], [#418], [#508]).
-The host `platform` is read once at the composition root (`index.ts`) and injected: into `PermissionManager` (rule-matching case-fold), into `PermissionSession` (which builds the `PathNormalizer` from `platform` + the session `cwd` and exposes it via `getPathNormalizer()`), and into the subagent-context detection.
-No interior `src/` module reads `process.platform` — an ESLint `no-restricted-syntax` guard scoped to `pi-permission-system/src` (exempting `index.ts`) enforces this, so every `path-containment` / `path-normalization` / canonicalize / rule / subagent-context leaf takes an injected `platform` rather than a `= process.platform` default.
-`PathNormalizer` is a facade *over* the platform-parameterized `path-containment` / `path-normalization` / `AccessPath` primitives: Phase 7 Step 4 ([#505]) dissolved `path-utils.ts` into those cohesive modules (the seam was untouched — the facade kept the same leaf calls under new module names).
-The change is behavior-preserving on POSIX (every converted op already used the host `node:path`); the `win32` flavor is newly exercised by injected-platform unit tests, and [#508] then lands the drive-letter routing fix on the seam.
+Phase 8 seeds `src/authority/` with the modules it rewrites: `subagent-detection.ts` and `subagent-context.ts` (Step 5), then `approval-escalator.ts`, `forwarded-request-server.ts`, and `forwarding-io.ts` (Step 6).
+The remaining elicitation modules (`gate-prompter.ts`, `prompting-gateway.ts`, `permission-prompter.ts`, `permission-dialog.ts`, `permission-forwarding.ts`, `subagent-registry.ts`) migrate in Phase 9 as the spine rewrites them into the `Authorizer` interface and its implementations — there is no peer `subagent/` domain, because the subagent machinery is the cross-session edge of `authority/`.
 
-#### Residual `getPlatform()` threading (follow-up [#511])
+## Improvement roadmap — Phase 7: AccessPath as the universal internal path representation (complete)
 
-The seam left five call sites threading `platform` *directly* rather than through `PathNormalizer`, because they call raw path-leaf functions that are not `AccessPath` operations.
-`PermissionSession.getPlatform()` (and the `ToolCallGateInputs.getPlatform()` it backed) existed only to feed them; it has been retired now that every consumer is folded, while the leaf `platform` parameters in the relocated path modules (`path-containment.ts`, `path-normalization.ts`, `pi-infrastructure-read.ts`) persist.
-How each relates to the Phase 7 steps above:
+Phase 7 finished the direction opened by [#487]: `AccessPath` became the one internal representation for every concrete path the system handles.
+Steps 1–2 ([#502], [#503]) brought the per-tool path-bearing gate and the service/RPC policy queries to lexical ∪ canonical parity (breaking, mechanically parallel to [#486]), Step 3 ([#504]) retired `input-normalizer`'s dead path normalization, Step 4 ([#505]) dissolved the `path-utils.ts` grab-bag into six cohesive modules, and Step 5 ([#506]) formalized `path-values` as the manager's deliberate string boundary (`docs/decisions/0002-path-values-string-boundary.md`).
+A precursor refactor ([#510]) threaded the injected `PathNormalizer` platform seam behind the recurring Windows-path bugs ([#345], [#382], [#508]), and follow-ups [#511] / [#513] retired the residual `getPlatform()` threading.
 
-- **Per-tool gate suggestion value** (`handlers/gates/tool.ts` `deriveSuggestionValue` → `normalizePathForComparison`) — ✅ retired by **Step 1 ([#502])**: `deriveSuggestionValue` now derives the session-approval value from `accessPath.value()`, dropping the `platform` thread into `describeToolGate`.
-- **`input-normalizer` path-policy values** (`normalizePathSurfaceValues` → `getPathPolicyValues`) — ✅ retired by **Steps 2–3 ([#503], [#504])**: Step 2 migrated the service/RPC path queries onto `AccessPath`; Step 3 removed the path-bearing/special-surface branches from `normalizeInput` entirely (#504).
-- **Infra-read containment** (`handlers/gates/external-directory.ts`) — ✅ routed through `PathNormalizer.isInfrastructureRead` ([#511]): the gate already holds the normalizer, which now answers the containment question over the already-built `AccessPath`.
-  Step 4 ([#505]) still keeps `isPiInfrastructureRead` (`pi-infrastructure-read.ts`) and `isPathWithinDirectory` / `isPathOutsideWorkingDirectory` (`path-containment.ts`) as platform-taking leaf predicates that the normalizer delegates to.
-- **Skill-prompt sanitization** (`skill-prompt-sanitizer.ts` `createResolvedSkillEntry` / `findSkillPathMatch`; reached from `before-agent-start.ts` and `handlers/gates/skill-read.ts`) — ✅ routed through `PathNormalizer.comparableValue` / `isWithinDirectory` ([#511]).
-  Skill entries still cache `normalizedLocation` / `normalizedBaseDir` as lexical strings (matching stays lexical, no new filesystem access), but they are now computed by the normalizer rather than by direct `normalizePathForComparison` calls.
+All 5 steps are closed: [#502], [#503], [#504], [#505], [#506].
 
-✅ `getPlatform()` has been removed: with both [#511] and Step 1 ([#502]) landed, `ToolCallGatePipeline.evaluate` no longer reads it, so `PermissionSession.getPlatform()` and `ToolCallGateInputs.getPlatform()` were dropped ([#513] resolved).
-The leaf `platform` parameters in `path-containment.ts` / `pi-infrastructure-read.ts` persist (the containment / infra-read predicates still take it).
-
-## Improvement roadmap — Phase 6: Access-intent extraction (complete)
-
-Phase 6 extracted the access-intent domain across eight steps: it decomposed the 1,143-line `bash-program.ts` god file into focused modules under `src/access-intent/bash/`, introduced the `AccessPath` value object that makes the [#418] lexical/canonical conflation a compile-time error, collapsed the two external-directory gates onto a single shared policy check, narrowed `ScopedPermissionResolver` to one `resolve(intent)` entry point (eliminating the [#393] false-green class), dissolved the `common.ts` grab-bag, and extracted a shared external-directory test fixture.
-`BashProgram` is now a 102-LOC born-ready facade; duplication fell from 6.9% to 3.6%.
-The `src/access-intent/` directory is the package's first domain group — the bash engine and `AccessPath` live there; path/MCP normalizers migrate in a later phase.
-Follow-on issue [#486] (canonical-form matching for the `path` surface) is now implemented: both path producers emit `access-path` intents, so the `path` surface matches the lexical aliases ∪ canonical form (the [#418] set) like `external_directory`, and the gate-emitted `path-values` variant was collapsed.
-This also pulled the bash-path `AccessPath` migration forward from [#487], narrowing its residual scope to config-pattern and prompt-input path handling.
-
-All 8 steps are closed: [#473], [#474], [#475], [#476], [#477], [#478], [#479], [#480].
-
-Full findings, step details, dependency diagram, and release batches: [history/phase-6-access-intent-extraction.md](history/phase-6-access-intent-extraction.md).
+Full findings, step details, dependency diagram, and release batches: [history/phase-7-accesspath-universal-representation.md](history/phase-7-accesspath-universal-representation.md).
 
 ## Refactoring history
 
-The architecture above is the product of six completed improvement phases.
+The architecture above is the product of seven completed improvement phases.
 Each phase's findings, numbered plan, dependency graph, and health metrics are preserved in a per-phase history file under [`history/`](history/).
 
-| Phase | Theme                                         | History                                                                                |
-| ----- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 1     | Preview formatter extension seam              | [phase-1-preview-formatter-seam.md](history/phase-1-preview-formatter-seam.md)         |
-| 2     | Complexity and duplication paydown            | [phase-2-complexity-duplication.md](history/phase-2-complexity-duplication.md)         |
-| 3     | State-owning collaborators                    | [phase-3-collaborator-encapsulation.md](history/phase-3-collaborator-encapsulation.md) |
-| 4     | Constructibility and god-object decomposition | [phase-4-constructibility.md](history/phase-4-constructibility.md)                     |
-| 5     | Tell-Don't-Ask and decoupling sweep           | [phase-5-tell-dont-ask-sweep.md](history/phase-5-tell-dont-ask-sweep.md)               |
-| 6     | Access-intent extraction                      | [phase-6-access-intent-extraction.md](history/phase-6-access-intent-extraction.md)     |
+| Phase | Theme                                           | History                                                                                                  |
+| ----- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 1     | Preview formatter extension seam                | [phase-1-preview-formatter-seam.md](history/phase-1-preview-formatter-seam.md)                           |
+| 2     | Complexity and duplication paydown              | [phase-2-complexity-duplication.md](history/phase-2-complexity-duplication.md)                           |
+| 3     | State-owning collaborators                      | [phase-3-collaborator-encapsulation.md](history/phase-3-collaborator-encapsulation.md)                   |
+| 4     | Constructibility and god-object decomposition   | [phase-4-constructibility.md](history/phase-4-constructibility.md)                                       |
+| 5     | Tell-Don't-Ask and decoupling sweep             | [phase-5-tell-dont-ask-sweep.md](history/phase-5-tell-dont-ask-sweep.md)                                 |
+| 6     | Access-intent extraction                        | [phase-6-access-intent-extraction.md](history/phase-6-access-intent-extraction.md)                       |
+| 7     | AccessPath as the universal path representation | [phase-7-accesspath-universal-representation.md](history/phase-7-accesspath-universal-representation.md) |
 
 ### Phase 1 — Preview formatter extension seam (complete)
 
@@ -995,6 +1004,11 @@ Seven steps ([#362]–[#368]), all closed.
 Extracted the access-intent domain: decomposed the 1,143-line `bash-program.ts` god file into `src/access-intent/bash/` (parser, node-text, token-collection, command-enumeration, cwd-projection, program facade), introduced the `AccessPath` value object eliminating the [#418] lexical/canonical conflation, collapsed the two external-directory gates onto a single shared policy check, narrowed `ScopedPermissionResolver` to one `resolve(intent)` (killing the [#393] false-green class), dissolved `common.ts` into `value-guards.ts` + `yaml-frontmatter.ts`, and extracted the external-directory test fixture.
 Eight steps ([#473]–[#480]), all closed.
 
+### Phase 7 — AccessPath as the universal internal path representation (complete)
+
+Made `AccessPath` the universal internal path representation: migrated the per-tool path-bearing gate and the service/RPC policy queries onto `AccessPath` (closing the symlink-evadability asymmetry), retired the dead lexical-only normalization, dissolved the `path-utils.ts` grab-bag into six cohesive modules, and formalized the resolver-internal `path-values` string boundary in a decision record with a lint guard.
+Five steps ([#502]–[#506]), all closed, plus the `PathNormalizer` platform-seam precursor and residual-threading follow-ups.
+
 [#266]: https://github.com/gotgenes/pi-packages/issues/266
 [#282]: https://github.com/gotgenes/pi-packages/issues/282
 [#285]: https://github.com/gotgenes/pi-packages/issues/285
@@ -1012,13 +1026,11 @@ Eight steps ([#473]–[#480]), all closed.
 [#382]: https://github.com/gotgenes/pi-packages/issues/382
 [#393]: https://github.com/gotgenes/pi-packages/issues/393
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
+[#309]: https://github.com/gotgenes/pi-packages/issues/309
+[#472]: https://github.com/gotgenes/pi-packages/issues/472
 [#473]: https://github.com/gotgenes/pi-packages/issues/473
-[#474]: https://github.com/gotgenes/pi-packages/issues/474
-[#475]: https://github.com/gotgenes/pi-packages/issues/475
 [#476]: https://github.com/gotgenes/pi-packages/issues/476
-[#477]: https://github.com/gotgenes/pi-packages/issues/477
 [#478]: https://github.com/gotgenes/pi-packages/issues/478
-[#479]: https://github.com/gotgenes/pi-packages/issues/479
 [#480]: https://github.com/gotgenes/pi-packages/issues/480
 [#486]: https://github.com/gotgenes/pi-packages/issues/486
 [#487]: https://github.com/gotgenes/pi-packages/issues/487
