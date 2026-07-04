@@ -186,6 +186,20 @@ An opaque-payload wrapper (`bash`/`sh`/`dash`/`zsh`/`ksh -c`, or `eval`) is flag
 The enumerator also strips a leading `variable_assignment` prefix from each command unit so an env-var prefix (`AWS_PROFILE=prod aws …`) cannot defeat a command-pattern rule (#481).
 With `debugLog` on, the boundary writes one `permission.decision` trace per call and a `permission.session_summary` line on shutdown (via `DecisionAudit`); a `toolCalls != allowed + blocked + errors` mismatch logs a warning — a re-opened silent path.
 
+## Windows and Git Bash
+
+Platform facts verified against Pi core source during #533 planning:
+
+- **Pi core executes every bash tool command through Git Bash on Windows** (`pi/packages/coding-agent/src/utils/shell.ts`): resolution order is custom `shellPath` → `%ProgramFiles%\Git\bin\bash.exe` → any `bash.exe` on PATH (MSYS2/Cygwin); there is no cmd/PowerShell branch.
+  So bash tokens gated on a `win32` host carry POSIX/MSYS path semantics, while tool-input paths (`read`/`write`/`edit`) carry Node `fs` win32 semantics — the two surfaces have **different platforms** on the same host.
+- Node `fs` on Windows genuinely resolves `/dev/null` to `C:\dev\null`, so a *tool-input* `/dev/null` prompting is correct behavior; a *bash* `> /dev/null` prompting is a bug — Git Bash's MSYS runtime maps it to the NUL device and never touches the filesystem.
+- Pi core rewrites Windows-style `> NUL` redirects to `> /dev/null` before spawning the shell (`normalizeNulRedirects()`, [earendil-works/pi#4731]), because MSYS does not recognize `NUL` and would create a literal undeletable file.
+  So `/dev/null` is the canonical device token the gates see on win32 — core actively produces it.
+- MSYS interprets POSIX-shaped absolute paths through its mount table: `/dev/*` are runtime devices; `/c/…` is a deterministic drive mount for `C:\…`; `/tmp` is a mount whose Windows target **varies by bash flavor** (Git Bash → `%TEMP%`; MSYS2 → `<msysroot>\tmp`; Cygwin → its own root) and other absolutes (`/usr`, `/etc`, `/mingw64`) resolve inside the install root.
+  This package therefore must never map `/tmp` (or any non-drive-mount POSIX absolute) to a concrete Windows path — no `cygpath` shell-outs, no `os.tmpdir()` reads; determinism (same policy + same input → same decision) forbids both.
+- Git Bash also accepts Windows-shaped paths (`C:/foo`, `C:\foo`) unchanged, so the drive-letter token handling (#508) and win32 case folding (#382) apply to those shapes on both surfaces — the MSYS semantics above are *additive* branches for POSIX-shaped tokens, not a replacement.
+- The bash-token interpretation layer implementing these semantics (exact `/dev/*` devices preserved, `/c/` mounts translated, other POSIX absolutes literal-only external) is planned in `packages/pi-permission-system/docs/plans/0533-win32-git-bash-posix-paths.md` (#533).
+
 ## Notes for Agents
 
 Before implementing, understand:
@@ -216,4 +230,5 @@ When a plan or test asserts a specific bash repro string, trace the token throug
 [#261]: https://github.com/gotgenes/pi-packages/issues/261
 [#296]: https://github.com/gotgenes/pi-packages/issues/296
 [#509]: https://github.com/gotgenes/pi-packages/issues/509
+[earendil-works/pi#4731]: https://github.com/earendil-works/pi/issues/4731
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md

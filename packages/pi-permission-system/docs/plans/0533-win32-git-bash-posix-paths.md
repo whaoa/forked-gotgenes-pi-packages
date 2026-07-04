@@ -178,7 +178,7 @@ interpretBashCdTarget(target: string):
 - `docs/configuration.md` — extend the Windows paragraph (currently case-insensitivity only) with Git Bash semantics: device paths honored, `/c/` mounts translated, other POSIX absolutes matched as typed; reconcile the "OS device paths are always excluded" sentence with a note that this now holds on Windows too.
 - `docs/architecture/architecture.md` — module-tree entries: add `msys-bash-tokens.ts`; update `path-normalizer.ts`, `access-path.ts`, `path-normalization.ts`, and `bash-path-resolver.ts` entries for the new methods/options.
 - `docs/decisions/0003-git-bash-posix-path-semantics.md` (new ADR) — records the "bash surface is MSYS on win32" decision, the deterministic subset chosen (devices, drive mounts, literal-only absolutes), and the rejected alternatives (`cygpath`, `%TEMP%` mapping).
-- `.pi/skills/package-pi-permission-system/SKILL.md` — extend the bash-token platform note (the paragraph describing classifier/platform routing) with the win32 POSIX-token branches.
+- `.pi/skills/package-pi-permission-system/SKILL.md` — the `Windows and Git Bash` platform-facts section was added during planning; update its final sentence from "planned in" to the implemented behavior, and extend the bash-token platform note in `Notes for Agents` with the win32 POSIX-token branches.
 
 No exports are removed or renamed, so no removed-symbol grep is required.
 
