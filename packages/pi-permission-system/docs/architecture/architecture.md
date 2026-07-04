@@ -846,14 +846,14 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 ### Steps
 
 1. **Extract shared fixtures from `permission-manager-unified.test.ts`.**
-   Target: `test/permission-manager-unified.test.ts` (3,714 LOC, 24 clone groups / 305 duplicated lines, accelerating churn) — extract the repeated config-harness blocks into `test/helpers/manager-harness.ts` (or a sibling fixture module).
+   ([#525]) Target: `test/permission-manager-unified.test.ts` (3,714 LOC, 24 clone groups / 305 duplicated lines, accelerating churn) — extract the repeated config-harness blocks into `test/helpers/manager-harness.ts` (or a sibling fixture module).
    No production change; tidies the ground Step 2's manager tests land on.
    Smell: Category D (test duplication).
    Outcome: the file's clone groups drop to near zero; test-tree duplication falls measurably.
    Release: independent
 
 2. **Move yolo into recorded authority: composition-stage `ask` → `allow` rewrite.**
-   Target: `src/permission-manager.ts` (apply the rewrite over the composed ruleset at check time, keyed off an injected yolo reader; yolo state must join the `resolvedPermissionsCache` key or be applied post-cache), `src/rule.ts` (`RuleOrigin` gains `"yolo"`; update this doc's inline `Rule` listing), `src/handlers/gates/helpers.ts` + `runner.ts` (a yolo-origin `allow` derives resolution `auto_approved`, and the runner writes the `permission_request.auto_approved` review entry so review-log parity holds).
+   ([#526]) Target: `src/permission-manager.ts` (apply the rewrite over the composed ruleset at check time, keyed off an injected yolo reader; yolo state must join the `resolvedPermissionsCache` key or be applied post-cache), `src/rule.ts` (`RuleOrigin` gains `"yolo"`; update this doc's inline `Rule` listing), `src/handlers/gates/helpers.ts` + `runner.ts` (a yolo-origin `allow` derives resolution `auto_approved`, and the runner writes the `permission_request.auto_approved` review entry so review-log parity holds).
    Display must not change: `getComposedConfigRules` / `/permission-system show` keep showing the configured actions, not the rewrite.
    Faithful to current behavior: explicit `deny` is not `ask`, so yolo suppresses prompts but preserves hard denies (see [yolo is recorded authority](#yolo-is-recorded-authority)).
    Smell: Category C (policy smeared across the prompt path).
@@ -861,34 +861,34 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    Release: batch "yolo-recorded-authority"
 
 3. **Delete the dead yolo arms from the prompt path; dissolve `yolo-mode.ts`.**
-   Target: `src/permission-prompter.ts` (drop the auto-approve arm), `src/prompting-gateway.ts` (`canConfirm()` = hasUI ∨ isSubagent; `canResolveAskPermissionRequest` deleted), `src/yolo-mode.ts` (dissolved — `isYoloModeEnabled` and the serve arm's check move next to their config in `extension-config.ts`).
+   ([#527]) Target: `src/permission-prompter.ts` (drop the auto-approve arm), `src/prompting-gateway.ts` (`canConfirm()` = hasUI ∨ isSubagent; `canResolveAskPermissionRequest` deleted), `src/yolo-mode.ts` (dissolved — `isYoloModeEnabled` and the serve arm's check move next to their config in `extension-config.ts`).
    The forwarded-inbox serve arm keeps its yolo check for now — it dissolves when serving becomes resolution (Phase 9), and is documented as such.
    Smell: Category A (dead code after Step 2).
    Outcome: no yolo knowledge on the prompt path; `canConfirm()` is reduced to the two Authorizer-selection predicates.
    Release: batch "yolo-recorded-authority"
 
 4. **Extract a shared forwarded-permission test harness.**
-   Target: `test/permission-forwarder.test.ts` (43-line clone ×2 plus 6 groups / 110 lines), `test/forwarding-manager.test.ts`, `test/permission-forwarding.test.ts` — extract request/response builders, temp forwarding-dir setup, and a fake `ForwarderContext` into `test/helpers/forwarding-fixtures.ts`.
+   ([#528]) Target: `test/permission-forwarder.test.ts` (43-line clone ×2 plus 6 groups / 110 lines), `test/forwarding-manager.test.ts`, `test/permission-forwarding.test.ts` — extract request/response builders, temp forwarding-dir setup, and a fake `ForwarderContext` into `test/helpers/forwarding-fixtures.ts`.
    Smell: Category D (test duplication).
    Outcome: forwarder-family clone groups drop to near zero; Step 6 migrates its per-class tests onto the harness instead of copying scaffolding again.
    Release: independent
 
 5. **Extract a `SubagentDetection` collaborator; seed `src/authority/`.**
-   Target: new `src/authority/subagent-detection.ts` — a class constructed once in `index.ts` with (`subagentSessionsDir`, `platform`, `registry`), exposing `isSubagent(ctx)`; move `src/subagent-context.ts` → `src/authority/subagent-context.ts` (its consumers are all rewired by this step anyway).
+   ([#529]) Target: new `src/authority/subagent-detection.ts` — a class constructed once in `index.ts` with (`subagentSessionsDir`, `platform`, `registry`), exposing `isSubagent(ctx)`; move `src/subagent-context.ts` → `src/authority/subagent-context.ts` (its consumers are all rewired by this step anyway).
    `PromptingGateway`, `ForwardingManager`, and `PermissionForwarder` drop the threaded dep triple and take the collaborator.
    Smell: Category C (dep triple threaded through three constructors) + Category E (seeds the authority domain directory).
    Outcome: one construction site for subagent detection — the input the Phase 9 Authorizer selection consumes; `src/authority/` exists.
    Release: independent
 
 6. **Split `PermissionForwarder` by direction of authority flow.**
-   Target: `src/forwarded-permissions/permission-forwarder.ts` (591 LOC, both roles) → `src/authority/approval-escalator.ts` (`ApprovalEscalator implements ApprovalRequester` — keeps the three-way dispatch with each branch a named method, plus the request-write/poll machinery) and `src/authority/forwarded-request-server.ts` (`ForwardedRequestServer implements InboxProcessor` — `processInbox` and the per-request serve flow); `src/forwarded-permissions/io.ts` → `src/authority/forwarding-io.ts`; the `forwarded-permissions/` directory dissolves.
+   ([#530]) Target: `src/forwarded-permissions/permission-forwarder.ts` (591 LOC, both roles) → `src/authority/approval-escalator.ts` (`ApprovalEscalator implements ApprovalRequester` — keeps the three-way dispatch with each branch a named method, plus the request-write/poll machinery) and `src/authority/forwarded-request-server.ts` (`ForwardedRequestServer implements InboxProcessor` — `processInbox` and the per-request serve flow); `src/forwarded-permissions/io.ts` → `src/authority/forwarding-io.ts`; the `forwarded-permissions/` directory dissolves.
    Callers are unchanged: `PermissionPrompter` keeps depending on `ApprovalRequester`, `ForwardingManager` on `InboxProcessor`.
    Smell: Category B/C (dual-role class; the target's declared split).
    Outcome: each class constructs with only its own dependencies; Phase 9 turns the escalator's three named branches into the three `Authorizer`s branch-by-branch instead of dissecting a god class.
    Release: independent
 
 7. **Remove the deprecated `permissions:rpc:check` / `permissions:rpc:prompt` event-bus channel.**
-   Target: delete `src/permission-event-rpc.ts` and `test/permission-event-rpc.test.ts`; remove the deprecated request/reply payload types and channel constants from `src/permission-events.ts`; unwire from `index.ts` / `PermissionServiceLifecycle`; update the cross-extension docs to point exclusively at the `Symbol.for()` service accessor.
+   ([#531]) Target: delete `src/permission-event-rpc.ts` and `test/permission-event-rpc.test.ts`; remove the deprecated request/reply payload types and channel constants from `src/permission-events.ts`; unwire from `index.ts` / `PermissionServiceLifecycle`; update the cross-extension docs to point exclusively at the `Symbol.for()` service accessor.
    Before writing the migration note, verify the named replacement methods on the real `PermissionsService` type.
    Narrows [#309] to the service path only — leave a comment on that issue.
    Smell: Category A (deprecated subsystem) / Category F (duplicate cross-extension surface).
@@ -896,7 +896,7 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    Release: independent
 
 8. **Split `value-guards.ts` by cohesion.**
-   Target: `src/value-guards.ts` (56 LOC, 22 dependents — fallow's sole refactoring target, priority 28.8): keep the generic parsing guards (`toRecord`, `getNonEmptyString`, `normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`); move the domain guards (`isPermissionState`, `isDenyWithReason`) next to the types they guard (`src/types.ts`).
+   ([#532]) Target: `src/value-guards.ts` (56 LOC, 22 dependents — fallow's sole refactoring target, priority 28.8): keep the generic parsing guards (`toRecord`, `getNonEmptyString`, `normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`); move the domain guards (`isPermissionState`, `isDenyWithReason`) next to the types they guard (`src/types.ts`).
    Smell: Category B (high-impact file) / Category E (mixed cohesion).
    Outcome: fallow refactoring targets 1 → 0; domain guards co-located with their types.
    Release: independent
@@ -905,14 +905,14 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 
 ```mermaid
 flowchart TD
-    S1["Step 1<br/>Manager-unified test fixtures"]
-    S2["Step 2<br/>yolo into the composed ruleset"]
-    S3["Step 3<br/>Delete dead yolo arms"]
-    S4["Step 4<br/>Forwarding test harness"]
-    S5["Step 5<br/>SubagentDetection + seed authority/"]
-    S6["Step 6<br/>Split PermissionForwarder by direction"]
-    S7["Step 7<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
-    S8["Step 8<br/>Split value-guards.ts"]
+    S1["Step 1 (#525)<br/>Manager-unified test fixtures"]
+    S2["Step 2 (#526)<br/>yolo into the composed ruleset"]
+    S3["Step 3 (#527)<br/>Delete dead yolo arms"]
+    S4["Step 4 (#528)<br/>Forwarding test harness"]
+    S5["Step 5 (#529)<br/>SubagentDetection + seed authority/"]
+    S6["Step 6 (#530)<br/>Split PermissionForwarder by direction"]
+    S7["Step 7 (#531)<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
+    S8["Step 8 (#532)<br/>Split value-guards.ts"]
 
     S1 --> S2
     S2 --> S3
@@ -1028,6 +1028,14 @@ Five steps ([#502]–[#506]), all closed, plus the `PathNormalizer` platform-sea
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
 [#309]: https://github.com/gotgenes/pi-packages/issues/309
 [#472]: https://github.com/gotgenes/pi-packages/issues/472
+[#525]: https://github.com/gotgenes/pi-packages/issues/525
+[#526]: https://github.com/gotgenes/pi-packages/issues/526
+[#527]: https://github.com/gotgenes/pi-packages/issues/527
+[#528]: https://github.com/gotgenes/pi-packages/issues/528
+[#529]: https://github.com/gotgenes/pi-packages/issues/529
+[#530]: https://github.com/gotgenes/pi-packages/issues/530
+[#531]: https://github.com/gotgenes/pi-packages/issues/531
+[#532]: https://github.com/gotgenes/pi-packages/issues/532
 [#473]: https://github.com/gotgenes/pi-packages/issues/473
 [#476]: https://github.com/gotgenes/pi-packages/issues/476
 [#478]: https://github.com/gotgenes/pi-packages/issues/478
