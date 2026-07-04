@@ -86,7 +86,10 @@ When the analysis touches handler wiring or shared interfaces, load the `design-
 
 ### Step 6: Assess file and directory organization against the domain
 
-Run `ls packages/$1/src` and look at the shape of the tree, not just the contents of files.
+**Skip this step when domain subdirectories already exist and the `src/` root file count is small** (fewer than 10 top-level files): the deep directory-organization analysis is a scripted no-op on a package that has already been grouped into domains.
+Run `ls packages/$1/src | grep -c '\.ts$'` to check the root file count and note the skip.
+
+Otherwise, run `ls packages/$1/src` and look at the shape of the tree, not just the contents of files.
 A flat `src/` with many top-level modules (20+) is a Category E smell ("Flat directory" in the `improvement-discovery` taxonomy): navigation degrades, and the absence of grouping hides which files form a cohesive feature or domain concept.
 Watch for a module that will not sit still in any obvious group — that usually means the organizing concept has not been named yet, and the reorg should wait on (or motivate) the work that names it.
 
@@ -106,8 +109,18 @@ Compute Priority = Impact × (6 − Risk).
 
 ### Step 8: Propose the phase plan
 
-Group findings into issue-sized steps (max 9 per phase).
+Group findings into issue-sized steps.
+Nine steps is a **ceiling, not a target** — a phase may have one step, or none.
 Identify dependency ordering and parallel tracks.
+
+**Deferral gate.**
+If discovery surfaced no cause-level finding (Category A–C — structural fusion, coupling/boundary flaws, dead subsystems) and the candidate list is polish-only (Category B unit-size, Category D, Category E symptoms), say so plainly and present **"defer"** and **"lean phase"** as first-class `ask_user` options alongside a full phase.
+This is deliberately **not** a numeric threshold — the priority score ranks findings *within* a phase, it does not decide *whether* a phase exists.
+The honest framing ("discovery yielded only polish") is the point; do not manufacture a full phase to fill the ceiling.
+
+**Feasibility probe.**
+Before committing any step whose outcome claim depends on the SDK/type surface (e.g. "remove the file-level `eslint-disable` once the SDK exports usable types"), confirm the named type or export actually exists in the real surface (SDK `.d.ts`, `--help`, schema).
+Do not commit an outcome the surface cannot deliver — this mirrors the AGENTS.md rule that a named remediation in a migration note must be verified against the real surface.
 
 ## Output
 
