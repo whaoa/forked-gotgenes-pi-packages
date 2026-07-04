@@ -1,6 +1,7 @@
 import { posix as posixPath, win32 as winPath } from "node:path";
 
 import { AccessPath } from "./access-intent/access-path";
+import { classifyWin32BashToken } from "./access-intent/bash/msys-bash-tokens";
 import {
   canonicalNormalizePathForComparison,
   normalizePathForComparison,
@@ -10,7 +11,6 @@ import {
   isPathWithinDirectory,
 } from "./path-containment";
 import { isPiInfrastructureRead } from "./pi-infrastructure-read";
-import { isSafeSystemPath } from "./safe-system-paths";
 
 /**
  * Path-interpretation collaborator, constructed once at the session edge with
@@ -60,14 +60,24 @@ export class PathNormalizer {
    * absolute token carries MSYS semantics, not `node:path.win32` semantics. On
    * win32 the recognized safe device paths (`/dev/null`, `/dev/std{in,out,err}`)
    * are preserved verbatim as devices instead of being resolved into
-   * `c:\dev\null`; every other token delegates to {@link forPath}. On POSIX
-   * this is a straight delegation to {@link forPath}.
+   * `c:\dev\null`, and MSYS drive mounts (`/c/…`) are translated to their
+   * Windows equivalent (`C:\…`) before resolution; every other token delegates
+   * to {@link forPath}. On POSIX this is a straight delegation to
+   * {@link forPath}.
    */
   forBashToken(token: string, options?: { resolveBase?: string }): AccessPath {
-    if (this.platform === "win32" && isSafeSystemPath(token)) {
-      return AccessPath.forDevice(token);
+    if (this.platform !== "win32") return this.forPath(token, options);
+
+    const shape = classifyWin32BashToken(token);
+    switch (shape.kind) {
+      case "device":
+        return AccessPath.forDevice(token);
+      case "drive-mount":
+        return this.forPath(shape.windowsPath, options);
+      case "posix-absolute":
+      case "plain":
+        return this.forPath(token, options);
     }
-    return this.forPath(token, options);
   }
 
   /** Platform-aware absoluteness (`win32` vs `posix` rules). */

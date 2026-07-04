@@ -1028,6 +1028,32 @@ describe("Git Bash POSIX device paths (win32 semantics)", () => {
   });
 });
 
+describe("Git Bash MSYS drive mounts (win32 semantics)", () => {
+  const windowsCwd = "C:/projects/app";
+
+  async function extractWin32(command: string): Promise<string[]> {
+    return extractWithNormalizer(
+      command,
+      new PathNormalizer("win32", windowsCwd),
+    );
+  }
+
+  test("an in-cwd drive mount is not flagged", async () => {
+    const result = await extractWin32("cat /c/projects/app/inside.txt");
+    expect(result).toHaveLength(0);
+  });
+
+  test("an out-of-cwd drive mount is flagged as its translated Windows path", async () => {
+    const result = await extractWin32("cat /c/Other/secret.txt");
+    expect(result).toEqual(["c:\\other\\secret.txt"]);
+  });
+
+  test("a different-drive mount is flagged as its translated Windows path", async () => {
+    const result = await extractWin32("cat /d/secrets/pw.txt");
+    expect(result).toEqual(["d:\\secrets\\pw.txt"]);
+  });
+});
+
 describe("bash external-directory denial messages (centralized)", () => {
   test("denial message includes command, paths, and extension tag", () => {
     const result = formatDenyReason({

@@ -203,6 +203,22 @@ describe("PathNormalizer", () => {
       }
     });
 
+    test("forBashToken translates an MSYS drive mount to a Windows path", () => {
+      const ap = normalizer.forBashToken("/c/Other/x");
+      expect(ap.value()).toBe("c:\\other\\x");
+      expect(
+        normalizer.isBoundaryOutsideWorkingDirectory(ap.boundaryValue()),
+      ).toBe(true);
+    });
+
+    test("forBashToken translates an in-cwd drive mount (not external)", () => {
+      const ap = normalizer.forBashToken("/c/projects/app/inside.txt");
+      expect(ap.value()).toBe("c:\\projects\\app\\inside.txt");
+      expect(
+        normalizer.isBoundaryOutsideWorkingDirectory(ap.boundaryValue()),
+      ).toBe(false);
+    });
+
     test("isBoundaryOutsideWorkingDirectory case-folds against the baked cwd", () => {
       expect(
         normalizer.isBoundaryOutsideWorkingDirectory("c:\\projects\\app\\src"),
