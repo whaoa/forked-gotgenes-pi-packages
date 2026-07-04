@@ -1,5 +1,5 @@
 ---
-description: Run fallow analysis, trace from index.ts outward, and propose the next improvement phase
+description: Form a cause hypothesis from the architecture doc, corroborate with fallow, and propose the next improvement phase
 ---
 
 # Plan the next improvement round
@@ -28,19 +28,9 @@ Load these skills before starting analysis:
 
 ## Analysis (follow the improvement-discovery workflow)
 
-### Step 1: Run fallow
+### Step 1: Read the architecture document and form a cause hypothesis
 
-Run the full fallow suite for the package, from the repo root — the `fallow:*` scripts exist only in the root `package.json`, and `--workspace` scopes the analysis:
-
-```bash
-pnpm fallow health --score --hotspots --targets --workspace @gotgenes/$1 2>&1 || true
-pnpm fallow dead-code --workspace @gotgenes/$1 2>&1 || true
-pnpm fallow dupes --workspace @gotgenes/$1 2>&1 || true
-```
-
-Record: health score, dead code findings, production/test duplication, hotspots, refactoring targets.
-
-### Step 2: Read the architecture document
+Start from first principles, before running any tool — fallow finds symptoms by construction (it is syntactic), so leading with it frames the whole analysis around symptoms.
 
 Read `packages/$1/docs/architecture/architecture.md`.
 Note:
@@ -58,7 +48,28 @@ Archiving the prior phase — with its step-completion gate and doc reconciliati
 
 If the architecture document already declares a direction for Phase N (e.g. a deferred phase), treat it as a hypothesis, not a commitment — confirm the focus with the user (`ask_user`) before deep-tracing in that direction, and let the discovery findings decide.
 
-### Step 3: Trace from entry point outward
+Before touching any tool, write down a **cause hypothesis**: the first-principles structural problem you expect the next phase to dissolve (structural fusion, a coupling/boundary flaw, a dead subsystem), read against the architecture doc's first-principles section.
+The later steps corroborate, refine, or refute it — they do not replace it.
+
+### Step 2: Sweep open issues
+
+Reconcile the tracker against the architecture doc — doc/tracker drift otherwise causes re-planning filed work or missing a parked candidate.
+
+```bash
+gh issue list --label "pkg:$1" --state open
+```
+
+Cross-check each open issue against the architecture doc's claims about which issues remain open, and note any that are parked candidates for this phase or already-filed work you must not re-plan.
+
+### Step 3: Run fallow for corroboration and baseline
+
+Fallow **corroborates** the cause hypothesis and supplies outcome baselines (LOC, complexity, dead code, duplication) — it does not set the agenda.
+Run the full suite from the repo root (the exact commands and interpretation live in the `fallow` and `improvement-discovery` skills you loaded); record the health score, dead-code findings, production/test duplication, hotspots, and refactoring targets.
+
+**The phase spine must not be fallow-sourced-only.**
+At least the primary cause must trace to the principle-driven reading of Step 1, not to a syntactic fallow finding — cite fallow signals as symptoms of that cause, not as the motivation for a step.
+
+### Step 4: Trace from entry point outward
 
 Read `packages/$1/src/index.ts` and trace its dependency graph:
 
@@ -66,14 +77,14 @@ Read `packages/$1/src/index.ts` and trace its dependency graph:
 - Note size, exports, fan-out, code smells
 - Pay special attention to: `as any` casts, adapter closure density, forward references, wide parameter lists, mixed responsibilities, anemic domain objects (data classes that a manager reaches into instead of telling)
 
-### Step 4: Read the tests as evidence of constructibility
+### Step 5: Read the tests as evidence of constructibility
 
 `fallow`'s metrics miss god objects, closure density, and DIP violations.
 Read the largest test files and `test/helpers/`: module-level `vi.mock`, wide `as unknown as` casts, and multi-field fixtures (a `makeX` stubbing 10+ methods, or one mock passed to a constructor several times) mean the production object is hard to construct — a production smell, not a test-tree problem.
 Do not accept the architecture doc's self-justification for a smell at face value; verify the claim against the code and tests.
 When the analysis touches handler wiring or shared interfaces, load the `design-review` skill before writing the plan.
 
-### Step 5: Assess file and directory organization against the domain
+### Step 6: Assess file and directory organization against the domain
 
 Run `ls packages/$1/src` and look at the shape of the tree, not just the contents of files.
 A flat `src/` with many top-level modules (20+) is a Category E smell ("Flat directory" in the `improvement-discovery` taxonomy): navigation degrades, and the absence of grouping hides which files form a cohesive feature or domain concept.
@@ -87,13 +98,13 @@ A domain directory may expose a lean `index.ts` barrel as its cross-domain API, 
 Reorg scope is preference-sensitive (churn vs. coherence), so when the opportunity is larger than the files the phase already touches, use `ask_user` to decide how much to fold in.
 When the full reorg exceeds the current phase, record a **forward-looking directory sketch** (the target domain directories + these principles) in the architecture doc and seed only the first domain now — see the pi-permission-system Phase 6 "Directory organization" section for the pattern.
 
-### Step 6: Apply the smell taxonomy
+### Step 7: Apply the smell taxonomy
 
 For each finding, classify it using the taxonomy from the `improvement-discovery` skill (Category A–E).
 Score each on Impact (1–5) and Risk (1–5).
 Compute Priority = Impact × (6 − Risk).
 
-### Step 7: Propose the phase plan
+### Step 8: Propose the phase plan
 
 Group findings into issue-sized steps (max 9 per phase).
 Identify dependency ordering and parallel tracks.
@@ -107,7 +118,7 @@ The section should include:
 1. A summary of findings (updated health metrics table).
 2. Numbered steps with:
    - Title
-   - Target files/functions — when a step extracts or moves code and a domain directory applies (Step 5), name the destination path (e.g. `src/<domain>/<file>.ts`) so directory placement rides along with the change rather than landing flat and being moved later.
+   - Target files/functions — when a step extracts or moves code and a domain directory applies (Step 6), name the destination path (e.g. `src/<domain>/<file>.ts`) so directory placement rides along with the change rather than landing flat and being moved later.
    - Smell category addressed
    - Expected measurable outcome
    - A `Release:` tag on its own line — `Release: independent` or `Release: batch "<batch-name>"` (see the `improvement-discovery` skill's Output format).
