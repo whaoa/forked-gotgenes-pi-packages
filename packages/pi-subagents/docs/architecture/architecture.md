@@ -941,7 +941,7 @@ Directory organization is healthy (seven domain directories, six root files) —
 
 ### Steps
 
-#### Step 1 — Extract result delivery from `Subagent`
+#### Step 1 — Extract result delivery from `Subagent` ([#535])
 
 Smell: Category C (anemic domain / misplaced state, Law of Demeter, scattered resets) — the result-delivery domain named in the first-principles refinement is still fused into the execution record.
 Target files:
@@ -958,7 +958,7 @@ Outcome: zero `record.notification?.` reach-throughs in `src/`; `Subagent` carri
 
 `Release: batch "result-delivery"`
 
-#### Step 2 — Decompose `get-result-tool.execute`
+#### Step 2 — Decompose `get-result-tool.execute` ([#536])
 
 Smell: Category B (oversized function) — 61 lines, 15 cyclomatic, CRAP 63.6; mixes wait/consume policy, stats formatting, and output assembly.
 Target files:
@@ -970,7 +970,7 @@ Outcome: `execute` ≤ 30 lines with cyclomatic < 10; off the fallow high-comple
 
 `Release: batch "result-delivery"`
 
-#### Step 3 — `Subagent.steer` returns an outcome
+#### Step 3 — `Subagent.steer` returns an outcome ([#537])
 
 Smell: Category C (ask-then-tell) — coordinators pre-check status before telling.
 Target files:
@@ -982,7 +982,7 @@ Outcome: zero steer status pre-checks outside `Subagent.steer`; `steer-tool.exec
 
 `Release: independent`
 
-#### Step 4 — Type the model boundary
+#### Step 4 — Type the model boundary ([#538])
 
 Smell: Category C (platform type threading) — `ModelRegistry.find/getAll/getAvailable` return `any`, forcing `any`/`unknown` model threading through `model-resolver`, `spawn-config`, `service-adapter`, and `parent-snapshot`.
 Target files:
@@ -995,7 +995,7 @@ Outcome: `model-resolver.ts` file-level eslint-disable removed; `service-adapter
 
 `Release: independent`
 
-#### Step 5 — Narrow `tui`/`theme` render interfaces
+#### Step 5 — Narrow `tui`/`theme` render interfaces ([#539])
 
 Smell: Category C/D (platform type threading; wide `any` params in render callbacks).
 Target files:
@@ -1010,7 +1010,7 @@ Outcome: file-level eslint-disable headers 5 → ≤ 2; remaining suppressions a
 
 `Release: independent`
 
-#### Step 6 — Table-driven settings handler
+#### Step 6 — Table-driven settings handler ([#540])
 
 Smell: Category B (function duplication inside one function) — `subagents-settings.handle` (13 cyclomatic, 24 cognitive, 52 lines) repeats the select→input→parse→validate→apply→notify flow three times.
 Target files:
@@ -1022,7 +1022,7 @@ Outcome: `handle` cyclomatic ≤ 6 and cognitive ≤ 10; off the fallow high-com
 
 `Release: independent`
 
-#### Step 7 — Decompose the notification renderer
+#### Step 7 — Decompose the notification renderer ([#541])
 
 Smell: Category B/D (oversized arrow, untested complexity) — the renderer arrow in `src/observation/renderer.ts` is fallow's top triage concern (17 cyclomatic, CRAP 79.4).
 Target files:
@@ -1036,7 +1036,7 @@ Outcome: renderer arrow cyclomatic < 10; `renderer.ts` off the top of the fallow
 
 `Release: independent`
 
-#### Step 8 — Full-value `SubagentStateInit`
+#### Step 8 — Full-value `SubagentStateInit` ([#542])
 
 Smell: Category D (shared factory complexity → narrow/complete the production init surface) — `createTestSubagent` (19 cyclomatic, 25 cognitive) seeds metrics via mutation loops because `SubagentStateInit` accepts only transition fields.
 Target files:
@@ -1048,7 +1048,7 @@ Outcome: `createTestSubagent` cyclomatic ≤ 8; off the fallow complexity list; 
 
 `Release: independent`
 
-#### Step 9 — Consolidate remaining test clone families
+#### Step 9 — Consolidate remaining test clone families ([#543])
 
 Smell: Category D (test duplication) — two clone families (`spawn-config.test.ts`: 2 groups / 21 lines; `subagent-manager.test.ts`: 2 groups / 15 lines) plus the `session-config.test.ts` pair (16 lines).
 Target files: the three test files and `test/helpers/` as needed.
@@ -1063,13 +1063,13 @@ Outcome: in-package clone groups 9 → ≤ 5; duplicated lines 81 → ≤ 40.
 
 ```mermaid
 flowchart LR
-    S1["Step 1<br/>Result delivery off Subagent"] --> S2["Step 2<br/>Decompose get-result-tool"]
-    S1 -.soft.-> S7["Step 7<br/>Decompose notification renderer"]
-    S3["Step 3<br/>Steer returns an outcome"]
-    S4["Step 4<br/>Type the model boundary"]
-    S5["Step 5<br/>Narrow tui/theme interfaces"]
-    S6["Step 6<br/>Table-driven settings handler"]
-    S8["Step 8<br/>Full-value SubagentStateInit"] --> S9["Step 9<br/>Consolidate test clones"]
+    S1["Step 1 (#535)<br/>Result delivery off Subagent"] --> S2["Step 2 (#536)<br/>Decompose get-result-tool"]
+    S1 -.soft.-> S7["Step 7 (#541)<br/>Decompose notification renderer"]
+    S3["Step 3 (#537)<br/>Steer returns an outcome"]
+    S4["Step 4 (#538)<br/>Type the model boundary"]
+    S5["Step 5 (#539)<br/>Narrow tui/theme interfaces"]
+    S6["Step 6 (#540)<br/>Table-driven settings handler"]
+    S8["Step 8 (#542)<br/>Full-value SubagentStateInit"] --> S9["Step 9 (#543)<br/>Consolidate test clones"]
     S2 --> S9
     S3 --> S9
 ```
@@ -1217,5 +1217,14 @@ The upstream test suite is run periodically as a regression canary for the sessi
 [#462]: https://github.com/gotgenes/pi-packages/issues/462
 [#463]: https://github.com/gotgenes/pi-packages/issues/463
 [#470]: https://github.com/gotgenes/pi-packages/issues/470
+[#535]: https://github.com/gotgenes/pi-packages/issues/535
+[#536]: https://github.com/gotgenes/pi-packages/issues/536
+[#537]: https://github.com/gotgenes/pi-packages/issues/537
+[#538]: https://github.com/gotgenes/pi-packages/issues/538
+[#539]: https://github.com/gotgenes/pi-packages/issues/539
+[#540]: https://github.com/gotgenes/pi-packages/issues/540
+[#541]: https://github.com/gotgenes/pi-packages/issues/541
+[#542]: https://github.com/gotgenes/pi-packages/issues/542
+[#543]: https://github.com/gotgenes/pi-packages/issues/543
 [ADR-0002]: ../decisions/0002-extensions-on-a-minimal-core.md
 [ADR-0004]: ../decisions/0004-reconsider-ui-direction.md
