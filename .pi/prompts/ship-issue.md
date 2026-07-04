@@ -75,6 +75,7 @@ Otherwise continue.
 
 Build the close comment from the commits since the shipped package's previous release.
 Derive the previous tag package-scoped (`git tag --list '<pkg>-v*' --sort=-creatordate | head -1`, where `<pkg>` is the shipped package from the issue's plan path), not `git tag --sort=-version:refname | head -1`, which sorts lexically across all package tags and returns an unrelated package.
+For a repo-root tooling change (plan under `docs/plans/`, not `packages/<PKG>/docs/plans/`), there is no `<pkg>` and no package tag — anchor the range on the parent of the issue's first commit (`git log --oneline <parent>..HEAD`), or the most recent `chore: release main` commit.
 
 ```bash
 git log --oneline <pkg-tag>..HEAD
