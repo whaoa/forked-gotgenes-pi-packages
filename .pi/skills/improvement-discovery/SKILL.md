@@ -138,6 +138,11 @@ Priority = Impact × (6 − Risk)
 | 6–11     | Nice-to-have or next phase |
 | ≤ 5      | Defer indefinitely         |
 
+> **Fallow-CRAP gotcha.**
+> Fallow estimates CRAP from static reference tracing when no coverage file is supplied, and the estimate is unreliable — a module with a real test file can report a CRAP in the 70s.
+> Before citing a CRAP score as a step's motivation, either run `fallow health --coverage <file>` with a real coverage file or confirm whether a test file exists for the module.
+> Treat estimated CRAP as a hint, not a finding — never let a step earn its place on an estimated score.
+
 ## Grouping heuristics
 
 - **One issue per extraction** — each "extract X from Y" is a single issue.
@@ -156,9 +161,12 @@ The plan should produce:
 1. **Updated health metrics** — table comparing before/after for the phase.
 2. **Step list** — numbered steps, each with:
    - Title and issue reference
-   - What smell it addresses
+   - **Cause** — the first-principles structural cause the step dissolves (name it explicitly), with any fallow signal cited as the _symptom_ of that cause, not the motivation.
+     A step whose only stated justification is a fallow finding is a symptom-driven step; trace it to a cause or drop it.
+   - What smell it addresses (Category A–F)
    - Specific files/functions targeted
    - Expected measurable outcome (LOC reduction, complexity drop, bag field reduction)
+   - **Impact / Risk / Priority** — the per-step scores from the prioritization framework (`Priority = Impact × (6 − Risk)`), published on the step so the ranking is auditable in the committed roadmap (and at `/plan-issue` time), not left in the session transcript.
 3. **Step dependency diagram** — Mermaid flowchart showing which steps unblock others.
 4. **Tracks** — group steps into named parallel tracks.
 5. **Release batches** — make release coordination grep-able, in two artifacts:
