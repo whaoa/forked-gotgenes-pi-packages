@@ -33,3 +33,29 @@ Produced a 4-step TDD plan (rule helper → manager rewrite + wiring → resolut
   The architecture doc inline-copies `RuleOrigin`/`Rule` (must add `"yolo"`); the "yolo checks on the ask path" health-metric row is *not* flipped in this step (arms removed only in [#527]); `permission-prompter.md` update rides with [#527] since the arm still exists.
   No `README.md` command-surface change.
 - **ADR-0002 boundary preserved.** `rewriteAsksToYolo` is a string-only `Ruleset` transform in `rule.ts`; the manager imports it without breaching the `no-restricted-imports` `AccessPath` guard.
+
+## Stage: Implementation — TDD (2026-07-05T15:45:00Z)
+
+### Session summary
+
+Executed all 4 planned TDD cycles for the yolo composition-stage rewrite: (1) `rewriteAsksToYolo` + `"yolo"` `RuleOrigin` in `rule.ts`; (2) the post-cache rewrite in `PermissionManager.check` behind an injected `isYoloEnabled` reader, wired in `index.ts`; (3) `deriveResolution` allow+autoApproved→`auto_approved` plus a `GateRunner` yolo fast-path; (4) architecture-doc sync (inline `RuleOrigin` listing, Step 2 ✅ on heading + `S2` Mermaid node, `Landed:` note).
+Test count moved +16 (2283 → 2299); full suite, `pnpm run check`, root `pnpm run lint`, and `pnpm fallow dead-code` all green.
+
+### Observations
+
+- **Plan deviation (simplification).**
+  The plan suggested threading `isYoloEnabled` through `test/helpers/manager-harness.ts`; instead the new `test/permission-manager-yolo.test.ts` constructs `PermissionManager` directly with the already-exported `createInMemoryPolicyLoader` + an injected `isYoloEnabled` closure.
+  Narrower, no harness surface added.
+  The reviewer confirmed this is a clean simplification, not a gap.
+- **Lint caught unnecessary optional chains in the first Red.**
+  `@typescript-eslint/no-unnecessary-condition` fired on `rewritten?.` after a `const [rewritten] = ...` destructure (element type is non-nullish with `noUncheckedIndexedAccess` off); array-index `result[0]?.` was *not* flagged.
+  Fixed the destructured accesses to plain member access before committing.
+- **Pre-completion reviewer: PASS** — ready for `/ship-issue`.
+  Deterministic checks green; cross-step invariants (#478 single `check` entry point, #506/ADR-0002 string boundary, #525 manager-harness fixtures, display-unchanged) all verified.
+  `mmdc` rendered the modified `architecture.md` charts including the `S2` ✅ node.
+  No WARN findings.
+- **Ship-time note.**
+  Release is **mid-batch — defer** (batch "yolo-recorded-authority", tail = [#527]); the release-please PR stays open until [#527] lands.
+  Confirm at ship time.
+- **Skill-read parity nuance held as designed.**
+  No code path change was needed for skill-reads: the yolo-aware sanitizer already resolves a skill's state to `allow` before the gate, so a skill-read auto-allows and logs `policy_allow`/`origin: "builtin"` (accepted, operator-confirmed).
