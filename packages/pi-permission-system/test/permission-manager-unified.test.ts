@@ -26,6 +26,7 @@ import {
   createManager,
   createManagerWithConfig,
   createManagerWithProject,
+  createManagerWithScopes,
   createMissingConfigManager,
   sessionRule,
 } from "#test/helpers/manager-harness";
@@ -563,46 +564,9 @@ describe("checkPermission — home path expansion in external_directory rules", 
 // Rule origin provenance
 // ---------------------------------------------------------------------------
 
-/**
- * Build a manager with a global config and an optional project config.
- * Returns the manager and a cleanup function.
- */
-function makeManagerWithScopes(
-  globalPermission: Record<string, unknown>,
-  projectPermission?: Record<string, unknown>,
-): { manager: PermissionManager; cleanup: () => void } {
-  const baseDir = mkdtempSync(join(tmpdir(), "pm-provenance-test-"));
-  const agentsDir = join(baseDir, "agents");
-  mkdirSync(agentsDir, { recursive: true });
-  const globalConfigPath = join(baseDir, "global-config.json");
-  writeFileSync(
-    globalConfigPath,
-    JSON.stringify({ permission: globalPermission }, null, 2),
-  );
-
-  let projectGlobalConfigPath: string | undefined;
-  if (projectPermission !== undefined) {
-    projectGlobalConfigPath = join(baseDir, "project-config.json");
-    writeFileSync(
-      projectGlobalConfigPath,
-      JSON.stringify({ permission: projectPermission }, null, 2),
-    );
-  }
-
-  const manager = new PermissionManager({
-    globalConfigPath,
-    agentsDir,
-    projectGlobalConfigPath,
-  });
-  return {
-    manager,
-    cleanup: () => rmSync(baseDir, { recursive: true, force: true }),
-  };
-}
-
 describe("checkPermission — rule origin provenance", () => {
   it("single-scope global: config rule has origin 'global'", () => {
-    const { manager, cleanup } = makeManagerWithScopes({ read: "allow" });
+    const { manager, cleanup } = createManagerWithScopes({ read: "allow" });
     try {
       const result = checkTool(manager, "read", {});
       expect(result.state).toBe("allow");
@@ -613,7 +577,7 @@ describe("checkPermission — rule origin provenance", () => {
   });
 
   it("single-scope global with pattern map: origin is 'global'", () => {
-    const { manager, cleanup } = makeManagerWithScopes({
+    const { manager, cleanup } = createManagerWithScopes({
       bash: { "git *": "allow" },
     });
     try {
@@ -626,7 +590,7 @@ describe("checkPermission — rule origin provenance", () => {
   });
 
   it("project overrides global: winning rule has origin 'project'", () => {
-    const { manager, cleanup } = makeManagerWithScopes(
+    const { manager, cleanup } = createManagerWithScopes(
       { read: "ask" },
       { read: "allow" },
     );
@@ -642,7 +606,7 @@ describe("checkPermission — rule origin provenance", () => {
   it("both-object merge: patterns retain their own origins", () => {
     // global defines bash["git *"] = allow; project adds bash["rm *"] = deny.
     // Both patterns should survive with their own origins.
-    const { manager, cleanup } = makeManagerWithScopes(
+    const { manager, cleanup } = createManagerWithScopes(
       { bash: { "git *": "allow" } },
       { bash: { "rm *": "deny" } },
     );
@@ -665,7 +629,7 @@ describe("checkPermission — rule origin provenance", () => {
 
   it("both-object merge: project pattern overrides global pattern for same key", () => {
     // Both scopes define bash["git *"]; project wins for that pattern.
-    const { manager, cleanup } = makeManagerWithScopes(
+    const { manager, cleanup } = createManagerWithScopes(
       { bash: { "git *": "ask" } },
       { bash: { "git *": "allow" } },
     );
@@ -682,7 +646,7 @@ describe("checkPermission — rule origin provenance", () => {
 
   it("string replaces object: all patterns from replacing scope get origin 'project'", () => {
     // global defines bash as an object; project replaces with string "allow".
-    const { manager, cleanup } = makeManagerWithScopes(
+    const { manager, cleanup } = createManagerWithScopes(
       { bash: { "git *": "ask", "npm *": "ask" } },
       { bash: "allow" },
     );
@@ -700,7 +664,7 @@ describe("checkPermission — rule origin provenance", () => {
 
   it("object replaces string: all patterns from replacing scope get origin 'project'", () => {
     // global defines read as a string "ask"; project replaces with object.
-    const { manager, cleanup } = makeManagerWithScopes(
+    const { manager, cleanup } = createManagerWithScopes(
       { read: "ask" },
       { read: { "*": "allow" } },
     );
@@ -731,7 +695,7 @@ describe("checkPermission — rule origin provenance", () => {
   });
 
   it("universal fallback (*) set in global config carries origin 'global'", () => {
-    const { manager, cleanup } = makeManagerWithScopes({ "*": "allow" });
+    const { manager, cleanup } = createManagerWithScopes({ "*": "allow" });
     try {
       // No explicit surface rule — hits the synthesized default derived from "*".
       const result = checkTool(manager, "read", {});
@@ -743,7 +707,7 @@ describe("checkPermission — rule origin provenance", () => {
   });
 
   it("universal fallback (*) overridden by project carries origin 'project'", () => {
-    const { manager, cleanup } = makeManagerWithScopes(
+    const { manager, cleanup } = createManagerWithScopes(
       { "*": "ask" },
       { "*": "allow" },
     );
