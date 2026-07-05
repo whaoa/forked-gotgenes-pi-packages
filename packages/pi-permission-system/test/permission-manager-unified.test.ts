@@ -23,6 +23,8 @@ import {
 } from "#src/permission-manager";
 import type { Ruleset } from "#src/rule";
 import {
+  createInMemoryManager,
+  createInMemoryPolicyLoader,
   createManager,
   createManagerWithConfig,
   createManagerWithProject,
@@ -733,69 +735,19 @@ describe("checkPermission — rule origin provenance", () => {
 // In-memory PolicyLoader stub tests — no filesystem required
 // ---------------------------------------------------------------------------
 
-import type { PolicyLoader } from "#src/permission-manager";
-import type { ResolvedPolicyPaths } from "#src/policy-loader";
 import type { PermissionCheckResult, ScopeConfig } from "#src/types";
-
-/**
- * Minimal in-memory PolicyLoader for testing merge + evaluation logic
- * without touching the filesystem.
- */
-function createInMemoryPolicyLoader(
-  scopes: {
-    global?: ScopeConfig;
-    project?: ScopeConfig;
-    agent?: Record<string, ScopeConfig>;
-    projectAgent?: Record<string, ScopeConfig>;
-  } = {},
-  mcpServerNames: readonly string[] = [],
-): PolicyLoader {
-  const issues: string[] = [];
-  return {
-    loadGlobalConfig: () => scopes.global ?? ({} as const),
-    loadProjectConfig: () => scopes.project ?? ({} as const),
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- || is intentional: handles both falsy name and missing key
-    loadAgentConfig: (name?: string) => (name && scopes.agent?.[name]) || {},
-    loadProjectAgentConfig: (name?: string) =>
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- || is intentional: handles both falsy name and missing key
-      (name && scopes.projectAgent?.[name]) || {},
-    getConfiguredMcpServerNames: () => mcpServerNames,
-    getCacheStamp: () => "in-memory",
-    getConfigIssues: () => issues,
-    getResolvedPolicyPaths: (): ResolvedPolicyPaths => ({
-      globalConfigPath: "/in-memory/config.json",
-      globalConfigExists: true,
-      projectConfigPath: null,
-      projectConfigExists: false,
-      agentsDir: "/in-memory/agents",
-      agentsDirExists: false,
-      projectAgentsDir: null,
-      projectAgentsDirExists: false,
-    }),
-  };
-}
-
-/** Create a PermissionManager backed by an in-memory PolicyLoader. */
-function makeInMemoryManager(
-  scopes: Parameters<typeof createInMemoryPolicyLoader>[0] = {},
-  mcpServerNames: readonly string[] = [],
-): PermissionManager {
-  return new PermissionManager({
-    policyLoader: createInMemoryPolicyLoader(scopes, mcpServerNames),
-  });
-}
 
 describe("PermissionManager with in-memory PolicyLoader", () => {
   describe("universal fallback", () => {
     it("defaults to ask when no config is provided", () => {
-      const manager = makeInMemoryManager();
+      const manager = createInMemoryManager();
       const result = checkTool(manager, "read", {});
       expect(result.state).toBe("ask");
       expect(result.origin).toBe("builtin");
     });
 
     it("respects permission['*'] = 'allow' from global config", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "allow" } },
       });
       const result = checkTool(manager, "read", {});
@@ -804,7 +756,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("respects permission['*'] = 'deny' from global config", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "deny" } },
       });
       const result = checkTool(manager, "write", {});
@@ -814,7 +766,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
   describe("surface routing", () => {
     it("bash surface routes correctly", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: {
           permission: { "*": "ask", bash: { "git *": "allow" } },
         },
@@ -828,7 +780,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("tool surface routes correctly for built-in tools", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "deny", read: "allow" } },
       });
       const result = checkTool(manager, "read", {});
@@ -837,7 +789,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("skill surface routes correctly", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: {
           permission: { "*": "ask", skill: { librarian: "allow" } },
         },
@@ -848,7 +800,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("mcp surface routes correctly", () => {
-      const manager = makeInMemoryManager(
+      const manager = createInMemoryManager(
         {
           global: {
             permission: { "*": "ask", mcp: { exa_search: "allow" } },
@@ -865,7 +817,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("external_directory surface routes correctly", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: {
           permission: {
             "*": "ask",
@@ -884,7 +836,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("extension tools use 'default' source when no config rule matches", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "ask" } },
       });
       const result = checkTool(manager, "my_custom_tool", {});
@@ -895,7 +847,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
   describe("multi-scope merge", () => {
     it("project overrides global", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { read: "ask" } },
         project: { permission: { read: "allow" } },
       });
@@ -905,7 +857,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("agent overrides project", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { read: "ask" } },
         project: { permission: { read: "allow" } },
         agent: { coder: { permission: { read: "deny" } } },
@@ -916,7 +868,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("project-agent overrides agent", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { read: "deny" } },
         agent: { coder: { permission: { read: "deny" } } },
         projectAgent: { coder: { permission: { read: "allow" } } },
@@ -927,7 +879,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("deep-shallow merge preserves patterns from different scopes", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { bash: { "git *": "allow" } } },
         project: { permission: { bash: { "rm *": "deny" } } },
       });
@@ -945,7 +897,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("string replaces object in override scope", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: {
           permission: { bash: { "git *": "ask", "npm *": "ask" } },
         },
@@ -959,7 +911,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
   describe("session rule composition", () => {
     it("session rule wins over config", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "deny" } },
       });
       const sessionRules: Ruleset = [sessionRule("read", "*")];
@@ -969,7 +921,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("session rule does not bleed across surfaces", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "ask" } },
       });
       const sessionRules: Ruleset = [sessionRule("bash", "git *")];
@@ -995,7 +947,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
   describe("origin tracking", () => {
     it("universal fallback from project carries origin 'project'", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "ask" } },
         project: { permission: { "*": "allow" } },
       });
@@ -1005,7 +957,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("session origin is 'session'", () => {
-      const manager = makeInMemoryManager();
+      const manager = createInMemoryManager();
       const sessionRules: Ruleset = [sessionRule("read", "*")];
       const result = checkTool(manager, "read", {}, undefined, sessionRules);
       expect(result.origin).toBe("session");
@@ -1014,7 +966,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
   describe("getToolPermission", () => {
     it("returns tool-level state for built-in tools", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "deny", read: "allow" } },
       });
       expect(manager.getToolPermission("read")).toBe("allow");
@@ -1022,7 +974,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("returns tool-level state for bash surface", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { "*": "deny", bash: "allow" } },
       });
       expect(manager.getToolPermission("bash")).toBe("allow");
@@ -1031,7 +983,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
   describe("getComposedConfigRules", () => {
     it("returns only config-layer rules", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: {
           permission: { "*": "ask", bash: { "git *": "allow" } },
         },
@@ -1046,7 +998,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
   describe("getPromotablePathTokenMatcher (#509)", () => {
     it("matches a bare token against a specific deny pattern", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { path: { id_rsa: "deny" } } },
       });
       const isPromotable = manager.getPromotablePathTokenMatcher();
@@ -1055,7 +1007,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("matches a bare token against a specific ask wildcard pattern", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { path: { "*.pem": "ask" } } },
       });
       const isPromotable = manager.getPromotablePathTokenMatcher();
@@ -1064,7 +1016,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("does not match against the universal '*' path pattern", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { path: { "*": "ask" } } },
       });
       const isPromotable = manager.getPromotablePathTokenMatcher();
@@ -1073,7 +1025,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("does not match against an allow-only path pattern", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { path: { id_rsa: "allow" } } },
       });
       const isPromotable = manager.getPromotablePathTokenMatcher();
@@ -1081,7 +1033,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("returns a no-op matcher when no path rules exist", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { read: "allow" } },
       });
       const isPromotable = manager.getPromotablePathTokenMatcher();
@@ -1112,7 +1064,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
     });
 
     it("scopes to the requested agent's composed rules", () => {
-      const manager = makeInMemoryManager({
+      const manager = createInMemoryManager({
         global: { permission: { path: { id_rsa: "deny" } } },
         agent: {
           coder: { permission: { path: { "secret.key": "deny" } } },

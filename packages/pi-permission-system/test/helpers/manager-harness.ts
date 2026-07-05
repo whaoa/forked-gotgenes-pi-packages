@@ -8,9 +8,58 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { PermissionManager } from "#src/permission-manager";
+import { PermissionManager, type PolicyLoader } from "#src/permission-manager";
+import type { ResolvedPolicyPaths } from "#src/policy-loader";
 import type { Rule } from "#src/rule";
 import type { PermissionState, ScopeConfig } from "#src/types";
+
+/**
+ * Minimal in-memory PolicyLoader for testing merge + evaluation logic
+ * without touching the filesystem.
+ */
+export function createInMemoryPolicyLoader(
+  scopes: {
+    global?: ScopeConfig;
+    project?: ScopeConfig;
+    agent?: Record<string, ScopeConfig>;
+    projectAgent?: Record<string, ScopeConfig>;
+  } = {},
+  mcpServerNames: readonly string[] = [],
+): PolicyLoader {
+  const issues: string[] = [];
+  return {
+    loadGlobalConfig: () => scopes.global ?? ({} as const),
+    loadProjectConfig: () => scopes.project ?? ({} as const),
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- || is intentional: handles both falsy name and missing key
+    loadAgentConfig: (name?: string) => (name && scopes.agent?.[name]) || {},
+    loadProjectAgentConfig: (name?: string) =>
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- || is intentional: handles both falsy name and missing key
+      (name && scopes.projectAgent?.[name]) || {},
+    getConfiguredMcpServerNames: () => mcpServerNames,
+    getCacheStamp: () => "in-memory",
+    getConfigIssues: () => issues,
+    getResolvedPolicyPaths: (): ResolvedPolicyPaths => ({
+      globalConfigPath: "/in-memory/config.json",
+      globalConfigExists: true,
+      projectConfigPath: null,
+      projectConfigExists: false,
+      agentsDir: "/in-memory/agents",
+      agentsDirExists: false,
+      projectAgentsDir: null,
+      projectAgentsDirExists: false,
+    }),
+  };
+}
+
+/** Manager backed by an in-memory PolicyLoader — no filesystem required. */
+export function createInMemoryManager(
+  scopes: Parameters<typeof createInMemoryPolicyLoader>[0] = {},
+  mcpServerNames: readonly string[] = [],
+): PermissionManager {
+  return new PermissionManager({
+    policyLoader: createInMemoryPolicyLoader(scopes, mcpServerNames),
+  });
+}
 
 /** Manager backed by nonexistent config paths — universal default is "ask". */
 export function createMissingConfigManager(
