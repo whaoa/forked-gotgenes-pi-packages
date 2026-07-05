@@ -12,6 +12,17 @@ import { PermissionManager } from "#src/permission-manager";
 import type { Rule } from "#src/rule";
 import type { PermissionState, ScopeConfig } from "#src/types";
 
+/** Manager backed by nonexistent config paths — universal default is "ask". */
+export function createMissingConfigManager(
+  mcpServerNames: readonly string[] = [],
+): PermissionManager {
+  return new PermissionManager({
+    globalConfigPath: "/nonexistent/config.json",
+    agentsDir: "/nonexistent/agents",
+    mcpServerNames: [...mcpServerNames],
+  });
+}
+
 /** Build a session-layer rule (default action "allow"). */
 export function sessionRule(
   surface: string,

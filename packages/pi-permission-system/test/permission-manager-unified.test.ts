@@ -25,23 +25,13 @@ import type { Ruleset } from "#src/rule";
 import {
   createManager,
   createManagerWithProject,
+  createMissingConfigManager,
   sessionRule,
 } from "#test/helpers/manager-harness";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Manager backed by a missing config file — universal default is "ask". */
-function makeManager(
-  mcpServerNames: readonly string[] = [],
-): PermissionManager {
-  return new PermissionManager({
-    globalConfigPath: "/nonexistent/config.json",
-    agentsDir: "/nonexistent/agents",
-    mcpServerNames: [...mcpServerNames],
-  });
-}
 
 /**
  * Manager backed by a real on-disk config file written to a temp directory.
@@ -188,7 +178,7 @@ function checkPath(
 
 describe("checkPermission — session rules", () => {
   it("session rule wins over the universal default (external_directory)", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const sessionRules: Ruleset = [
       sessionRule("external_directory", "/other/project"),
     ];
@@ -206,7 +196,7 @@ describe("checkPermission — session rules", () => {
   });
 
   it("session rule wins over the universal default (skill)", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const sessionRules: Ruleset = [sessionRule("skill", "librarian")];
     const result = checkTool(
       manager,
@@ -221,7 +211,7 @@ describe("checkPermission — session rules", () => {
   });
 
   it("session rule wins over the universal default (bash)", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const sessionRules: Ruleset = [sessionRule("bash", "git status")];
     const result = checkTool(
       manager,
@@ -236,7 +226,7 @@ describe("checkPermission — session rules", () => {
   });
 
   it("session rule wins over the universal default (tool — read)", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const sessionRules: Ruleset = [sessionRule("read", "*")];
     const result = checkTool(manager, "read", {}, undefined, sessionRules);
     expect(result.state).toBe("allow");
@@ -244,7 +234,7 @@ describe("checkPermission — session rules", () => {
   });
 
   it("session rule wins over the universal default (mcp)", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const sessionRules: Ruleset = [sessionRule("mcp", "mcp_status")];
     const result = checkTool(manager, "mcp", {}, undefined, sessionRules);
     expect(result.state).toBe("allow");
@@ -252,14 +242,14 @@ describe("checkPermission — session rules", () => {
   });
 
   it("no session rules — falls through to default (ask)", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const result = checkTool(manager, "read", {}, undefined, []);
     expect(result.state).toBe("ask");
     expect(result.source).not.toBe("session");
   });
 
   it("session rule with narrower pattern does not block a broader command not in session", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     // Only "git status" is session-approved; "git push" should fall through to default.
     const sessionRules: Ruleset = [sessionRule("bash", "git status")];
     const result = checkTool(
@@ -274,7 +264,7 @@ describe("checkPermission — session rules", () => {
   });
 
   it("session wildcard pattern matches multiple commands", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const sessionRules: Ruleset = [sessionRule("bash", "git *")];
     const push = checkTool(
       manager,
@@ -324,7 +314,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("source is 'special' even for a default match (no config rule)", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const result = checkPath(manager, "/some/path", {}, "external_directory");
       expect(result.state).toBe("ask");
       expect(result.source).toBe("special");
@@ -332,7 +322,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("matchedPattern is undefined for a default match", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const result = checkPath(manager, "/unknown", {}, "external_directory");
       expect(result.matchedPattern).toBeUndefined();
     });
@@ -355,7 +345,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("source is 'skill' even for a default match", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const result = checkTool(manager, "skill", { name: "unknown" });
       expect(result.state).toBe("ask");
       expect(result.source).toBe("skill");
@@ -382,7 +372,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("source is 'bash' even for a default match, command is empty string", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const result = checkTool(manager, "bash", {});
       expect(result.source).toBe("bash");
       expect(result.command).toBe("");
@@ -411,7 +401,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("source is 'default' when all targets match only the synthesized default", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const result = checkTool(manager, "mcp", { tool: "exa:search" });
       expect(result.state).toBe("ask");
       expect(result.source).toBe("default");
@@ -449,14 +439,14 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("built-in tool: source is 'tool' even for a default match", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const result = checkTool(manager, "read", {});
       expect(result.state).toBe("ask");
       expect(result.source).toBe("tool");
     });
 
     it("extension tool: source is 'default' when no config rule matches", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const result = checkTool(manager, "my_custom_tool", {});
       expect(result.state).toBe("ask");
       expect(result.source).toBe("default");
@@ -479,7 +469,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
   describe("matchedPattern for session rules across surfaces", () => {
     it("matchedPattern is the session rule pattern for a session match (bash)", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const sessionRules: Ruleset = [sessionRule("bash", "git *")];
       const result = checkTool(
         manager,
@@ -493,7 +483,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("matchedPattern is the session rule pattern for a session match (skill)", () => {
-      const manager = makeManager();
+      const manager = createMissingConfigManager();
       const sessionRules: Ruleset = [sessionRule("skill", "librarian")];
       const result = checkTool(
         manager,
@@ -748,14 +738,14 @@ describe("checkPermission — rule origin provenance", () => {
 
   it("no config match: origin is 'builtin' (default layer)", () => {
     // No config — falls back to synthesized default.
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const result = checkTool(manager, "read", {});
     expect(result.state).toBe("ask");
     expect(result.origin).toBe("builtin");
   });
 
   it("session rule: origin is 'session'", () => {
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const sessionRules: Ruleset = [sessionRule("read", "*")];
     const result = checkTool(manager, "read", {}, undefined, sessionRules);
     expect(result.state).toBe("allow");
@@ -791,7 +781,7 @@ describe("checkPermission — rule origin provenance", () => {
 
   it("built-in fallback (no * in any config): origin is 'builtin'", () => {
     // Manager with no config file — built-in "ask" default.
-    const manager = makeManager();
+    const manager = createMissingConfigManager();
     const result = checkTool(manager, "read", {});
     expect(result.state).toBe("ask");
     expect(result.origin).toBe("builtin");
