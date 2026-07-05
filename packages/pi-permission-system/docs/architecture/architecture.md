@@ -34,6 +34,7 @@ This document describes the internal design of the permission system, informed b
  * Synthesized:   "builtin" (universal default / evaluate() fallback),
  *                "baseline" (conditional MCP metadata auto-allow).
  * Runtime:       "session" (session approvals).
+ * Rewrite:       "yolo" (composition-stage ask→allow rewrite under yolo mode).
  */
 type RuleOrigin =
   | "global"
@@ -42,7 +43,8 @@ type RuleOrigin =
   | "project-agent"
   | "builtin"
   | "baseline"
-  | "session";
+  | "session"
+  | "yolo";
 
 interface Rule {
   /** The permission surface: "bash", "edit", "mcp", "skill", "external_directory", "path", etc. */
@@ -854,12 +856,15 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    Landed: the seven config-harness factories plus the `sessionRule` builder now live in `test/helpers/manager-harness.ts`; the test file drops from 3,745 to 3,481 LOC with one intentional act/assert clone remaining (agent-frontmatter, kept per the plan's Non-Goals).
    Release: independent
 
-2. **Move yolo into recorded authority: composition-stage `ask` → `allow` rewrite.**
+2. ✅ **Move yolo into recorded authority: composition-stage `ask` → `allow` rewrite.**
    ([#526]) Target: `src/permission-manager.ts` (apply the rewrite over the composed ruleset at check time, keyed off an injected yolo reader; yolo state must join the `resolvedPermissionsCache` key or be applied post-cache), `src/rule.ts` (`RuleOrigin` gains `"yolo"`; update this doc's inline `Rule` listing), `src/handlers/gates/helpers.ts` + `runner.ts` (a yolo-origin `allow` derives resolution `auto_approved`, and the runner writes the `permission_request.auto_approved` review entry so review-log parity holds).
    Display must not change: `getComposedConfigRules` / `/permission-system show` keep showing the configured actions, not the rewrite.
    Faithful to current behavior: explicit `deny` is not `ask`, so yolo suppresses prompts but preserves hard denies (see [yolo is recorded authority](#yolo-is-recorded-authority)).
    Smell: Category C (policy smeared across the prompt path).
    Outcome: `evaluate()` is the only yolo decision point; the prompter and gateway yolo arms become unreachable; review log and decision events keep reporting `auto_approved`.
+   Landed: `rewriteAsksToYolo` (pure `Ruleset` transform in `rule.ts`) is applied post-cache in `PermissionManager.check` behind an injected `isYoloEnabled` reader, wired in `index.ts` to `isYoloModeEnabled(configStore.current())`; `deriveResolution` maps a yolo-origin `allow` to `auto_approved` and `GateRunner` gained a yolo fast-path that writes the `permission_request.auto_approved` review entry (runner `logContext` shape, `toolCallId` not `requestId`).
+   Skill-reads under yolo resolve to `allow` via the yolo-aware sanitizer and log `policy_allow`/`origin: "builtin"` — an accepted parity nuance (the prompter arm still auto-approves nothing new).
+   The `yolo checks on the ask path` metric is not yet flipped; the prompter/gateway arms are removed in Step 3.
    Release: batch "yolo-recorded-authority"
 
 3. **Delete the dead yolo arms from the prompt path; dissolve `yolo-mode.ts`.**
@@ -908,7 +913,7 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 ```mermaid
 flowchart TD
     S1["✅ Step 1 (#525)<br/>Manager-unified test fixtures"]
-    S2["Step 2 (#526)<br/>yolo into the composed ruleset"]
+    S2["✅ Step 2 (#526)<br/>yolo into the composed ruleset"]
     S3["Step 3 (#527)<br/>Delete dead yolo arms"]
     S4["Step 4 (#528)<br/>Forwarding test harness"]
     S5["Step 5 (#529)<br/>SubagentDetection + seed authority/"]
