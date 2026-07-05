@@ -62,7 +62,7 @@ export function deriveResolution(
   canConfirm: boolean,
   autoApproved = false,
 ): PermissionDecisionResolution {
-  if (state === "allow") return "policy_allow";
+  if (state === "allow") return autoApproved ? "auto_approved" : "policy_allow";
   if (state === "deny") return "policy_deny";
   // state === "ask"
   if (action === "allow") {

@@ -78,6 +78,30 @@ describe("GateRunner — descriptor path", () => {
     );
   });
 
+  it("returns allow and emits auto_approved on a yolo-origin allow without prompting", async () => {
+    const { runner, deps } = makeGateRunner({
+      resolveResult: makeCheckResult({
+        state: "allow",
+        origin: "yolo",
+        matchedPattern: "*",
+      }),
+    });
+    const result = await runner.run(makeDescriptor(), null, "tc-1");
+    expect(result).toEqual({ action: "allow" });
+    expect(deps.prompt).not.toHaveBeenCalled();
+    expect(deps.reporter.writeReviewLog).toHaveBeenCalledWith(
+      "permission_request.auto_approved",
+      expect.objectContaining({ resolution: "auto_approved" }),
+    );
+    expect(deps.reporter.emitDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        result: "allow",
+        resolution: "auto_approved",
+        origin: "yolo",
+      }),
+    );
+  });
+
   it("returns allow and emits user_approved when ask + user approves", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),

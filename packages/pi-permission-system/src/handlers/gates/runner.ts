@@ -105,6 +105,28 @@ export class GateRunner {
       return { action: "allow" };
     }
 
+    // 2b. Yolo fast-path — a composition-stage ask→allow rewrite records
+    // origin "yolo" on the matched rule. Auto-approve without prompting,
+    // preserving today's single auto_approved review entry + decision event
+    // so review-log parity holds (#526).
+    if (check.state === "allow" && check.origin === "yolo") {
+      this.reporter.writeReviewLog("permission_request.auto_approved", {
+        ...descriptor.logContext,
+        agentName,
+        resolution: "auto_approved",
+      });
+      this.reporter.emitDecision(
+        buildDecisionEvent(
+          descriptor.decision,
+          check,
+          agentName,
+          "allow",
+          deriveResolution(check.state, "allow", false, false, true),
+        ),
+      );
+      return { action: "allow" };
+    }
+
     // 3. Apply the deny/ask/allow gate
     const canConfirm = this.prompter.canConfirm();
 

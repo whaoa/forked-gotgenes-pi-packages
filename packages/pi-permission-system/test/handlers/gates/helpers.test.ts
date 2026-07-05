@@ -74,6 +74,12 @@ describe("deriveResolution", () => {
     );
   });
 
+  it("returns auto_approved for allow + autoApproved (yolo-origin allow)", () => {
+    expect(deriveResolution("allow", "allow", false, false, true)).toBe(
+      "auto_approved",
+    );
+  });
+
   it("returns user_denied for ask + block with canConfirm", () => {
     expect(deriveResolution("ask", "block", false, true)).toBe("user_denied");
   });
