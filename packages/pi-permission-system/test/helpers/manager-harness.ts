@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { getGlobalConfigPath, getProjectConfigPath } from "#src/config-paths";
 import { PermissionManager, type PolicyLoader } from "#src/permission-manager";
 import type { ResolvedPolicyPaths } from "#src/policy-loader";
 import type { Rule } from "#src/rule";
@@ -215,4 +216,51 @@ export function createManagerWithScopes(
           : ({ permission: projectPermission } as ScopeConfig),
     },
   );
+}
+
+/**
+ * Build a temp agentDir with a global config and an optional cwd with a
+ * project config. Returns the paths and a cleanup function.
+ */
+export function createAgentDirHarness(opts: {
+  globalPermission: Record<string, unknown>;
+  projectPermission?: Record<string, unknown>;
+}): {
+  agentDir: string;
+  cwd: string;
+  globalConfigPath: string;
+  projectConfigPath: string;
+  cleanup: () => void;
+} {
+  const baseDir = mkdtempSync(join(tmpdir(), "pm-agent-dir-test-"));
+  const agentDir = join(baseDir, "agent");
+  const cwd = join(baseDir, "project");
+
+  const globalConfigPath = getGlobalConfigPath(agentDir);
+  mkdirSync(join(agentDir, "extensions", "pi-permission-system"), {
+    recursive: true,
+  });
+  writeFileSync(
+    globalConfigPath,
+    JSON.stringify({ permission: opts.globalPermission }, null, 2),
+  );
+
+  const projectConfigPath = getProjectConfigPath(cwd);
+  mkdirSync(join(cwd, ".pi", "extensions", "pi-permission-system"), {
+    recursive: true,
+  });
+  if (opts.projectPermission) {
+    writeFileSync(
+      projectConfigPath,
+      JSON.stringify({ permission: opts.projectPermission }, null, 2),
+    );
+  }
+
+  return {
+    agentDir,
+    cwd,
+    globalConfigPath,
+    projectConfigPath,
+    cleanup: () => rmSync(baseDir, { recursive: true, force: true }),
+  };
 }

@@ -11,11 +11,7 @@ import { describe, expect, it, test } from "vitest";
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import { BashProgram } from "#src/access-intent/bash/program";
 import { getPathPolicyValues } from "#src/access-intent/path-normalization";
-import {
-  getGlobalConfigPath,
-  getProjectAgentsDir,
-  getProjectConfigPath,
-} from "#src/config-paths";
+import { getGlobalConfigPath, getProjectAgentsDir } from "#src/config-paths";
 import { PathNormalizer } from "#src/path-normalizer";
 import {
   PermissionManager,
@@ -23,6 +19,7 @@ import {
 } from "#src/permission-manager";
 import type { Ruleset } from "#src/rule";
 import {
+  createAgentDirHarness,
   createInMemoryManager,
   createInMemoryPolicyLoader,
   createManager,
@@ -1571,55 +1568,6 @@ describe("cross-cutting path surface — home-expanded values", () => {
 // ---------------------------------------------------------------------------
 
 describe("PermissionManager — configureForCwd and agentDir option", () => {
-  /**
-   * Build a temp agentDir with a global config and an optional cwd with a
-   * project config.  Returns the paths and a cleanup function.
-   */
-  function makeAgentDirSetup(opts: {
-    globalPermission: Record<string, unknown>;
-    projectPermission?: Record<string, unknown>;
-  }): {
-    agentDir: string;
-    cwd: string;
-    globalConfigPath: string;
-    projectConfigPath: string;
-    cleanup: () => void;
-  } {
-    const baseDir = mkdtempSync(join(tmpdir(), "pm-agent-dir-test-"));
-    const agentDir = join(baseDir, "agent");
-    const cwd = join(baseDir, "project");
-
-    // Write global config under getGlobalConfigPath(agentDir)
-    const globalConfigPath = getGlobalConfigPath(agentDir);
-    mkdirSync(join(agentDir, "extensions", "pi-permission-system"), {
-      recursive: true,
-    });
-    writeFileSync(
-      globalConfigPath,
-      JSON.stringify({ permission: opts.globalPermission }, null, 2),
-    );
-
-    // Write project config under getProjectConfigPath(cwd)
-    const projectConfigPath = getProjectConfigPath(cwd);
-    mkdirSync(join(cwd, ".pi", "extensions", "pi-permission-system"), {
-      recursive: true,
-    });
-    if (opts.projectPermission) {
-      writeFileSync(
-        projectConfigPath,
-        JSON.stringify({ permission: opts.projectPermission }, null, 2),
-      );
-    }
-
-    return {
-      agentDir,
-      cwd,
-      globalConfigPath,
-      projectConfigPath,
-      cleanup: () => rmSync(baseDir, { recursive: true, force: true }),
-    };
-  }
-
   it("ScopedPermissionManager is exported and PermissionManager satisfies it", () => {
     // Type-level assertion: assigning PermissionManager to ScopedPermissionManager compiles.
     const manager = new PermissionManager({
@@ -1634,7 +1582,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
   });
 
   it("construction with { agentDir } reads global config from getGlobalConfigPath(agentDir)", () => {
-    const { agentDir, cleanup } = makeAgentDirSetup({
+    const { agentDir, cleanup } = createAgentDirHarness({
       globalPermission: { read: "deny" },
     });
     try {
@@ -1647,7 +1595,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
   });
 
   it("configureForCwd(cwd) applies project config (project overrides global)", () => {
-    const { agentDir, cwd, cleanup } = makeAgentDirSetup({
+    const { agentDir, cwd, cleanup } = createAgentDirHarness({
       globalPermission: { read: "deny" },
       projectPermission: { read: "allow" },
     });
@@ -1666,7 +1614,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
   });
 
   it("configureForCwd(undefined) reverts to global-only", () => {
-    const { agentDir, cwd, cleanup } = makeAgentDirSetup({
+    const { agentDir, cwd, cleanup } = createAgentDirHarness({
       globalPermission: { read: "deny" },
       projectPermission: { read: "allow" },
     });
@@ -1685,7 +1633,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
   });
 
   it("configureForCwd clears the resolved-permissions cache", () => {
-    const { agentDir, globalConfigPath, cleanup } = makeAgentDirSetup({
+    const { agentDir, globalConfigPath, cleanup } = createAgentDirHarness({
       globalPermission: { read: "allow" },
     });
     try {
@@ -1709,7 +1657,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
   it("configureForCwd(cwd) derives projectAgentsDir at <cwd>/.pi/agents (regression: #428)", () => {
     // Bug: old code derived <cwd>/.pi/agent/agents instead of <cwd>/.pi/agents.
     // This test pins the correct path and verifies agentsDir is unchanged.
-    const { agentDir, cwd, cleanup } = makeAgentDirSetup({
+    const { agentDir, cwd, cleanup } = createAgentDirHarness({
       globalPermission: { read: "allow" },
     });
     try {
@@ -1725,7 +1673,7 @@ describe("PermissionManager — configureForCwd and agentDir option", () => {
 
   it("configureForCwd(cwd) enforces permission: frontmatter from <cwd>/.pi/agents/<agent>.md (regression: #428)", () => {
     // Bug: wrong directory meant project-agent frontmatter was never loaded.
-    const { agentDir, cwd, cleanup } = makeAgentDirSetup({
+    const { agentDir, cwd, cleanup } = createAgentDirHarness({
       globalPermission: { read: "allow" },
     });
     try {
