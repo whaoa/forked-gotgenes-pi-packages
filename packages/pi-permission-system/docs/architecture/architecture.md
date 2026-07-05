@@ -846,11 +846,12 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 
 ### Steps
 
-1. **Extract shared fixtures from `permission-manager-unified.test.ts`.**
+1. ✅ **Extract shared fixtures from `permission-manager-unified.test.ts`.**
    ([#525]) Target: `test/permission-manager-unified.test.ts` (3,714 LOC, 24 clone groups / 305 duplicated lines, accelerating churn) — extract the repeated config-harness blocks into `test/helpers/manager-harness.ts` (or a sibling fixture module).
    No production change; tidies the ground Step 2's manager tests land on.
    Smell: Category D (test duplication).
    Outcome: the file's clone groups drop to near zero; test-tree duplication falls measurably.
+   Landed: the seven config-harness factories plus the `sessionRule` builder now live in `test/helpers/manager-harness.ts`; the test file drops from 3,745 to 3,481 LOC with one intentional act/assert clone remaining (agent-frontmatter, kept per the plan's Non-Goals).
    Release: independent
 
 2. **Move yolo into recorded authority: composition-stage `ask` → `allow` rewrite.**
@@ -906,7 +907,7 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 
 ```mermaid
 flowchart TD
-    S1["Step 1 (#525)<br/>Manager-unified test fixtures"]
+    S1["✅ Step 1 (#525)<br/>Manager-unified test fixtures"]
     S2["Step 2 (#526)<br/>yolo into the composed ruleset"]
     S3["Step 3 (#527)<br/>Delete dead yolo arms"]
     S4["Step 4 (#528)<br/>Forwarding test harness"]
