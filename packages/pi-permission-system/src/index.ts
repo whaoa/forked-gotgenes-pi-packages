@@ -36,6 +36,7 @@ import { subscribeSubagentLifecycle } from "./subagent-lifecycle-events";
 import { getSubagentSessionRegistry } from "./subagent-registry";
 import { ToolAccessExtractorRegistry } from "./tool-access-extractor-registry";
 import { ToolInputFormatterRegistry } from "./tool-input-formatter-registry";
+import { isYoloModeEnabled } from "./yolo-mode";
 
 export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const agentDir = getAgentDir();
@@ -46,10 +47,6 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // session (PathNormalizer) and, later, rule evaluation. Interior modules must
   // not read process.platform (enforced by the eslint guard scoped to src/).
   const hostPlatform = process.platform;
-  const permissionManager = new PermissionManager({
-    agentDir,
-    platform: hostPlatform,
-  });
   const sessionRules = new SessionRules();
   const subagentRegistry = getSubagentSessionRegistry();
   const formatterRegistry = new ToolInputFormatterRegistry();
@@ -64,6 +61,15 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   let configStore: ConfigStore;
   // eslint-disable-next-line prefer-const -- forward-declared let; `const` requires an initializer
   let session: PermissionSession;
+
+  // Constructed after the `configStore` forward declaration so the yolo reader
+  // can close over it; the closure runs per check(), after configStore is
+  // assigned below. yolo becomes a composition-stage ask→allow rewrite (#526).
+  const permissionManager = new PermissionManager({
+    agentDir,
+    platform: hostPlatform,
+    isYoloEnabled: () => isYoloModeEnabled(configStore.current()),
+  });
 
   const logger = new PermissionSessionLogger({
     globalLogsDir: paths.globalLogsDir,

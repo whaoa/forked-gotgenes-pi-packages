@@ -20,6 +20,7 @@ import {
   evaluateAnyValue,
   evaluateFirst,
   pathMatchOptions,
+  rewriteAsksToYolo,
 } from "./rule";
 import { mergeScopesWithOrigins } from "./scope-merge";
 import {
@@ -52,6 +53,9 @@ const DEFAULT_UNIVERSAL_FALLBACK: PermissionState = "ask";
 
 /** Promotion predicate matching no token — the no-`path`-rules default (#509). */
 const NO_PROMOTION: PathRuleTokenMatcher = () => false;
+
+/** Default yolo reader — yolo disabled unless the composition root injects one. */
+const YOLO_DISABLED = (): boolean => false;
 
 type FileCacheEntry<TValue> = {
   stamp: string;
@@ -110,11 +114,20 @@ export interface PermissionManagerOptions extends PolicyLoaderOptions {
    * Defaults to a POSIX flavor; production always supplies the real platform.
    */
   platform?: NodeJS.Platform;
+  /**
+   * yolo-mode reader, injected from the composition root. When it reports
+   * true, {@link PermissionManager.check} rewrites every matched `ask` to a
+   * standing `allow` tagged `origin: "yolo"` (recorded authority, #526).
+   * Read per check so a mid-session config change takes effect; defaults to
+   * yolo disabled.
+   */
+  isYoloEnabled?: () => boolean;
 }
 
 export class PermissionManager implements ScopedPermissionManager {
   private readonly agentDir: string | undefined;
   private readonly platform: NodeJS.Platform;
+  private readonly isYoloEnabled: () => boolean;
   private loader: PolicyLoader;
   private readonly resolvedPermissionsCache = new Map<
     string,
@@ -124,6 +137,7 @@ export class PermissionManager implements ScopedPermissionManager {
   constructor(options: PermissionManagerOptions = {}) {
     this.agentDir = options.agentDir;
     this.platform = options.platform ?? "linux";
+    this.isYoloEnabled = options.isYoloEnabled ?? YOLO_DISABLED;
     this.loader =
       options.policyLoader ??
       new FilePolicyLoader(
@@ -311,9 +325,15 @@ export class PermissionManager implements ScopedPermissionManager {
     sessionRules?: Ruleset,
   ): PermissionCheckResult {
     const { composedRules } = this.resolvePermissions(intent.agentName);
-    const fullRules: Ruleset = sessionRules?.length
+    const composedWithSession: Ruleset = sessionRules?.length
       ? [...composedRules, ...sessionRules]
       : composedRules;
+    // Apply the yolo rewrite post-cache so the resolved-permissions cache and
+    // the display surfaces (getComposedConfigRules / getToolPermission) stay
+    // yolo-free — only the resolution path sees the ask→allow rewrite (#526).
+    const fullRules: Ruleset = this.isYoloEnabled()
+      ? rewriteAsksToYolo(composedWithSession)
+      : composedWithSession;
 
     if (intent.kind === "path-values") {
       const lookupValues =
