@@ -9,7 +9,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PermissionManager } from "#src/permission-manager";
-import type { ScopeConfig } from "#src/types";
+import type { Rule } from "#src/rule";
+import type { PermissionState, ScopeConfig } from "#src/types";
+
+/** Build a session-layer rule (default action "allow"). */
+export function sessionRule(
+  surface: string,
+  pattern: string,
+  action: PermissionState = "allow",
+): Rule {
+  return { surface, pattern, action, layer: "session", origin: "session" };
+}
 
 export type CreateManagerOptions = {
   mcpServerNames?: readonly string[];

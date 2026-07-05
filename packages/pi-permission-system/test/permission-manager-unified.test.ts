@@ -21,10 +21,11 @@ import {
   PermissionManager,
   type ScopedPermissionManager,
 } from "#src/permission-manager";
-import type { Rule, Ruleset } from "#src/rule";
+import type { Ruleset } from "#src/rule";
 import {
   createManager,
   createManagerWithProject,
+  sessionRule,
 } from "#test/helpers/manager-harness";
 
 // ---------------------------------------------------------------------------
@@ -66,17 +67,9 @@ function makeManagerWithConfig(
   };
 }
 
-const sessionAllow = (surface: string, pattern: string): Rule => ({
-  surface,
-  pattern,
-  action: "allow",
-  layer: "session",
-  origin: "session",
-});
-
 describe("PermissionManager — injected platform (#510)", () => {
   const winAllow: Ruleset = [
-    sessionAllow("external_directory", "C:\\Users\\Foo\\pi\\*"),
+    sessionRule("external_directory", "C:\\Users\\Foo\\pi\\*"),
   ];
 
   it("win32 manager folds case for path-surface matching", () => {
@@ -131,7 +124,7 @@ describe("PermissionManager — injected platform (#510)", () => {
 
     const allowed = manager.check(
       { kind: "path-values", surface: "external_directory", values },
-      [sessionAllow("external_directory", "/tmp*")],
+      [sessionRule("external_directory", "/tmp*")],
     );
     expect(allowed.state).toBe("allow");
 
@@ -197,7 +190,7 @@ describe("checkPermission — session rules", () => {
   it("session rule wins over the universal default (external_directory)", () => {
     const manager = makeManager();
     const sessionRules: Ruleset = [
-      sessionAllow("external_directory", "/other/project"),
+      sessionRule("external_directory", "/other/project"),
     ];
     const result = checkPath(
       manager,
@@ -214,7 +207,7 @@ describe("checkPermission — session rules", () => {
 
   it("session rule wins over the universal default (skill)", () => {
     const manager = makeManager();
-    const sessionRules: Ruleset = [sessionAllow("skill", "librarian")];
+    const sessionRules: Ruleset = [sessionRule("skill", "librarian")];
     const result = checkTool(
       manager,
       "skill",
@@ -229,7 +222,7 @@ describe("checkPermission — session rules", () => {
 
   it("session rule wins over the universal default (bash)", () => {
     const manager = makeManager();
-    const sessionRules: Ruleset = [sessionAllow("bash", "git status")];
+    const sessionRules: Ruleset = [sessionRule("bash", "git status")];
     const result = checkTool(
       manager,
       "bash",
@@ -244,7 +237,7 @@ describe("checkPermission — session rules", () => {
 
   it("session rule wins over the universal default (tool — read)", () => {
     const manager = makeManager();
-    const sessionRules: Ruleset = [sessionAllow("read", "*")];
+    const sessionRules: Ruleset = [sessionRule("read", "*")];
     const result = checkTool(manager, "read", {}, undefined, sessionRules);
     expect(result.state).toBe("allow");
     expect(result.source).toBe("session");
@@ -252,7 +245,7 @@ describe("checkPermission — session rules", () => {
 
   it("session rule wins over the universal default (mcp)", () => {
     const manager = makeManager();
-    const sessionRules: Ruleset = [sessionAllow("mcp", "mcp_status")];
+    const sessionRules: Ruleset = [sessionRule("mcp", "mcp_status")];
     const result = checkTool(manager, "mcp", {}, undefined, sessionRules);
     expect(result.state).toBe("allow");
     expect(result.source).toBe("session");
@@ -268,7 +261,7 @@ describe("checkPermission — session rules", () => {
   it("session rule with narrower pattern does not block a broader command not in session", () => {
     const manager = makeManager();
     // Only "git status" is session-approved; "git push" should fall through to default.
-    const sessionRules: Ruleset = [sessionAllow("bash", "git status")];
+    const sessionRules: Ruleset = [sessionRule("bash", "git status")];
     const result = checkTool(
       manager,
       "bash",
@@ -282,7 +275,7 @@ describe("checkPermission — session rules", () => {
 
   it("session wildcard pattern matches multiple commands", () => {
     const manager = makeManager();
-    const sessionRules: Ruleset = [sessionAllow("bash", "git *")];
+    const sessionRules: Ruleset = [sessionRule("bash", "git *")];
     const push = checkTool(
       manager,
       "bash",
@@ -487,7 +480,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
   describe("matchedPattern for session rules across surfaces", () => {
     it("matchedPattern is the session rule pattern for a session match (bash)", () => {
       const manager = makeManager();
-      const sessionRules: Ruleset = [sessionAllow("bash", "git *")];
+      const sessionRules: Ruleset = [sessionRule("bash", "git *")];
       const result = checkTool(
         manager,
         "bash",
@@ -501,7 +494,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
     it("matchedPattern is the session rule pattern for a session match (skill)", () => {
       const manager = makeManager();
-      const sessionRules: Ruleset = [sessionAllow("skill", "librarian")];
+      const sessionRules: Ruleset = [sessionRule("skill", "librarian")];
       const result = checkTool(
         manager,
         "skill",
@@ -763,15 +756,7 @@ describe("checkPermission — rule origin provenance", () => {
 
   it("session rule: origin is 'session'", () => {
     const manager = makeManager();
-    const sessionRules: Ruleset = [
-      {
-        surface: "read",
-        pattern: "*",
-        action: "allow",
-        layer: "session",
-        origin: "session",
-      },
-    ];
+    const sessionRules: Ruleset = [sessionRule("read", "*")];
     const result = checkTool(manager, "read", {}, undefined, sessionRules);
     expect(result.state).toBe("allow");
     expect(result.source).toBe("session");
@@ -1046,7 +1031,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
       const manager = makeInMemoryManager({
         global: { permission: { "*": "deny" } },
       });
-      const sessionRules: Ruleset = [sessionAllow("read", "*")];
+      const sessionRules: Ruleset = [sessionRule("read", "*")];
       const result = checkTool(manager, "read", {}, undefined, sessionRules);
       expect(result.state).toBe("allow");
       expect(result.source).toBe("session");
@@ -1056,7 +1041,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
       const manager = makeInMemoryManager({
         global: { permission: { "*": "ask" } },
       });
-      const sessionRules: Ruleset = [sessionAllow("bash", "git *")];
+      const sessionRules: Ruleset = [sessionRule("bash", "git *")];
       const bashResult = checkTool(
         manager,
         "bash",
@@ -1090,7 +1075,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
     it("session origin is 'session'", () => {
       const manager = makeInMemoryManager();
-      const sessionRules: Ruleset = [sessionAllow("read", "*")];
+      const sessionRules: Ruleset = [sessionRule("read", "*")];
       const result = checkTool(manager, "read", {}, undefined, sessionRules);
       expect(result.origin).toBe("session");
     });
@@ -1294,7 +1279,7 @@ describe("checkPermission — per-tool path patterns", () => {
       read: { "*": "allow", "*.env": "deny" },
     });
     try {
-      const sessionRules: Ruleset = [sessionAllow("read", ".env")];
+      const sessionRules: Ruleset = [sessionRule("read", ".env")];
       const result = checkPath(
         manager,
         ".env",
@@ -1401,7 +1386,7 @@ describe("cross-cutting path surface", () => {
       path: { "*": "allow", "*.env": "deny" },
     });
     try {
-      const sessionRules: Ruleset = [sessionAllow("path", "/project/.env")];
+      const sessionRules: Ruleset = [sessionRule("path", "/project/.env")];
       const result = checkPath(
         manager,
         "/project/.env",
@@ -2976,13 +2961,7 @@ test("checkPermission returns source 'session' when session rules cover the exte
 
   try {
     const sessionRules = [
-      {
-        surface: "external_directory",
-        pattern: "/other/project/*",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
+      sessionRule("external_directory", "/other/project/*"),
     ];
 
     const result = checkPath(
@@ -3008,13 +2987,7 @@ test("checkPermission falls back to config policy when session rules do not cove
 
   try {
     const sessionRules = [
-      {
-        surface: "external_directory",
-        pattern: "/other/project/*",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
+      sessionRule("external_directory", "/other/project/*"),
     ];
 
     const result = checkTool(
@@ -3070,13 +3043,7 @@ test("session rules for one surface do not affect checks on other surfaces", () 
 
   try {
     const sessionRules = [
-      {
-        surface: "external_directory",
-        pattern: "/other/project/*",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
+      sessionRule("external_directory", "/other/project/*"),
     ];
 
     const bashResult = checkTool(
@@ -3110,13 +3077,7 @@ test("session rules override config deny for external_directory", () => {
 
   try {
     const sessionRules = [
-      {
-        surface: "external_directory",
-        pattern: "/other/project/*",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
+      sessionRule("external_directory", "/other/project/*"),
     ];
 
     const result = checkPath(
@@ -3138,15 +3099,7 @@ test("checkPermission returns source 'session' for bash when session rules match
   const { manager, cleanup } = createManager({ permission: {} });
 
   try {
-    const sessionRules = [
-      {
-        surface: "bash",
-        pattern: "git *",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
-    ];
+    const sessionRules = [sessionRule("bash", "git *")];
 
     const result = checkTool(
       manager,
@@ -3167,15 +3120,7 @@ test("checkPermission returns source 'session' for bash when session rule is exa
   const { manager, cleanup } = createManager({ permission: {} });
 
   try {
-    const sessionRules = [
-      {
-        surface: "bash",
-        pattern: "ls",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
-    ];
+    const sessionRules = [sessionRule("bash", "ls")];
 
     const result = checkTool(
       manager,
@@ -3195,15 +3140,7 @@ test("checkPermission falls back to config for bash when session rules do not ma
   const { manager, cleanup } = createManager({ permission: { bash: "deny" } });
 
   try {
-    const sessionRules = [
-      {
-        surface: "bash",
-        pattern: "git *",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
-    ];
+    const sessionRules = [sessionRule("bash", "git *")];
 
     const result = checkTool(
       manager,
@@ -3223,15 +3160,7 @@ test("checkPermission returns source 'session' for mcp when session rules match 
   const { manager, cleanup } = createManager({ permission: {} });
 
   try {
-    const sessionRules = [
-      {
-        surface: "mcp",
-        pattern: "exa:*",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
-    ];
+    const sessionRules = [sessionRule("mcp", "exa:*")];
 
     const result = checkTool(
       manager,
@@ -3251,15 +3180,7 @@ test("checkPermission returns source 'session' for skill when session rules matc
   const { manager, cleanup } = createManager({ permission: {} });
 
   try {
-    const sessionRules = [
-      {
-        surface: "skill",
-        pattern: "librarian",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
-    ];
+    const sessionRules = [sessionRule("skill", "librarian")];
 
     const result = checkTool(
       manager,
@@ -3280,15 +3201,7 @@ test("checkPermission returns source 'session' for tool surface when session rul
   const { manager, cleanup } = createManager({ permission: {} });
 
   try {
-    const sessionRules = [
-      {
-        surface: "read",
-        pattern: "*",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
-    ];
+    const sessionRules = [sessionRule("read", "*")];
 
     const result = checkTool(manager, "read", {}, undefined, sessionRules);
     expect(result.state).toBe("allow");
@@ -3302,15 +3215,7 @@ test("bash session rules do not bleed into mcp checks", () => {
   const { manager, cleanup } = createManager({ permission: {} });
 
   try {
-    const sessionRules = [
-      {
-        surface: "bash",
-        pattern: "git *",
-        action: "allow" as const,
-        layer: "session" as const,
-        origin: "session" as const,
-      },
-    ];
+    const sessionRules = [sessionRule("bash", "git *")];
 
     const result = checkTool(
       manager,
@@ -3498,7 +3403,7 @@ describe("checkPathPolicy", () => {
       path: { "*": "ask", "src/*": "deny" },
     });
     try {
-      const sessionRules: Ruleset = [sessionAllow("path", "src/*")];
+      const sessionRules: Ruleset = [sessionRule("path", "src/*")];
       const result = checkPathValues(
         manager,
         ["src/App.jsx"],
@@ -3609,7 +3514,7 @@ describe("check — tool intent", () => {
       bash: { "*": "deny" },
     });
     try {
-      const sessionRules: Ruleset = [sessionAllow("bash", "echo *")];
+      const sessionRules: Ruleset = [sessionRule("bash", "echo *")];
       const intent: ResolvedAccessIntent = {
         kind: "tool",
         surface: "bash",
@@ -3711,7 +3616,7 @@ describe("check — path-values intent", () => {
       path: { "*": "ask", "src/*": "deny" },
     });
     try {
-      const sessionRules: Ruleset = [sessionAllow("path", "src/*")];
+      const sessionRules: Ruleset = [sessionRule("path", "src/*")];
       const intent: ResolvedAccessIntent = {
         kind: "path-values",
         surface: "path",
