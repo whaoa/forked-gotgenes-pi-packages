@@ -59,3 +59,49 @@ Test count moved +16 (2283 → 2299); full suite, `pnpm run check`, root `pnpm r
   Confirm at ship time.
 - **Skill-read parity nuance held as designed.**
   No code path change was needed for skill-reads: the yolo-aware sanitizer already resolves a skill's state to `allow` before the gate, so a skill-read auto-allows and logs `policy_allow`/`origin: "builtin"` (accepted, operator-confirmed).
+
+## Stage: Final Retrospective (2026-07-05T23:38:59Z)
+
+### Session summary
+
+Planned, TDD-implemented, and shipped the yolo composition-stage `ask`→`allow` rewrite (Phase 8 Step 2) across three stages in one continuous session.
+Four TDD cycles landed (+16 tests, 2283→2299), the `pre-completion-reviewer` returned PASS first try, and the change was pushed with green CI; the release was deferred per the plan's mid-batch `**Release:**` marker (batch tail = [#527]).
+
+### Observations
+
+#### What went well
+
+- **Plan-time `ask_user` on output-shape forks prevented rework.**
+  Two genuine parity ambiguities the issue's "parity holds" wording left open — the `auto_approved` review-log entry shape (runner `logContext` vs. prompter `promptDetails`) and skill-read reporting (`policy_allow` vs. `auto_approved`) — were resolved with the operator at plan time.
+  Both could have surfaced as a pre-completion WARN or post-ship surprise; resolving them up front produced a first-try PASS and zero TDD rework.
+- **Exhaustive reachability trace during planning.**
+  The plan verified that every `ask`-producing path (tool/bash/mcp/path/`external_directory`/skill-input via `manager.check`, and skill-read `preResolved` via the yolo-aware sanitizer) resolves to `allow` under yolo, so the prompter arm becomes provably unreachable.
+  This de-risked [#527] and meant the TDD had no runtime surprises.
+- **Validated plan deviation — simpler than planned.**
+  Skipped the planned `test/helpers/manager-harness.ts` extension and constructed the manager directly with the already-exported `createInMemoryPolicyLoader` + an injected `isYoloEnabled` closure; the reviewer confirmed this is a clean simplification, not a coverage gap.
+- **Deterministic release decision.**
+  The plan's grep-able `**Release:**` marker made the ship-time defer a single crisp `ask_user`, sourced from the plan rather than inferred from prose.
+
+#### What caused friction (agent side)
+
+- `other` — the first TDD-Step-1 commit was rejected by the pre-commit lint hook: the new test used `rewritten?.field` after a `const [rewritten] = rewriteAsksToYolo(...)` destructure, which `@typescript-eslint/no-unnecessary-condition` rejects (the destructured element type is non-nullish).
+  Notably, array-index access (`result[0]?.field`) in the same file was *not* flagged — an asymmetry that made the failure non-obvious.
+  Impact: one fix + re-run cycle (~2 tool calls); no logic rework, deterministically caught by the hook before the commit landed.
+
+#### What caused friction (user side)
+
+- None.
+  The two plan-time forks and the ship-time defer were clean, well-scoped decisions with no earlier-context opportunities missed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the `deepseek-v4-flash` and `claude-fable-5` `model_change` entries had no assistant turns under them (verified by interleaving `message` + `model_change` via `read_session`); they were transient selections that never ran, not a lightweight-model-on-judgment mismatch.
+  Ship ran on `claude-sonnet-5`, retro on `claude-opus-4-8`, and the `pre-completion-reviewer` subagent ran on its configured model for judgment-heavy review — all appropriate.
+- **Feedback-loop gap analysis** — `pnpm run check` ran incrementally after Steps 2 and 3 (the interface/type-changing steps), alongside the per-commit lint hook, with the full check/lint/test/fallow suite at the end.
+  Incremental, no end-only verification gap.
+- **Escalation-delay / unused-tool** — no rabbit-holes; no error sequence exceeded one fix cycle, and no subagent/tool was needed but skipped.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0526-yolo-recorded-authority.md`.
+   No `AGENTS.md`, skill, or prompt edits — the operator confirmed retro-file-only (the single friction point was deterministically caught by the pre-commit lint hook, below the bar for a rule change).
