@@ -9,6 +9,7 @@ import { wildcardMatch } from "./wildcard-matcher";
  * Synthesized:   "builtin" (universal default / evaluate() fallback),
  *                "baseline" (conditional MCP metadata auto-allow).
  * Runtime:       "session" (session approvals).
+ * Rewrite:       "yolo" (composition-stage ask→allow rewrite under yolo mode).
  */
 export type RuleOrigin =
   | "global"
@@ -17,7 +18,8 @@ export type RuleOrigin =
   | "project-agent"
   | "builtin"
   | "baseline"
-  | "session";
+  | "session"
+  | "yolo";
 
 /** A single permission rule — the atomic unit of policy. */
 export interface Rule {
@@ -40,6 +42,24 @@ export interface Rule {
 
 /** An ordered list of rules. Later rules take priority (last-match-wins). */
 export type Ruleset = Rule[];
+
+/**
+ * Rewrite every `ask` rule to `allow`, tagged `origin: "yolo"`.
+ *
+ * The composition-stage expression of yolo mode as recorded authority: when
+ * enabled, an `ask` becomes a standing `allow` grant in the ruleset rather than
+ * a live prompt-path concern. `deny` and existing `allow` rules pass through
+ * untouched, so yolo suppresses prompts but preserves hard denies.
+ *
+ * Pure and non-mutating — `surface`, `pattern`, and `layer` are preserved so
+ * downstream `matchedPattern` / source derivation is unaffected; only `action`
+ * and `origin` change.
+ */
+export function rewriteAsksToYolo(rules: Ruleset): Ruleset {
+  return rules.map((rule) =>
+    rule.action === "ask" ? { ...rule, action: "allow", origin: "yolo" } : rule,
+  );
+}
 
 /**
  * Pure permission evaluation.

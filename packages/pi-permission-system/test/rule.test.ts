@@ -5,6 +5,7 @@ import {
   evaluateAnyValue,
   evaluateFirst,
   evaluateMostRestrictive,
+  rewriteAsksToYolo,
 } from "#src/rule";
 
 describe("evaluate", () => {
@@ -646,5 +647,104 @@ describe("evaluateMostRestrictive", () => {
     expect(result).not.toBeNull();
     expect(result!.rule.action).toBe("deny");
     expect(result!.value).toBe(".env");
+  });
+});
+
+describe("rewriteAsksToYolo", () => {
+  const askBash: Rule = {
+    surface: "bash",
+    pattern: "*",
+    action: "ask",
+    layer: "config",
+    origin: "global",
+  };
+  const denyEnv: Rule = {
+    surface: "path",
+    pattern: ".env",
+    action: "deny",
+    layer: "config",
+    origin: "project",
+  };
+  const allowRead: Rule = {
+    surface: "read",
+    pattern: "*",
+    action: "allow",
+    layer: "config",
+    origin: "agent",
+  };
+  const askDefault: Rule = {
+    surface: "*",
+    pattern: "*",
+    action: "ask",
+    layer: "default",
+    origin: "builtin",
+  };
+
+  test("rewrites an ask rule to allow tagged origin 'yolo'", () => {
+    const result = rewriteAsksToYolo([askBash]);
+    expect(result).toEqual([
+      {
+        surface: "bash",
+        pattern: "*",
+        action: "allow",
+        layer: "config",
+        origin: "yolo",
+      },
+    ]);
+  });
+
+  test("preserves surface, pattern, and layer while flipping ask", () => {
+    const [rewritten] = rewriteAsksToYolo([askBash]);
+    expect(rewritten.surface).toBe("bash");
+    expect(rewritten.pattern).toBe("*");
+    expect(rewritten.layer).toBe("config");
+    expect(rewritten.action).toBe("allow");
+    expect(rewritten.origin).toBe("yolo");
+  });
+
+  test("rewrites the synthesized universal default ask rule", () => {
+    const result = rewriteAsksToYolo([askDefault]);
+    expect(result[0]?.action).toBe("allow");
+    expect(result[0]?.origin).toBe("yolo");
+    expect(result[0]?.layer).toBe("default");
+  });
+
+  test("passes deny rules through untouched (preserves hard denies)", () => {
+    const result = rewriteAsksToYolo([denyEnv]);
+    expect(result).toEqual([denyEnv]);
+  });
+
+  test("passes allow rules through untouched", () => {
+    const result = rewriteAsksToYolo([allowRead]);
+    expect(result).toEqual([allowRead]);
+  });
+
+  test("rewrites only ask rules in a mixed ruleset, preserving order", () => {
+    const ruleset: Ruleset = [askDefault, allowRead, askBash, denyEnv];
+    const result = rewriteAsksToYolo(ruleset);
+    expect(result.map((r) => r.action)).toEqual([
+      "allow",
+      "allow",
+      "allow",
+      "deny",
+    ]);
+    expect(result.map((r) => r.origin)).toEqual([
+      "yolo",
+      "agent",
+      "yolo",
+      "project",
+    ]);
+  });
+
+  test("does not mutate the input ruleset", () => {
+    const ruleset: Ruleset = [askBash];
+    rewriteAsksToYolo(ruleset);
+    expect(ruleset[0]?.action).toBe("ask");
+    expect(ruleset[0]?.origin).toBe("global");
+  });
+
+  test("'yolo' is a valid RuleOrigin", () => {
+    const origin: RuleOrigin = "yolo";
+    expect(origin).toBe("yolo");
   });
 });
