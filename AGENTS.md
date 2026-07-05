@@ -52,6 +52,7 @@ A multi-edit `Edit` call is atomic: if one `oldText` fails to match, the whole b
 After a rejection, re-apply every intended edit (not just the ones you retried) and run `pnpm run check` to confirm none were silently dropped — but `tsc` passes on a dropped `import type` removal (an unused type import is not an error), so re-read the affected region rather than trusting the check alone.
 When an edit's `oldText` would span a decorative comment rule (a long run of `─`/`═`), anchor on adjacent unique code lines rather than the rule itself — miscounting the run fails the whole atomic batch.
 If you delete such a block by line number with `sed`, re-read the region afterward to confirm you did not remove an enclosing brace.
+A multi-line `perl -0777`/`sed` regex substitution across many similar blocks is a trap — a non-greedy `.*?` group spans block boundaries and silently corrupts a neighbor; collapse repeated multi-line literals with per-block `Edit` calls and reserve scripted substitution for single-line per-symbol renames (Refs #525).
 When wrapping existing lines in a new enclosing block (a `describe`, function, or `try`), emit the opening and closing braces as two `edits[]` entries in one `Edit` call (or use `Write`) — a lone opening brace fails the whole file parse, and the close is too far from the open to anchor in the same `oldText`.
 
 ### Multi-session issue lifecycle

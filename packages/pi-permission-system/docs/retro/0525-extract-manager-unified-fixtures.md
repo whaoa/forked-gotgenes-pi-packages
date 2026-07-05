@@ -41,3 +41,46 @@ Test-count delta is zero — no cases added or removed, only setup scaffolding r
 - The two single-instance inline blocks (MCP-settings, `PI_CODING_AGENT_DIR`) and the two `getResolvedPolicyPaths` blocks were left in place as planned; only `getProjectConfigPath` became an orphaned import and was pruned in Step 6.
 - Pre-completion reviewer: WARN (1 non-blocking finding — the `package-pi-permission-system` skill still listed only `createManager` / `createManagerWithProject` for `manager-harness.ts`).
   Folded the fix into this session (commit `e1cca63e`) rather than deferring to #526, since Step 2 will start importing the new builders.
+
+## Stage: Final Retrospective (2026-07-05T18:48:59Z)
+
+### Session summary
+
+One continuous session carried #525 from planning through TDD, ship, and retro.
+Extracted seven config-harness factories plus a `sessionRule` builder from `test/permission-manager-unified.test.ts` into the shared `test/helpers/manager-harness.ts` (file dropped 3,745 → 3,481 LOC), shipped as eight commits with zero test-count delta, closed the issue, and confirmed the work auto-batches (no release cut).
+Execution was clean; the only agent-side friction was a scripted-regex corruption in the first extraction step, self-caught by biome and fixed inline.
+
+### Observations
+
+#### What went well
+
+- Plan-to-outcome fidelity was exact: the plan predicted "clone groups drop to near zero," and the sole remaining in-file clone was precisely the agent-frontmatter act/assert pair the plan's Non-Goals had already excluded as the test subject (per the `testing` skill).
+  No mid-flight scope re-decision was needed.
+- The delegator design (collapsing `makeManagerWithConfig` / `makeManagerWithScopes` into thin wrappers over the existing `createManager` / `createManagerWithProject` rather than relocating duplicate bodies) removed the duplication instead of moving it, and preserved all 62 + 10 call sites via a localized `as ScopeConfig` cast — a clean tidy-first outcome verified entirely by the green suite.
+- Incremental verification was exemplary: `vitest` + `tsc` + `biome` ran after every one of the six extraction steps, so each commit landed green and the one corruption surfaced within seconds of the edit that caused it.
+
+#### What caused friction (agent side)
+
+- `wrong-abstraction` (tooling choice) — Step 1 used a `perl -0777` slurp-mode substitution to collapse ~12 similar inline `sessionRules` object literals into `sessionRule(...)` calls; the non-greedy `.*?` group spanned across block boundaries and corrupted two blocks (lines 762 and 2966).
+  Self-caught immediately by biome parse errors; fixed with two targeted `Edit` calls plus an unused-import prune, all within the same commit.
+  Impact: ~3 extra tool calls, no rework to any deliverable, no behavior impact.
+  The `sed` per-symbol renames (`sessionAllow` → `sessionRule`, `makeManager` → `createMissingConfigManager`, etc.) were the right tool and caused no trouble — only the multi-line structural collapse was the wrong fit for a scripted regex.
+
+#### What caused friction (user side)
+
+- None.
+  The issue was operator-authored with an unambiguous named target, so no `ask_user` gate or mid-session correction was warranted at any stage.
+
+### Diagnostic details
+
+- **Feedback-loop gap analysis** — no gap; the positive case.
+  Verification ran after each extraction step rather than only at session end, which is why the perl corruption was caught within one tool call of the edit rather than surfacing later as a suite failure.
+- **Escalation-delay tracking** — no rabbit-hole.
+  On hitting the perl corruption the approach switched immediately from scripted regex to targeted `Edit` calls; no sequence of >5 tool calls was spent retrying the failed technique.
+- **Model-performance correlation** — the session cycled through several model selections (`claude-opus-4-8`, `claude-sonnet-5`, `deepseek-v4-flash`, `claude-fable-5`); the `pre-completion-reviewer` subagent ran on its own frontmatter-pinned model for the review, appropriate for judgment-heavy work.
+  No mismatch observed — mechanical migration and design judgment both landed correctly.
+
+### Changes made
+
+1. `AGENTS.md` ("Edit tool batches" section) — appended a one-sentence rule after the existing `sed` line: a multi-line `perl -0777`/`sed` regex substitution across many similar blocks is a trap (a non-greedy `.*?` group spans block boundaries and corrupts a neighbor); collapse repeated multi-line literals with per-block `Edit` calls and reserve scripted substitution for single-line per-symbol renames.
+2. `packages/pi-permission-system/docs/retro/0525-extract-manager-unified-fixtures.md` — added this Final Retrospective stage entry.
