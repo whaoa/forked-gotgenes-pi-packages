@@ -92,6 +92,7 @@ Skip this step if the issue's "Proposed change" section is unambiguous.
 If the issue is third-party (its author is not the gh CLI user, as determined in Gather context), do **not** skip the `ask-user` gate even when the proposed change is unambiguous.
 The ambiguity for a third-party issue is not *how* to build it but *whether* the operator wants it built, and in what form.
 Use `ask-user` to confirm the direction before planning: at minimum ask whether to (a) implement the proposal as described, (b) implement a different approach to the same underlying problem, or (c) decline/defer.
+When the issue is in an unfamiliar domain (a platform, protocol, or tool you have not verified), research the domain facts first — the direction options themselves depend on them, and an ungrounded ask gets bounced (Refs #533).
 When the proposal also has design ambiguities, fold those into the same `ask-user` call.
 Let the operator's answers — not the issue body — drive the plan's Goals and Design Overview.
 

@@ -50,3 +50,45 @@ Pre-completion reviewer returned PASS.
 - **One existing test intentionally updated:** `program.test.ts` win32 `cat /etc/hosts` flipped from `c:\etc\hosts` to the literal `/etc/hosts` — the intended behavior change (a non-mount POSIX absolute is install-root-relative in Git Bash, matched as typed).
 - **Latent dedup bug fixed (cycle 3):** `projectExternalPaths` dedup key changed to `canonical || lexical` so two distinct literal-only paths no longer collapse on an empty boundary value.
 - Pre-completion reviewer: PASS (no blocking or non-blocking findings beyond the two documented deviations, both test-covered).
+
+## Stage: Final Retrospective (2026-07-05T15:26:26Z)
+
+### Session summary
+
+Shipped #533 end to end across plan → skill-doc → TDD (6 cycles) → ship: `pi-permission-system` `18.1.1` → `18.1.2`, five `fix:` commits plus docs, `+50` tests, pre-completion PASS, release-please PR #544 merged.
+The arc was clean; the only rework traced to one planning gap and one prematurely-grounded `ask_user` round.
+
+### Observations
+
+#### What went well
+
+- **Research-first planning turned a band-aid into a principled fix.**
+  Reading the local `pi` checkout (`packages/coding-agent/src/utils/shell.ts`) to confirm Git Bash is always the win32 shell, and finding core's own `normalizeNulRedirects()`, reframed the issue from "special-case `/dev/null`" to "the bash surface's platform is MSYS on win32."
+  This is the load-bearing insight the whole design rests on.
+- **Empirical probe prevented a wrong abstraction from shipping (novel win).**
+  In cycle 5, before committing to the backslash-alias design, a throwaway `wildcardMatch` test confirmed the win32 matcher folds a rule's separators (`/` → `\`) so a forward-slash value is unmatchable.
+  Probing the actual matcher (rather than reasoning about it) located the alias correctly on `AccessPath.forLiteral` in backslash form in one shot.
+- **Exemplary incremental verification.**
+  Each TDD cycle ran red → green → `pnpm run check` (on shared-type changes) → full suite (on shared-projection changes) → commit; no end-of-session verification pile-up and no post-hoc fixup commits.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the plan designed a `literalAliases`/match-alias mechanism (on `path-normalization.ts`/`forPath`) without probing the package's **own** win32 wildcard matcher (`pathMatchOptions` separator folding).
+  Both TDD deviations trace to this single gap: the alias had to be dropped from `path-normalization.ts` (dead weight for drive mounts, which already yield backslashes) and relocated to `AccessPath.forLiteral` in backslash form for literal-only paths, and cycle 5 grew from `test:` to `fix:`.
+  Impact: no wasted commits (caught by an empirical probe during TDD before implementing), but the plan's Module-Level Changes and one cycle's commit type were both inaccurate; two prior-cycle test assertions were updated in cycle 5.
+- `instruction-violation` (self-identified at retro; user-caught in session) — the first `ask_user` direction gate offered options (device-only vs. full MSYS translation vs. decline) **before** researching Git Bash/MSYS mechanics, so the options were ungrounded.
+  The operator bounced it ("I don't know enough about Git Bash/MSYS… research this before we propose"), which cost an extra `ask_user` round.
+  The `ask-user` skill already says "gather evidence first from code/docs/tools"; the evidence gathered was the package code, not the external platform mechanics the direction options depended on.
+  Impact: one extra decision round; no rework of artifacts.
+
+#### What caused friction (user side)
+
+- None material.
+  The operator's early redirect ("research over a band-aid") and the mid-planning "I feel so confused" about the prior win32 issues were both productive — the latter surfaced a genuine reconciliation need (additive vs. contradictory) that strengthened the plan's framing.
+  Both are examples of a redirecting question arriving at the right moment, not oversight friction.
+
+### Changes made
+
+1. `.pi/prompts/plan-issue.md` — added one sentence to the third-party `Decide` guidance: for an unfamiliar-domain issue, research the domain facts before the direction `ask-user` gate, since the direction options depend on them (an ungrounded ask gets bounced).
+   Refs #533.
+2. `packages/pi-permission-system/docs/retro/0533-win32-git-bash-posix-paths.md` — appended this Final Retrospective stage entry.
