@@ -200,6 +200,13 @@ Do not split this into multiple sections; one coherent list per retro.
 If the user suggests further refinements after the commit, implement them, append to the same `### Changes made` section, and commit again.
 Every change made during the retro must be recorded before the session ends.
 
+## Step 10 — Recommend the next issue
+
+After the retro is committed, surface the next issue to work on so the operator can start it directly.
+Derive it from the shipped issue's roadmap: read the plan's dependency diagram or the package's `docs/architecture/architecture.md` for the step this issue unblocks (e.g. "unblocks #M", the next incomplete numbered step).
+If a successor exists, recommend `/plan-issue #M` (name the step).
+If none is queued or the roadmap phase is complete, say so explicitly.
+
 ## Rules
 
 - Be conservative — only propose changes clearly justified by evidence in this session.

@@ -121,6 +121,10 @@ Print:
 - The released version, if a release commit just landed (`git tag --points-at HEAD` or read `package.json`).
 - Issue close confirmation.
 - Anything that was skipped and why.
+- The next step: `/retro <N>` to capture this session's retrospective.
+
+Name `/retro <N>` as the single next step.
+Do **not** recommend the next issue to plan here — `/retro` surfaces the next roadmap issue at its end, after the retrospective is written.
 
 ## Constraints
 

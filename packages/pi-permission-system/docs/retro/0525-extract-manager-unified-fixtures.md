@@ -84,3 +84,5 @@ Execution was clean; the only agent-side friction was a scripted-regex corruptio
 
 1. `AGENTS.md` ("Edit tool batches" section) — appended a one-sentence rule after the existing `sed` line: a multi-line `perl -0777`/`sed` regex substitution across many similar blocks is a trap (a non-greedy `.*?` group spans block boundaries and corrupts a neighbor); collapse repeated multi-line literals with per-block `Edit` calls and reserve scripted substitution for single-line per-symbol renames.
 2. `packages/pi-permission-system/docs/retro/0525-extract-manager-unified-fixtures.md` — added this Final Retrospective stage entry.
+3. `.pi/prompts/ship-issue.md` (Step 7 Final report) — named `/retro <N>` as the single next step and instructed against recommending the next issue there; the ship report previously left the "next step" unspecified, so the model improvised a `/plan-issue` recommendation with the wrong timing.
+4. `.pi/prompts/retro.md` (new Step 10) — added a closing step that surfaces the next roadmap issue (`/plan-issue #M`) after the retro is committed, moving the next-issue recommendation to the correct point in the workflow.
