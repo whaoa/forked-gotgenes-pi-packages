@@ -24,6 +24,7 @@ import {
 import type { Ruleset } from "#src/rule";
 import {
   createManager,
+  createManagerWithConfig,
   createManagerWithProject,
   createMissingConfigManager,
   sessionRule,
@@ -32,30 +33,6 @@ import {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Manager backed by a real on-disk config file written to a temp directory.
- * Returns the manager and a cleanup function.
- */
-function makeManagerWithConfig(
-  permission: Record<string, unknown>,
-  mcpServerNames: readonly string[] = [],
-): { manager: PermissionManager; cleanup: () => void } {
-  const baseDir = mkdtempSync(join(tmpdir(), "pm-unified-test-"));
-  const agentsDir = join(baseDir, "agents");
-  mkdirSync(agentsDir, { recursive: true });
-  const globalConfigPath = join(baseDir, "config.json");
-  writeFileSync(globalConfigPath, JSON.stringify({ permission }, null, 2));
-  const manager = new PermissionManager({
-    globalConfigPath,
-    agentsDir,
-    mcpServerNames: [...mcpServerNames],
-  });
-  return {
-    manager,
-    cleanup: () => rmSync(baseDir, { recursive: true, force: true }),
-  };
-}
 
 describe("PermissionManager — injected platform (#510)", () => {
   const winAllow: Ruleset = [
@@ -294,7 +271,7 @@ describe("checkPermission — session rules", () => {
 describe("checkPermission — source derivation and matchedPattern", () => {
   describe("external_directory (special surface)", () => {
     it("source is 'special' for a config-matched path", () => {
-      const { manager, cleanup } = makeManagerWithConfig({
+      const { manager, cleanup } = createManagerWithConfig({
         "*": "ask",
         external_directory: { "/trusted/*": "allow" },
       });
@@ -330,7 +307,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
   describe("skill surface", () => {
     it("source is 'skill' for a config-matched skill name", () => {
-      const { manager, cleanup } = makeManagerWithConfig({
+      const { manager, cleanup } = createManagerWithConfig({
         "*": "ask",
         skill: { librarian: "allow" },
       });
@@ -354,7 +331,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
   describe("bash surface", () => {
     it("source is 'bash' and command is included in result", () => {
-      const { manager, cleanup } = makeManagerWithConfig({
+      const { manager, cleanup } = createManagerWithConfig({
         "*": "ask",
         bash: { "git *": "allow" },
       });
@@ -382,7 +359,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
   describe("mcp surface", () => {
     it("source is 'mcp' for a config-matched target", () => {
-      const { manager, cleanup } = makeManagerWithConfig(
+      const { manager, cleanup } = createManagerWithConfig(
         { "*": "ask", mcp: { exa_search: "allow" } },
         ["exa"],
       );
@@ -409,7 +386,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("target field is set for a matched mcp call", () => {
-      const { manager, cleanup } = makeManagerWithConfig(
+      const { manager, cleanup } = createManagerWithConfig(
         { "*": "ask", mcp: { mcp_status: "allow" } },
         [],
       );
@@ -425,7 +402,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
   describe("tool surfaces", () => {
     it("built-in tool: source is always 'tool' (config match)", () => {
-      const { manager, cleanup } = makeManagerWithConfig({
+      const { manager, cleanup } = createManagerWithConfig({
         "*": "ask",
         read: "allow",
       });
@@ -453,7 +430,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
     });
 
     it("extension tool: source is 'tool' when a config rule matches", () => {
-      const { manager, cleanup } = makeManagerWithConfig({
+      const { manager, cleanup } = createManagerWithConfig({
         "*": "ask",
         my_custom_tool: "allow",
       });
@@ -503,7 +480,7 @@ describe("checkPermission — source derivation and matchedPattern", () => {
 
 describe("checkPermission — home path expansion in external_directory rules", () => {
   it("~/glob pattern allows a path under the real home directory", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       "*": "ask",
       external_directory: { "~/trusted/*": "allow" },
     });
@@ -523,7 +500,7 @@ describe("checkPermission — home path expansion in external_directory rules", 
   });
 
   it("$HOME/glob pattern allows a path under the real home directory", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       "*": "ask",
       external_directory: { "$HOME/trusted/*": "allow" },
     });
@@ -543,7 +520,7 @@ describe("checkPermission — home path expansion in external_directory rules", 
   });
 
   it("~/glob deny rule blocks a path under home", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       "*": "allow",
       external_directory: { "~/private/*": "deny" },
     });
@@ -562,7 +539,7 @@ describe("checkPermission — home path expansion in external_directory rules", 
   });
 
   it("~/glob pattern does not match a path outside home", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       "*": "ask",
       external_directory: { "~/trusted/*": "allow" },
     });
@@ -1191,7 +1168,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
 
 describe("checkPermission — per-tool path patterns", () => {
   it("denies read of .env when path pattern matches", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1204,7 +1181,7 @@ describe("checkPermission — per-tool path patterns", () => {
   });
 
   it("allows read of non-.env file when .env is denied", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1216,7 +1193,7 @@ describe("checkPermission — per-tool path patterns", () => {
   });
 
   it("allows write to src/ when only src/ is allowed", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       write: { "*": "deny", "src/*": "allow" },
     });
     try {
@@ -1229,7 +1206,7 @@ describe("checkPermission — per-tool path patterns", () => {
   });
 
   it("denies write outside src/ when only src/ is allowed", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       write: { "*": "deny", "src/*": "allow" },
     });
     try {
@@ -1241,7 +1218,7 @@ describe("checkPermission — per-tool path patterns", () => {
   });
 
   it("backward compat: 'read': 'allow' allows read of any path", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: "allow",
     });
     try {
@@ -1253,7 +1230,7 @@ describe("checkPermission — per-tool path patterns", () => {
   });
 
   it("backward compat: 'read': 'deny' denies read of any path", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: "deny",
     });
     try {
@@ -1265,7 +1242,7 @@ describe("checkPermission — per-tool path patterns", () => {
   });
 
   it("session rule for specific path overrides config deny", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1286,7 +1263,7 @@ describe("checkPermission — per-tool path patterns", () => {
   });
 
   it("falls back to '*' when input.path is missing", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1298,7 +1275,7 @@ describe("checkPermission — per-tool path patterns", () => {
   });
 
   it("getToolPermission still returns surface-level state (not path-specific)", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1316,7 +1293,7 @@ describe("checkPermission — per-tool path patterns", () => {
 
 describe("cross-cutting path surface", () => {
   it("denies .env via the path surface", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "*.env": "deny" },
       read: "allow",
     });
@@ -1330,7 +1307,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("allows non-matching paths via the path surface", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "*.env": "deny" },
       read: "allow",
     });
@@ -1343,7 +1320,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("path surface does not interfere with per-tool rules", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow" },
       read: { "*": "allow", "*.secret": "deny" },
     });
@@ -1360,7 +1337,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("getToolPermission('path') returns catch-all action", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1372,7 +1349,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("session approval on path surface overrides config deny", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1393,7 +1370,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("configs without path key behave identically (no path gate fires)", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: "allow",
     });
     try {
@@ -1406,7 +1383,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("universal default produces undefined matchedPattern for gate skip (#58)", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       "*": "ask",
       read: "allow",
       find: "allow",
@@ -1430,7 +1407,7 @@ describe("cross-cutting path surface", () => {
   // ── Deny-with-reason ────────────────────────────────────────────────────
 
   it("deny-with-reason: reason threads through to PermissionCheckResult", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       bash: { "npm *": { action: "deny", reason: "Use pnpm instead" } },
     });
     try {
@@ -1446,7 +1423,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("deny-without-reason: reason is undefined in PermissionCheckResult", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       bash: { "rm -rf *": "deny" },
     });
     try {
@@ -1459,7 +1436,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("deny-with-reason on a non-bash surface", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: {
         "*.env": {
           action: "deny",
@@ -1478,7 +1455,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("non-string reason falls through to the default (malformed config)", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       bash: { "npm *": { action: "deny", reason: 42 } },
     });
     try {
@@ -1496,7 +1473,7 @@ describe("cross-cutting path surface", () => {
 
   it("last-match-wins: catch-all after deny overrides the deny", () => {
     // Classic misconfiguration: deny is before allow, so allow wins.
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*.env": "deny", "*": "allow" },
     });
     try {
@@ -1510,7 +1487,7 @@ describe("cross-cutting path surface", () => {
 
   it("last-match-wins: deny after catch-all blocks the path", () => {
     // Correct ordering: catch-all first, specific deny after.
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1524,7 +1501,7 @@ describe("cross-cutting path surface", () => {
   // ── .env.example override recipe ────────────────────────────────────────
 
   it(".env.example override: denies .env and .env.local, allows .env.example", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: {
         "*": "allow",
         "*.env": "deny",
@@ -1547,7 +1524,7 @@ describe("cross-cutting path surface", () => {
   // ── Universal fallback interaction ──────────────────────────────────────
 
   it("universal '*': 'allow' with no path key makes the path gate transparent", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       "*": "allow",
     });
     try {
@@ -1559,7 +1536,7 @@ describe("cross-cutting path surface", () => {
   });
 
   it("universal '*': 'deny' with no path key denies via path surface too", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       "*": "deny",
     });
     try {
@@ -1573,7 +1550,7 @@ describe("cross-cutting path surface", () => {
   // ── Composition: path allows, per-tool denies ──────────────────────
 
   it("per-tool deny still blocks even when path surface allows", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow" },
       read: "deny",
     });
@@ -1595,7 +1572,7 @@ describe("cross-cutting path surface", () => {
 
 describe("cross-cutting path surface — home-expanded values", () => {
   it("~/... path value is denied by a ~/* rule (reported footgun)", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "~/.ssh/*": "deny" },
     });
     try {
@@ -1608,7 +1585,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
   });
 
   it("$HOME/... path value is denied by a ~/* rule", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "~/.ssh/*": "deny" },
     });
     try {
@@ -1621,7 +1598,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
   });
 
   it("$HOME/... path value matches a $HOME/* pattern rule", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "$HOME/.ssh/*": "deny" },
     });
     try {
@@ -1634,7 +1611,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
   });
 
   it("already-absolute home path is still denied by ~/* rule", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "~/.ssh/*": "deny" },
     });
     try {
@@ -1646,7 +1623,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
   });
 
   it("non-home value is unchanged — .env still matches *.env", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "allow", "*.env": "deny" },
     });
     try {
@@ -1659,7 +1636,7 @@ describe("cross-cutting path surface — home-expanded values", () => {
   });
 
   it("per-tool read surface denies ~/... path with a ~/* rule", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       "*": "allow",
       read: { "*": "allow", "~/.ssh/*": "deny" },
     });
@@ -3290,7 +3267,7 @@ describe("checkPermission — cwd-aware path policy values", () => {
   const cwd = "/workspace/project";
 
   it("matches a relative read input against an absolute allowlist", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: { "*": "ask", [`${cwd}/*`]: "allow" },
     });
     try {
@@ -3304,7 +3281,7 @@ describe("checkPermission — cwd-aware path policy values", () => {
   });
 
   it("keeps legacy relative path rules working after configureForCwd", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: { "*": "allow", "src/*": "deny" },
     });
     try {
@@ -3318,7 +3295,7 @@ describe("checkPermission — cwd-aware path policy values", () => {
   });
 
   it("preserves last-match-wins across absolute and relative aliases", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       read: {
         "*": "ask",
         [`${cwd}/*`]: "allow",
@@ -3337,7 +3314,7 @@ describe("checkPermission — cwd-aware path policy values", () => {
   });
 
   it("matches the cross-cutting path surface against absolute allowlists", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "ask", [`${cwd}/*`]: "allow" },
     });
     try {
@@ -3355,7 +3332,7 @@ describe("checkPathPolicy", () => {
   const cwd = "/workspace/project";
 
   it("evaluates precomputed policy values against the path surface", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "ask", [`${cwd}/*`]: "allow" },
     });
     try {
@@ -3373,7 +3350,7 @@ describe("checkPathPolicy", () => {
   });
 
   it("preserves last-match-wins across the provided aliases", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "ask", [`${cwd}/*`]: "allow", "src/*": "deny" },
     });
     try {
@@ -3389,7 +3366,7 @@ describe("checkPathPolicy", () => {
   });
 
   it("applies session rules over config", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "ask", "src/*": "deny" },
     });
     try {
@@ -3408,7 +3385,7 @@ describe("checkPathPolicy", () => {
   });
 
   it("falls back to the catch-all for an empty value list", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "deny" },
     });
     try {
@@ -3421,7 +3398,7 @@ describe("checkPathPolicy", () => {
   });
 
   it("evaluates against the external_directory surface when one is provided", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       external_directory: { "*": "ask", "/tmp/*": "allow" },
     });
     try {
@@ -3442,7 +3419,7 @@ describe("checkPathPolicy", () => {
   });
 
   it("defaults to the path surface when no surface is provided", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       external_directory: { "*": "ask", "/tmp/*": "allow" },
       path: { "*": "allow" },
     });
@@ -3464,7 +3441,7 @@ describe("checkPathPolicy", () => {
 
 describe("check — tool intent", () => {
   it("resolves a tool call on the bash surface", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       bash: { "*": "allow", "git push": "deny" },
     });
     try {
@@ -3483,7 +3460,7 @@ describe("check — tool intent", () => {
   });
 
   it("resolves a tool call on the read surface", () => {
-    const { manager, cleanup } = makeManagerWithConfig({ read: "deny" });
+    const { manager, cleanup } = createManagerWithConfig({ read: "deny" });
     try {
       const intent: ResolvedAccessIntent = {
         kind: "tool",
@@ -3500,7 +3477,7 @@ describe("check — tool intent", () => {
   });
 
   it("applies session rules via the tool intent", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       bash: { "*": "deny" },
     });
     try {
@@ -3544,7 +3521,7 @@ describe("check — path-values intent", () => {
   const cwd = "/workspace/project";
 
   it("evaluates precomputed policy values against the path surface", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "ask", [`${cwd}/*`]: "allow" },
     });
     try {
@@ -3564,7 +3541,7 @@ describe("check — path-values intent", () => {
   });
 
   it("evaluates against the external_directory surface", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       external_directory: { "*": "ask", "/tmp/*": "allow" },
     });
     try {
@@ -3584,7 +3561,7 @@ describe("check — path-values intent", () => {
   });
 
   it("falls back to the catch-all for an empty value list", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "deny" },
     });
     try {
@@ -3602,7 +3579,7 @@ describe("check — path-values intent", () => {
   });
 
   it("applies session rules via the path-values intent", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "ask", "src/*": "deny" },
     });
     try {
@@ -3621,7 +3598,7 @@ describe("check — path-values intent", () => {
   });
 
   it("last-match-wins across the provided aliases", () => {
-    const { manager, cleanup } = makeManagerWithConfig({
+    const { manager, cleanup } = createManagerWithConfig({
       path: { "*": "ask", [`${cwd}/*`]: "allow", "src/*": "deny" },
     });
     try {

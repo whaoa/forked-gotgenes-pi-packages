@@ -76,6 +76,22 @@ export function createManager(
   };
 }
 
+/**
+ * Manager backed by a temp config holding only a permission map.
+ * Delegates to createManager; returns the manager and its cleanup.
+ */
+export function createManagerWithConfig(
+  permission: Record<string, unknown>,
+  mcpServerNames: readonly string[] = [],
+): { manager: PermissionManager; cleanup: () => void } {
+  const { manager, cleanup } = createManager(
+    { permission } as ScopeConfig,
+    {},
+    { mcpServerNames },
+  );
+  return { manager, cleanup };
+}
+
 export function createManagerWithProject(
   config: ScopeConfig,
   agentFiles: Record<string, string> = {},
