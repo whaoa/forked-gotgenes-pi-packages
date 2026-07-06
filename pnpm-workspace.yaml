@@ -20,7 +20,7 @@ catalog:
   "typescript": "^6.0.3"
   "vitest": "^4.1.8"
   "@types/node": "^22.15.3"
-  fallow: "^2.91.0"
+  fallow: "^3.2.0"
 
 allowBuilds:
   "@google/genai": true
@@ -30,13 +30,13 @@ allowBuilds:
   tree-sitter-bash: true
 
 minimumReleaseAgeExclude:
-  - '@fallow-cli/darwin-arm64@2.91.0'
-  - '@fallow-cli/darwin-x64@2.91.0'
-  - '@fallow-cli/linux-arm64-gnu@2.91.0'
-  - '@fallow-cli/linux-arm64-musl@2.91.0'
-  - '@fallow-cli/linux-x64-gnu@2.91.0'
-  - '@fallow-cli/linux-x64-musl@2.91.0'
-  - '@fallow-cli/win32-arm64-msvc@2.91.0'
-  - '@fallow-cli/win32-x64-msvc@2.91.0'
-  - fallow@2.91.0
+  - '@fallow-cli/darwin-arm64@3.2.0'
+  - '@fallow-cli/darwin-x64@3.2.0'
+  - '@fallow-cli/linux-arm64-gnu@3.2.0'
+  - '@fallow-cli/linux-arm64-musl@3.2.0'
+  - '@fallow-cli/linux-x64-gnu@3.2.0'
+  - '@fallow-cli/linux-x64-musl@3.2.0'
+  - '@fallow-cli/win32-arm64-msvc@3.2.0'
+  - '@fallow-cli/win32-x64-msvc@3.2.0'
+  - fallow@3.2.0
   - '@gotgenes/pi-subagents@16.4.0'
