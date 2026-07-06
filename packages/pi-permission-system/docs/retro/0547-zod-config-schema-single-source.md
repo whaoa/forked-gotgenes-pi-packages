@@ -50,5 +50,58 @@ All deterministic gates pass; pre-completion reviewer returned WARN (one finding
 - **#532 interaction** — removed the two config-only guards it planned to keep; updated `architecture.md`'s Step 8 note and the ADR to reflect the shrunk target without closing #532.
 - **zod `4.4.3`** installed cleanly, no `minimumReleaseAgeExclude` needed; tarball verified to ship `src/config-schema.ts` + schema + migration doc and exclude `scripts/`, `test/`, and the internal ADR.
 
+## Stage: Final Retrospective (2026-07-06T18:00:00Z)
+
+### Session summary
+
+One continuous session carried #547 through planning, TDD implementation, and ship.
+Shipped `pi-permission-system` `v19.0.0` (major, breaking): zod is now the single source of truth for the config-file shape, the JSON Schema and config types both derive from it, the stale hosted `$id`/`$schema` URLs are repointed to the monorepo, and config-file validation is strict and fail-closed.
+Six implementation commits, `+10` net tests, pre-completion WARN fixed, CI green, release-please PR #550 merged, issue closed.
+
+### Observations
+
+#### What went well
+
+- **Discovery-first planning reframed the issue.**
+  The request was "add a JSON Schema," but investigation found the schema already existed and completions already worked; the real defects were a stale hosted URL and schema/type/loader drift.
+  Reframing avoided building a redundant artifact and produced a higher-value single-source-of-truth outcome.
+- **Throwaway exploration scripts before committing to the schema shape.**
+  Two disposable `explore-zod.ts` runs revealed that `reused: "ref"` produced ugly `__schemaN` `$defs` and that `.meta({ id })` alone yields clean `$defs` — and that `markdownDescription`/`examples`/`default` all pass through `.meta()` (no `override` needed).
+  This is the `testing` skill's "write a disposable exploratory script first" rule paying off directly.
+- **Caught a latent regression during implementation.**
+  `normalizeUnifiedConfig` was dual-purpose (config files *and* per-agent frontmatter); a naive strict-ification would have silently dropped agent `permission` blocks (frontmatter carries `name`/`model`/etc.).
+  Grepping the callers surfaced it, and the fix kept agent frontmatter tolerant while config files went strict.
+- **Proactively checked biome warnings (exit 0).**
+  After removing test blocks, an unused `it` import lingered as a biome *warning* — which `pnpm run lint` passes and the pre-completion reviewer's error-gated checks would miss.
+  Explicitly inspecting `biome check` warnings caught it before commit.
+- **Incremental verification, no feedback-loop gap.** `pnpm run check` / the affected test file / `pnpm run lint` ran after *every* TDD step, and the full suite + `fallow dead-code` + a `pnpm pack` tarball inspection ran at the end. `expectTypeOf(...).toEqualTypeOf(...)` (enforced by `tsc`) de-risked the ~58-consumer type lift-and-shift before it landed.
+- **Ship-flow rule adherence under an in-progress release check.**
+  The release-please PR reported `UNSTABLE` with a check still `IN_PROGRESS`; per the ship prompt I waited and re-polled rather than falling back to `gh pr merge` while the check ran, then merged clean via `release_pr_merge`.
+
+#### What caused friction (agent side)
+
+- `other` (path typo) — one `Edit` used an absolute path missing the `pi-packages/packages/` segment, tripping the permission gate.
+  Impact: one rejected call + retry, no rework.
+- `missing-context` — did not anticipate that biome formats committed JSON, so the first `gen:schema` output failed lint (biome collapses single-element arrays differently than `JSON.stringify`).
+  Impact: one fix cycle; resolved by chaining `biome format --write` into `gen:schema` so the generated file is deterministic and lint-clean.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's two mid-planning interjections (zod over TypeBox; pin the latest production version + favor schema composability) were well-timed and materially improved the design; they could not have come earlier since the operator did not yet know the schema already existed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — one subagent dispatch: `pre-completion-reviewer` on `anthropic/claude-sonnet-5` (274s, 53 tool uses) for judgment-heavy review (acceptance criteria, design review, doc staleness, Mermaid render).
+  Appropriate model for the work; no mismatch.
+- **Escalation-delay tracking** — no rabbit holes; the longest same-target sequence was the two deliberate zod-exploration script runs, which were investigative, not stuck.
+- **Unused-tool detection** — `web_search` + `fetch_content` (zod v4 `toJSONSchema` docs) and disposable scripts covered the unfamiliar-library risk; no Explore/Plan subagent was warranted (full context was already in-session).
+- **Feedback-loop gap analysis** — none: verification ran incrementally after each step rather than only at the end.
+
+### Changes made
+
+1. Added this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0547-zod-config-schema-single-source.md`.
+   No prompt, `AGENTS.md`, or skill changes: the operator chose retro-only, since the `gen:schema` script already self-documents the `biome format` chaining and the other candidate lessons duplicate existing guidance.
+
 [#532]: https://github.com/gotgenes/pi-packages/issues/532
 [colinhacks/zod#5272]: https://github.com/colinhacks/zod/issues/5272
