@@ -34,12 +34,13 @@ The deliberate, interactive final `/retro $1` runs once at the root after `/land
 The stage note lives in an `exclude-paths` dir, so it triggers no release — but it must be committed **on this branch** so it rides the single ff-merge when root lands the work.
 
 1. Determine the retro file path (same `NNNN-<slug>` as the plan file: single-package → `packages/<PKG>/docs/retro/`; cross-package → `docs/retro/`).
-2. Capture this peer session's transcript path so the root's final `/retro` can double-check raw messages (sessions live under `~/.pi/agent/sessions/`, so they survive the worktree teardown):
+2. Capture this peer session's transcript path so the root's final `/retro` can read it with `read_session_file` (sessions live under `~/.pi/agent/sessions/`, so they survive the worktree teardown):
 
    ```bash
    enc="--$(pwd | sed 's#^/##; s#/#-#g')--"; ls -t ~/.pi/agent/sessions/"$enc"/*.jsonl 2>/dev/null | head -1
    ```
 
+   (Equivalently, the root can call `list_session_files({ cwd: "<this worktree path>" })` and pick the newest entry — the `sed` one-liner above is just this peer session capturing its own path inline.)
 3. Append a stage entry (anchor the `Edit` on the file's last line — the repeated `### Observations` headers make header-anchored edits ambiguous):
 
    ```markdown
@@ -49,7 +50,7 @@ The stage note lives in an `exclude-paths` dir, so it triggers no release — bu
 
    1–2 sentences: pre-push check results and any context the root needs at land time (deferred work, the plan's `**Release:**` marker, follow-ups).
 
-   **Peer session transcript:** `<path from step 2>` — raw JSONL for message-level verification at land/retro time.
+   **Peer session transcript:** `<path from step 2>` — read with `read_session_file({ path: "<path>" })` for message-level verification at land/retro time.
 
    ### Observations
 

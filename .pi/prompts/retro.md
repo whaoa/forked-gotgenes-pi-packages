@@ -58,7 +58,8 @@ Your synthesis should span all stages — not just this session.
 Look for patterns that recur across stages, friction that compounds, and whether earlier observations led to adjustments.
 
 For a worktree issue, the implementation happened in a **separate peer session** whose transcript `read_session` cannot reach (it reads only the current session; the peer is a sibling, not a parent).
-The `## Stage: Ship (worktree)` breadcrumb records a **Peer session transcript** path (a raw `.jsonl` under `~/.pi/agent/sessions/`, which survives the worktree teardown) — read it with `Read`/`Bash` when a diagnostic lens (e.g. model-performance correlation) needs message-level detail the breadcrumbs do not carry.
+The `## Stage: Ship (worktree)` breadcrumb records a **Peer session transcript** path (a `.jsonl` under `~/.pi/agent/sessions/`, which survives the worktree teardown) — read it with `read_session_file({ path: "<path>" })` when a diagnostic lens (e.g. model-performance correlation) needs message-level detail the breadcrumbs do not carry; it renders the peer transcript through the same pipeline as `read_session`.
+If only the peer worktree's cwd is known (no recorded path), use `list_session_files({ cwd: "<worktree path>" })` to find its newest session file first.
 
 Be specific: cite file paths, commit subjects, and concrete tool sequences.
 Categorize each friction point with one label:
@@ -94,7 +95,7 @@ Skip a lens entirely when it finds nothing notable.
 
 1. **Model-performance correlation** — for each subagent dispatch (if any), note which model ran and what task it performed.
    Flag quality mismatches: a reasoning-weak model on judgment-heavy work (architecture decisions, code review), or a high-cost model on purely mechanical work (formatting, simple grep).
-   If the `read_session` or `read_parent_session` tools are available, use them to inspect model assignments: attribute each turn to the inline `[provider/model]` label the transcript renders on it.
+   If the `read_session`, `read_parent_session`, or `read_session_file` tools are available, use them to inspect model assignments: attribute each turn to the inline `[provider/model]` label the transcript renders on it.
    `[model change]` lines are suppressed unless the switch actually ran a turn, so every rendered marker reflects an effective switch — no manual phantom-filtering is needed.
 2. **Escalation-delay tracking** — for each `rabbit-hole` friction point, count how many consecutive tool calls the agent spent on the same error or approach before resolving or changing strategy.
    Flag sequences longer than 5 consecutive tool calls on the same error as "should have dispatched an Explore or Plan subagent" or "should have asked the user."
