@@ -22,7 +22,7 @@ import {
   type SessionSummary,
   summarizeEntries,
 } from "./entry-summary.js";
-import { formatTranscript } from "./format-transcript.js";
+import { formatTranscript, type TranscriptEntry } from "./format-transcript.js";
 import {
   deriveParentSessionFile,
   readParentSessionEntries,
@@ -87,6 +87,33 @@ function formatResultText(
   }
   // kind === "transcript"
   return `${theme.fg("success", "\u2713")} ${theme.fg("muted", formatSummaryText(details.summary))} ${hint}`;
+}
+
+/**
+ * Filter entries by `types`, slice to the most recent `limit`, then summarize
+ * and format the result. Shared by every tool that renders a transcript from
+ * an entry array (`read_session`, `read_parent_session`, `read_session_file`).
+ */
+function buildTranscriptResult(
+  allEntries: TranscriptEntry[],
+  params: { types?: string[]; limit?: number },
+): {
+  content: [{ type: "text"; text: string }];
+  details: SessionToolDetails;
+} {
+  let entries = allEntries;
+  if (params.types) {
+    const allowed = new Set(params.types);
+    entries = entries.filter((e) => allowed.has(e.type));
+  }
+  if (params.limit != null) {
+    entries = entries.slice(-params.limit);
+  }
+  const summary = summarizeEntries(entries);
+  return {
+    content: [{ type: "text", text: formatTranscript(entries) }],
+    details: { kind: "transcript", summary },
+  };
 }
 
 export default function sessionTools(pi: ExtensionAPI): void {
@@ -194,19 +221,7 @@ export default function sessionTools(pi: ExtensionAPI): void {
         _onUpdate: unknown,
         ctx: ExtensionContext,
       ) {
-        let entries = ctx.sessionManager.getEntries();
-        if (params.types) {
-          const allowed = new Set(params.types);
-          entries = entries.filter((e) => allowed.has(e.type));
-        }
-        if (params.limit != null) {
-          entries = entries.slice(-params.limit);
-        }
-        const summary = summarizeEntries(entries);
-        return {
-          content: [{ type: "text", text: formatTranscript(entries) }],
-          details: { kind: "transcript", summary } as SessionToolDetails,
-        };
+        return buildTranscriptResult(ctx.sessionManager.getEntries(), params);
       },
     }),
   );
@@ -294,20 +309,7 @@ export default function sessionTools(pi: ExtensionAPI): void {
           };
         }
 
-        let entries = allEntries;
-        if (params.types) {
-          const allowed = new Set(params.types);
-          entries = entries.filter((e) => allowed.has(e.type));
-        }
-        if (params.limit != null) {
-          entries = entries.slice(-params.limit);
-        }
-
-        const summary = summarizeEntries(entries);
-        return {
-          content: [{ type: "text", text: formatTranscript(entries) }],
-          details: { kind: "transcript", summary } as SessionToolDetails,
-        };
+        return buildTranscriptResult(allEntries, params);
       },
     }),
   );
