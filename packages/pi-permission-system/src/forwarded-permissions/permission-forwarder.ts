@@ -6,6 +6,7 @@ import {
   type SessionEntryView,
 } from "#src/active-agent";
 import type { ConfigReader } from "#src/config-store";
+import { isYoloModeEnabled } from "#src/extension-config";
 import type {
   PermissionDecisionUi,
   PermissionPromptDecision,
@@ -31,7 +32,6 @@ import type { DebugReviewLogger } from "#src/session-logger";
 import { isSubagentExecutionContext } from "#src/subagent-context";
 import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
-import { shouldAutoApprovePermissionState } from "#src/yolo-mode";
 
 import {
   cleanupPermissionForwardingLocationIfEmpty,
@@ -90,7 +90,7 @@ export interface PermissionForwarderDeps {
     message: string,
     options?: RequestPermissionOptions,
   ) => Promise<PermissionPromptDecision>;
-  /** Read current config for yolo-mode auto-approve check (called at prompt time). */
+  /** Read current config for the retained forwarded-inbox yolo auto-approve check. */
   config: ConfigReader;
 }
 
@@ -506,7 +506,10 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
       approved: false,
       state: "denied",
     };
-    if (shouldAutoApprovePermissionState("ask", this.config.current())) {
+    // Last yolo check outside the composed ruleset: dissolves when
+    // processInbox is refactored onto evaluate() + Authorizer selection in
+    // the Phase 9 spine work.
+    if (isYoloModeEnabled(this.config.current())) {
       this.logger.review(
         "forwarded_permission.auto_approved",
         forwardedPermissionLogDetails,

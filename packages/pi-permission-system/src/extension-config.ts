@@ -66,6 +66,13 @@ export function normalizePermissionSystemConfig(
   return result;
 }
 
+export function isYoloModeEnabled(
+  config: PermissionSystemExtensionConfig,
+): boolean {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- typed as boolean but may be undefined at runtime (untyped callers); Boolean() guards against that
+  return Boolean(config.yoloMode);
+}
+
 export function ensurePermissionSystemLogsDirectory(
   logsDir: string,
 ): string | undefined {

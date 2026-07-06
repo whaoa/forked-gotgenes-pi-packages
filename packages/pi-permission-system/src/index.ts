@@ -6,6 +6,7 @@ import { getGlobalConfigPath } from "./config-paths";
 import { ConfigStore } from "./config-store";
 import { DecisionAudit } from "./decision-audit";
 import { GateDecisionReporter } from "./decision-reporter";
+import { isYoloModeEnabled } from "./extension-config";
 import { computeExtensionPaths } from "./extension-paths";
 import {
   PermissionForwarder,
@@ -36,7 +37,6 @@ import { subscribeSubagentLifecycle } from "./subagent-lifecycle-events";
 import { getSubagentSessionRegistry } from "./subagent-registry";
 import { ToolAccessExtractorRegistry } from "./tool-access-extractor-registry";
 import { ToolInputFormatterRegistry } from "./tool-input-formatter-registry";
-import { isYoloModeEnabled } from "./yolo-mode";
 
 export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const agentDir = getAgentDir();

@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 
+import type { PermissionSystemExtensionConfig } from "#src/extension-config";
 import {
   detectMisplacedPermissionKeys,
+  isYoloModeEnabled,
   normalizePermissionSystemConfig,
 } from "#src/extension-config";
+
+function makeConfig(
+  yoloMode: boolean | undefined,
+): PermissionSystemExtensionConfig {
+  return { yoloMode } as PermissionSystemExtensionConfig;
+}
 
 describe("detectMisplacedPermissionKeys", () => {
   it("returns an empty array for a record with only valid extension keys", () => {
@@ -125,5 +133,19 @@ describe("normalizePermissionSystemConfig", () => {
   it("omits toolTextSummaryMaxLength when absent", () => {
     const result = normalizePermissionSystemConfig({});
     expect("toolTextSummaryMaxLength" in result).toBe(false);
+  });
+});
+
+describe("isYoloModeEnabled", () => {
+  it("returns true when yoloMode is true", () => {
+    expect(isYoloModeEnabled(makeConfig(true))).toBe(true);
+  });
+
+  it("returns false when yoloMode is false", () => {
+    expect(isYoloModeEnabled(makeConfig(false))).toBe(false);
+  });
+
+  it("returns false when yoloMode is undefined", () => {
+    expect(isYoloModeEnabled(makeConfig(undefined))).toBe(false);
   });
 });
