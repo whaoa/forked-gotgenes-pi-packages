@@ -8,27 +8,19 @@ import {
   getLegacyProjectPolicyPath,
   getProjectConfigPath,
 } from "./config-paths";
-import { unifiedConfigSchema } from "./config-schema";
+import {
+  type UnifiedPermissionConfig,
+  unifiedConfigSchema,
+} from "./config-schema";
 import { mergeFlatPermissions } from "./permission-merge";
 import type { FlatPermissionConfig, PatternValue } from "./types";
 import { isDenyWithReason, isPermissionState } from "./value-guards";
 
-/**
- * Unified config shape combining runtime knobs and flat permission policy.
- * All fields are optional so partial configs (project-only, global-only) work.
- */
-export interface UnifiedPermissionConfig {
-  // Runtime knobs
-  debugLog?: boolean;
-  permissionReviewLog?: boolean;
-  yoloMode?: boolean;
-  toolInputPreviewMaxLength?: number;
-  toolTextSummaryMaxLength?: number;
-  piInfrastructureReadPaths?: string[];
-
-  // Flat permission policy
-  permission?: FlatPermissionConfig;
-}
+// The unified config shape is derived from the zod schema (config-schema.ts,
+// the single source of truth) and re-exported so existing importers keep their
+// import path. All fields are optional so partial configs merge before
+// defaults are applied downstream.
+export type { UnifiedPermissionConfig };
 
 export interface UnifiedConfigLoadResult {
   config: UnifiedPermissionConfig;

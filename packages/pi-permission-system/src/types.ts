@@ -1,20 +1,21 @@
-export type PermissionState = "allow" | "deny" | "ask";
-
+import type {
+  DenyWithReason,
+  FlatPermissionConfig,
+  PatternValue,
+  PermissionState,
+} from "./config-schema";
 import type { RuleOrigin } from "./rule";
 
-export type { RuleOrigin };
-
-/**
- * A deny action with an optional reason annotation, used when a pattern maps
- * to an object instead of a plain PermissionState string.
- */
-export interface DenyWithReason {
-  action: "deny";
-  reason?: string;
-}
-
-/** A pattern value: a PermissionState string OR a DenyWithReason object. */
-export type PatternValue = PermissionState | DenyWithReason;
+// The config-file shape types are derived from the zod schema
+// (config-schema.ts) — the single source of truth — and re-exported here so
+// existing importers keep their import path.
+export type {
+  DenyWithReason,
+  FlatPermissionConfig,
+  PatternValue,
+  PermissionState,
+  RuleOrigin,
+};
 
 /**
  * Predicate deciding whether a bare bash token should be promoted into the
@@ -26,17 +27,6 @@ export type PatternValue = PermissionState | DenyWithReason;
  * manager while the bash layer only asks the predicate.
  */
 export type PathRuleTokenMatcher = (token: string) => boolean;
-
-/**
- * The on-disk permission shape inside the `"permission"` key.
- * A surface value is a PermissionState string (shorthand for `{ "*": action }`)
- * or a pattern→value map. Pattern values may be a PermissionState string or a
- * DenyWithReason object. A top-level value is never a bare DenyWithReason.
- */
-export type FlatPermissionConfig = Record<
-  string,
-  PermissionState | Record<string, PatternValue>
->;
 
 /**
  * Per-scope permission config shape after loading and validation.
