@@ -125,6 +125,8 @@ Guardrails:
   Two peers touching `pnpm-lock.yaml`, `release-please-config.json`, or the same package's source is the main parallel-work hazard.
 - `/ship-issue` is trunk-only; ship a worktree branch with `/ship-worktree` (peer) + `/land-worktree` (root), never `/ship-issue`.
 - Whoever lands second rebases first: if `/land-worktree`'s ff-merge fails, the peer re-runs `/ship-worktree` to rebase onto the new `origin/main` (a non-linear merge into `main` is rejected by design).
+- Land a pending worktree branch before committing unrelated work to `main`.
+  An intervening root commit to `main` stales the peer's completed `/ship-worktree` rebase, so the ff-merge is rejected and the peer must re-rebase (Refs #549).
 - A first launch in each worktree reinstalls `.pi/npm/` (gitignored, so it does not carry over) — a one-time cost Pi handles automatically.
 
 ### Session naming convention

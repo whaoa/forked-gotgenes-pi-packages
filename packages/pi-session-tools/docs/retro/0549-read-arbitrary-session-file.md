@@ -55,3 +55,48 @@ No deferred work or follow-ups from this issue.
 ### Observations
 
 Keep it a concise breadcrumb, not a full retrospective — the final `/retro 549` at the root captures the retrospective proper.
+
+## Stage: Final Retrospective (2026-07-06T23:47:45Z)
+
+### Session summary
+
+Root-session land + retro: fast-forward-merged the peer branch onto `main`, verified CI green, closed #549, released `pi-session-tools-v1.2.0`, and tore down the worktree.
+This retro then dogfooded the tool the issue shipped — `read_session_file` rendered the peer worktree transcript through the same pipeline as `read_session`, the first real use of the #549 feature.
+The land took two attempts: the first ff-merge was rejected as non-fast-forward because the root had committed an unrelated `fix(worktree)` directly to `main` between the peer's completed `/ship-worktree` rebase and the land.
+
+### Observations
+
+#### What went well
+
+- `read_session_file` dogfooding — the tool shipped in this issue was immediately used (post-reload) to read the peer session transcript for this retro, closing the #546 → #549 arc: the root retro can now reach a sibling peer session cleanly instead of raw `Read`/`Bash` on `.jsonl`.
+  The `types`/`limit` filtering worked as designed (isolated `model_change` markers, then paged `message` entries).
+- Release-check discipline — during release the `release-please` PR's `statusCheckRollup` had a check still `IN_PROGRESS`.
+  Per the #546 guidance (a non-empty rollup mid-check is neither the merge nor the `gh pr merge` fallback case), I waited via `ci_watch` and then merged by rebase rather than falling back prematurely — the rule proved its value on first encounter.
+- The land protocol's non-fast-forward guard executed cleanly: the failed ff-merge stopped the flow, nothing was force-pushed, the blocking commit was pushed, and the peer re-rebased — "whoever lands second rebases first" worked as documented.
+
+#### What caused friction (agent side)
+
+- `scope-drift` — committed an unrelated `fix(worktree)` directly to `main` between the peer's completed `/ship-worktree` rebase and the `/land-worktree` ff-merge.
+  The peer branch was based on the pre-fix `origin/main`, so the ff-merge was rejected as non-fast-forward; recovery required pushing the fix, reporting the divergence, and the peer re-running `/ship-worktree` to rebase onto the new `origin/main`.
+  Impact: one extra ship→land round-trip (peer re-rebased 8 commits; root re-ran `/land-worktree`).
+  The land flow handled it correctly (detected non-ff, stopped, did not force), so the churn was self-inflicted by the commit ordering, not a protocol gap — landing the pending branch first would have avoided it.
+- `other` (one-time bootstrap) — `read_session_file`, the tool this issue shipped, was **not registered** in the running root session on first call (`Tool read_session_file not found`), because the long-lived root session predated the merge that added it.
+  A session reload fixed it.
+  This bites only the session that first ships a session tool the retro itself uses; for every later issue the tool is already loaded, so it is an observation, not a recurring rule.
+
+#### What caused friction (user side)
+
+- The `Great. Make sure to commit` request for the `fix(worktree)` change landed immediately before `/land-worktree 549`.
+  Framed as opportunity, not criticism: the fix was legitimate and small, but sequencing the pending worktree land before the unrelated `main` commit would have avoided the re-rebase round-trip.
+
+### Diagnostic details
+
+- **Model-performance correlation** — peer implementation ran on `claude-sonnet-5` (101 turns) with the `pre-completion-reviewer` dispatched on `claude-opus-4-8` (18 turns): reasoning-heavier model on the fresh-context judgment review, lighter model on mechanical TDD — a sound split.
+  The root land/retro session hopped across `claude-sonnet-5` → `claude-opus-4-8` → `deepseek-v4-flash` → `claude-fable-5` → `claude-opus-4-8`; the `deepseek`/`fable` turns look like operator model-switch experiments rather than task-driven assignment, and the land flow is mechanical enough that no mismatch caused harm.
+- **Escalation-delay tracking** — no `rabbit-hole`; the non-ff merge was diagnosed in a single command and resolved via the documented protocol.
+- **Feedback-loop gap analysis** — not applicable to the root land (no code changes); the peer session ran verification incrementally (grep of the peer transcript: 19 `pnpm run check`, 26 `pnpm run lint`, 33 `fallow dead-code`, 7 `pnpm run test`), not only at the end.
+
+### Changes made
+
+1. `AGENTS.md` — added a convergence guardrail to the `Parallel peer sessions (git worktrees)` list: land a pending worktree branch before committing unrelated work to `main`, because an intervening root commit stales the peer's `/ship-worktree` rebase and forces a re-rebase (Refs #549).
+2. Declined P2 (a `retro.md` session-reload note) as a one-time bootstrap scenario — recorded as the `other` friction observation above instead of a permanent prompt rule.
