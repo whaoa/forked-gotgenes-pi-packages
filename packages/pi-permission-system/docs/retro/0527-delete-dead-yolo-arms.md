@@ -23,3 +23,20 @@ The plan is four commits (three `refactor:` cycles plus a `docs:` completion com
   No `README.md` command-surface change.
 
 [#526]: https://github.com/gotgenes/pi-packages/issues/526
+
+## Stage: Implementation — TDD (2026-07-05T00:00:00Z)
+
+### Session summary
+
+Executed all four planned commits: removed `PermissionPrompter`'s dead auto-approve arm, reduced `PromptingGateway.canConfirm()` to `hasUI ∨ isSubagent` and deleted `canResolveAskPermissionRequest`/`AskPermissionResolutionOptions`, dissolved `src/yolo-mode.ts` (moved `isYoloModeEnabled` into `extension-config.ts`, deleted `shouldAutoApprovePermissionState`, re-pointed the forwarded-inbox serve arm), then updated `architecture.md` (Step 3 ✅ marker, Mermaid node, module tree, two metric rows) and `permission-prompter.md`.
+Test count moved 2299 → 2283 (removed 4 prompter yolo tests, 1 gateway yolo test, 8 `yolo-mode.test.ts` tests; added 3 `isYoloModeEnabled` tests in `extension-config.test.ts`).
+The `pre-completion-reviewer` returned PASS on the first dispatch.
+
+### Observations
+
+- No deviations from the plan — all four TDD steps landed exactly as designed, including the dependency-bag narrowing (`config` dropped from both `PermissionPrompterDeps` and `PromptingGatewayDeps`) and the serve-arm re-point to `isYoloModeEnabled` with the Phase 9 retention comment.
+- Followed the plan's metrics-table guidance by prefixing `✅` on the Target-column values for "yolo checks on the ask path" and "canConfirm() predicates" (matching the precedent in `docs/architecture/history/phase-7-accesspath-universal-representation.md`) rather than mutating the frozen "Phase 7 close" baseline column.
+- The `test/permission-forwarder.test.ts` serve-arm test needed no edit — confirmed the plan's claim that `isYoloModeEnabled` is behavior-identical to the old `shouldAutoApprovePermissionState("ask", …)` call it replaced.
+- Pre-completion reviewer: PASS.
+  Reviewer warnings: one non-blocking note — `architecture.md`'s "Target: the authority model" section (~line 500) still names `yolo-mode.ts` in a "today these concerns are spread across…" sentence; this was outside the plan's declared doc-sweep scope (module tree, Step 3 marker, two metric rows, `permission-prompter.md`) and is left for a future spine-related doc pass.
+- Batch status: this is the tail of "yolo-recorded-authority" (Steps 2, 3) — `/ship-issue` should now merge the release-please PR left open by [#526]'s `mid-batch — defer` marker.
