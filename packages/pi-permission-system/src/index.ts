@@ -96,7 +96,6 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const forwarder = new PermissionForwarder(forwardingDeps);
 
   const prompter = new PermissionPrompter({
-    config: configStore,
     logger,
     events: pi.events,
     forwarder,

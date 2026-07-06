@@ -1,5 +1,4 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { ConfigReader } from "./config-store";
 import type { ApprovalRequester } from "./forwarded-permissions/permission-forwarder";
 import type { PermissionPromptDecision } from "./permission-dialog";
 import {
@@ -8,7 +7,6 @@ import {
 } from "./permission-events";
 import { buildDirectUiPrompt } from "./permission-ui-prompt";
 import type { ReviewLogger } from "./session-logger";
-import { shouldAutoApprovePermissionState } from "./yolo-mode";
 
 export type PermissionReviewSource = "tool_call" | "skill_input" | "skill_read";
 
@@ -40,13 +38,11 @@ export interface PermissionPrompterApi {
 /**
  * Dependencies required by PermissionPrompter.
  *
- * Keeps the prompter's external surface narrow: callers provide config
- * access, a review logger, the UI-prompt event bus, and the forwarder
- * that owns the UI/subagent-forwarding branching logic.
+ * Keeps the prompter's external surface narrow: callers provide a review
+ * logger, the UI-prompt event bus, and the forwarder that owns the
+ * UI/subagent-forwarding branching logic.
  */
 export interface PermissionPrompterDeps {
-  /** Read current config for yolo-mode check (called at prompt time). */
-  config: ConfigReader;
   /** Write structured entries to the permission review log. */
   logger: ReviewLogger;
   /** Event bus used for UI prompt broadcasts. */
@@ -57,10 +53,13 @@ export interface PermissionPrompterDeps {
 
 /**
  * Encapsulates the full permission-prompt flow:
- *   1. Yolo-mode auto-approval check.
- *   2. Review-log "waiting" entry.
- *   3. UI-present vs. subagent-forwarding branching (via confirmPermission).
- *   4. Review-log "approved" / "denied" entry.
+ *   1. Review-log "waiting" entry.
+ *   2. UI-present vs. subagent-forwarding branching (via confirmPermission).
+ *   3. Review-log "approved" / "denied" entry.
+ *
+ * Yolo-mode auto-approval happens upstream, at the composition stage
+ * (`PermissionManager.check`'s `rewriteAsksToYolo`) — an `ask` never reaches
+ * this class under yolo, so this class has no yolo-mode knowledge.
  *
  * Injecting a single PermissionPrompter instance means adding a new prompt
  * parameter (e.g. a future sessionLabel variant) only requires changing
@@ -73,11 +72,6 @@ export class PermissionPrompter implements PermissionPrompterApi {
     ctx: ExtensionContext,
     details: PromptPermissionDetails,
   ): Promise<PermissionPromptDecision> {
-    if (shouldAutoApprovePermissionState("ask", this.deps.config.current())) {
-      this.writeReviewEntry("permission_request.auto_approved", details);
-      return { approved: true, state: "approved", autoApproved: true };
-    }
-
     this.writeReviewEntry("permission_request.waiting", details);
 
     // Build the event once. When this session has UI it broadcasts directly;
