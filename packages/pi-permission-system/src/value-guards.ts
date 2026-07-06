@@ -17,23 +17,6 @@ export function getNonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-/** Returns `raw` if it is an array of strings; otherwise `undefined`. */
-export function normalizeOptionalStringArray(
-  raw: unknown,
-): string[] | undefined {
-  return Array.isArray(raw) &&
-    raw.every((p): p is string => typeof p === "string")
-    ? raw
-    : undefined;
-}
-
-/** Returns `raw` if it is a positive integer; otherwise `undefined`. */
-export function normalizeOptionalPositiveInt(raw: unknown): number | undefined {
-  return typeof raw === "number" && Number.isInteger(raw) && raw > 0
-    ? raw
-    : undefined;
-}
-
 export function isPermissionState(value: unknown): value is PermissionState {
   return value === "allow" || value === "deny" || value === "ask";
 }

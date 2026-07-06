@@ -1,11 +1,9 @@
-import { describe, expect, it, test } from "vitest";
+import { describe, expect, test } from "vitest";
 
 import {
   getNonEmptyString,
   isDenyWithReason,
   isPermissionState,
-  normalizeOptionalPositiveInt,
-  normalizeOptionalStringArray,
   toRecord,
 } from "#src/value-guards";
 
@@ -121,73 +119,5 @@ describe("isDenyWithReason", () => {
     expect(isDenyWithReason(undefined)).toBe(false);
     expect(isDenyWithReason("deny")).toBe(false);
     expect(isDenyWithReason(["deny"])).toBe(false);
-  });
-});
-
-describe("normalizeOptionalStringArray", () => {
-  it("returns the array for a valid string array", () => {
-    expect(normalizeOptionalStringArray(["a", "b", "c"])).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
-  });
-
-  it("returns an empty array for an empty array", () => {
-    expect(normalizeOptionalStringArray([])).toEqual([]);
-  });
-
-  it("returns undefined for a plain string", () => {
-    expect(normalizeOptionalStringArray("x")).toBeUndefined();
-  });
-
-  it("returns undefined for a number", () => {
-    expect(normalizeOptionalStringArray(42)).toBeUndefined();
-  });
-
-  it("returns undefined for a plain object", () => {
-    expect(normalizeOptionalStringArray({ a: "b" })).toBeUndefined();
-  });
-
-  it("returns undefined for a mixed-type array", () => {
-    expect(normalizeOptionalStringArray(["a", 1])).toBeUndefined();
-  });
-
-  it("returns undefined for undefined", () => {
-    expect(normalizeOptionalStringArray(undefined)).toBeUndefined();
-  });
-
-  it("returns undefined for null", () => {
-    expect(normalizeOptionalStringArray(null)).toBeUndefined();
-  });
-});
-
-describe("normalizeOptionalPositiveInt", () => {
-  it("returns the value for a valid positive integer", () => {
-    expect(normalizeOptionalPositiveInt(1)).toBe(1);
-    expect(normalizeOptionalPositiveInt(200)).toBe(200);
-    expect(normalizeOptionalPositiveInt(9999)).toBe(9999);
-  });
-
-  it("returns undefined for zero", () => {
-    expect(normalizeOptionalPositiveInt(0)).toBeUndefined();
-  });
-
-  it("returns undefined for negative integers", () => {
-    expect(normalizeOptionalPositiveInt(-1)).toBeUndefined();
-    expect(normalizeOptionalPositiveInt(-100)).toBeUndefined();
-  });
-
-  it("returns undefined for non-integer numbers (floats)", () => {
-    expect(normalizeOptionalPositiveInt(400.5)).toBeUndefined();
-    expect(normalizeOptionalPositiveInt(1.1)).toBeUndefined();
-  });
-
-  it("returns undefined for non-number types", () => {
-    expect(normalizeOptionalPositiveInt("200")).toBeUndefined();
-    expect(normalizeOptionalPositiveInt(true)).toBeUndefined();
-    expect(normalizeOptionalPositiveInt(null)).toBeUndefined();
-    expect(normalizeOptionalPositiveInt(undefined)).toBeUndefined();
-    expect(normalizeOptionalPositiveInt({})).toBeUndefined();
   });
 });
