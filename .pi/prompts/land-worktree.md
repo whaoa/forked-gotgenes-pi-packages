@@ -84,6 +84,10 @@ Print:
 - Issue close confirmation(s).
 - Worktree/branch teardown confirmation.
 - Anything skipped and why.
+- The next step: `/retro $1` — the deliberate, interactive final retrospective, run here at the root on `main` (commits straight to `main`).
+
+Name `/retro $1` as the single next step.
+Do **not** recommend the next issue to plan here — `/retro` surfaces the next roadmap issue at its end, after the retrospective is written.
 
 ## Constraints
 

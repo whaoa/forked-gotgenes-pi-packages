@@ -1,5 +1,5 @@
 ---
-description: Peer-session ship prep — retro, rebase a worktree branch onto main, hand off to root for landing
+description: Peer-session ship prep — rebase a worktree branch onto main, hand off to root for landing
 ---
 
 # Ship a worktree branch (peer session)
@@ -27,12 +27,28 @@ Run from the worktree root (your current directory):
 
 If either fails, fix and commit before continuing.
 
-## 3. Retrospective (must land with the branch)
+## 3. Write ship stage notes (must land with the branch)
 
-The retro note lives in an `exclude-paths` dir, so it triggers no release — but it must be committed **on this branch** so it rides the single ff-merge when root lands the work.
+Write a concise **ship** stage breadcrumb — not the final retrospective.
+The deliberate, interactive final `/retro $1` runs once at the root after `/land-worktree $1`, on `main`; do **not** run it here.
+The stage note lives in an `exclude-paths` dir, so it triggers no release — but it must be committed **on this branch** so it rides the single ff-merge when root lands the work.
 
-1. If you have not yet run the retrospective for issue $1, run `/retro $1` now and let it write and commit the stage entry.
-2. Confirm the retro file is committed (`git status` clean for it) before proceeding.
+1. Determine the retro file path (same `NNNN-<slug>` as the plan file: single-package → `packages/<PKG>/docs/retro/`; cross-package → `docs/retro/`).
+2. Append a stage entry (anchor the `Edit` on the file's last line — the repeated `### Observations` headers make header-anchored edits ambiguous):
+
+   ```markdown
+   ## Stage: Ship (worktree) (<ISO 8601 timestamp>)
+
+   ### Session summary
+
+   1–2 sentences: pre-push check results and any context the root needs at land time (deferred work, the plan's `**Release:**` marker, follow-ups).
+
+   ### Observations
+
+   Keep it a concise breadcrumb, not a full retrospective — the final `/retro $1` at the root captures the retrospective proper.
+   ```
+
+3. Commit: `git add <retro-file> && git commit -m "docs(retro): add ship stage notes for issue #$1"`.
 
 ## 4. Sync and rebase onto main
 
@@ -49,7 +65,8 @@ Do **not** push this branch and do **not** force-push anything — the root sess
 Report:
 
 - The branch name and its new HEAD (`git log --oneline -1`).
-- That checks passed, retro is committed, and the rebase onto `origin/main` is clean.
+- That checks passed, the ship stage note is committed, and the rebase onto `origin/main` is clean.
+- That the final `/retro $1` is **not** run here — it runs at the root after `/land-worktree $1`.
 - The next action: **switch to the root session and run `/land-worktree $1`**.
 
 ## Constraints

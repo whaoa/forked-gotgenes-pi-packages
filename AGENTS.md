@@ -108,13 +108,16 @@ Convergence (the two-session ship flow):
 
 The trunk `/ship-issue` assumes linear `main` and breaks for a worktree branch, so the convergence is split across the peer and root sessions:
 
-1. Peer session — `/ship-worktree <N>`: run pre-push checks, run `/retro <N>` (committed on the branch so it rides the land), then `git fetch origin` + `git rebase origin/main`.
+1. Peer session — `/ship-worktree <N>`: run pre-push checks, write a **ship** stage note (committed on the branch so it rides the land), then `git fetch origin` + `git rebase origin/main`.
    The peer never touches `main`, never pushes the branch, never force-pushes — worktrees share the same `.git`, so the root sees the branch ref directly.
+   The peer writes only stage breadcrumbs (planning/TDD/ship); the deliberate, interactive final `/retro` does not run here.
 2. Root session — `/land-worktree <N>`: `git merge --ff-only <branch>` into `main`, push, verify CI, `issue_close`, then release.
    If the ff-merge is not a fast-forward (another peer landed first), the peer re-runs `/ship-worktree <N>` to rebase onto the new `origin/main`.
 3. Release is the root's serialized responsibility — only the root merges the single release-please PR (by rebase), so peers never race on it.
    It honors the plan's `**Release:**` marker: `mid-batch — defer` leaves the PR open.
-4. `/land-worktree` ends by running `scripts/worktree-rm.sh <N> --delete-branch`.
+4. `/land-worktree` ends by running `scripts/worktree-rm.sh <N> --delete-branch`, then names `/retro <N>` as the final step.
+5. Root session — `/retro <N>`: the deliberate, interactive final retrospective, run at the root on `main` after the land (commits straight to `main`, no branch needed) — mirroring the trunk flow's terminal `/retro`.
+   Run it on your preferred model; the stage breadcrumbs from the peer session are already on `main` for it to synthesize.
 
 Guardrails:
 

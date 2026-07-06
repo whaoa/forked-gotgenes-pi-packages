@@ -115,6 +115,13 @@ The one notable moment was `release_pr_merge` refusing with `merge_state: UNSTAB
 
 - None — the land ran end to end without intervention.
 
+#### Workflow-design finding (surfaced in the retro discussion)
+
+- `wrong-abstraction` in the worktree ship flow — `/ship-worktree` step 3 ran the **full** `/retro $1` inline in the peer session, so the deliberate, interactive final retrospective (which the operator wants on a chosen model) was consumed automatically mid-ship on whatever model the peer ran.
+  The prompt justified this with "the retro note must ride the branch," but that rationale holds only for **stage breadcrumbs** (planning/TDD), not the final retrospective: this very session proved the final `/retro` runs cleanly at the root on `main` after land and commits straight to `main` (`7480846e`), no branch needed.
+  Impact: a duplicate/premature retrospective (a peer "Final Retrospective" plus this root "Land" stage).
+  Fixed this session by realigning the worktree flow with the trunk flow — peer writes a ship breadcrumb; the final `/retro` runs at the root after `/land-worktree` (see Changes made).
+
 ### Diagnostic details
 
 - **Model-performance correlation** — no subagents were dispatched this stage; the entire land ran on the session model.
@@ -124,3 +131,7 @@ The one notable moment was `release_pr_merge` refusing with `merge_state: UNSTAB
 ### Changes made
 
 1. Added a sub-bullet to step 6.2 of `.pi/prompts/land-worktree.md` covering the running-check `UNSTABLE` case (wait via `ci_watch`, then retry `release_pr_merge`; do not fall back to `gh pr merge` while a check runs), mirroring the guidance already in `.pi/prompts/ship-issue.md` (Refs #546).
+2. Realigned the worktree ship flow with the trunk flow so the final `/retro` is the deliberate last step (operator's model choice, interactive), not an inline peer-session step:
+   1. `.pi/prompts/ship-worktree.md` — replaced step 3's inline `/retro $1` call with a lightweight `## Stage: Ship (worktree)` breadcrumb that rides the branch; updated the frontmatter description and the hand-off report accordingly.
+   2. `.pi/prompts/land-worktree.md` — the final report now names `/retro $1` as the single final step (run at the root on `main`), mirroring `/ship-issue`.
+   3. `AGENTS.md` — updated the worktree convergence flow: the peer writes only stage breadcrumbs, and a new terminal step runs the final `/retro` at the root after land.
