@@ -93,6 +93,45 @@ read_parent_session({ types?: string[], limit?: number })
 
 Parameters and output format are the same as `read_session`.
 
+### `read_session_file`
+
+Read an arbitrary session file as a structured transcript, given its path.
+Useful for reading a **sibling** session that neither `read_session` (current session only) nor `read_parent_session` (parent-via-subagent only) can reach — for example, a peer worktree session in the parallel-worktree ship flow.
+
+```text
+read_session_file({ path: string, types?: string[], limit?: number })
+```
+
+Parameters:
+
+- `path` — absolute path to a session `.jsonl` file.
+- `types` / `limit` — same as `read_session`.
+
+Output format is the same as `read_session`.
+Returns a status message (not an error) when the file does not exist.
+
+### `list_session_files`
+
+List a working directory's session files, newest first.
+Encodes the given `cwd` to Pi's session-directory naming convention (`--<cwd with slashes replaced by dashes>--` under the sessions root) and lists the `.jsonl` files found there, so a caller does not have to hand-roll the encoding.
+Pass a listed path to `read_session_file` to render it as a transcript.
+
+```text
+list_session_files({ cwd: string })
+```
+
+Parameters:
+
+- `cwd` — the working directory whose session files to list (e.g. a peer worktree path).
+  Required — there is no default, since the sibling-session use case always targets a directory other than the current session's own.
+
+```text
+Session directory: /Users/chris/.pi/agent/sessions/--Users-chris-worktrees-issue-546--
+2 session files, newest first:
+  /Users/chris/.pi/agent/sessions/--Users-chris-worktrees-issue-546--/2026-07-06T10-00-00Z_.jsonl
+  /Users/chris/.pi/agent/sessions/--Users-chris-worktrees-issue-546--/2026-07-05T09-00-00Z_.jsonl
+```
+
 ## Install
 
 ```bash
