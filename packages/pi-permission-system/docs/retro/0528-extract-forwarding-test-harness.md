@@ -44,3 +44,45 @@ Test count is unchanged (2293 pass in pi-permission-system); this was arrangemen
 - The missing-`responses/` race test drove the `createResponsesDir` option on `createForwardingTempDir` — the one place the handle needs to deviate from the default layout.
 - All `expect(...)` assertions preserved byte-identical (reviewer diffed line-by-line and confirmed).
 - Pre-completion reviewer: PASS (all deterministic checks green; code design, docs, Mermaid, dead-code all PASS; acceptance-criteria/cross-step/follow-up lenses SKIP as not applicable to a test-only change).
+
+## Stage: Final Retrospective (2026-07-06T23:12:10Z)
+
+### Session summary
+
+Shipped Phase 8 Step 4 across a single continuous session (plan → TDD → ship): extracted `test/helpers/forwarding-fixtures.ts`, migrated `permission-forwarder.test.ts` fully and `permission-forwarding.test.ts` opportunistically, and marked the roadmap step complete.
+CI green on `4476a2c1`, issue closed, no release cut (all commits are `test:` or excluded-path `docs:`, so the work auto-batches).
+Zero plan deviations and a first-pass PASS from the pre-completion reviewer.
+
+### Observations
+
+#### What went well
+
+- The two decisions the plan deliberately left open resolved cleanly at implementation time without re-litigation: `makeSubagentRegistry` was adopted (it read cleaner across 5 call sites) and `forwarding-manager.test.ts` was left untouched — both exactly as the plan's Non-Goals and Open Questions anticipated.
+  The plan's discipline of naming borderline calls as deferred-judgment (rather than over-specifying or silently deciding) paid off.
+- Incremental verification was exemplary: after each of the three steps, the affected test file plus `pnpm run check` and `pnpm fallow dead-code` ran before committing, so no type or dead-code surprise reached the end-of-session gate.
+  Bundling fixture creation with its first consumer in one commit kept `fallow dead-code` green at every checkpoint.
+- The planning `ask_user` (temp-dir API shape; migration aggressiveness) front-loaded the only two preference-sensitive forks, so TDD ran uninterrupted.
+
+#### What caused friction (agent side)
+
+- `other` (tool-schema slip) — the first `Edit` call marking Step 4 complete in `architecture.md` included an invalid `type: "str_replace"` field and was rejected.
+  Self-identified; retried immediately without the field and succeeded.
+  Impact: one wasted tool call, no rework.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's two `ask_user` answers during planning were sufficient to carry planning, implementation, and ship without further intervention.
+
+### Diagnostic details
+
+- **Model-performance correlation** — one subagent dispatch (`pre-completion-reviewer`) on judgment-heavy verification work (deterministic checks + line-by-line assertion diff + Mermaid parse); appropriate assignment, returned actionable PASS.
+- **Escalation-delay tracking** — no `rabbit-hole` points; longest same-error streak was one (the `Edit` schema rejection), resolved on the next call.
+- **Feedback-loop gap analysis** — verification was incremental, not end-loaded: check/test/fallow ran after every step, matching the ideal cadence.
+- **Unused-tool detection** — no `missing-context` gaps; `grep`/`Read` on the three known test files were the right tools (semantic `colgrep` search was unnecessary for a bounded, named file set).
+
+### Changes made
+
+1. `packages/pi-permission-system/docs/retro/0528-extract-forwarding-test-harness.md` — appended this Final Retrospective stage entry.
+
+No `AGENTS.md` or prompt changes proposed: the sole friction point (an `Edit` tool-schema slip) was a self-corrected one-off, not a recurring pattern or a rule gap, so no salience tweak is warranted (operator confirmed retro-notes-only).
