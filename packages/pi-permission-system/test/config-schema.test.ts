@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type {
   DenyWithReason as SchemaDenyWithReason,
@@ -166,5 +169,20 @@ describe("buildPermissionsJsonSchema", () => {
       Record<string, unknown>
     >;
     expect(Array.isArray(properties.permission.examples)).toBe(true);
+  });
+});
+
+describe("committed schemas/permissions.schema.json is in sync", () => {
+  it("equals the generated schema (run `pnpm run gen:schema` if this fails)", () => {
+    const committedPath = join(
+      import.meta.dirname,
+      "..",
+      "schemas",
+      "permissions.schema.json",
+    );
+    const committed = JSON.parse(
+      readFileSync(committedPath, "utf-8"),
+    ) as unknown;
+    expect(committed).toEqual(buildPermissionsJsonSchema());
   });
 });

@@ -24,6 +24,7 @@
   ],
   "scripts": {
     "check": "tsc --noEmit",
+    "gen:schema": "node --experimental-strip-types scripts/generate-permissions-schema.ts && biome format --write schemas/permissions.schema.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:md": "rumdl check *.md docs/**/*.md",
