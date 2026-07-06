@@ -712,7 +712,7 @@ src/
 ├── decision-reporter.ts      `DecisionReporter` interface + `GateDecisionReporter` class - owns `SessionLogger` and event bus; writes review-log entries and emits decision events (#322)
 ├── decision-audit.ts         `DecisionRecorder` / `DecisionSummaryWriter` / `AuditLogger` interfaces + `DecisionAudit` class - per-session decision counters (`recordDecision` / `recordError`); `writeSummary` emits a `permission.session_summary` debug line on shutdown and warns on a `toolCalls != allowed + blocked + errors` invariant violation (#452)
 ├── gate-prompter.ts          `GatePrompter` interface - `canConfirm()` + `prompt(details)`; the prompting role `GateRunner` needs, bound to context by the implementor (#323)
-├── prompting-gateway.ts      `PromptingGateway` class - context-owning `GatePrompter` implementation; owns the stored `ExtensionContext`, the can-prompt policy (UI / subagent / yolo-mode), and `prompt(details)` delegation; `PromptingGatewayLifecycle` interface drives `activate`/`deactivate` from `PermissionSession` (#339)
+├── prompting-gateway.ts      `PromptingGateway` class - context-owning `GatePrompter` implementation; owns the stored `ExtensionContext`, the can-prompt policy (UI / subagent), and `prompt(details)` delegation; `PromptingGatewayLifecycle` interface drives `activate`/`deactivate` from `PermissionSession` (#339)
 ├── session-approval-recorder.ts `SessionApprovalRecorder` interface - records a granted session-scoped approval into the session ruleset; implemented by `SessionRules` (#323, #341)
 │
 ├── permission-session.ts     `PermissionSession` class - state/lifecycle owner: owns context lifecycle, session-rule lifecycle (`reset`/`shutdown`/`reload`), skill entries, agent-name resolution, the config gateway, the Tell-Don't-Ask gate inputs, and `notify(message)` (Tell-Don't-Ask UI warn over the owned context, no-op before activation — dissolves the `index.ts` forward-reference cycle, #363); `implements ToolCallGateInputs` (the pipeline's input contract); the resolve role moved to `PermissionResolver` (#340), the recorder role to `SessionRules`, and the three fig-leaf handler role interfaces (`GateHandlerSession` / `AgentPrepSession` / `SessionLifecycleSession`) were retired — handlers depend on the concrete class + `PermissionResolver` (#341)
@@ -804,7 +804,6 @@ src/
 ├── session-logger.ts          `SessionLogger` interface + `PermissionSessionLogger` class; owns JSONL-writer composition, IO-failure warning dedup, and notify sink (#336, [#362])
 ├── logging.ts                 JSONL review/debug log writer
 ├── status.ts                  Footer status bar integration
-├── yolo-mode.ts               Auto-approve logic
 ├── value-guards.ts            Runtime type guards (`toRecord`, `getNonEmptyString`, `normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`, `isPermissionState`, `isDenyWithReason`)
 ├── yaml-frontmatter.ts        Minimal YAML/frontmatter parsing (`parseSimpleYamlMap`, `extractFrontmatter`)
 └── types.ts                   Core type definitions (PermissionState, FlatPermissionConfig, etc.)
@@ -835,16 +834,16 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 - **The test scaffolding the spine will rewrite is duplicated.**
   `permission-manager-unified.test.ts` carries 24 clone groups (305 lines, accelerating churn); `permission-forwarder.test.ts` carries 6 groups including a 43-line clone ×2.
 
-| Metric                                     | Phase 7 close                                | Target after Phase 8                                                 |
-| ------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------- |
-| Health score                               | 76 (B)                                       | ≥ 76 (B)                                                             |
-| yolo checks on the ask path                | 3 (prompter, gateway, serve arm)             | 1 (composition-stage rewrite) + serve arm (dissolves with the spine) |
-| `canConfirm()` predicates                  | hasUI ∨ isSubagent ∨ yolo                    | hasUI ∨ isSubagent (selection-ready)                                 |
-| Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | 2                                                                    |
-| `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | 1 each (two classes under `src/authority/`)                          |
-| Subagent-detection dep-triple constructors | 3                                            | 1 (`SubagentDetection`)                                              |
-| fallow refactoring targets                 | 1 (`value-guards.ts`)                        | 0                                                                    |
-| Duplication                                | 6.7% (3,129 lines)                           | ≤ 5.5%                                                               |
+| Metric                                     | Phase 7 close                                | Target after Phase 8                                                    |
+| ------------------------------------------ | -------------------------------------------- | ----------------------------------------------------------------------- |
+| Health score                               | 76 (B)                                       | ≥ 76 (B)                                                                |
+| yolo checks on the ask path                | 3 (prompter, gateway, serve arm)             | ✅ 1 (composition-stage rewrite) + serve arm (dissolves with the spine) |
+| `canConfirm()` predicates                  | hasUI ∨ isSubagent ∨ yolo                    | ✅ hasUI ∨ isSubagent (selection-ready)                                 |
+| Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | 2                                                                       |
+| `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | 1 each (two classes under `src/authority/`)                             |
+| Subagent-detection dep-triple constructors | 3                                            | 1 (`SubagentDetection`)                                                 |
+| fallow refactoring targets                 | 1 (`value-guards.ts`)                        | 0                                                                       |
+| Duplication                                | 6.7% (3,129 lines)                           | ≤ 5.5%                                                                  |
 
 ### Steps
 
@@ -867,11 +866,12 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    The `yolo checks on the ask path` metric is not yet flipped; the prompter/gateway arms are removed in Step 3.
    Release: batch "yolo-recorded-authority"
 
-3. **Delete the dead yolo arms from the prompt path; dissolve `yolo-mode.ts`.**
+3. ✅ **Delete the dead yolo arms from the prompt path; dissolve `yolo-mode.ts`.**
    ([#527]) Target: `src/permission-prompter.ts` (drop the auto-approve arm), `src/prompting-gateway.ts` (`canConfirm()` = hasUI ∨ isSubagent; `canResolveAskPermissionRequest` deleted), `src/yolo-mode.ts` (dissolved — `isYoloModeEnabled` and the serve arm's check move next to their config in `extension-config.ts`).
    The forwarded-inbox serve arm keeps its yolo check for now — it dissolves when serving becomes resolution (Phase 9), and is documented as such.
    Smell: Category A (dead code after Step 2).
    Outcome: no yolo knowledge on the prompt path; `canConfirm()` is reduced to the two Authorizer-selection predicates.
+   Landed: `PermissionPrompter.prompt()` dropped the auto-approve arm and its `config` dependency; `PromptingGateway.canConfirm()` is now `hasUI ∨ isSubagentExecutionContext(...)`, and `canResolveAskPermissionRequest` / `AskPermissionResolutionOptions` are deleted; `isYoloModeEnabled` moved into `extension-config.ts` and `yolo-mode.ts` is deleted; the forwarded-inbox serve arm re-points at `isYoloModeEnabled` with a comment noting it dissolves in the Phase 9 spine work.
    Release: batch "yolo-recorded-authority"
 
 4. **Extract a shared forwarded-permission test harness.**
@@ -914,7 +914,7 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 flowchart TD
     S1["✅ Step 1 (#525)<br/>Manager-unified test fixtures"]
     S2["✅ Step 2 (#526)<br/>yolo into the composed ruleset"]
-    S3["Step 3 (#527)<br/>Delete dead yolo arms"]
+    S3["✅ Step 3 (#527)<br/>Delete dead yolo arms"]
     S4["Step 4 (#528)<br/>Forwarding test harness"]
     S5["Step 5 (#529)<br/>SubagentDetection + seed authority/"]
     S6["Step 6 (#530)<br/>Split PermissionForwarder by direction"]
