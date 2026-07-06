@@ -34,7 +34,13 @@ The deliberate, interactive final `/retro $1` runs once at the root after `/land
 The stage note lives in an `exclude-paths` dir, so it triggers no release — but it must be committed **on this branch** so it rides the single ff-merge when root lands the work.
 
 1. Determine the retro file path (same `NNNN-<slug>` as the plan file: single-package → `packages/<PKG>/docs/retro/`; cross-package → `docs/retro/`).
-2. Append a stage entry (anchor the `Edit` on the file's last line — the repeated `### Observations` headers make header-anchored edits ambiguous):
+2. Capture this peer session's transcript path so the root's final `/retro` can double-check raw messages (sessions live under `~/.pi/agent/sessions/`, so they survive the worktree teardown):
+
+   ```bash
+   enc="--$(pwd | sed 's#^/##; s#/#-#g')--"; ls -t ~/.pi/agent/sessions/"$enc"/*.jsonl 2>/dev/null | head -1
+   ```
+
+3. Append a stage entry (anchor the `Edit` on the file's last line — the repeated `### Observations` headers make header-anchored edits ambiguous):
 
    ```markdown
    ## Stage: Ship (worktree) (<ISO 8601 timestamp>)
@@ -43,12 +49,14 @@ The stage note lives in an `exclude-paths` dir, so it triggers no release — bu
 
    1–2 sentences: pre-push check results and any context the root needs at land time (deferred work, the plan's `**Release:**` marker, follow-ups).
 
+   **Peer session transcript:** `<path from step 2>` — raw JSONL for message-level verification at land/retro time.
+
    ### Observations
 
    Keep it a concise breadcrumb, not a full retrospective — the final `/retro $1` at the root captures the retrospective proper.
    ```
 
-3. Commit: `git add <retro-file> && git commit -m "docs(retro): add ship stage notes for issue #$1"`.
+4. Commit: `git add <retro-file> && git commit -m "docs(retro): add ship stage notes for issue #$1"`.
 
 ## 4. Sync and rebase onto main
 

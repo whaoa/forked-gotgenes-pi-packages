@@ -57,6 +57,9 @@ If the retro file already contains stage entries from prior sessions (sections h
 Your synthesis should span all stages — not just this session.
 Look for patterns that recur across stages, friction that compounds, and whether earlier observations led to adjustments.
 
+For a worktree issue, the implementation happened in a **separate peer session** whose transcript `read_session` cannot reach (it reads only the current session; the peer is a sibling, not a parent).
+The `## Stage: Ship (worktree)` breadcrumb records a **Peer session transcript** path (a raw `.jsonl` under `~/.pi/agent/sessions/`, which survives the worktree teardown) — read it with `Read`/`Bash` when a diagnostic lens (e.g. model-performance correlation) needs message-level detail the breadcrumbs do not carry.
+
 Be specific: cite file paths, commit subjects, and concrete tool sequences.
 Categorize each friction point with one label:
 

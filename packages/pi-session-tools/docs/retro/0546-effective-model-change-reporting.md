@@ -135,3 +135,14 @@ The one notable moment was `release_pr_merge` refusing with `merge_state: UNSTAB
    1. `.pi/prompts/ship-worktree.md` — replaced step 3's inline `/retro $1` call with a lightweight `## Stage: Ship (worktree)` breadcrumb that rides the branch; updated the frontmatter description and the hand-off report accordingly.
    2. `.pi/prompts/land-worktree.md` — the final report now names `/retro $1` as the single final step (run at the root on `main`), mirroring `/ship-issue`.
    3. `AGENTS.md` — updated the worktree convergence flow: the peer writes only stage breadcrumbs, and a new terminal step runs the final `/retro` at the root after land.
+3. Closed a peer-transcript access gap the move introduced (the root retro's `read_session` sees only the land session; the peer worktree session is an unreachable sibling):
+   1. `.pi/prompts/ship-worktree.md` — the Ship breadcrumb now records the **peer session transcript** path (a raw `.jsonl` under `~/.pi/agent/sessions/`, derived via a `pwd`-encoding `sed` one-liner; it survives worktree teardown).
+   2. `.pi/prompts/retro.md` — Step 2 now tells the retro to read that peer transcript with `Read`/`Bash` when a diagnostic lens needs message-level detail.
+   3. Filed #549 (`pkg:pi-session-tools`, `enhancement`) for the proper fix — a `pi-session-tools` capability to read an arbitrary session file by path and render it through the same `formatTranscript`/`summarizeEntries` pipeline as `read_session`.
+
+### Diagnostic details (retro-discussion follow-up)
+
+- **Unused-tool / feedback-loop insight** — the operator's question "does the final retro agent have enough information to double-check messages in the worktree session?"
+  exposed that moving `/retro` to the root traded away the peer session's `read_session` access.
+  Verified empirically: `read_session` reads only `ctx.sessionManager.getEntries()` (current session), `read_parent_session` reaches only a `tasks/`-derived parent, and the peer session `.jsonl` (243 messages, 2 `model_change` entries for #546) persists at `~/.pi/agent/sessions/--<encoded-cwd>--/` after teardown.
+  Mitigated inline (B) and queued the complete fix (C, #549).
