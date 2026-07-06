@@ -114,6 +114,48 @@ function buildToolResultMap(
   return map;
 }
 
+/**
+ * Return the entry indices of `model_change` markers that took effect — a
+ * switch followed by at least one assistant turn before the next switch (or
+ * the end of entries).
+ *
+ * A phantom switch (cycling the TUI picker, or ending a session on a switch)
+ * never produces a turn and is excluded.
+ * Guard: when the stream contains no assistant messages at all (e.g. a
+ * `types: ["model_change"]` filtered query), every marker is treated as
+ * effective — there is no ground truth to validate against, and suppressing
+ * all of them would hide the only signal the caller asked for.
+ */
+export function collectEffectiveModelChangeIndices(
+  entries: TranscriptEntry[],
+): Set<number> {
+  const effective = new Set<number>();
+  const modelChangeIndices: number[] = [];
+  let pendingIndex: number | null = null;
+  let sawAssistantMessage = false;
+
+  for (const [index, entry] of entries.entries()) {
+    if (entry.type === "model_change") {
+      modelChangeIndices.push(index);
+      pendingIndex = index;
+      continue;
+    }
+    if (entry.type !== "message") continue;
+    const msg = (entry as unknown as Record<string, unknown>).message as
+      | Record<string, unknown>
+      | undefined;
+    if (msg?.role !== "assistant") continue;
+    sawAssistantMessage = true;
+    if (pendingIndex !== null) {
+      effective.add(pendingIndex);
+      pendingIndex = null;
+    }
+  }
+
+  if (!sawAssistantMessage) return new Set(modelChangeIndices);
+  return effective;
+}
+
 /** Collect all toolCallIds that appear in assistant message content arrays. */
 function collectAssistantToolCallIds(entries: TranscriptEntry[]): Set<string> {
   const ids = new Set<string>();
@@ -227,12 +269,16 @@ function formatBashMessage(message: Record<string, unknown>): string {
 export function formatTranscript(entries: TranscriptEntry[]): string {
   const resultMap = buildToolResultMap(entries);
   const assistantToolCallIds = collectAssistantToolCallIds(entries);
+  const effectiveModelChanges = collectEffectiveModelChangeIndices(entries);
 
   const parts: string[] = [];
   let turnNum = 0;
 
-  for (const entry of entries) {
+  for (const [index, entry] of entries.entries()) {
     if (entry.type !== "message") {
+      if (entry.type === "model_change" && !effectiveModelChanges.has(index)) {
+        continue; // phantom switch — suppressed
+      }
       const formatted = formatMetadataEntry(entry);
       if (formatted !== null) parts.push(formatted);
       continue;
