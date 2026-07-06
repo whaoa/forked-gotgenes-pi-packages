@@ -23,10 +23,8 @@ import {
   summarizeEntries,
 } from "./entry-summary.js";
 import { formatTranscript, type TranscriptEntry } from "./format-transcript.js";
-import {
-  deriveParentSessionFile,
-  readParentSessionEntries,
-} from "./parent-session.js";
+import { deriveParentSessionFile } from "./parent-session.js";
+import { readSessionFileEntries } from "./session-file.js";
 
 /** Discriminated union stored in tool `details` for the two session-read tools. */
 type SessionToolDetails =
@@ -293,7 +291,7 @@ export default function sessionTools(pi: ExtensionAPI): void {
           };
         }
 
-        const allEntries = readParentSessionEntries(parentFile);
+        const allEntries = readSessionFileEntries(parentFile);
         if (!allEntries) {
           return {
             content: [
