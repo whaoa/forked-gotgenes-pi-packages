@@ -125,13 +125,33 @@ describe("summarizeEntries", () => {
     expect(summarizeEntries(entries).compactions).toBe(2);
   });
 
-  it("counts model_change entries", () => {
+  it("counts model_change entries when no assistant message is present (filtered-stream guard)", () => {
     const entries = [
       modelChangeEntry(),
       modelChangeEntry(),
       modelChangeEntry(),
     ];
     expect(summarizeEntries(entries).modelChanges).toBe(3);
+  });
+
+  it("counts only effective model changes — ones followed by an assistant turn", () => {
+    const entries = [modelChangeEntry(), assistantMessage(0)];
+    expect(summarizeEntries(entries).modelChanges).toBe(1);
+  });
+
+  it("excludes a trailing model_change with no following assistant turn from the count", () => {
+    const entries = [assistantMessage(0), modelChangeEntry()];
+    expect(summarizeEntries(entries).modelChanges).toBe(0);
+  });
+
+  it("counts only the last of several consecutive model_change entries that precede a turn", () => {
+    const entries = [
+      modelChangeEntry(),
+      modelChangeEntry(),
+      modelChangeEntry(),
+      assistantMessage(0),
+    ];
+    expect(summarizeEntries(entries).modelChanges).toBe(1);
   });
 
   it("ignores unrelated entry types", () => {
@@ -187,7 +207,7 @@ describe("summarizeEntries", () => {
       messages: 4, // 2 user + 2 assistant
       toolCalls: 3, // 2 + 1
       compactions: 1,
-      modelChanges: 1,
+      modelChanges: 0, // trailing model_change has no following assistant turn — phantom
     });
   });
 });

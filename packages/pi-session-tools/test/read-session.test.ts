@@ -261,6 +261,15 @@ describe("read_session tool", () => {
         },
         { type: "compaction", tokensBefore: 1000 },
         { type: "model_change", provider: "anthropic", modelId: "claude-opus" },
+        {
+          type: "message",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "switched" }],
+            provider: "anthropic",
+            model: "claude-opus",
+          },
+        },
       ];
 
       const ctx = makeCtx(entries);
@@ -277,8 +286,8 @@ describe("read_session tool", () => {
       expect(result.details).toEqual({
         kind: "transcript",
         summary: {
-          totalEntries: 4,
-          messages: 2,
+          totalEntries: 5,
+          messages: 3,
           toolCalls: 1,
           compactions: 1,
           modelChanges: 1,

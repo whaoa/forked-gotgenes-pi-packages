@@ -5,7 +5,10 @@
  * as a testable layer beneath the theme-coupled rendering in `index.ts`.
  */
 
-import type { TranscriptEntry } from "./format-transcript.js";
+import {
+  collectEffectiveModelChangeIndices,
+  type TranscriptEntry,
+} from "./format-transcript.js";
 
 export interface SessionSummary {
   /** Total number of entries in the (already filtered/limited) array. */
@@ -16,7 +19,7 @@ export interface SessionSummary {
   toolCalls: number;
   /** Entries with `type: "compaction"`. */
   compactions: number;
-  /** Entries with `type: "model_change"`. */
+  /** `model_change` entries followed by an assistant turn (phantom switches excluded). */
   modelChanges: number;
 }
 
@@ -29,17 +32,13 @@ export function summarizeEntries(entries: TranscriptEntry[]): SessionSummary {
   let messages = 0;
   let toolCalls = 0;
   let compactions = 0;
-  let modelChanges = 0;
 
   for (const entry of entries) {
     if (entry.type === "compaction") {
       compactions++;
       continue;
     }
-    if (entry.type === "model_change") {
-      modelChanges++;
-      continue;
-    }
+    if (entry.type === "model_change") continue;
     if (entry.type !== "message") continue;
 
     const e = entry as unknown as Record<string, unknown>;
@@ -72,7 +71,7 @@ export function summarizeEntries(entries: TranscriptEntry[]): SessionSummary {
     messages,
     toolCalls,
     compactions,
-    modelChanges,
+    modelChanges: collectEffectiveModelChangeIndices(entries).size,
   };
 }
 
