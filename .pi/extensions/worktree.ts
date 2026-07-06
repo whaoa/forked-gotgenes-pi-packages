@@ -24,6 +24,31 @@ const SCRIPT_REL_PATH = "scripts/worktree-new.sh";
 // pnpm install dominates the runtime; give it generous headroom.
 const TIMEOUT_MS = 5 * 60 * 1000;
 
+// Patterns matching worktree-new.sh's own status printfs (worktree path,
+// branch, mise trust, launch confirmation, teardown hint) — as opposed to the
+// noisy pnpm install output interleaved in the same stdout stream.
+const SUMMARY_LINE_PATTERNS = [
+  /^worktree : /,
+  /^branch\s+: /,
+  /^branch .* already exists/,
+  /^mise: trusted /,
+  /^\u2713 peer Pi session launched/,
+  /^\s*initial prompt: /,
+  /^\u26a0 not inside WezTerm/,
+  /^\s*cd /,
+  /^when done, tear it down with:/,
+  /^\s*scripts\/worktree-rm\.sh /,
+];
+
+function extractSummaryLines(stdout: string): string[] {
+  return stdout
+    .split("\n")
+    .filter((line) =>
+      SUMMARY_LINE_PATTERNS.some((pattern) => pattern.test(line)),
+    )
+    .map((line) => line.trim());
+}
+
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("worktree", {
     description:
@@ -56,14 +81,17 @@ export default function (pi: ExtensionAPI) {
       });
 
       if (result.code === 0) {
-        // Surface the script's final summary line (worktree path / branch / tab).
-        const lastLine =
-          result.stdout
-            .trimEnd()
-            .split("\n")
-            .filter((line) => line.trim())
-            .pop() ?? `Worktree created for issue #${issue}.`;
-        ctx.ui.notify(lastLine, "info");
+        // Surface the script's own summary lines (worktree path, branch, launch
+        // confirmation, teardown hint) rather than just the last line — the
+        // script's final printf is the teardown hint alone, which on its own
+        // gives no indication the worktree/session actually got created.
+        const summary = extractSummaryLines(result.stdout);
+        ctx.ui.notify(
+          summary.length > 0
+            ? summary.join("\n")
+            : `Worktree created for issue #${issue}.`,
+          "info",
+        );
       } else {
         const detail = (result.stderr || result.stdout)
           .trim()
