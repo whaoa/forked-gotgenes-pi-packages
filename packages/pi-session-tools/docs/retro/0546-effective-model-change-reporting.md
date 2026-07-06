@@ -49,3 +49,38 @@ All four commits landed as separate, focused changes; no deviations from the pla
 - **Pre-completion reviewer: PASS.**
   All deterministic checks (`pnpm run check`, `pnpm run lint`, `pnpm run test`, `pnpm fallow dead-code`) passed; all 3 acceptance criteria assessed, with AC1 ("per-model turn counts") explicitly noted as an intentional, plan-documented descope rather than an oversight.
   Reviewer flagged one action item for the ship step: surface the AC1 descope explicitly in the issue-close comment so it reads as a scoped delivery, not a silent partial fix.
+
+## Stage: Final Retrospective (2026-07-06T00:00:00Z)
+
+### Session summary
+
+Reviewed the full arc of issue #546 (Planning → TDD → Ship) for workflow improvements.
+Two consensus-driven changes were approved and implemented: a new `code-design` skill entry documenting a `.forEach()` closure-narrowing lint trap, and an extension to `/plan-issue`'s "Decide" gate requiring a proposed aggregate/report to be traced to a real consumer before its shape is designed.
+
+### Observations
+
+#### What went well
+
+- Tracing the issue's proposed `summarizeModels` roll-up back to its one real consumer (`.pi/prompts/retro.md`'s model-performance lens) via `grep`/`Read`, rather than accepting the issue's literal proposal at face value, surfaced that the lens already had per-turn attribution and only needed the phantom-marker noise removed.
+  This collapsed a two-part proposal into a single, smaller, better-targeted fix before any code was written.
+- Checks ran incrementally throughout the TDD cycle (`pnpm run check`/`lint`/`test` after each step, plus root-level `lint` and `pnpm fallow dead-code` before the final commit) — no gap between a change landing and its verification.
+
+#### What caused friction (agent side)
+
+- `premature-convergence` — the first `ask_user` call during Planning built three questions entirely around *how* to shape/place the issue's proposed `summarizeModels` roll-up, without first checking whether any real consumer read that shape.
+  Impact: one wasted `ask_user` round-trip; no commit rework (caught before any plan artifact was written), but cost a full question-answer-reanalyze cycle.
+  The user's redirect ("let's talk about what information is useful first... look to the questions we ask at retro and retro-stage") is what corrected course.
+- `instruction-violation`, self-identified — the first `Edit` call on `format-transcript.test.ts` used the plan document's literal `\u2192` escape sequence instead of the file's actual `→` character, violating the system-level Unicode-character instruction.
+  The 2-edit atomic batch was rejected; corrected on the immediate retry.
+  Added friction but no rework.
+- Novel, reusable finding (not a violation) — mutating `pendingIndex`/`sawAssistantMessage` inside an `.forEach()` callback caused `@typescript-eslint/no-unnecessary-condition` to flag a later `if (!sawAssistantMessage)` as "always truthy", since TypeScript's control-flow narrowing doesn't track closure-scoped mutations back into the enclosing scope.
+  Rewriting as a `for...of` loop fixed it instantly — now documented in `code-design` (see Changes made).
+
+#### What caused friction (user side)
+
+- None — the one intervention (the Planning-stage redirect) was a well-timed, low-cost correction made before any artifact existed, not a correction of already-committed work.
+
+### Changes made
+
+1. Added a "Closure narrowing loop" entry to the "Biome / ESLint linter conflicts" section of `.pi/skills/code-design/SKILL.md`, documenting the `.forEach()`/`no-unnecessary-condition` trap and the `for...of` fix.
+2. Extended the "Decide" section of `.pi/prompts/plan-issue.md` with a rule requiring a proposed aggregate/report to be traced to a concrete downstream consumer before its shape is designed (Refs #546).

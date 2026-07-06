@@ -79,6 +79,7 @@ Before starting fresh, check whether prior sessions have already done work on th
 Treat the issue's "Proposed change" as a hypothesis, not a spec.
 An extraction that only relocates statements to lower a complexity metric — introducing no new collaborator and moving no behavior onto data — is procedure-splitting, not design improvement.
 When the issue prescribes a specific decomposition, verify (against the `code-design` heuristics) that each extracted piece returns a value, owns state, or gives behavior to data before planning around it.
+When the issue proposes a new aggregate, report, or roll-up for human/agent consumption (not a refactor), grep the concrete downstream reader (a retro lens, a README section, a prompt) before designing its shape — a proposal can satisfy every code-design heuristic and still have no consumer (Refs #546).
 
 Classify whether the change is breaking — independently of whether it is ambiguous.
 A change is breaking if it alters the observable behavior, output shape, or default of existing code or config on upgrade without a user edit.

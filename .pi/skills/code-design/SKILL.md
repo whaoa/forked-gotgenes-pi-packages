@@ -214,3 +214,8 @@ Fix: `// eslint-disable-next-line prefer-const -- forward-declared let; const re
 
 Before adding `void` to silence `@typescript-eslint/no-floating-promises`, confirm the discarded promise carried no semantics (capture for later `await`, ordering, completion signal).
 If the promise was previously assigned or awaited, the `void` is a behavior change, not a formatting fix — give the value an owner (store it, or invert control so the owning object captures it) instead.
+
+### Closure narrowing loop
+
+`.forEach()` callback mutations of outer-scope `let` variables are invisible to TypeScript's control-flow narrowing outside the callback; `@typescript-eslint/no-unnecessary-condition` then flags a later `if (!flag)` check as "always truthy"/"always falsy" even though the flag does change at runtime.
+Fix: use a `for...of` loop instead of `.forEach()` when a callback mutates a variable a later conditional depends on.
