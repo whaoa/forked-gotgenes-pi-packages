@@ -6,6 +6,7 @@
  *   get_session_name — Get the current session name
  *   read_session — Read the current session's raw entries (survives compaction)
  *   read_parent_session — Read the parent session's entries from a subagent context
+ *   read_session_file — Read an arbitrary session file's entries by path
  */
 
 import { Type } from "@earendil-works/pi-ai";
@@ -39,10 +40,11 @@ type SessionToolDetails =
  */
 function formatCallText(
   label: string,
-  args: { types?: string[]; limit?: number },
+  args: { types?: string[]; limit?: number; path?: string },
   theme: Theme,
 ): string {
   const hints: string[] = [];
+  if (args.path) hints.push(`path: ${args.path}`);
   if (args.types && args.types.length > 0)
     hints.push(`types: [${args.types.join(", ")}]`);
   if (args.limit != null) hints.push(`limit: ${args.limit}`);
@@ -303,6 +305,78 @@ export default function sessionTools(pi: ExtensionAPI): void {
             details: {
               kind: "status",
               message: `Parent session file not found: ${parentFile}`,
+            } as SessionToolDetails,
+          };
+        }
+
+        return buildTranscriptResult(allEntries, params);
+      },
+    }),
+  );
+
+  pi.registerTool(
+    defineTool({
+      name: "read_session_file",
+      label: "Read Session File",
+      description:
+        "Read an arbitrary session file by path and render it as a structured transcript. " +
+        "Useful for reading a sibling session (e.g. a peer worktree session) that neither " +
+        "read_session nor read_parent_session can reach. " +
+        "Returns a structured transcript with numbered user/assistant turns, one-line tool call summaries, " +
+        "and metadata events. Tool result bodies, thinking content, and image data are omitted. " +
+        "Returns an error if the file does not exist.",
+      parameters: Type.Object({
+        path: Type.String({
+          description: "Absolute path to a session JSONL file.",
+        }),
+        types: Type.Optional(
+          Type.Array(
+            Type.String({
+              description:
+                'Entry type to include (e.g., "message", "compaction", "model_change")',
+            }),
+            {
+              description:
+                "Filter entries by type. When omitted, all entry types are returned.",
+            },
+          ),
+        ),
+        limit: Type.Optional(
+          Type.Number({
+            description:
+              "Return only the most recent N entries (after type filtering).",
+          }),
+        ),
+      }),
+      renderCall(args, theme, context) {
+        const text =
+          (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+        text.setText(formatCallText("read session file", args, theme));
+        return text;
+      },
+      renderResult(result, options, theme, context) {
+        const text =
+          (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+        text.setText(formatResultText(result, options, theme));
+        return text;
+      },
+      // eslint-disable-next-line @typescript-eslint/require-await -- satisfies async tool interface; no actual async work
+      async execute(
+        _toolCallId: string,
+        params: { path: string; types?: string[]; limit?: number },
+      ) {
+        const allEntries = readSessionFileEntries(params.path);
+        if (!allEntries) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Session file not found: ${params.path}`,
+              },
+            ],
+            details: {
+              kind: "status",
+              message: `Session file not found: ${params.path}`,
             } as SessionToolDetails,
           };
         }
