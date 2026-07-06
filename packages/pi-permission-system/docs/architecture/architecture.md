@@ -875,10 +875,12 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    Landed: `PermissionPrompter.prompt()` dropped the auto-approve arm and its `config` dependency; `PromptingGateway.canConfirm()` is now `hasUI ∨ isSubagentExecutionContext(...)`, and `canResolveAskPermissionRequest` / `AskPermissionResolutionOptions` are deleted; `isYoloModeEnabled` moved into `extension-config.ts` and `yolo-mode.ts` is deleted; the forwarded-inbox serve arm re-points at `isYoloModeEnabled` with a comment noting it dissolves in the Phase 9 spine work.
    Release: batch "yolo-recorded-authority"
 
-4. **Extract a shared forwarded-permission test harness.**
+4. ✅ **Extract a shared forwarded-permission test harness.**
    ([#528]) Target: `test/permission-forwarder.test.ts` (43-line clone ×2 plus 6 groups / 110 lines), `test/forwarding-manager.test.ts`, `test/permission-forwarding.test.ts` — extract request/response builders, temp forwarding-dir setup, and a fake `ForwarderContext` into `test/helpers/forwarding-fixtures.ts`.
    Smell: Category D (test duplication).
    Outcome: forwarder-family clone groups drop to near zero; Step 6 migrates its per-class tests onto the harness instead of copying scaffolding again.
+   Landed: `test/helpers/forwarding-fixtures.ts` holds `createForwardingTempDir` (handle + `cleanup`, with a `writeRequest` writer), `makeForwarderDeps`, `makeForwarderContext`, `makeUiDecision`, and `makeSubagentRegistry`; `permission-forwarder.test.ts` migrated fully (every `try/finally` temp-dir block gone, `makeEvents` reused from `handler-fixtures`) and `permission-forwarding.test.ts` onto `makeSubagentRegistry`.
+   `forwarding-manager.test.ts` was left unchanged — its `ExtensionContext`-cast ctx, mocked `subagent-context`, and fake-timer polling do not overlap the harness (per the plan's Non-Goals).
    Release: independent
 
 5. **Extract a `SubagentDetection` collaborator; seed `src/authority/`.**
@@ -917,7 +919,7 @@ flowchart TD
     S1["✅ Step 1 (#525)<br/>Manager-unified test fixtures"]
     S2["✅ Step 2 (#526)<br/>yolo into the composed ruleset"]
     S3["✅ Step 3 (#527)<br/>Delete dead yolo arms"]
-    S4["Step 4 (#528)<br/>Forwarding test harness"]
+    S4["✅ Step 4 (#528)<br/>Forwarding test harness"]
     S5["Step 5 (#529)<br/>SubagentDetection + seed authority/"]
     S6["Step 6 (#530)<br/>Split PermissionForwarder by direction"]
     S7["Step 7 (#531)<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
