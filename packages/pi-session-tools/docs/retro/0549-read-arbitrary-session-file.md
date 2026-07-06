@@ -41,3 +41,17 @@ No deviations from the plan — every Module-Level Changes file was touched exac
 - Pre-completion reviewer: **PASS**.
   All deterministic checks (`check`, `lint`, `test`, `fallow dead-code`) passed; all 4 plan Goals verified against code; the #251/#411/#546 invariants confirmed intact via byte-identical diffs on the five sibling test files reached through the refactor.
   No WARN findings.
+
+## Stage: Ship (worktree) (2026-07-06T19:20:00Z)
+
+### Session summary
+
+Pre-push checks (`pnpm run lint`, `pnpm fallow dead-code`) both passed with no fixes needed.
+Plan's `**Release:**` marker is `ship independently` (no batch, no deferral) — root can proceed straight to release after landing.
+No deferred work or follow-ups from this issue.
+
+**Peer session transcript:** `/Users/chris/.pi/agent/sessions/--Users-chris-development-pi-pi-packages-worktrees-issue-549--/2026-07-06T19-15-18-886Z_019f38db-38e6-7cb4-82df-3e4f9f78bfed.jsonl` — read with `read_session_file({ path: "<path>" })` for message-level verification at land/retro time.
+
+### Observations
+
+Keep it a concise breadcrumb, not a full retrospective — the final `/retro 549` at the root captures the retrospective proper.
