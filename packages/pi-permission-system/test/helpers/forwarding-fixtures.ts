@@ -26,6 +26,10 @@ import {
   type ForwardedPermissionRequest,
   type PermissionForwardingLocation,
 } from "#src/permission-forwarding";
+import {
+  type SubagentSessionInfo,
+  SubagentSessionRegistry,
+} from "#src/subagent-registry";
 
 /** Handle over a temp forwarding directory; register `cleanup` in `afterEach`. */
 export interface ForwardingTempDir {
@@ -133,4 +137,21 @@ export function makeUiDecision(
   overrides: Partial<PermissionPromptDecision> = {},
 ): PermissionPromptDecision {
   return { approved: true, state: "approved", ...overrides };
+}
+
+/**
+ * Builds a `SubagentSessionRegistry`, optionally pre-registering `childSessionId`.
+ *
+ * Omit `entry` for an empty registry (the "session not in registry" case);
+ * pass `{}` to register `childSessionId` with no `parentSessionId`.
+ */
+export function makeSubagentRegistry(
+  childSessionId: string,
+  entry?: SubagentSessionInfo,
+): SubagentSessionRegistry {
+  const registry = new SubagentSessionRegistry();
+  if (entry) {
+    registry.register(childSessionId, entry);
+  }
+  return registry;
 }

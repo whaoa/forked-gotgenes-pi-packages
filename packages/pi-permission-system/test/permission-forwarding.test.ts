@@ -8,7 +8,7 @@ import {
   SUBAGENT_PARENT_SESSION_ENV_CANDIDATES,
   SUBAGENT_PARENT_SESSION_ENV_KEY,
 } from "#src/permission-forwarding";
-import { SubagentSessionRegistry } from "#src/subagent-registry";
+import { makeSubagentRegistry } from "#test/helpers/forwarding-fixtures";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -156,8 +156,7 @@ describe("resolvePermissionForwardingTargetSessionId — registry resolution", (
   const childSessionId = "child-session-abc";
 
   test("returns parentSessionId from registry when env vars are absent", () => {
-    const registry = new SubagentSessionRegistry();
-    registry.register(childSessionId, {
+    const registry = makeSubagentRegistry(childSessionId, {
       parentSessionId: "parent-from-registry",
     });
 
@@ -173,8 +172,7 @@ describe("resolvePermissionForwardingTargetSessionId — registry resolution", (
   });
 
   test("registry takes priority over env vars", () => {
-    const registry = new SubagentSessionRegistry();
-    registry.register(childSessionId, {
+    const registry = makeSubagentRegistry(childSessionId, {
       parentSessionId: "parent-from-registry",
     });
 
@@ -190,8 +188,7 @@ describe("resolvePermissionForwardingTargetSessionId — registry resolution", (
   });
 
   test("falls through to env vars when registry entry has no parentSessionId", () => {
-    const registry = new SubagentSessionRegistry();
-    registry.register(childSessionId, {}); // no parentSessionId
+    const registry = makeSubagentRegistry(childSessionId, {}); // no parentSessionId
 
     expect(
       resolvePermissionForwardingTargetSessionId({
@@ -205,7 +202,7 @@ describe("resolvePermissionForwardingTargetSessionId — registry resolution", (
   });
 
   test("falls through to env vars when sessionId is not in registry", () => {
-    const registry = new SubagentSessionRegistry(); // empty
+    const registry = makeSubagentRegistry(childSessionId); // empty
 
     expect(
       resolvePermissionForwardingTargetSessionId({
@@ -219,8 +216,7 @@ describe("resolvePermissionForwardingTargetSessionId — registry resolution", (
   });
 
   test("returns null when registry entry has no parentSessionId and no env vars set", () => {
-    const registry = new SubagentSessionRegistry();
-    registry.register(childSessionId, {}); // no parentSessionId
+    const registry = makeSubagentRegistry(childSessionId, {}); // no parentSessionId
 
     expect(
       resolvePermissionForwardingTargetSessionId({
