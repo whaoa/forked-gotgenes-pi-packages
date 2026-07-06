@@ -26,3 +26,21 @@ Release recommendation: ship independently (test-only, `hidden: true` `test:` ch
 - Structured as refactor cycles (green throughout, no red phase) with `pnpm fallow dead-code` gating each step so fixtures always land with a consumer.
 - `makeSubagentRegistry` (Step 2) is flagged borderline — its adoption is a deferred implementation judgment call, no follow-up issue needed.
 - No `src/` symbol changes, so the only doc touch is the Phase 8 Step 4 `✅` marker in `architecture.md` (step heading + `S4` Mermaid node), landed in the implementation commit per the package skill.
+
+## Stage: Implementation — TDD (2026-07-06T15:40:00Z)
+
+### Session summary
+
+Executed all three plan steps as refactor cycles (green throughout, no red phase).
+Created `test/helpers/forwarding-fixtures.ts` and fully migrated `permission-forwarder.test.ts`, adopted `makeSubagentRegistry` in `permission-forwarding.test.ts`, and marked Phase 8 Step 4 complete in `architecture.md`.
+Test count is unchanged (2293 pass in pi-permission-system); this was arrangement-only deduplication.
+
+### Observations
+
+- No deviations from the plan.
+  Both optional decisions the plan flagged resolved toward inclusion: `makeSubagentRegistry` (Step 2) read cleaner across the 5 registry call sites, so it was adopted; `forwarding-manager.test.ts` was left unchanged exactly as the Non-Goals predicted (its `ExtensionContext`-cast ctx and fake-timer polling do not overlap the harness).
+- `makeUiDecision` doubles as the default for `makeForwarderDeps.requestPermissionDecisionFromUi`, so the approving-UI default is centralized.
+  Reused `makeEvents` from `#test/helpers/handler-fixtures` rather than re-implementing the `{ emit, on }` mock.
+- The missing-`responses/` race test drove the `createResponsesDir` option on `createForwardingTempDir` — the one place the handle needs to deviate from the default layout.
+- All `expect(...)` assertions preserved byte-identical (reviewer diffed line-by-line and confirmed).
+- Pre-completion reviewer: PASS (all deterministic checks green; code design, docs, Mermaid, dead-code all PASS; acceptance-criteria/cross-step/follow-up lenses SKIP as not applicable to a test-only change).
