@@ -8,8 +8,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ConfigReader } from "#src/config-store";
-import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import type { PermissionPromptDecision } from "#src/permission-dialog";
 import type {
   PermissionPrompterApi,
@@ -42,16 +40,6 @@ function makeCtx(overrides: Partial<ExtensionContext> = {}): ExtensionContext {
   } as unknown as ExtensionContext;
 }
 
-function makeConfigReader(
-  overrides: Partial<typeof DEFAULT_EXTENSION_CONFIG> = {},
-): ConfigReader {
-  return {
-    current: vi
-      .fn<() => typeof DEFAULT_EXTENSION_CONFIG>()
-      .mockReturnValue({ ...DEFAULT_EXTENSION_CONFIG, ...overrides }),
-  };
-}
-
 function makePrompterApi(): PermissionPrompterApi & {
   prompt: ReturnType<typeof vi.fn>;
 } {
@@ -75,7 +63,6 @@ function makeDeps(
   overrides: Partial<PromptingGatewayDeps> = {},
 ): PromptingGatewayDeps {
   return {
-    config: overrides.config ?? makeConfigReader(),
     subagentSessionsDir:
       overrides.subagentSessionsDir ?? "/test/agent/subagent-sessions",
     platform: overrides.platform ?? "linux",
@@ -99,27 +86,15 @@ describe("PromptingGateway", () => {
       expect(gateway.canConfirm()).toBe(true);
     });
 
-    it("returns false when context has no UI, is not a subagent, and yolo mode is off", () => {
-      const gateway = new PromptingGateway(
-        makeDeps({ config: makeConfigReader({ yoloMode: false }) }),
-      );
+    it("returns false when context has no UI and is not a subagent", () => {
+      const gateway = new PromptingGateway(makeDeps());
       gateway.activate(makeCtx({ hasUI: false }));
       expect(gateway.canConfirm()).toBe(false);
     });
 
-    it("returns true when yolo mode is enabled (no UI, not subagent)", () => {
-      const gateway = new PromptingGateway(
-        makeDeps({ config: makeConfigReader({ yoloMode: true }) }),
-      );
-      gateway.activate(makeCtx({ hasUI: false }));
-      expect(gateway.canConfirm()).toBe(true);
-    });
-
     it("returns true when running as a subagent (env hint)", () => {
       vi.stubEnv("PI_IS_SUBAGENT", "1");
-      const gateway = new PromptingGateway(
-        makeDeps({ config: makeConfigReader({ yoloMode: false }) }),
-      );
+      const gateway = new PromptingGateway(makeDeps());
       gateway.activate(makeCtx({ hasUI: false }));
       expect(gateway.canConfirm()).toBe(true);
       vi.unstubAllEnvs();

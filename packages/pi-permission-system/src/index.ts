@@ -102,7 +102,6 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   });
 
   const gateway = new PromptingGateway({
-    config: configStore,
     subagentSessionsDir: paths.subagentSessionsDir,
     platform: hostPlatform,
     registry: subagentRegistry,

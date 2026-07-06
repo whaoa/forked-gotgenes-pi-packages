@@ -1,12 +1,6 @@
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { PermissionState } from "./types";
 
-export interface AskPermissionResolutionOptions {
-  config: PermissionSystemExtensionConfig;
-  hasUI: boolean;
-  isSubagent: boolean;
-}
-
 export function isYoloModeEnabled(
   config: PermissionSystemExtensionConfig,
 ): boolean {
@@ -19,12 +13,4 @@ export function shouldAutoApprovePermissionState(
   config: PermissionSystemExtensionConfig,
 ): boolean {
   return state === "ask" && isYoloModeEnabled(config);
-}
-
-export function canResolveAskPermissionRequest(
-  options: AskPermissionResolutionOptions,
-): boolean {
-  return (
-    options.hasUI || options.isSubagent || isYoloModeEnabled(options.config)
-  );
 }

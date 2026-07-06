@@ -1,6 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import type { ConfigReader } from "./config-store";
 import type { GatePrompter } from "./gate-prompter";
 import type { PermissionPromptDecision } from "./permission-dialog";
 import type {
@@ -9,18 +8,15 @@ import type {
 } from "./permission-prompter";
 import { isSubagentExecutionContext } from "./subagent-context";
 import type { SubagentSessionRegistry } from "./subagent-registry";
-import { canResolveAskPermissionRequest } from "./yolo-mode";
 
 /**
  * Dependencies required by PromptingGateway.
  *
- * All four fields are actively consumed:
- * - `config` + `subagentSessionsDir` + `registry` drive `canConfirm()`.
+ * All fields are actively consumed:
+ * - `subagentSessionsDir` + `registry` drive `canConfirm()`.
  * - `prompter` is called by `prompt()`.
  */
 export interface PromptingGatewayDeps {
-  /** Read current config for the yolo-mode branch of the can-prompt policy. */
-  config: ConfigReader;
   /** Static path used to detect a forwarding subagent context. */
   subagentSessionsDir: string;
   /** Host platform, injected from the composition root, for subagent-context path detection. */
@@ -46,8 +42,8 @@ export interface PromptingGatewayLifecycle {
  * Context-owning implementation of the GatePrompter role.
  *
  * Owns the stored ExtensionContext and the "can we prompt?" policy
- * (UI / subagent / yolo-mode), replacing the four twin methods
- * that previously lived on PermissionSession.
+ * (UI / subagent), replacing the four twin methods that previously
+ * lived on PermissionSession.
  *
  * Lifecycle: PermissionSession drives activate/deactivate so the stored
  * context mirrors the session context without independent call-site changes.
@@ -72,22 +68,22 @@ export class PromptingGateway
   /**
    * Whether an interactive permission prompt can be shown.
    *
-   * Returns false when no context is active. Otherwise delegates to
-   * canResolveAskPermissionRequest, which checks hasUI, subagent status,
-   * and yolo-mode — relocating the policy from the index.ts closure.
+   * Returns false when no context is active. Otherwise true when the
+   * context has UI or is a forwarding subagent — the two Authorizer-
+   * selection predicates the Phase 9 spine will consume. Yolo-mode never
+   * reaches this policy: it is resolved upstream at the composition stage.
    */
   canConfirm(): boolean {
     if (this.context === null) return false;
-    return canResolveAskPermissionRequest({
-      config: this.deps.config.current(),
-      hasUI: this.context.hasUI,
-      isSubagent: isSubagentExecutionContext(
+    return (
+      this.context.hasUI ||
+      isSubagentExecutionContext(
         this.context,
         this.deps.subagentSessionsDir,
         this.deps.platform,
         this.deps.registry,
-      ),
-    });
+      )
+    );
   }
 
   /**
