@@ -7,8 +7,10 @@
  *   read_session — Read the current session's raw entries (survives compaction)
  *   read_parent_session — Read the parent session's entries from a subagent context
  *   read_session_file — Read an arbitrary session file's entries by path
+ *   list_session_files — List a cwd's session files, newest first
  */
 
+import { join } from "node:path";
 import { Type } from "@earendil-works/pi-ai";
 import {
   defineTool,
@@ -25,12 +27,18 @@ import {
 } from "./entry-summary.js";
 import { formatTranscript, type TranscriptEntry } from "./format-transcript.js";
 import { deriveParentSessionFile } from "./parent-session.js";
-import { readSessionFileEntries } from "./session-file.js";
+import {
+  deriveSessionsRoot,
+  encodeCwdToSessionDirName,
+  listSessionFiles,
+  readSessionFileEntries,
+} from "./session-file.js";
 
-/** Discriminated union stored in tool `details` for the two session-read tools. */
+/** Discriminated union stored in tool `details` for the session-read and discovery tools. */
 type SessionToolDetails =
   | { kind: "transcript"; summary: SessionSummary }
-  | { kind: "status"; message: string };
+  | { kind: "status"; message: string }
+  | { kind: "listing"; directory: string; count: number };
 
 // ---- rendering helpers ----
 
@@ -40,11 +48,12 @@ type SessionToolDetails =
  */
 function formatCallText(
   label: string,
-  args: { types?: string[]; limit?: number; path?: string },
+  args: { types?: string[]; limit?: number; path?: string; cwd?: string },
   theme: Theme,
 ): string {
   const hints: string[] = [];
   if (args.path) hints.push(`path: ${args.path}`);
+  if (args.cwd) hints.push(`cwd: ${args.cwd}`);
   if (args.types && args.types.length > 0)
     hints.push(`types: [${args.types.join(", ")}]`);
   if (args.limit != null) hints.push(`limit: ${args.limit}`);
@@ -85,8 +94,28 @@ function formatResultText(
   if (details.kind === "status") {
     return `${theme.fg("warning", "\u26a0")} ${theme.fg("muted", details.message)} ${hint}`;
   }
+  if (details.kind === "listing") {
+    const count =
+      details.count === 1 ? "1 session file" : `${details.count} session files`;
+    return `${theme.fg("success", "\u2713")} ${theme.fg("muted", `${count} in ${details.directory}`)} ${hint}`;
+  }
   // kind === "transcript"
   return `${theme.fg("success", "\u2713")} ${theme.fg("muted", formatSummaryText(details.summary))} ${hint}`;
+}
+
+/**
+ * Render the text body for `list_session_files`: the resolved directory,
+ * then either the newest-first file listing or a "no files" message.
+ */
+function renderListing(directory: string, files: string[]): string {
+  const header = `Session directory: ${directory}`;
+  if (files.length === 0) return `${header}\nNo session files found.`;
+  const countLine =
+    files.length === 1
+      ? "1 session file, newest first:"
+      : `${files.length} session files, newest first:`;
+  const fileLines = files.map((f) => `  ${f}`).join("\n");
+  return `${header}\n${countLine}\n${fileLines}`;
 }
 
 /**
@@ -382,6 +411,60 @@ export default function sessionTools(pi: ExtensionAPI): void {
         }
 
         return buildTranscriptResult(allEntries, params);
+      },
+    }),
+  );
+
+  pi.registerTool(
+    defineTool({
+      name: "list_session_files",
+      label: "List Session Files",
+      description:
+        "List a cwd's session files, newest first. " +
+        "Encodes the given cwd to Pi's session-directory naming convention and lists the " +
+        ".jsonl files found there, so a caller does not have to hand-roll the encoding. " +
+        "Pass the returned path to read_session_file to render one as a transcript. " +
+        "Useful for locating a sibling session (e.g. a peer worktree session).",
+      parameters: Type.Object({
+        cwd: Type.String({
+          description:
+            "The working directory whose session files to list (e.g. a peer worktree path).",
+        }),
+      }),
+      renderCall(args, theme, context) {
+        const text =
+          (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+        text.setText(formatCallText("list session files", args, theme));
+        return text;
+      },
+      renderResult(result, options, theme, context) {
+        const text =
+          (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+        text.setText(formatResultText(result, options, theme));
+        return text;
+      },
+      // eslint-disable-next-line @typescript-eslint/require-await -- satisfies async tool interface; no actual async work
+      async execute(
+        _toolCallId: string,
+        params: { cwd: string },
+        _signal: unknown,
+        _onUpdate: unknown,
+        ctx: ExtensionContext,
+      ) {
+        const root = deriveSessionsRoot(
+          ctx.sessionManager.getSessionFile(),
+          process.cwd(),
+        );
+        const directory = join(root, encodeCwdToSessionDirName(params.cwd));
+        const files = listSessionFiles(directory);
+        return {
+          content: [{ type: "text", text: renderListing(directory, files) }],
+          details: {
+            kind: "listing",
+            directory,
+            count: files.length,
+          } as SessionToolDetails,
+        };
       },
     }),
   );
