@@ -84,3 +84,43 @@ Two consensus-driven changes were approved and implemented: a new `code-design` 
 
 1. Added a "Closure narrowing loop" entry to the "Biome / ESLint linter conflicts" section of `.pi/skills/code-design/SKILL.md`, documenting the `.forEach()`/`no-unnecessary-condition` trap and the `for...of` fix.
 2. Extended the "Decide" section of `.pi/prompts/plan-issue.md` with a rule requiring a proposed aggregate/report to be traced to a concrete downstream consumer before its shape is designed (Refs #546).
+
+## Stage: Land — root worktree convergence (2026-07-06T14:57:11Z)
+
+### Session summary
+
+Ran `/land-worktree 546` from the root checkout: fast-forwarded the peer branch onto `main`, pushed, verified CI, closed the issue, merged the release-please PR by rebase, and tore down the worktree.
+The release cut `pi-session-tools-v1.1.1`.
+The one notable moment was `release_pr_merge` refusing with `merge_state: UNSTABLE` — resolved correctly by checking `statusCheckRollup` and waiting for a running check rather than force-merging.
+
+### Observations
+
+#### What went well
+
+- **Correctly distinguished a running-check `UNSTABLE` from a no-check `UNSTABLE`.**
+  `release_pr_merge` refused PR #548 with `merge_state: UNSTABLE`.
+  The `/land-worktree` prompt frames `UNSTABLE` only as "the `GITHUB_TOKEN` no-checks case — empty `statusCheckRollup`" and says to fall back to `gh pr merge`.
+  Rather than applying that fallback blindly, I inspected `gh pr view 548 --json statusCheckRollup` and found a `CI` check actively `IN_PROGRESS` (this repo runs CI on release PRs via `RELEASE_PLEASE_TOKEN`, per commit `c3f554f1`), so the empty-rollup precondition was false.
+  Waited for `ci_watch` on the release PR's run to reach `success`, then retried `release_pr_merge`, which merged cleanly by rebase — no force-merge over a live check.
+- **Verified the full release-PR body before merging** (`gh pr view 548 --json body -q .body`) — confirmed it bumped only `pi-session-tools: 1.1.1` with no unexpected sibling-package bump.
+- **Tight tool batching** — issue-title fetch paired with the root/branch check, and `set_session_name` paired with `git fetch`/`pull`, kept independent calls in single parallel batches.
+
+#### What caused friction (agent side)
+
+- `missing-context` (prompt gap, not agent error) — the `/land-worktree` release step documents only the empty-rollup fallback and omits the "check still running → wait" branch that `ship-issue.md` (line 112) already carries.
+  Impact: no rework — I inferred the correct behavior from the non-empty rollup — but a less careful pass could have force-merged over a running check.
+  The two ship prompts should agree; see Changes made.
+
+#### What caused friction (user side)
+
+- None — the land ran end to end without intervention.
+
+### Diagnostic details
+
+- **Model-performance correlation** — no subagents were dispatched this stage; the entire land ran on the session model.
+  No mismatch to flag.
+- The other three lenses (escalation-delay, unused-tool, feedback-loop gap) found nothing notable: no rabbit-holes, no missing tool dispatch, and CI verification ran at the correct points (after the push, and again on the release PR before merging).
+
+### Changes made
+
+1. Added a sub-bullet to step 6.2 of `.pi/prompts/land-worktree.md` covering the running-check `UNSTABLE` case (wait via `ci_watch`, then retry `release_pr_merge`; do not fall back to `gh pr merge` while a check runs), mirroring the guidance already in `.pi/prompts/ship-issue.md` (Refs #546).

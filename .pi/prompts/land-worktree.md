@@ -66,6 +66,7 @@ Releasing is the root's serialized responsibility — only the root merges the s
 2. To release: `release_pr_find` → check the **full** PR body for which packages it bumps (release-please collapses each in a `<details>` block) → `release_pr_merge` (rebase).
    - Print the body explicitly with `gh pr view <N> --json body -q .body` — a `--jq` that drops `body` skips the check silently and an unexpected sibling-package bump slips through.
    - On an `UNSTABLE`-no-checks refusal (the `GITHUB_TOKEN` case — empty `statusCheckRollup`), fall back to `gh pr merge <N> --rebase`, then `git pull --ff-only`.
+   - A non-empty rollup with a check still `IN_PROGRESS` is neither case — wait for it (`ci_watch`), then retry `release_pr_merge`; do not fall back to `gh pr merge` while a check is running (Refs #546).
    - Never `--merge`; never merge a genuinely blocked PR (`CONFLICTING`/`DIRTY`/`BEHIND` or a failing check).
 3. `release_watch` for the tag.
 
