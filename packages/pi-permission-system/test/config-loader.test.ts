@@ -148,7 +148,7 @@ describe("loadUnifiedConfig", () => {
     expect(result.config.permission).toEqual({ "*": "ask" });
   });
 
-  it("ignores unknown keys without emitting issues", () => {
+  it("rejects unknown keys with a clear issue and empty config", () => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(
       configPath,
@@ -160,9 +160,10 @@ describe("loadUnifiedConfig", () => {
     );
 
     const result = loadUnifiedConfig(configPath);
-    expect(result.issues).toEqual([]);
-    expect(result.config.debugLog).toBe(false);
-    expect(result.config).not.toHaveProperty("unknownField");
+    expect(result.issues.join("\n")).toContain("unknownField");
+    expect(result.issues.join("\n")).toContain("anotherRandom");
+    // Fail-closed: the whole scope is rejected, dropping the valid field too.
+    expect(result.config).toEqual({});
   });
 
   it("returns empty config and no issues when the file does not exist", () => {
@@ -182,7 +183,7 @@ describe("loadUnifiedConfig", () => {
     expect(result.issues[0]).toContain(configPath);
   });
 
-  it("normalizes boolean fields strictly", () => {
+  it("rejects non-boolean runtime knobs with a clear issue", () => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(
       configPath,
@@ -194,12 +195,29 @@ describe("loadUnifiedConfig", () => {
     );
 
     const result = loadUnifiedConfig(configPath);
-    expect(result.config.debugLog).toBeUndefined();
-    expect(result.config.permissionReviewLog).toBeUndefined();
-    expect(result.config.yoloMode).toBeUndefined();
+    expect(result.config).toEqual({});
+    expect(result.issues.join("\n")).toContain("debugLog");
   });
 
-  it("normalizes permission map, keeping only valid PermissionState values", () => {
+  it("fails closed: an invalid field contributes no permission rules", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        permission: { "*": "allow", read: "allow" },
+        toolInputPreviewMaxLength: -5,
+      }),
+    );
+
+    const result = loadUnifiedConfig(configPath);
+    // Even though permission carried `allow` rules, the invalid knob rejects
+    // the whole scope so no `allow` leaks through — downstream falls to `ask`.
+    expect(result.config).toEqual({});
+    expect(result.config.permission).toBeUndefined();
+    expect(result.issues.length).toBeGreaterThan(0);
+  });
+
+  it("rejects an invalid PermissionState inside a permission map", () => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(
       configPath,
@@ -213,10 +231,8 @@ describe("loadUnifiedConfig", () => {
     );
 
     const result = loadUnifiedConfig(configPath);
-    expect(result.config.permission).toEqual({
-      read: "allow",
-      bash: { "git *": "ask" },
-    });
+    expect(result.config).toEqual({});
+    expect(result.issues.length).toBeGreaterThan(0);
   });
 
   it("accepts permission as object with mixed string and object values", () => {
@@ -266,7 +282,7 @@ describe("loadUnifiedConfig", () => {
     });
   });
 
-  it("strips a deny object with a non-string reason (malformed)", () => {
+  it("rejects a deny object with a non-string reason", () => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(
       configPath,
@@ -281,9 +297,8 @@ describe("loadUnifiedConfig", () => {
     );
 
     const result = loadUnifiedConfig(configPath);
-    expect(result.config.permission).toEqual({
-      bash: { "git *": "allow" },
-    });
+    expect(result.config).toEqual({});
+    expect(result.issues.length).toBeGreaterThan(0);
   });
 
   it("returns no permission when the permission field is absent", () => {
@@ -294,12 +309,13 @@ describe("loadUnifiedConfig", () => {
     expect(result.config.permission).toBeUndefined();
   });
 
-  it("ignores a non-object permission field", () => {
+  it("rejects a non-object permission field", () => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(configPath, JSON.stringify({ permission: "allow" }));
 
     const result = loadUnifiedConfig(configPath);
-    expect(result.config.permission).toBeUndefined();
+    expect(result.config).toEqual({});
+    expect(result.issues.length).toBeGreaterThan(0);
   });
 
   it("parses toolInputPreviewMaxLength when a valid positive integer is present", () => {
@@ -342,14 +358,15 @@ describe("loadUnifiedConfig", () => {
     ["float", 1.5],
     ["string", "200"],
     ["boolean", true],
-  ] as const)("omits toolInputPreviewMaxLength for invalid value: %s", (_label, value) => {
+  ] as const)("rejects invalid toolInputPreviewMaxLength: %s", (_label, value) => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(
       configPath,
       JSON.stringify({ toolInputPreviewMaxLength: value }),
     );
     const result = loadUnifiedConfig(configPath);
-    expect(result.config).not.toHaveProperty("toolInputPreviewMaxLength");
+    expect(result.config).toEqual({});
+    expect(result.issues.length).toBeGreaterThan(0);
   });
 
   it.each([
@@ -358,14 +375,15 @@ describe("loadUnifiedConfig", () => {
     ["float", 1.5],
     ["string", "80"],
     ["boolean", false],
-  ] as const)("omits toolTextSummaryMaxLength for invalid value: %s", (_label, value) => {
+  ] as const)("rejects invalid toolTextSummaryMaxLength: %s", (_label, value) => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(
       configPath,
       JSON.stringify({ toolTextSummaryMaxLength: value }),
     );
     const result = loadUnifiedConfig(configPath);
-    expect(result.config).not.toHaveProperty("toolTextSummaryMaxLength");
+    expect(result.config).toEqual({});
+    expect(result.issues.length).toBeGreaterThan(0);
   });
 
   it("parses piInfrastructureReadPaths when a valid string array is present", () => {
@@ -400,14 +418,15 @@ describe("loadUnifiedConfig", () => {
     ["number", 42],
     ["mixed-type array", ["a", 1]],
     ["object", { a: "b" }],
-  ] as const)("omits piInfrastructureReadPaths for invalid value: %s", (_label, value) => {
+  ] as const)("rejects invalid piInfrastructureReadPaths: %s", (_label, value) => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(
       configPath,
       JSON.stringify({ piInfrastructureReadPaths: value }),
     );
     const result = loadUnifiedConfig(configPath);
-    expect(result.config).not.toHaveProperty("piInfrastructureReadPaths");
+    expect(result.config).toEqual({});
+    expect(result.issues.length).toBeGreaterThan(0);
   });
 });
 

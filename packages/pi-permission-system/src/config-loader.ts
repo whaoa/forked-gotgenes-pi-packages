@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { normalize } from "node:path";
+import type { ZodError } from "zod";
 import {
   getGlobalConfigPath,
   getLegacyExtensionConfigPath,
@@ -7,15 +8,10 @@ import {
   getLegacyProjectPolicyPath,
   getProjectConfigPath,
 } from "./config-paths";
+import { unifiedConfigSchema } from "./config-schema";
 import { mergeFlatPermissions } from "./permission-merge";
 import type { FlatPermissionConfig, PatternValue } from "./types";
-import {
-  isDenyWithReason,
-  isPermissionState,
-  normalizeOptionalPositiveInt,
-  normalizeOptionalStringArray,
-  toRecord,
-} from "./value-guards";
+import { isDenyWithReason, isPermissionState } from "./value-guards";
 
 /**
  * Unified config shape combining runtime knobs and flat permission policy.
@@ -118,20 +114,13 @@ function consumeString(input: string, start: number): ScanSegment {
   return { output, nextIndex: i };
 }
 
-function normalizeOptionalBoolean(value: unknown): boolean | undefined {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  return undefined;
-}
-
 /**
  * Normalize a raw `permission` value from parsed JSON into a FlatPermissionConfig.
  * Accepts PermissionState strings and DenyWithReason objects inside pattern
  * maps. Drops non-object top-level values, invalid PermissionState strings, and
  * invalid action values inside object maps.
  */
-function normalizeFlatPermissionValue(
+export function normalizeFlatPermissionValue(
   value: unknown,
 ): FlatPermissionConfig | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -172,52 +161,39 @@ function normalizeFlatPermissionValue(
 }
 
 /**
- * Normalize raw parsed JSON into the unified config shape.
+ * Validate raw parsed JSON against the config schema (the single source of
+ * truth in `config-schema.ts`).
+ *
+ * On success the typed config is returned. On failure the whole scope config is
+ * rejected — fail-closed: an empty config contributes no rules, so missing
+ * surfaces fall through to the universal `ask` default rather than `allow` —
+ * and every schema violation is reported as a clear, actionable issue.
  */
-export function normalizeUnifiedConfig(raw: unknown): {
-  config: UnifiedPermissionConfig;
-  issues: string[];
-} {
-  const record = toRecord(raw);
-  const issues: string[] = [];
-  const config: UnifiedPermissionConfig = {};
+export function validateUnifiedConfig(
+  parsed: unknown,
+): UnifiedConfigLoadResult {
+  const result = unifiedConfigSchema.safeParse(parsed);
+  if (result.success) {
+    return { config: result.data, issues: [] };
+  }
+  return { config: {}, issues: formatConfigIssues(result.error) };
+}
 
-  // Runtime knobs
-  const debugLog = normalizeOptionalBoolean(record.debugLog);
-  if (debugLog !== undefined) config.debugLog = debugLog;
-
-  const permissionReviewLog = normalizeOptionalBoolean(
-    record.permissionReviewLog,
-  );
-  if (permissionReviewLog !== undefined)
-    config.permissionReviewLog = permissionReviewLog;
-
-  const yoloMode = normalizeOptionalBoolean(record.yoloMode);
-  if (yoloMode !== undefined) config.yoloMode = yoloMode;
-
-  const toolInputPreviewMaxLength = normalizeOptionalPositiveInt(
-    record.toolInputPreviewMaxLength,
-  );
-  if (toolInputPreviewMaxLength !== undefined)
-    config.toolInputPreviewMaxLength = toolInputPreviewMaxLength;
-
-  const toolTextSummaryMaxLength = normalizeOptionalPositiveInt(
-    record.toolTextSummaryMaxLength,
-  );
-  if (toolTextSummaryMaxLength !== undefined)
-    config.toolTextSummaryMaxLength = toolTextSummaryMaxLength;
-
-  const piInfrastructureReadPaths = normalizeOptionalStringArray(
-    record.piInfrastructureReadPaths,
-  );
-  if (piInfrastructureReadPaths !== undefined)
-    config.piInfrastructureReadPaths = piInfrastructureReadPaths;
-
-  // Flat permission policy
-  const permission = normalizeFlatPermissionValue(record.permission);
-  if (permission !== undefined) config.permission = permission;
-
-  return { config, issues };
+/** Render each schema violation as a clear, path-qualified message. */
+function formatConfigIssues(error: ZodError): string[] {
+  const messages: string[] = [];
+  for (const issue of error.issues) {
+    if (issue.code === "unrecognized_keys") {
+      for (const key of issue.keys) {
+        messages.push(`Unrecognized config key '${key}'.`);
+      }
+      continue;
+    }
+    const location =
+      issue.path.length > 0 ? issue.path.map(String).join(".") : "(root)";
+    messages.push(`Invalid config value at '${location}': ${issue.message}`);
+  }
+  return messages;
 }
 
 /**
@@ -320,7 +296,8 @@ export function loadAndMergeConfigs(
         `Move it to '${newGlobalPath}':\n` +
         `  mv '${legacyGlobalPolicyPath}' '${newGlobalPath}'`,
     );
-    allIssues.push(...legacy.issues);
+    // Legacy files are migrated away; the move-it guidance above is the
+    // actionable signal, so strict-validation issues for them are suppressed.
     merged = mergeUnifiedConfigs(merged, legacy.config);
   }
 
@@ -337,7 +314,7 @@ export function loadAndMergeConfigs(
         `Move runtime settings to '${newGlobalPath}':\n` +
         `  mv '${legacyExtConfigPath}' '${newGlobalPath}'`,
     );
-    allIssues.push(...legacy.issues);
+    // See above: legacy-file validation issues are suppressed.
     merged = mergeUnifiedConfigs(merged, legacy.config);
   }
 
@@ -355,7 +332,7 @@ export function loadAndMergeConfigs(
         `Move it to '${newProjectPath}':\n` +
         `  mv '${legacyProjectPolicyPath}' '${newProjectPath}'`,
     );
-    allIssues.push(...legacy.issues);
+    // See above: legacy-file validation issues are suppressed.
     merged = mergeUnifiedConfigs(merged, legacy.config);
   }
 
@@ -421,7 +398,7 @@ export function loadUnifiedConfig(path: string): UnifiedConfigLoadResult {
   try {
     const raw = readFileSync(path, "utf-8");
     const parsed = JSON.parse(stripJsonComments(raw)) as unknown;
-    return normalizeUnifiedConfig(parsed);
+    return validateUnifiedConfig(parsed);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

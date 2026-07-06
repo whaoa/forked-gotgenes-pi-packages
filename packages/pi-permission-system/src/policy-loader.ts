@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   loadUnifiedConfig,
-  normalizeUnifiedConfig,
+  normalizeFlatPermissionValue,
   stripJsonComments,
 } from "./config-loader";
 import { getGlobalConfigPath } from "./config-paths";
@@ -263,10 +263,14 @@ export class FilePolicyLoader implements PolicyLoader {
       if (!frontmatter) {
         value = {};
       } else {
+        // Agent frontmatter carries non-config keys (name, description, model,
+        // …) alongside `permission`, so it is not validated by the strict
+        // config-file schema; only the `permission` block is extracted, and its
+        // malformed entries are dropped tolerantly as before.
         const parsed = parseSimpleYamlMap(frontmatter);
-        const { config, issues } = normalizeUnifiedConfig(parsed);
-        this.accumulateConfigIssues(issues);
-        value = { permission: config.permission };
+        value = {
+          permission: normalizeFlatPermissionValue(parsed.permission),
+        };
       }
     } catch {
       value = {};
