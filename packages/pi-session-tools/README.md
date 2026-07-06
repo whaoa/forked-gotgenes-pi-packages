@@ -48,6 +48,8 @@ Parameters:
 
 The output is a human-readable transcript: numbered user/assistant turns, one-line tool call summaries with correlated result status, and metadata events (compaction, model changes).
 Tool result bodies, thinking content, and image data are omitted.
+A `[model change]` line renders only when the switch actually took effect — a marker followed by an assistant turn before the next switch or the end of entries.
+A phantom switch (e.g. cycling the TUI model picker with no turn run after it) is omitted from both the transcript and the `model changes` count.
 
 In the TUI the tool row shows a compact summary by default (e.g. `✓ 42 entries — 38 messages, 18 tool calls, 2 compactions`).
 Press `Ctrl-O` to expand to the full transcript.
@@ -72,6 +74,11 @@ The test is failing because...
 ---
 
 [model change] → anthropic/claude-opus-4-20250514
+
+---
+
+3. assistant [anthropic/claude-opus-4-20250514]
+Looking at the recent commits...
 ```
 
 ### `read_parent_session`
