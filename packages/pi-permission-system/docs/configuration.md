@@ -36,7 +36,7 @@ Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`) use simple replace
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/gotgenes/pi-permission-system/main/schemas/permissions.schema.json",
+  "$schema": "https://raw.githubusercontent.com/gotgenes/pi-packages/main/packages/pi-permission-system/schemas/permissions.schema.json",
 
   // Runtime knobs
   "debugLog": false,
@@ -697,4 +697,10 @@ npx --yes ajv-cli@5 validate \
   -d ./config.json
 ```
 
-**Editor tip:** Add `"$schema": "./schemas/permissions.schema.json"` to your config for autocomplete support.
+**Editor tip:** Add the hosted schema URL as the `$schema` key in your config for autocomplete and validation support:
+
+```json
+"$schema": "https://raw.githubusercontent.com/gotgenes/pi-packages/main/packages/pi-permission-system/schemas/permissions.schema.json"
+```
+
+The schema is generated from the extension's zod source of truth (`src/config-schema.ts`); regenerate it with `pnpm run gen:schema` after changing the config shape.

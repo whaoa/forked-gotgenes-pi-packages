@@ -765,7 +765,8 @@ src/
 ├── permission-event-rpc.ts   permissions:rpc:check (deprecated) and permissions:rpc:prompt handlers; the check handler routes path-surface queries through the resolver as an `access-path` intent (canonical parity, #503)
 ├── permission-ui-prompt.ts   Centralized construction for `permissions:ui_prompt` event payloads - single source for the emitted contract shape
 ├── config-store.ts           `ConfigStore` class — owns `config` + `lastConfigWarning`; `ConfigReader`, `SessionConfigStore`, `CommandConfigStore` narrow interfaces (#335, #337)
-├── config-loader.ts          File I/O, format detection
+├── config-loader.ts          File I/O, format detection, strict zod validation (fail-closed) for config files
+├── config-schema.ts          Zod schemas - single source of truth for the config shape; derives the JSON Schema (buildPermissionsJsonSchema) and the config types (#547)
 ├── config-paths.ts           Path derivation
 ├── extension-paths.ts        `ExtensionPaths` value object - immutable path constants derived from `agentDir` (and optional Pi `getPackageDir()`) at startup (`computeExtensionPaths`)
 ├── config-reporter.ts        Structured log entries for resolved config
@@ -804,9 +805,9 @@ src/
 ├── session-logger.ts          `SessionLogger` interface + `PermissionSessionLogger` class; owns JSONL-writer composition, IO-failure warning dedup, and notify sink (#336, [#362])
 ├── logging.ts                 JSONL review/debug log writer
 ├── status.ts                  Footer status bar integration
-├── value-guards.ts            Runtime type guards (`toRecord`, `getNonEmptyString`, `normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`, `isPermissionState`, `isDenyWithReason`)
+├── value-guards.ts            Runtime type guards (`toRecord`, `getNonEmptyString`, `isPermissionState`, `isDenyWithReason`)
 ├── yaml-frontmatter.ts        Minimal YAML/frontmatter parsing (`parseSimpleYamlMap`, `extractFrontmatter`)
-└── types.ts                   Core type definitions (PermissionState, FlatPermissionConfig, etc.)
+└── types.ts                   Core type definitions; the config-shape types (PermissionState, FlatPermissionConfig, etc.) are re-exported from config-schema.ts (#547)
 ```
 
 ## Improvement roadmap — Phase 8: Tidy first for the authority spine
@@ -903,7 +904,8 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    Release: independent
 
 8. **Split `value-guards.ts` by cohesion.**
-   ([#532]) Target: `src/value-guards.ts` (56 LOC, 22 dependents — fallow's sole refactoring target, priority 28.8): keep the generic parsing guards (`toRecord`, `getNonEmptyString`, `normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`); move the domain guards (`isPermissionState`, `isDenyWithReason`) next to the types they guard (`src/types.ts`).
+   ([#532]) Target: `src/value-guards.ts`: keep the generic parsing guards (`toRecord`, `getNonEmptyString`); move the domain guards (`isPermissionState`, `isDenyWithReason`) next to the types they guard (`src/types.ts`).
+   Note: [#547] already removed the config-only guards (`normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`) when zod took over config validation, shrinking this target.
    Smell: Category B (high-impact file) / Category E (mixed cohesion).
    Outcome: fallow refactoring targets 1 → 0; domain guards co-located with their types.
    Release: independent
@@ -1059,4 +1061,5 @@ Five steps ([#502]–[#506]), all closed, plus the `PathNormalizer` platform-sea
 [#510]: https://github.com/gotgenes/pi-packages/issues/510
 [#511]: https://github.com/gotgenes/pi-packages/issues/511
 [#513]: https://github.com/gotgenes/pi-packages/issues/513
+[#547]: https://github.com/gotgenes/pi-packages/issues/547
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
