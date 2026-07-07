@@ -19,7 +19,7 @@ export interface ReviewLogger {
 
 /**
  * Logging seam for consumers that write both debug and review entries.
- * Injected into `ConfigStore` and `PermissionForwarder`.
+ * Injected into `ConfigStore`, `ApprovalEscalator`, and `ForwardedRequestServer`.
  */
 export interface DebugReviewLogger extends ReviewLogger {
   debug(event: string, details?: Record<string, unknown>): void;

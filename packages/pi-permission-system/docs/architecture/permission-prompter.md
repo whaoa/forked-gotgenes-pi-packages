@@ -45,7 +45,7 @@ interface PermissionPrompterDeps {
 }
 ```
 
-`ApprovalRequester` is the narrow seam defined in `src/forwarded-permissions/permission-forwarder.ts`:
+`ApprovalRequester` is the narrow seam defined in `src/authority/approval-escalator.ts`:
 
 ```typescript
 interface ApprovalRequester {
@@ -61,15 +61,16 @@ interface ApprovalRequester {
 ## Relationship to the forwarder
 
 `PermissionPrompter` delegates the UI/forwarding decision to the injected `ApprovalRequester`.
-It never assembles a forwarding-dependency bag internally — the single `PermissionForwarder` instance (constructed in `index.ts` with its own `PermissionForwarderDeps`) is shared between the prompter and `ForwardingManager`.
+It never assembles a forwarding-dependency bag internally — the `ApprovalEscalator` instance (constructed in `index.ts` with its own `ApprovalEscalatorDeps`) is injected directly into the prompter.
+The escalation-up role (`ApprovalEscalator`, injected here) and the serving-down role (`ForwardedRequestServer`, injected into `ForwardingManager`) are separate classes as of #530 — they no longer share a single instance.
 
 ## Wiring
 
-`PermissionPrompter` is instantiated once in `piPermissionSystemExtension()` (`src/index.ts`) after the `PermissionForwarder`, and injected into `PermissionSessionRuntimeDeps.promptPermission`:
+`PermissionPrompter` is instantiated once in `piPermissionSystemExtension()` (`src/index.ts`) after the `ApprovalEscalator`, and injected into `PermissionSessionRuntimeDeps.promptPermission`:
 
 ```typescript
-const forwarder = new PermissionForwarder(forwardingDeps);
-const prompter = new PermissionPrompter({ …, forwarder });
+const escalator = new ApprovalEscalator(escalatorDeps);
+const prompter = new PermissionPrompter({ …, forwarder: escalator });
 // …
 promptPermission: (ctx, details) => prompter.prompt(ctx, details),
 ```

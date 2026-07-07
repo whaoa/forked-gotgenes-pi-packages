@@ -581,9 +581,8 @@ This is the same recursion pi-subagents describes (a subagent is a child Pi), vi
 The model collapses scattered machinery into the spine:
 
 - **`canConfirm()`** disappears — every `Authorizer` answers.
-- **`PermissionForwarder` splits by direction of authority flow.**
-  `requestApproval` is escalation *up* — it is the `ParentAuthorizer`.
-  `processInbox` is serving escalations from *below* — a distinct role (the session acting as authority, or relaying toward it), not an `Authorizer`.
+- **`ApprovalEscalator`'s three named branches become the three `Authorizer` implementations.**
+  ([#530] already split the dual-role `PermissionForwarder` by direction of authority flow: `ApprovalEscalator.requestApproval` escalation *up* — it is the `ParentAuthorizer` — and `ForwardedRequestServer.processInbox` serving escalations from *below* — a distinct role (the session acting as authority, or relaying toward it), not an `Authorizer`.)
 - **The elicitation thicket** (`GatePrompter`, `PromptingGateway`, `PermissionPrompter`, `ApprovalRequester`) becomes the `Authorizer` interface and its three implementations.
 - **yolo** leaves the decision path entirely (below).
 
@@ -824,16 +823,17 @@ src/
 ├── builtin-tool-input-formatters.ts   Built-in formatters registered at startup: formatMcpInputForPrompt keyed to "mcp" (#283)
 ├── tool-registry.ts           ToolRegistry interface + tool name validation
 ├── active-agent.ts            Agent name detection from session/system prompt
-├── authority/                 Subagent detection and the cross-session authority edge (seeded #529)
+├── authority/                 Subagent detection, the cross-session authority edge, and forwarded-permission escalation (seeded #529; forwarding subsystem relocated here #530)
 │   ├── subagent-detection.ts  SubagentDetection class - single owner of subagent detection (SubagentDetector.isSubagent + RegisteredChildDetector.isRegisteredChild); delegates to subagent-context (#529)
-│   └── subagent-context.ts    Pure subagent execution context detection (registry + env vars + filesystem)
+│   ├── subagent-context.ts    Pure subagent execution context detection (registry + env vars + filesystem)
+│   ├── forwarder-context.ts   `ForwarderContext` read-interface + `getSessionId` - shared by the escalation and serving roles (#530)
+│   ├── approval-escalator.ts  `ApprovalEscalator` class (`ApprovalRequester`) - escalation-up role: the three-way dispatch (hasUI → direct dialog, not-a-subagent → deny, else → forward) plus the request-write/poll machinery (#315, #316, #317, #530)
+│   ├── forwarded-request-server.ts `ForwardedRequestServer` class (`InboxProcessor`) - serving-down role: `processInbox()` drains forwarded requests and the per-request serve flow (#530)
+│   └── forwarding-io.ts       Forwarding filesystem helpers - request/response read-write, location derivation, atomic JSON writes
 ├── subagent-registry.ts       SubagentSessionRegistry class + getSubagentSessionRegistry() process-global accessor - in-process subagent session tracking
 ├── subagent-lifecycle-events.ts subscribeSubagentLifecycle() - subscribes to @gotgenes/pi-subagents child lifecycle events; registers/unregisters child sessions in SubagentSessionRegistry (ADR 0002)
 ├── permission-forwarding.ts   Constants for cross-session forwarding (registry + env var resolution)
-├── forwarding-manager.ts      `ForwardingController` interface + `ForwardingManager` class - drives the forwarded-permission inbox polling lifecycle; tells `PermissionForwarder.processInbox`
-├── forwarded-permissions/     Poll-based approval forwarding for subagents
-│   ├── permission-forwarder.ts `PermissionForwarder` class (`ApprovalRequester` + `InboxProcessor`) - owns the forwarding lifecycle: `requestApproval()` polls for the parent's decision, `processInbox()` drains forwarded requests (#315, #316, #317)
-│   └── io.ts                  Forwarding filesystem helpers - request/response read-write, location derivation, atomic JSON writes
+├── forwarding-manager.ts      `ForwardingController` interface + `ForwardingManager` class - drives the forwarded-permission inbox polling lifecycle; tells `ForwardedRequestServer.processInbox`
 ├── session-logger.ts          `SessionLogger` interface + `PermissionSessionLogger` class; owns JSONL-writer composition, IO-failure warning dedup, and notify sink (#336, [#362])
 ├── logging.ts                 JSONL review/debug log writer
 ├── status.ts                  Footer status bar integration
@@ -873,7 +873,7 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 | yolo checks on the ask path                | 3 (prompter, gateway, serve arm)             | ✅ 1 (composition-stage rewrite) + serve arm (dissolves with the spine) |
 | `canConfirm()` predicates                  | hasUI ∨ isSubagent ∨ yolo                    | ✅ hasUI ∨ isSubagent (selection-ready)                                 |
 | Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | 2                                                                       |
-| `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | 1 each (two classes under `src/authority/`)                             |
+| `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | ✅ 1 each (two classes under `src/authority/`)                          |
 | Subagent-detection dep-triple constructors | 3                                            | ✅ 1 (`SubagentDetection`)                                              |
 | fallow refactoring targets                 | 1 (`value-guards.ts`)                        | 0                                                                       |
 | Duplication                                | 6.7% (3,129 lines)                           | ≤ 5.5%                                                                  |
@@ -924,11 +924,12 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    `PromptingGateway`, `ForwardingManager`, and `PermissionForwarder` took the `SubagentDetector` seam (the forwarder keeps `registry` for target resolution only), and the scope widened to `PermissionServiceLifecycle`, which took the `RegisteredChildDetector` seam and dropped its raw registry field — so all subagent-detection predicates now have one owner.
    Release: independent
 
-6. **Split `PermissionForwarder` by direction of authority flow.**
+6. ✅ **Split `PermissionForwarder` by direction of authority flow.**
    ([#530]) Target: `src/forwarded-permissions/permission-forwarder.ts` (591 LOC, both roles) → `src/authority/approval-escalator.ts` (`ApprovalEscalator implements ApprovalRequester` — keeps the three-way dispatch with each branch a named method, plus the request-write/poll machinery) and `src/authority/forwarded-request-server.ts` (`ForwardedRequestServer implements InboxProcessor` — `processInbox` and the per-request serve flow); `src/forwarded-permissions/io.ts` → `src/authority/forwarding-io.ts`; the `forwarded-permissions/` directory dissolves.
    Callers are unchanged: `PermissionPrompter` keeps depending on `ApprovalRequester`, `ForwardingManager` on `InboxProcessor`.
    Smell: Category B/C (dual-role class; the target's declared split).
    Outcome: each class constructs with only its own dependencies; Phase 9 turns the escalator's three named branches into the three `Authorizer`s branch-by-branch instead of dissecting a god class.
+   Landed: `src/authority/forwarder-context.ts` holds the shared `ForwarderContext` read-interface and `getSessionId`; `ApprovalEscalator` (escalation-up, `ApprovalRequester`) and `ForwardedRequestServer` (serving-down, `InboxProcessor`) each construct with only their own dependencies — the escalator dropped `config`/`events`, the server dropped `detection`/`registry`; `src/forwarded-permissions/` and `test/forwarded-permissions/` both dissolved.
    Release: independent
 
 7. **Remove the deprecated `permissions:rpc:check` / `permissions:rpc:prompt` event-bus channel.**
@@ -955,7 +956,7 @@ flowchart TD
     S3["✅ Step 3 (#527)<br/>Delete dead yolo arms"]
     S4["✅ Step 4 (#528)<br/>Forwarding test harness"]
     S5["✅ Step 5 (#529)<br/>SubagentDetection + seed authority/"]
-    S6["Step 6 (#530)<br/>Split PermissionForwarder by direction"]
+    S6["✅ Step 6 (#530)<br/>Split PermissionForwarder by direction"]
     S7["Step 7 (#531)<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
     S8["Step 8 (#532)<br/>Split value-guards.ts"]
 
