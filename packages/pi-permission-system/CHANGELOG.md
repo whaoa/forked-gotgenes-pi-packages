@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [19.0.1](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v19.0.0...pi-permission-system-v19.0.1) (2026-07-07)
+
+
+### Documentation
+
+* **pi-permission-system:** mark Phase 8 Step 6 complete; retarget forwarder docs ([c11d8a2](https://github.com/gotgenes/pi-packages/commit/c11d8a2653edbac3637e45c1e5c5867f0a882afe))
+
 ## [19.0.0](https://github.com/gotgenes/pi-packages/compare/pi-permission-system-v18.2.0...pi-permission-system-v19.0.0) (2026-07-06)
 
 
