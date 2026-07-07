@@ -1,8 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isSubagentExecutionContext } from "./authority/subagent-context";
+import type { SubagentDetector } from "./authority/subagent-detection";
 import type { InboxProcessor } from "./forwarded-permissions/permission-forwarder";
 import { PERMISSION_FORWARDING_POLL_INTERVAL_MS } from "./permission-forwarding";
-import type { SubagentSessionRegistry } from "./subagent-registry";
 
 /**
  * Narrow interface for the forwarding lifecycle used by `PermissionSession`.
@@ -27,10 +26,8 @@ export class ForwardingManager {
   private processing = false;
 
   constructor(
-    private readonly subagentSessionsDir: string,
+    private readonly detection: SubagentDetector,
     private readonly forwarder: InboxProcessor,
-    private readonly platform: NodeJS.Platform,
-    private readonly registry?: SubagentSessionRegistry,
   ) {}
 
   /**
@@ -40,15 +37,7 @@ export class ForwardingManager {
    * Stops any existing poll when the context does not qualify for forwarding.
    */
   start(ctx: ExtensionContext): void {
-    if (
-      !ctx.hasUI ||
-      isSubagentExecutionContext(
-        ctx,
-        this.subagentSessionsDir,
-        this.platform,
-        this.registry,
-      )
-    ) {
+    if (!ctx.hasUI || this.detection.isSubagent(ctx)) {
       this.stop();
       return;
     }

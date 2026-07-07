@@ -1,17 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SubagentDetector } from "#src/authority/subagent-detection";
 import { ForwardingManager } from "#src/forwarding-manager";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
 
-const mockProcessInbox = vi.hoisted(() =>
-  vi.fn((): Promise<void> => Promise.resolve()),
-);
-const mockIsSubagentExecutionContext = vi.hoisted(() => vi.fn());
-
-vi.mock("../src/authority/subagent-context", () => ({
-  isSubagentExecutionContext: mockIsSubagentExecutionContext,
-}));
+const mockProcessInbox = vi.fn((): Promise<void> => Promise.resolve());
+const mockIsSubagent = vi.fn((): boolean => false);
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -29,12 +24,12 @@ function makeForwarder() {
   return { processInbox: mockProcessInbox };
 }
 
+function makeDetection(): SubagentDetector {
+  return { isSubagent: mockIsSubagent };
+}
+
 function makeManager() {
-  return new ForwardingManager(
-    "/agent/subagent-sessions",
-    makeForwarder(),
-    "linux",
-  );
+  return new ForwardingManager(makeDetection(), makeForwarder());
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -42,8 +37,8 @@ function makeManager() {
 describe("ForwardingManager", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    mockIsSubagentExecutionContext.mockReset();
-    mockIsSubagentExecutionContext.mockReturnValue(false);
+    mockIsSubagent.mockReset();
+    mockIsSubagent.mockReturnValue(false);
     mockProcessInbox.mockReset();
     mockProcessInbox.mockResolvedValue(undefined);
   });
@@ -95,8 +90,8 @@ describe("ForwardingManager", () => {
       expect(mockProcessInbox).not.toHaveBeenCalled();
     });
 
-    it("does not start polling when isSubagentExecutionContext returns true", async () => {
-      mockIsSubagentExecutionContext.mockReturnValue(true);
+    it("does not start polling when the detector reports a subagent context", async () => {
+      mockIsSubagent.mockReturnValue(true);
       const manager = makeManager();
       const ctx = makeCtx();
       manager.start(ctx);
@@ -106,13 +101,13 @@ describe("ForwardingManager", () => {
     });
 
     it("stops any existing poll when called with a subagent context", async () => {
-      mockIsSubagentExecutionContext.mockReturnValueOnce(false);
+      mockIsSubagent.mockReturnValueOnce(false);
       const manager = makeManager();
       const ctx1 = makeCtx();
       manager.start(ctx1);
 
       // Second call with a subagent context.
-      mockIsSubagentExecutionContext.mockReturnValue(true);
+      mockIsSubagent.mockReturnValue(true);
       const ctx2 = makeCtx();
       manager.start(ctx2);
 
@@ -180,21 +175,12 @@ describe("ForwardingManager", () => {
       expect(mockProcessInbox).toHaveBeenCalledTimes(2);
     });
 
-    it("passes subagentSessionsDir from the constructor to isSubagentExecutionContext", () => {
-      const manager = new ForwardingManager(
-        "/custom/subagent-dir",
-        makeForwarder(),
-        "linux",
-      );
+    it("consults the detector with the current context", () => {
+      const manager = makeManager();
       const ctx = makeCtx();
       manager.start(ctx);
 
-      expect(mockIsSubagentExecutionContext).toHaveBeenCalledWith(
-        ctx,
-        "/custom/subagent-dir",
-        "linux",
-        undefined,
-      );
+      expect(mockIsSubagent).toHaveBeenCalledWith(ctx);
     });
   });
 });

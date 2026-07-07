@@ -116,12 +116,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
 
   session = new PermissionSession(
     paths,
-    new ForwardingManager(
-      paths.subagentSessionsDir,
-      forwarder,
-      hostPlatform,
-      subagentRegistry,
-    ),
+    new ForwardingManager(subagentDetection, forwarder),
     permissionManager,
     sessionRules,
     configStore,
