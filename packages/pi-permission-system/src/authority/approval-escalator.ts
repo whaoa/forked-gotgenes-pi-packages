@@ -38,13 +38,13 @@ import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
 
 /**
- * Constructor config for `PermissionForwarder`.
+ * Constructor config for `ApprovalEscalator`.
  *
  * Replaces the `PermissionForwardingDeps` interface that was previously
- * threaded into free functions in `polling.ts`.  The forwarder consumes it
+ * threaded into free functions in `polling.ts`.  The escalator consumes it
  * once at construction and stores each member as a private readonly field.
  */
-export interface PermissionForwarderDeps {
+export interface ApprovalEscalatorDeps {
   forwardingDir: string;
   /** Single owner of subagent detection; gates the forward-vs-deny decision. */
   detection: SubagentDetector;
@@ -85,11 +85,11 @@ function getContextSystemPrompt(ctx: ForwarderContext): string | undefined {
 // ── Public seam interfaces ────────────────────────────────────────────────
 
 /**
- * Narrow seam describing what `PermissionPrompter` needs from the forwarder:
+ * Narrow seam describing what `PermissionPrompter` needs from the escalator:
  * a single method that resolves a permission decision for the current context
  * (prompt directly when the session has UI, otherwise forward to the parent).
  *
- * Depending on the interface (not the concrete `PermissionForwarder`) keeps
+ * Depending on the interface (not the concrete `ApprovalEscalator`) keeps
  * the prompter's unit tests free of casts — they inject a plain
  * `{ requestApproval: vi.fn() }` mock.
  */
@@ -102,7 +102,7 @@ export interface ApprovalRequester {
   ): Promise<PermissionPromptDecision>;
 }
 
-// ── PermissionForwarder ───────────────────────────────────────────────────
+// ── ApprovalEscalator ────────────────────────────────────────────────
 
 /**
  * Owner of the escalation-up role of the forwarded-permission behavior.
@@ -112,7 +112,7 @@ export interface ApprovalRequester {
  * forward to the parent, building and persisting request files, and polling
  * for responses.
  */
-export class PermissionForwarder implements ApprovalRequester {
+export class ApprovalEscalator implements ApprovalRequester {
   private readonly forwardingDir: string;
   private readonly detection: SubagentDetector;
   private readonly registry: SubagentSessionRegistry | undefined;
@@ -124,7 +124,7 @@ export class PermissionForwarder implements ApprovalRequester {
     options?: RequestPermissionOptions,
   ) => Promise<PermissionPromptDecision>;
 
-  constructor(deps: PermissionForwarderDeps) {
+  constructor(deps: ApprovalEscalatorDeps) {
     this.forwardingDir = deps.forwardingDir;
     this.detection = deps.detection;
     this.registry = deps.registry;

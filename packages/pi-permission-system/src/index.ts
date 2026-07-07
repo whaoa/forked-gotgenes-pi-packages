@@ -1,6 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, getPackageDir } from "@earendil-works/pi-coding-agent";
 import {
+  ApprovalEscalator,
+  type ApprovalEscalatorDeps,
+} from "./authority/approval-escalator";
+import {
   ForwardedRequestServer,
   type ForwardedRequestServerDeps,
 } from "./authority/forwarded-request-server";
@@ -13,10 +17,6 @@ import { DecisionAudit } from "./decision-audit";
 import { GateDecisionReporter } from "./decision-reporter";
 import { isYoloModeEnabled } from "./extension-config";
 import { computeExtensionPaths } from "./extension-paths";
-import {
-  PermissionForwarder,
-  type PermissionForwarderDeps,
-} from "./forwarded-permissions/permission-forwarder";
 import { ForwardingManager } from "./forwarding-manager";
 import {
   AgentPrepHandler,
@@ -95,14 +95,14 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     logger,
   });
 
-  const forwardingDeps: PermissionForwarderDeps = {
+  const escalatorDeps: ApprovalEscalatorDeps = {
     forwardingDir: paths.forwardingDir,
     detection: subagentDetection,
     registry: subagentRegistry,
     logger,
     requestPermissionDecisionFromUi,
   };
-  const forwarder = new PermissionForwarder(forwardingDeps);
+  const escalator = new ApprovalEscalator(escalatorDeps);
 
   const requestServerDeps: ForwardedRequestServerDeps = {
     forwardingDir: paths.forwardingDir,
@@ -116,7 +116,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const prompter = new PermissionPrompter({
     logger,
     events: pi.events,
-    forwarder,
+    forwarder: escalator,
   });
 
   const gateway = new PromptingGateway({

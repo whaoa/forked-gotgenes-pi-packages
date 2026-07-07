@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { ApprovalRequester } from "./forwarded-permissions/permission-forwarder";
+import type { ApprovalRequester } from "./authority/approval-escalator";
 import type { PermissionPromptDecision } from "./permission-dialog";
 import {
   emitUiPromptEvent,

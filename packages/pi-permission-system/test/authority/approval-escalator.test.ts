@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { PermissionForwarder } from "#src/forwarded-permissions/permission-forwarder";
+import { ApprovalEscalator } from "#src/authority/approval-escalator";
 import {
+  makeEscalatorDeps,
   makeForwarderContext,
-  makeForwarderDeps,
   makeUiDecision,
 } from "#test/helpers/forwarding-fixtures";
 import { makeEvents } from "#test/helpers/handler-fixtures";
@@ -16,11 +16,11 @@ describe("requestApproval — UI fast path", () => {
       .fn()
       .mockResolvedValue(makeUiDecision());
 
-    const forwarder = new PermissionForwarder(
-      makeForwarderDeps({ requestPermissionDecisionFromUi }),
+    const escalator = new ApprovalEscalator(
+      makeEscalatorDeps({ requestPermissionDecisionFromUi }),
     );
 
-    await forwarder.requestApproval(
+    await escalator.requestApproval(
       makeForwarderContext({ hasUI: true }),
       "Allow git push?",
     );
@@ -38,11 +38,11 @@ describe("requestApproval — non-UI, non-subagent path", () => {
     const events = makeEvents();
     const requestPermissionDecisionFromUi = vi.fn();
 
-    const forwarder = new PermissionForwarder(
-      makeForwarderDeps({ requestPermissionDecisionFromUi }),
+    const escalator = new ApprovalEscalator(
+      makeEscalatorDeps({ requestPermissionDecisionFromUi }),
     );
 
-    const result = await forwarder.requestApproval(
+    const result = await escalator.requestApproval(
       makeForwarderContext({ hasUI: false }),
       "Allow git push?",
     );
