@@ -41,3 +41,38 @@ All deterministic checks (`pnpm run check`, `pnpm run lint`, `pnpm run test`, `p
 - Updated the "What it consolidates" bullet in the Target authority-model section (not explicitly named in the plan's Module-Level Changes) to stop describing the split as future Phase 9 work, since Phase 8 Step 6 already completed it — judged this was within the plan's "verify no current-state prose still claims the class is unsplit" instruction rather than scope creep.
 - Pre-completion reviewer: **PASS**.
   No findings; verified the dependency partition, doc updates, cross-step invariants (Step 4 `#528` harness, Step 5 `#529` `SubagentDetector` seam), Mermaid diagrams, and planned follow-up issues (`#531`, `#532`) all check out.
+
+## Stage: Final Retrospective (2026-07-07T15:15:00Z)
+
+### Session summary
+
+Shipped Phase 8 Step 6 across three stages (plan → TDD → ship) with zero rework: the plan's dependency partition and 4-commit sequence held exactly as designed, the pre-completion reviewer returned PASS with no findings, and the release cut `pi-permission-system` 19.0.1.
+The only friction was external and transient — a live GitHub Actions incident (Jul 7 2026, ~15:06 UTC: 500 errors on Actions runners / Codespaces REST APIs, "retries may be successful") degraded the CI runners during the ship window, causing three intermittent failures that each cleared on re-run before the push and the release-please PR could land.
+
+### Observations
+
+#### What went well
+
+- Clean plan-to-execution fidelity: the planning-stage dependency partition (5-field `ApprovalEscalatorDeps` / 5-field `ForwardedRequestServerDeps`, shared `ForwarderContext` + `getSessionId`) landed verbatim, with no unplanned coupling and no deviations across the four TDD commits.
+- The single planning-stage `ask_user` gate (dedicated `forwarder-context.ts` vs. folding into `forwarding-io.ts` vs. duplication) resolved the one genuine design fork up front, so the TDD stage never had to stop for a structural decision.
+- Incremental verification during TDD: `pnpm run check` plus the affected test file ran after each of the four steps, not just at the end — the type-level break from narrowing `PermissionForwarderDeps` (Step 2) surfaced immediately rather than at end-of-cycle.
+
+#### What caused friction (agent side)
+
+- `other` (external platform incident) — CI failed three times on 5000ms `testTimeout` timeouts in `pi-session-tools` (`read-session.test.ts`, `read-session-file.test.ts`, `read-parent-session.test.ts` — a different test each run), a package untouched by `#530`.
+  Root cause was a live GitHub Actions incident (500s on Actions runners, "retries may be successful") degrading runner I/O during the window: those tests run in ~150ms healthy but exceeded 5000ms under the degraded runner, a >30× slowdown that a `testTimeout` bump would not reliably survive.
+  Impact: three re-run cycles (one on the `main` push, two on release-please PR #552) plus two `ask_user` operator round-trips before the release could land; no code rework.
+- `missing-context` (self-corrected, user-caught) — during the retro I first attributed the failures to thin-margin flaky tests and drafted a `pi-session-tools` follow-up issue, reasoning from a `fetch_content` of githubstatus.com that returned a stale/cached view (the live Jul 7 Actions incident was absent, showing June 25 as latest).
+  The operator supplied the live incident text, correcting the attribution.
+  Impact: two extra retro round-trips and a nearly-misfiled follow-up issue; the retro's friction attribution was corrected before landing.
+  Lesson: when a CI failure might be platform-related, treat "retries succeed" plus failures confined to I/O-heavy tests as a strong transient-infra signal, and verify against the status page's **active** incidents (or the status API) rather than a possibly-cached page fetch.
+
+#### What caused friction (user side)
+
+- The operator was pulled into three mechanical re-run confirmations during ship, then had to correct the retro's root-cause attribution — oversight and fact-correction rather than strategic judgment.
+  Opportunity: none actionable — the trigger was a transient GitHub platform incident, outside this repo's control.
+
+### Follow-ups
+
+- None.
+  The ship-stage failures were a transient GitHub Actions incident, not a test-quality defect, so no `pi-session-tools` fix is warranted (an earlier draft of this retro proposed one; it was withdrawn after the incident was confirmed).
