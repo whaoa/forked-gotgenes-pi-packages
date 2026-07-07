@@ -39,3 +39,49 @@ Test count unchanged at 110 (8 files) before and after; no production `src/` fil
 - Pre-completion reviewer: **PASS**.
   All deterministic checks (`pnpm run check`, root `pnpm run lint`, `vitest run` for `pi-session-tools`, `pnpm fallow dead-code`) passed; commit messages, code design, and doc surfaces (none reference the old per-test-import idiom) all verified clean.
   No WARN findings.
+
+## Stage: Final Retrospective (2026-07-07T17:10:00Z)
+
+### Session summary
+
+Shipped the test-only `testTimeout` fix across TDD and ship stages: two `test:` commits converting four `pi-session-tools` tool test files from per-`it()` `await import("#src/index")` to a single static top-level import, plus the planning/TDD retro breadcrumbs.
+CI passed on `653abca2`; issue #554 closed with an implemented-in summary; no release cut (every commit since `pi-session-tools-v1.2.0` is a hidden `test:` type or an excluded-path `docs:`, so the work auto-batches).
+An unusually clean, low-friction execution — the plan predicted every outcome and nothing deviated.
+
+### Observations
+
+#### What went well
+
+- **Verification-first plan structure paid off.**
+  The plan isolated its one genuinely-uncertain assumption (does vitest hoist `vi.mock` above a *static* import?) into TDD Step 1 as a single-file, run-in-isolation check before the mechanical rollout in Step 2.
+  The assumption held on first run, so Step 2 was pure mechanism with zero risk — a good template for "one empirical unknown, then N mechanical repetitions" refactors.
+- **Incremental verification cadence.**
+  Checks ran at every boundary: `vitest run <file>` + `check` after Step 1, full package `vitest run` + `check` after Step 2, then root `lint` + `fallow dead-code` + lockfile check before the pre-completion dispatch.
+  No end-of-session surprise — the feedback loop was tight throughout.
+- **The `grep -rn 'await import("#src/index")' test/` guard** from the plan's Risks section caught nothing (exit 1, as hoped) but was the right cheap confirmation that no stale dynamic import survived the multi-file Step 2 batch.
+
+#### What caused friction (agent side)
+
+- `other` — In both the pre-completion context-gathering (`git describe --tags --abbrev=0` → `pi-permission-system-v20.0.0`) and the ship close-comment range (`git log <pkg-tag>..HEAD`), the monorepo's linear history surfaced unrelated commits/files from other packages' prior sessions, because the most-recent-reachable tag is cross-package and far behind this package's actual baseline.
+  Impact: added friction but no rework — I manually scoped the reviewer prompt to the six #554 files and appended `-- packages/pi-session-tools/` to the `git log` to filter.
+  Both corrections were self-identified and handled in-stride; no follow-up commits.
+
+#### What caused friction (user side)
+
+- None.
+  The plan was unambiguous and operator-authored, so no mid-session clarification or correction was needed at any stage.
+
+### Diagnostic details
+
+- **Model-performance correlation** — One subagent dispatch: the `pre-completion-reviewer` on `anthropic/claude-sonnet-5` (its pinned frontmatter model), 23 tool uses / 100s, returned PASS.
+  Appropriate pairing — a capable reasoning model on a judgment-heavy review checklist, not a mechanical task.
+- **Feedback-loop gap analysis** — Exemplary; no gap.
+  Verification ran incrementally after each TDD step rather than batched at the end (see "Incremental verification cadence" above).
+- **Escalation-delay / unused-tool lenses** — Nothing notable; no `rabbit-hole` or `missing-context` friction points arose, so no subagent or tool went underused.
+
+### Changes made
+
+1. `.pi/skills/testing/SKILL.md` — added a bullet to the *vi.mock and hoisting* subsection: prefer a static top-level `import` of the module-under-test over a per-test `await import(...)`, since Vitest hoists `vi.mock()`/`vi.hoisted()` above static imports and a per-test dynamic import of a heavy-dep module races the `testTimeout` window (Refs #554).
+2. `packages/pi-session-tools/docs/retro/0554-session-tools-test-static-import.md` — this Final Retrospective stage entry.
+
+Considered but not landed: package-scoping the `pre-completion` skill's Step 1 diff baseline (cosmetic monorepo papercut, handled in-stride, no rework) — left as an observation, not a change.

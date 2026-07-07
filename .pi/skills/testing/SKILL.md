@@ -20,6 +20,8 @@ Load this skill when writing, debugging, or planning tests.
 - When mocking a class constructor with `vi.mock()`, use `vi.fn()` with no implementation — not `vi.fn(() => ({}))`.
   Arrow-function implementations are not constructable; `new MockClass()` throws `"is not a constructor"`.
 - When mocking `node:*` built-in modules with `vi.mock()`, include a `default` key mirroring the named exports — omitting it causes "No default export defined on the mock" errors.
+- Import the module-under-test with a static top-level `import`, not a per-test `await import(...)` — Vitest hoists `vi.mock()`/`vi.hoisted()` above static imports, so the mock still applies.
+  A per-test dynamic import of a module that transitively pulls heavy deps pays the transform/resolve cost inside each test's `testTimeout` window and can flake CI (Refs #554).
 
 ### Typing mock functions
 
