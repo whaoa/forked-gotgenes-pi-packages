@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, getPackageDir } from "@earendil-works/pi-coding-agent";
+import { SubagentDetection } from "./authority/subagent-detection";
 import { registerBuiltinToolInputFormatters } from "./builtin-tool-input-formatters";
 import { registerPermissionSystemCommand } from "./config-modal";
 import { getGlobalConfigPath } from "./config-paths";
@@ -49,6 +50,13 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const hostPlatform = process.platform;
   const sessionRules = new SessionRules();
   const subagentRegistry = getSubagentSessionRegistry();
+  // Single owner of subagent detection, shared across every consumer instead of
+  // threading the (subagentSessionsDir, platform, registry) triple into each.
+  const subagentDetection = new SubagentDetection({
+    subagentSessionsDir: paths.subagentSessionsDir,
+    platform: hostPlatform,
+    registry: subagentRegistry,
+  });
   const formatterRegistry = new ToolInputFormatterRegistry();
   registerBuiltinToolInputFormatters(formatterRegistry);
   const accessExtractorRegistry = new ToolAccessExtractorRegistry();
@@ -102,9 +110,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   });
 
   const gateway = new PromptingGateway({
-    subagentSessionsDir: paths.subagentSessionsDir,
-    platform: hostPlatform,
-    registry: subagentRegistry,
+    detection: subagentDetection,
     prompter,
   });
 

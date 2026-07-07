@@ -8,6 +8,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { SubagentDetector } from "#src/authority/subagent-detection";
 import type { PermissionPromptDecision } from "#src/permission-dialog";
 import type {
   PermissionPrompterApi,
@@ -59,14 +60,15 @@ function makeDetails(): PromptPermissionDetails {
   };
 }
 
+function makeDetection(isSubagent = false): SubagentDetector {
+  return { isSubagent: vi.fn(() => isSubagent) };
+}
+
 function makeDeps(
   overrides: Partial<PromptingGatewayDeps> = {},
 ): PromptingGatewayDeps {
   return {
-    subagentSessionsDir:
-      overrides.subagentSessionsDir ?? "/test/agent/subagent-sessions",
-    platform: overrides.platform ?? "linux",
-    registry: overrides.registry,
+    detection: overrides.detection ?? makeDetection(),
     prompter: overrides.prompter ?? makePrompterApi(),
   };
 }
@@ -92,12 +94,12 @@ describe("PromptingGateway", () => {
       expect(gateway.canConfirm()).toBe(false);
     });
 
-    it("returns true when running as a subagent (env hint)", () => {
-      vi.stubEnv("PI_IS_SUBAGENT", "1");
-      const gateway = new PromptingGateway(makeDeps());
+    it("returns true when the detector reports a subagent context", () => {
+      const gateway = new PromptingGateway(
+        makeDeps({ detection: makeDetection(true) }),
+      );
       gateway.activate(makeCtx({ hasUI: false }));
       expect(gateway.canConfirm()).toBe(true);
-      vi.unstubAllEnvs();
     });
 
     it("returns false after deactivate", () => {

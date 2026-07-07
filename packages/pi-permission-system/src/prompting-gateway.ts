@@ -1,27 +1,22 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isSubagentExecutionContext } from "./authority/subagent-context";
+import type { SubagentDetector } from "./authority/subagent-detection";
 import type { GatePrompter } from "./gate-prompter";
 import type { PermissionPromptDecision } from "./permission-dialog";
 import type {
   PermissionPrompterApi,
   PromptPermissionDetails,
 } from "./permission-prompter";
-import type { SubagentSessionRegistry } from "./subagent-registry";
 
 /**
  * Dependencies required by PromptingGateway.
  *
  * All fields are actively consumed:
- * - `subagentSessionsDir` + `registry` drive `canConfirm()`.
+ * - `detection` drives `canConfirm()`.
  * - `prompter` is called by `prompt()`.
  */
 export interface PromptingGatewayDeps {
-  /** Static path used to detect a forwarding subagent context. */
-  subagentSessionsDir: string;
-  /** Host platform, injected from the composition root, for subagent-context path detection. */
-  platform: NodeJS.Platform;
-  /** Process-global registry used to detect a registered child session. */
-  registry?: SubagentSessionRegistry;
+  /** Single owner of subagent detection; drives `canConfirm()`. */
+  detection: SubagentDetector;
   /** Resolves the permission decision: direct UI dialog or forwarded to parent. */
   prompter: PermissionPrompterApi;
 }
@@ -74,15 +69,7 @@ export class PromptingGateway
    */
   canConfirm(): boolean {
     if (this.context === null) return false;
-    return (
-      this.context.hasUI ||
-      isSubagentExecutionContext(
-        this.context,
-        this.deps.subagentSessionsDir,
-        this.deps.platform,
-        this.deps.registry,
-      )
-    );
+    return this.context.hasUI || this.deps.detection.isSubagent(this.context);
   }
 
   /**
