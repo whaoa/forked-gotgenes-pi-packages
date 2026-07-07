@@ -867,7 +867,7 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
 ### Steps
 
 1. **Introduce the `Authorizer` spine: interface, three implementations, once-per-session selection.**
-   Cause: the three-way "who decides" dispatch is buried inside `ApprovalEscalator.requestApproval` and re-derived per prompt; the fallow signal (`waitForForwardedApproval` at 77 lines inside a class that also owns dispatch) is a symptom.
+   ([#555]) Cause: the three-way "who decides" dispatch is buried inside `ApprovalEscalator.requestApproval` and re-derived per prompt; the fallow signal (`waitForForwardedApproval` at 77 lines inside a class that also owns dispatch) is a symptom.
    Target: new `src/authority/authorizer.ts` (`Authorizer` interface — `authorize(details): Promise<PermissionPromptDecision>` — plus `selectAuthorizer(ctx, detection)`), new `src/authority/local-user-authorizer.ts` (owns `ctx.ui` + `requestPermissionDecisionFromUi` + direct UI-prompt event emission), new `src/authority/denying-authorizer.ts` (least-privilege deny), `src/authority/approval-escalator.ts` (sheds its `hasUI` and not-a-subagent arms; its forwarding machinery becomes the `ParentAuthorizer`), `src/prompting-gateway.ts` rewritten as the selection owner at `src/authority/authorizer-selection.ts` (context stored at `activate`, authorizer selected once per session), `src/permission-prompter.ts` → `src/authority/permission-prompter.ts` (keeps review-log bracketing, delegates to the selected `Authorizer`, drops per-call `ctx` threading).
    Smell: Category C (missing domain concept; relay chain of 4 role interfaces to reach one dialog).
    Outcome: the `hasUI`/`isSubagent`/deny dispatch exists in exactly one place (`selectAuthorizer`); predicates evaluated once per session activation; behavior-neutral — existing review-log and decision-event tests pass unchanged.
@@ -875,7 +875,7 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
    Release: independent
 
 2. **Dissolve `canConfirm()`: the ask path always escalates.**
-   Cause: "can anyone answer" is a pre-check duplicating the selection knowledge; with `DenyingAuthorizer`, absent authority is an authorizer that answers, not a boolean smeared across the gateway, gate, and runner.
+   ([#556]) Cause: "can anyone answer" is a pre-check duplicating the selection knowledge; with `DenyingAuthorizer`, absent authority is an authorizer that answers, not a boolean smeared across the gateway, gate, and runner.
    Target: delete `src/gate-prompter.ts`; `src/permission-gate.ts` drops the `canConfirm` param (`ask` always awaits `promptForApproval`); `src/handlers/gates/runner.ts` drops the pre-check; `src/handlers/gates/helpers.ts` derives `confirmation_unavailable` from a marker on the `DenyingAuthorizer`'s decision (mirroring the existing `autoApproved` marker) so review-log/decision-event parity holds.
    Smell: Category C (scattered boolean policy) / Category A (parameter dead after Step 1).
    Outcome: `canConfirm` occurrences in `src/` drop 15 → 0; `runDescriptor` sheds the pre-check plumbing; blocked-when-unavailable review entries byte-identical to today.
@@ -883,7 +883,7 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
    Release: independent
 
 3. **Serving is resolution: rebuild `processInbox` on `evaluate()` + the serving session's `Authorizer`.**
-   Cause: the serving node answers escalations without consulting its own recorded authority ([resolved direction](#resolved-direction) 1), so parent policy cannot govern a child's escalation and yolo needs the bespoke serve-time check.
+   ([#557]) Cause: the serving node answers escalations without consulting its own recorded authority ([resolved direction](#resolved-direction) 1), so parent policy cannot govern a child's escalation and yolo needs the bespoke serve-time check.
    Target: `src/authority/forwarded-request-server.ts` — inject a resolver view + the session's selected `Authorizer`; a request carrying `(surface, value)` resolves against the serving node's composed ruleset (`allow`, including yolo-rewritten, auto-approves — yolo inheritance for free; `deny` auto-denies; `ask` or missing fields escalates to the serving `Authorizer`); remove `isYoloModeEnabled` + the `ConfigReader` dep; add the one-hop canary (loud warning when a request arrives from a requester that is itself a registered non-root subagent).
    Smell: Category C (duplicate policy enforcement; single source of truth) / Category A (bespoke yolo arm).
    Outcome: zero yolo checks outside the composed ruleset; `processSingleForwardedRequest` < 60 lines; behavior change (ships as `feat:`): parent `allow`/`deny` rules now govern children's escalations.
@@ -891,7 +891,7 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
    Release: independent
 
 4. **Grant-scope selection on forwarded approvals.**
-   Cause: [resolved direction](#resolved-direction) 4 — a forwarded "for this session" grant can today land only on the requesting subagent; the human cannot choose the serving scope.
+   ([#558]) Cause: [resolved direction](#resolved-direction) 4 — a forwarded "for this session" grant can today land only on the requesting subagent; the human cannot choose the serving scope.
    Target: `src/permission-forwarding.ts` (request carries the child's suggested session pattern), `src/authority/approval-escalator.ts` (rides the existing `sessionApproval` suggestion along), `src/authority/forwarded-request-server.ts` + `src/permission-dialog.ts` (scope-aware dialog options — requesting subagent pre-selected as the least-privilege default); a whole-session grant records into the serving node's own `SessionRules`.
    Smell: completes the Category C authority model (feature riding the spine).
    Outcome: the forwarded dialog offers "this subagent only" (default) vs "whole session"; a whole-session grant suppresses future prompts for the parent and all children (verified by a composition-root round-trip test).
@@ -899,7 +899,7 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
    Release: independent
 
 5. **Complete the `authority/` migration.**
-   Cause: Phase 8's forward-looking directory sketch names the elicitation and subagent modules as `authority/` residents; Steps 1–4 rewrite most of them into place, and this step moves the mechanical remainder so the domain is closed and files move once.
+   ([#559]) Cause: Phase 8's forward-looking directory sketch names the elicitation and subagent modules as `authority/` residents; Steps 1–4 rewrite most of them into place, and this step moves the mechanical remainder so the domain is closed and files move once.
    Target: `src/permission-dialog.ts`, `src/permission-forwarding.ts`, `src/subagent-registry.ts`, `src/subagent-lifecycle-events.ts`, `src/forwarding-manager.ts` → `src/authority/`; imports rewritten via the `#src/` aliases.
    Smell: Category E (flat directory).
    Outcome: all escalation/forwarding/subagent modules live under `src/authority/`; flat `src/` root drops ~67 → ~62 modules; no behavior change.
@@ -910,11 +910,11 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
 
 ```mermaid
 flowchart TD
-    S1["Step 1<br/>Authorizer interface + selection"]
-    S2["Step 2<br/>Dissolve canConfirm"]
-    S3["Step 3<br/>Serving is resolution"]
-    S4["Step 4<br/>Grant-scope selection"]
-    S5["Step 5<br/>Complete authority/ migration"]
+    S1["Step 1 (#555)<br/>Authorizer interface + selection"]
+    S2["Step 2 (#556)<br/>Dissolve canConfirm"]
+    S3["Step 3 (#557)<br/>Serving is resolution"]
+    S4["Step 4 (#558)<br/>Grant-scope selection"]
+    S5["Step 5 (#559)<br/>Complete authority/ migration"]
 
     S1 --> S2
     S1 --> S3
@@ -1058,4 +1058,9 @@ Eight steps ([#525]–[#532]), all closed.
 [#519]: https://github.com/gotgenes/pi-packages/issues/519
 [#520]: https://github.com/gotgenes/pi-packages/issues/520
 [#521]: https://github.com/gotgenes/pi-packages/issues/521
+[#555]: https://github.com/gotgenes/pi-packages/issues/555
+[#556]: https://github.com/gotgenes/pi-packages/issues/556
+[#557]: https://github.com/gotgenes/pi-packages/issues/557
+[#558]: https://github.com/gotgenes/pi-packages/issues/558
+[#559]: https://github.com/gotgenes/pi-packages/issues/559
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
