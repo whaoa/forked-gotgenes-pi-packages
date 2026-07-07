@@ -46,5 +46,44 @@ All 2272 `pi-permission-system` tests pass (no count delta — assertions moved,
 - Pre-completion reviewer: **PASS**.
   No blocking or non-blocking findings; the fallow health-row deviation was explicitly called out as documented, not a defect.
 
+## Stage: Final Retrospective (2026-07-07T19:15:00Z)
+
+### Session summary
+
+Shipped Phase 8 Step 8 across three clean stages (Planning, TDD, Ship): moved the domain guards `isPermissionState`/`isDenyWithReason` from `value-guards.ts` to `types.ts`, repointed three consumers, split the guard tests into `test/types.test.ts`, and marked Phase 8 complete in `architecture.md`.
+CI landed green on `554479f9`, issue #532 was closed, and — as expected for an all-`refactor:`/excluded-`docs:` range — no release was cut; the work auto-batches into the next release.
+
+### Observations
+
+#### What went well
+
+- **The plan pre-priced its own deviation.**
+  The plan's Risks section predicted that `fallow` might not clear `value-guards.ts` to 0 targets (the fan-in lives on the retained generic guards, not the moved domain guards) and pre-authorized recording the actual count instead of forcing the projected `0`.
+  When the deviation materialized exactly as predicted, the TDD stage applied the pre-agreed handling with no scramble and no re-decision — a case of planning-stage foresight eliminating implementation-stage friction.
+  The pre-completion reviewer then classified it as documented, not a defect.
+- **Single-atomic-step discipline held.**
+  Removing the two exports breaks every importer at the type level in one commit, so the plan folded extraction + three consumer repoints + test move into one step (mirroring [#479]).
+  Execution matched: one `refactor:` commit, `pnpm run check` run immediately after the import change, clean.
+- **Incremental verification throughout.**
+  Red ran the affected test file, Green re-ran it, `pnpm run check` fired right after the shared-import change, then full suite → lint → `fallow dead-code` — no end-of-session verification pile-up.
+
+#### What caused friction (agent side)
+
+- `other` (tool-interaction) — the first Red-phase `Edit` batch was rejected with `edits.1.newText: must have required properties newText` when a block-deletion used an empty-string `newText`; the immediate retry with the same empty-string replacement succeeded.
+  Impact: one extra tool call, no rework, no behavior effect.
+  Too minor and too generic (not project-specific) to warrant a rule.
+- `other` (convention nuance, self-identified) — a `[#532]` reference-style link was initially placed inside the `architecture.md` module-tree fenced code block; caught against the `markdown-conventions` rule (issue refs inside fenced blocks are bare, matching the block's `(#547)` style) and corrected to bare `#532` before commit.
+  Impact: caught pre-commit, no rework.
+
+#### What caused friction (user side)
+
+- None.
+  The issue was operator-authored, the plan was unambiguous, and no mid-session correction was needed.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0532-split-value-guards-by-cohesion.md`.
+   No `AGENTS.md` or prompt changes — the session surfaced no reusable process gap.
+
 [#479]: https://github.com/gotgenes/pi-packages/issues/479
 [#547]: https://github.com/gotgenes/pi-packages/issues/547
