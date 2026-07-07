@@ -50,3 +50,50 @@ Pre-completion reviewer: initial **WARN** (one finding), resolved and re-reviewe
   This is the third doc surface the plan's grep missed; three misses in one `docs/guides/` directory suggests a directory-level grep (`docs/guides/*.md` for the mechanism name) would have caught all three at plan time instead of trickling out across lint, a manual grep, and the reviewer.
 - Takeaway for future RPC/mechanism-removal plans: when Module-Level Changes lists specific doc files by name, also run one unscoped `grep -rn <mechanism-name> docs/` before finalizing the plan — the reworked-mechanism grep guidance in AGENTS.md says to grep the mechanism name, but doing it file-by-file (as this plan did) missed siblings in the same directory as the one file that was checked.
 - No steps remain — both TDD Order steps and the `#309` comment are complete.
+
+## Stage: Final Retrospective (2026-07-07T19:16:59Z)
+
+### Session summary
+
+Shipped Phase 8 Step 7 end-to-end (plan → TDD → ship) in one session: pushed the atomic `feat!` removal plus docs repoint, closed #531, merged release-please PR #553, and cut `pi-permission-system-v20.0.0` (major, breaking).
+The removal itself was mechanically clean — `tsc` caught every dangling import, the pre-completion reviewer caught one real doc-staleness WARN, and the ship flow self-corrected a post-merge CI flake.
+The dominant cross-session pattern was a doc-grep scope gap at plan time: three shipped `docs/` surfaces referencing the RPC mechanism were missed and trickled out across three separate detection points.
+
+### Observations
+
+#### What went well
+
+- The atomic-removal design held: dropping the public exports from `permission-events.ts` broke `service.ts` and three consumer test files at the type level in one commit, and `pnpm run check` surfaced all of them at once — the plan's "tsc catches any missed importer" claim proved exact, with `src/` compiling clean on the first pass.
+- The pre-completion reviewer earned its keep: it caught a shipped, README-linked doc (`docs/guides/upstream-issue-template.md`) with a dead `#policy-query-rpc-deprecated` anchor that neither lint nor the manual grep had flagged — a genuine WARN → fix → PASS cycle, not a rubber stamp.
+- The ship flow diagnosed and cleared a post-merge CI flake without user help: `ci_find` on the release-merge SHA showed the `check` job failed, `--log-failed` identified two unrelated `pi-session-tools` timeouts, and `gh run rerun --failed` unblocked the release tag in one retry (2 diagnostic tool calls, no rabbit-hole).
+
+#### What caused friction (agent side)
+
+- `missing-context` — the plan's Module-Level Changes enumerated only `docs/cross-extension-api.md` and `docs/architecture/architecture.md` as doc touch-points; a repo-wide `grep -rn permissions:rpc docs/` at plan time was never run, so three sibling docs referencing the removed mechanism (`docs/subagent-integration.md`, `docs/guides/permission-frontmatter-for-subagent-extensions.md`, `docs/guides/upstream-issue-template.md`) were missed.
+  Impact: doc fixes trickled out across three detection points during TDD/ship — root `rumdl` (`MD051` fragment link), a post-implementation manual grep, and the pre-completion reviewer's WARN — costing one extra amend cycle on the docs commit instead of one clean pass.
+- `missing-context` — the package skill (`.pi/skills/package-pi-permission-system/SKILL.md`) still names the deleted `permission-event-rpc.ts` handler (line 125) and lists "RPC" as a live `pi.events` channel (line 120) after the ship.
+  The existing `/plan-issue` rule to "grep `.pi/skills/package-*/SKILL.md` for every removed symbol" would have caught `permission-event-rpc.ts`, but it was not applied at plan or TDD time, and the pre-completion reviewer's doc sweep did not cover `.pi/skills/`.
+  Impact: the skill shipped stale — a factual error the next reader of that skill inherits; fixed in this retro.
+
+#### What caused friction (user side)
+
+- None — the entire plan → TDD → ship → retro arc ran autonomously with no user correction or redirection.
+  The one moment where earlier context could have helped is orthogonal to this issue: the flaky `pi-session-tools` timeouts are a pre-existing infrastructure gap the operator may already know about, but nothing about this issue's flow depended on it.
+
+### Diagnostic details
+
+- **Feedback-loop gap analysis** — verification ran incrementally and caught most issues at the right layer (`pnpm run check` after the atomic removal; root `pnpm run lint` for the cross-file `MD051`).
+  The one gap: no `.pi/skills/` grep ran at any stage, so the stale skill references slipped past both the TDD-time symbol grep and the pre-completion reviewer, surfacing only in this retro.
+- **Escalation-delay / unused-tool** — no rabbit-holes; the CI-flake diagnosis was 2 tool calls.
+  The doc-grep gap was a grep-*scope* miss, not a missing-tool miss — a single unscoped `grep -rn` would have closed it, no subagent needed.
+
+### Follow-up (not implemented here)
+
+- The `pi-session-tools` tests `test/read-parent-session.test.ts` and `test/read-session-file.test.ts` timed out at 5000ms on the release-merge commit, blocking the release tag until a rerun.
+  These are flaky, unrelated to #531, and live in a different package — worth a separate GitHub issue against `pi-session-tools` (raise the `testTimeout` or fix the dynamic-`import("#src/index")` slow path), then `/plan-issue` on it.
+  Out of scope for this retro.
+
+### Changes made
+
+1. `.pi/skills/package-pi-permission-system/SKILL.md` — dropped the two stale RPC references left by #531: the `pi.events` bullet no longer lists "RPC" (now names the three surviving broadcasts), and the `LocalPermissionsService` paragraph no longer cites the deleted `permission-event-rpc.ts` handler; added a one-line note that #531 removed the RPC channel and the `Symbol.for()` accessor is the sole cross-extension surface.
+2. `.pi/prompts/plan-issue.md` — extended the Module-Level Changes removed-export grep guidance: when the removed export is a public or cross-extension API surface, also grep the whole `packages/<PKG>/docs/` tree, not just `docs/architecture/` (Refs #531).

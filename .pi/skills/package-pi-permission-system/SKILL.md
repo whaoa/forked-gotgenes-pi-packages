@@ -117,12 +117,13 @@ A regression guard lives in `test/composition-root.test.ts` ("session approvals 
 
 Shared communication channels:
 
-- **`pi.events`** (the event bus) — for fire-and-forget broadcasts and RPC.
+- **`pi.events`** (the event bus) — for fire-and-forget broadcasts (`permissions:ready` / `permissions:ui_prompt` / `permissions:decision`).
 - **`globalThis` + `Symbol.for()`** — process-global by spec, survives jiti isolation.
   Use for direct service access.
 
+The deprecated event-bus RPC channel (`permissions:rpc:check` / `permissions:rpc:prompt`) was removed in #531; the `Symbol.for()` service accessor is the sole cross-extension policy/prompt surface.
 The in-process implementation of `PermissionsService` is `LocalPermissionsService` (`src/permissions-service.ts`).
-It and the event-bus RPC check handler (`permission-event-rpc.ts`) route policy queries through the `PermissionResolver`, not `PermissionManager` directly: a path-shaped surface (`path` / `external_directory` / `read` / `write` / `edit` / `grep` / `find` / `ls`) query builds an `AccessPath` via `buildAccessIntentForSurface` and emits an `access-path` intent, so external queries match the lexical ∪ canonical set the gates do (#503); the normalizer is fetched per call from the session (`getPathNormalizer()`), so the published service answers against the parent cwd.
+It routes policy queries through the `PermissionResolver`, not `PermissionManager` directly: a path-shaped surface (`path` / `external_directory` / `read` / `write` / `edit` / `grep` / `find` / `ls`) query builds an `AccessPath` via `buildAccessIntentForSurface` and emits an `access-path` intent, so external queries match the lexical ∪ canonical set the gates do (#503); the normalizer is fetched per call from the session (`getPathNormalizer()`), so the published service answers against the parent cwd.
 The `session_start`-gated publication, #302 subagent-child guard, ready-event emit, and session teardown ordering are all owned by `PermissionServiceLifecycle` (`src/service-lifecycle.ts`), which is injected into `SessionLifecycleHandler`.
 Changes to publication timing or teardown order should go through `PermissionServiceLifecycle`, not `index.ts`.
 
