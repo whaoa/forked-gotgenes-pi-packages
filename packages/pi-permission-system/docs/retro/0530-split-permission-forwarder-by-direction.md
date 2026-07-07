@@ -74,5 +74,11 @@ The only friction was external and transient — a live GitHub Actions incident 
 
 ### Follow-ups
 
-- None.
-  The ship-stage failures were a transient GitHub Actions incident, not a test-quality defect, so no `pi-session-tools` fix is warranted (an earlier draft of this retro proposed one; it was withdrawn after the incident was confirmed).
+- **Correction (added post-commit, same day):** a fourth CI failure recurred hours later (Jul 7 ~19:21 UTC, `read-parent-session.test.ts`) with `githubstatus.com` reporting all systems operational — falsifying "transient GitHub incident" as the sole/durable explanation above.
+  Re-diagnosed: every failure across all four runs is the **first `it()` block** in one of `read-session.test.ts` / `read-session-file.test.ts` / `read-parent-session.test.ts`, each of which does `await import("#src/index")` inside the test body.
+  `#src/index.ts` transitively pulls in `@earendil-works/pi-coding-agent` / `@earendil-works/pi-ai` / `@earendil-works/pi-tui`; Vitest isolates each test file's module registry, so the cold-import cost is paid on the first call per file and races the 5000ms default `testTimeout` under CI parallel-package contention.
+  A fourth file, `list-session-files.test.ts`, rides the same edge (3.5–4.9s observed, never yet crossed).
+  The Jul 7 15:06 UTC Actions incident (500s on runners) likely was real and made the first three failures *more* likely that day, but the underlying vulnerability is independent of it and reproduces on a clean platform.
+  Filing a `pi-session-tools` issue to fix this is warranted after all: the dynamic per-test `import()` is unnecessary (Vitest hoists `vi.mock("node:fs", ...)` above all imports automatically, so a static top-level `import sessionTools from "#src/index"` would receive the mock and pay the cost once during collection instead of racing a per-test timer) — see the issue filed for the fix.
+  Lesson for future incident-attribution: a single external corroborating signal (a status-page incident) can still leave a *coincidental* co-occurrence undiagnosed; the recurrence check (does it reproduce absent the external cause?) is what actually distinguishes platform-caused from test-caused flakiness, not the initial correlation alone.
+  Filed as [#554](https://github.com/gotgenes/pi-packages/issues/554) with the full timing evidence and a candidate fix (replace the per-test dynamic `import("#src/index")` with a static top-level import — `vi.mock` hoisting makes the dynamic form unnecessary).
