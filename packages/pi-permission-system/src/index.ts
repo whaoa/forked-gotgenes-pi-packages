@@ -93,8 +93,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
 
   const forwardingDeps: PermissionForwarderDeps = {
     forwardingDir: paths.forwardingDir,
-    subagentSessionsDir: paths.subagentSessionsDir,
-    platform: hostPlatform,
+    detection: subagentDetection,
     registry: subagentRegistry,
     events: pi.events,
     logger,

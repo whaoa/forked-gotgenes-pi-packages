@@ -5,7 +5,7 @@ import {
   getActiveAgentNameFromSystemPrompt,
   type SessionEntryView,
 } from "#src/active-agent";
-import { isSubagentExecutionContext } from "#src/authority/subagent-context";
+import type { SubagentDetector } from "#src/authority/subagent-detection";
 import type { ConfigReader } from "#src/config-store";
 import { isYoloModeEnabled } from "#src/extension-config";
 import type {
@@ -51,7 +51,7 @@ import {
 /**
  * Narrow context the forwarder reads: the UI gate (`hasUI`), the dialog UI
  * surface, and the three session-manager readers it uses directly or via
- * {@link isSubagentExecutionContext} / {@link getActiveAgentName}.
+ * {@link SubagentDetector} / {@link getActiveAgentName}.
  *
  * `getSystemPrompt` is read reflectively (see `getContextSystemPrompt`), so it
  * is intentionally not a typed member. A full `ExtensionContext` satisfies this
@@ -76,10 +76,9 @@ export interface ForwarderContext {
  */
 export interface PermissionForwarderDeps {
   forwardingDir: string;
-  subagentSessionsDir: string;
-  /** Host platform, injected from the composition root, for subagent-context path detection. */
-  platform: NodeJS.Platform;
-  /** In-process subagent session registry for detection and forwarding target resolution. */
+  /** Single owner of subagent detection; gates the forward-vs-deny decision. */
+  detection: SubagentDetector;
+  /** In-process subagent session registry for forwarding target resolution. */
   registry?: SubagentSessionRegistry;
   /** Event bus used for UI prompt broadcasts. */
   events?: PermissionEventBus;
@@ -186,8 +185,7 @@ export interface InboxProcessor {
  */
 export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
   private readonly forwardingDir: string;
-  private readonly subagentSessionsDir: string;
-  private readonly platform: NodeJS.Platform;
+  private readonly detection: SubagentDetector;
   private readonly registry: SubagentSessionRegistry | undefined;
   private readonly events: PermissionEventBus | undefined;
   private readonly logger: DebugReviewLogger;
@@ -201,8 +199,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
 
   constructor(deps: PermissionForwarderDeps) {
     this.forwardingDir = deps.forwardingDir;
-    this.subagentSessionsDir = deps.subagentSessionsDir;
-    this.platform = deps.platform;
+    this.detection = deps.detection;
     this.registry = deps.registry;
     this.events = deps.events;
     this.logger = deps.logger;
@@ -231,14 +228,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
       );
     }
 
-    if (
-      !isSubagentExecutionContext(
-        ctx,
-        this.subagentSessionsDir,
-        this.platform,
-        this.registry,
-      )
-    ) {
+    if (!this.detection.isSubagent(ctx)) {
       return Promise.resolve({ approved: false, state: "denied" });
     }
 
@@ -313,12 +303,7 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
     const requesterSessionId = getSessionId(ctx);
     const targetSessionId = resolvePermissionForwardingTargetSessionId({
       hasUI: ctx.hasUI,
-      isSubagent: isSubagentExecutionContext(
-        ctx,
-        this.subagentSessionsDir,
-        this.platform,
-        this.registry,
-      ),
+      isSubagent: this.detection.isSubagent(ctx),
       currentSessionId: requesterSessionId,
       env: process.env,
       sessionId: requesterSessionId,

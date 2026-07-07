@@ -89,14 +89,17 @@ export function createForwardingTempDir(
   };
 }
 
-/** Builds `PermissionForwarderDeps` with linux defaults and an approving UI. */
+/**
+ * Builds `PermissionForwarderDeps` with a non-subagent detector and an
+ * approving UI. Pass `detection: { isSubagent: () => true }` to exercise the
+ * forwarded path.
+ */
 export function makeForwarderDeps(
   overrides: Partial<PermissionForwarderDeps> = {},
 ): PermissionForwarderDeps {
   return {
     forwardingDir: "/tmp/forwarding",
-    subagentSessionsDir: "/tmp/subagents",
-    platform: "linux",
+    detection: { isSubagent: vi.fn((): boolean => false) },
     logger: { review: vi.fn(), debug: vi.fn() },
     requestPermissionDecisionFromUi: vi
       .fn()
