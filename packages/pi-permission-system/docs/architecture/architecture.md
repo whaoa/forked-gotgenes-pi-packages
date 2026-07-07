@@ -678,6 +678,36 @@ A wrong classifier call is a misread of what is being accessed; a wrong Authoriz
 Because the classifier changes the *input* to the deterministic core, it weakens the "same `(toolName, input)` yields the same ruling" property more subtly than the Authorizer does — the model output becomes part of the intent — so it warrants its own decision record and is deliberately out of scope for the current target.
 The access-intent domain the gates emit into is the natural seam for such a pluggable classifier: deterministic today, model-assisted only if and when that trade is made by name.
 
+### Beyond the target: a pluggable escalation seam
+
+Like the classifier above, this is a **more distant** direction than the target — noted as a candidate extension point, not planned work; input to the Phase 9 spine design, not a step of it.
+
+The [#261]/[#267] inversion made pi-subagents pure — it publishes its child lifecycle and knows nothing about consumers ([ADR-0002]) — but the purity is one-sided: this package is the integration owner.
+It knows pi-subagents' event channel names (`subagent-lifecycle-events.ts`), hardcodes an env-hint inventory of known third-party subagent extensions (`SUBAGENT_ENV_HINT_KEYS`), and bakes in a session-directory heuristic.
+Supporting a new delegation framework — or something that is not a subagent extension at all, such as a chat-approval bot or a remote review surface — means editing this package.
+
+The subagent machinery decomposes into three roles a seam would name and separate:
+
+- **Detection** — is this session a delegated context?
+  This is an Authorizer-selection predicate; [#529]'s `SubagentDetection` gives it one owner.
+- **Target resolution** — where does authority live for this session; which node serves the escalation (`resolvePermissionForwardingTargetSessionId` today).
+- **Transport** — how an `ask` travels to that authority and the ruling returns (the file-based request/response polling today; [#530]'s `ApprovalEscalator`).
+
+A registered provider is exactly a selection predicate plus a `ParentAuthorizer`-shaped transport: "when my predicate matches this session and recorded authority is silent, escalate through me."
+The `Authorizer` spine is therefore the seam — this direction is the spine's registration story, not a mechanism beside it.
+
+Two shapes, the second generalizing the first:
+
+1. **A bridge extension** — a third package subscribes to pi-subagents' lifecycle and registers with this package's public seam, leaving both cores pure.
+   A dedicated glue extension knowing both ends is the sanctioned complement of the rule against outbound bridges *from a core*.
+2. **A dogfooded provider seam** — this package defines the registration API and implements its own built-in pi-subagents integration through it, the way `registerToolAccessExtractor` / `registerToolInputFormatter` already let extensions plug the gates; third parties register on equal terms and the zero-config default survives.
+
+A history guard: this re-introduces an inbound registration surface of the kind [#267] retired.
+It differs in kind — consumer-agnostic, documented for third parties, and consumed by the built-in provider itself, so it cannot go vacant the way the two-method `registerSubagentSession` RPC did.
+
+Any design must honor the standing constraints: registration lands synchronously before `bindExtensions()`; cross-session visibility rides `globalThis` + `Symbol.for()` (the [#296] bus-split lesson); a provider is live authority only and never touches `evaluate()`; and a session no provider claims selects `DenyingAuthorizer` — least privilege, unchanged.
+It sequences after the Phase 9 spine and warrants its own decision record.
+
 ### Naming
 
 The concept and the code role take two grammatical forms of one root, each for what it correctly denotes:
@@ -1020,7 +1050,9 @@ Eight steps ([#473]–[#480]), all closed.
 Made `AccessPath` the universal internal path representation: migrated the per-tool path-bearing gate and the service/RPC policy queries onto `AccessPath` (closing the symlink-evadability asymmetry), retired the dead lexical-only normalization, dissolved the `path-utils.ts` grab-bag into six cohesive modules, and formalized the resolver-internal `path-values` string boundary in a decision record with a lint guard.
 Five steps ([#502]–[#506]), all closed, plus the `PathNormalizer` platform-seam precursor and residual-threading follow-ups.
 
+[#261]: https://github.com/gotgenes/pi-packages/issues/261
 [#266]: https://github.com/gotgenes/pi-packages/issues/266
+[#267]: https://github.com/gotgenes/pi-packages/issues/267
 [#282]: https://github.com/gotgenes/pi-packages/issues/282
 [#285]: https://github.com/gotgenes/pi-packages/issues/285
 [#290]: https://github.com/gotgenes/pi-packages/issues/290
