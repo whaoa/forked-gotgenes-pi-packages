@@ -1,26 +1,18 @@
 /**
  * Permission event channel — public contract.
  *
- * Exports channel name constants, protocol version, TypeScript types for all
- * emitted events and RPC envelopes, and thin emit helpers.
+ * Exports channel name constants, TypeScript types for all emitted events,
+ * and thin emit helpers.
  *
  * Stability guarantee: fields may be added, but existing fields will not be
  * removed or renamed without a semver-major version bump.
  */
 
-/** Minimal event bus interface required by the emit helpers and RPC handlers. */
+/** Minimal event bus interface required by the emit helpers. */
 export interface PermissionEventBus {
   emit(channel: string, data: unknown): void;
   on(channel: string, handler: (data: unknown) => void): () => void;
 }
-
-// ── Protocol version ───────────────────────────────────────────────────────
-
-/**
- * RPC protocol version.
- * Bumped when the envelope shape or method contracts change in a breaking way.
- */
-export const PERMISSIONS_PROTOCOL_VERSION = 1;
 
 // ── Channel name constants ─────────────────────────────────────────────────
 
@@ -33,43 +25,14 @@ export const PERMISSIONS_UI_PROMPT_CHANNEL = "permissions:ui_prompt";
 /** Emitted after every permission gate resolution. */
 export const PERMISSIONS_DECISION_CHANNEL = "permissions:decision";
 
-/**
- * RPC request channel — query the permission policy (no prompting).
- *
- * @deprecated Use the `Symbol.for()`-backed service accessor instead:
- * ```typescript
- * const { getPermissionsService } = await import("@gotgenes/pi-permission-system");
- * const service = getPermissionsService();
- * if (service) {
- *   const result = service.checkPermission("bash", "git push");
- * }
- * ```
- * The event-bus RPC remains available as a zero-dependency fallback.
- */
-export const PERMISSIONS_RPC_CHECK_CHANNEL = "permissions:rpc:check";
-
-/** RPC request channel — forward a permission prompt to the parent UI. */
-export const PERMISSIONS_RPC_PROMPT_CHANNEL = "permissions:rpc:prompt";
-
-// ── Shared RPC envelope ────────────────────────────────────────────────────
-
-/**
- * Standard RPC reply envelope.
- * Success: `{ success: true, protocolVersion, data? }`.
- * Error:   `{ success: false, protocolVersion, error }`.
- */
-export type PermissionsRpcReply<T = void> =
-  | { success: true; protocolVersion: number; data?: T }
-  | { success: false; protocolVersion: number; error: string };
-
 // ── permissions:ready ──────────────────────────────────────────────────────
 
 /**
  * Payload emitted on `permissions:ready`.
  *
- * Intentionally empty: the channel is a readiness signal. Version negotiation
- * lives in the RPC envelope (`PermissionsRpcReply`), not in broadcast payloads —
- * the published types plus package semver define the broadcast contract.
+ * Intentionally empty: the channel is a readiness signal. There is no
+ * `protocolVersion` — the published types plus package semver define the
+ * broadcast contract.
  */
 export type PermissionsReadyEvent = Record<string, never>;
 
@@ -85,8 +48,7 @@ export type PermissionsReadyEvent = Record<string, never>;
 export type PermissionUiPromptSource =
   | "tool_call"
   | "skill_input"
-  | "skill_read"
-  | "rpc_prompt";
+  | "skill_read";
 
 /** Forwarding context, present only when a prompt was forwarded from a non-UI subagent. */
 export interface ForwardedPromptContext {
@@ -153,64 +115,6 @@ export interface PermissionDecisionEvent {
   agentName: string | null;
   /** Matched pattern from the winning rule (when available). */
   matchedPattern: string | null;
-}
-
-// ── permissions:rpc:check ──────────────────────────────────────────────────
-
-/**
- * Request payload for `permissions:rpc:check`.
- *
- * @deprecated Prefer `getPermissionsService().checkPermission()` from the
- * service accessor module. See `PERMISSIONS_RPC_CHECK_CHANNEL` for details.
- */
-export interface PermissionsCheckRequest {
-  requestId: string;
-  /** Permission surface to evaluate. */
-  surface: string;
-  /** The value to evaluate: command string, tool name, skill name, or path. */
-  value?: string;
-  /** Optional agent name for per-agent policy resolution. */
-  agentName?: string;
-}
-
-/**
- * Data field in a successful `permissions:rpc:check` reply.
- *
- * @deprecated Prefer `getPermissionsService().checkPermission()` from the
- * service accessor module. See `PERMISSIONS_RPC_CHECK_CHANNEL` for details.
- */
-export interface PermissionsCheckReplyData {
-  result: "allow" | "deny" | "ask";
-  matchedPattern: string | null;
-  origin: string | null;
-}
-
-// ── permissions:rpc:prompt ─────────────────────────────────────────────────
-
-/** Request payload for `permissions:rpc:prompt`. */
-export interface PermissionsPromptRequest {
-  requestId: string;
-  /** Permission surface being evaluated. */
-  surface: string;
-  /** Value being evaluated (shown in the dialog). */
-  value: string;
-  /** Optional agent name for display. */
-  agentName?: string;
-  /** Message to display in the permission dialog. */
-  message: string;
-  /** Optional label for the "for this session" option. */
-  sessionLabel?: string;
-}
-
-/** Data field in a successful `permissions:rpc:prompt` reply. */
-export interface PermissionsPromptReplyData {
-  approved: boolean;
-  /**
-   * Detailed state: "approved", "approved_for_session",
-   * "denied", or "denied_with_reason".
-   */
-  state: string;
-  denialReason?: string;
 }
 
 // ── Emit helpers ───────────────────────────────────────────────────────────

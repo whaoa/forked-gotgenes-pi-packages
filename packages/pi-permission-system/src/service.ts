@@ -18,18 +18,13 @@ import type { PermissionCheckResult, PermissionState } from "./types";
 export type {
   ForwardedPromptContext,
   PermissionDecisionEvent,
-  PermissionsPromptReplyData,
-  PermissionsPromptRequest,
   PermissionsReadyEvent,
-  PermissionsRpcReply,
   PermissionUiPromptEvent,
   PermissionUiPromptSource,
 } from "./permission-events";
 export {
   PERMISSIONS_DECISION_CHANNEL,
-  PERMISSIONS_PROTOCOL_VERSION,
   PERMISSIONS_READY_CHANNEL,
-  PERMISSIONS_RPC_PROMPT_CHANNEL,
   PERMISSIONS_UI_PROMPT_CHANNEL,
 } from "./permission-events";
 export type { PermissionCheckResult, PermissionState, ToolInputFormatter };
@@ -40,9 +35,9 @@ const SERVICE_KEY = Symbol.for("@gotgenes/pi-permission-system:service");
 /**
  * Public interface exposed to other extensions via `getPermissionsService()`.
  *
- * Mirrors the simplified RPC signature — surface + optional value + optional
- * agent name — and delegates to `PermissionManager.checkPermission()` with
- * current session rules internally.
+ * `checkPermission` takes a surface + optional value + optional agent name,
+ * and delegates to `PermissionManager.checkPermission()` with current session
+ * rules internally.
  */
 export interface PermissionsService {
   /**

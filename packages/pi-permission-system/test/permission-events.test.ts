@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated -- tests the deprecated RPC channel implementation */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -8,12 +7,7 @@ import { getGlobalConfigPath } from "#src/config-paths";
 import piPermissionSystemExtension from "#src/index";
 import type {
   PermissionDecisionEvent,
-  PermissionsCheckReplyData,
-  PermissionsCheckRequest,
-  PermissionsPromptReplyData,
-  PermissionsPromptRequest,
   PermissionsReadyEvent,
-  PermissionsRpcReply,
   PermissionUiPromptEvent,
 } from "#src/permission-events";
 import {
@@ -21,10 +15,7 @@ import {
   emitReadyEvent,
   emitUiPromptEvent,
   PERMISSIONS_DECISION_CHANNEL,
-  PERMISSIONS_PROTOCOL_VERSION,
   PERMISSIONS_READY_CHANNEL,
-  PERMISSIONS_RPC_CHECK_CHANNEL,
-  PERMISSIONS_RPC_PROMPT_CHANNEL,
   PERMISSIONS_UI_PROMPT_CHANNEL,
 } from "#src/permission-events";
 
@@ -40,16 +31,10 @@ function makeEventBus() {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 describe("constants", () => {
-  it("PERMISSIONS_PROTOCOL_VERSION is 1", () => {
-    expect(PERMISSIONS_PROTOCOL_VERSION).toBe(1);
-  });
-
   it("channel names have the correct values", () => {
     expect(PERMISSIONS_READY_CHANNEL).toBe("permissions:ready");
     expect(PERMISSIONS_UI_PROMPT_CHANNEL).toBe("permissions:ui_prompt");
     expect(PERMISSIONS_DECISION_CHANNEL).toBe("permissions:decision");
-    expect(PERMISSIONS_RPC_CHECK_CHANNEL).toBe("permissions:rpc:check");
-    expect(PERMISSIONS_RPC_PROMPT_CHANNEL).toBe("permissions:rpc:prompt");
   });
 });
 
@@ -63,7 +48,7 @@ describe("emitReadyEvent", () => {
     expect(bus.emit).toHaveBeenCalledWith("permissions:ready", {});
   });
 
-  it("carries no protocolVersion (version lives in the RPC envelope)", () => {
+  it("carries no protocolVersion (the broadcast contract is types + semver)", () => {
     const bus = makeEventBus();
     emitReadyEvent(bus);
     const payload = bus.emit.mock.calls[0][1] as PermissionsReadyEvent;
@@ -212,111 +197,6 @@ describe("emitDecisionEvent", () => {
     };
 
     expect(() => emitDecisionEvent(bus, makeDecisionEvent())).not.toThrow();
-  });
-});
-
-// ── Type-shape compile-time checks (runtime assertions on literal values) ──
-
-describe("type shapes (PermissionsRpcReply)", () => {
-  it("success reply has success=true and protocolVersion", () => {
-    const reply: PermissionsRpcReply<{ result: "allow" }> = {
-      success: true,
-      protocolVersion: PERMISSIONS_PROTOCOL_VERSION,
-      data: { result: "allow" },
-    };
-    expect(reply.success).toBe(true);
-    expect(reply.protocolVersion).toBe(1);
-  });
-
-  it("error reply has success=false and error string", () => {
-    const reply: PermissionsRpcReply = {
-      success: false,
-      protocolVersion: PERMISSIONS_PROTOCOL_VERSION,
-      error: "no_ui",
-    };
-    expect(reply.success).toBe(false);
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- narrowing on discriminated union
-    if (!reply.success) {
-      expect(reply.error).toBe("no_ui");
-    }
-  });
-});
-
-describe("type shapes (PermissionsCheckRequest)", () => {
-  it("minimal request requires requestId and surface", () => {
-    const req: PermissionsCheckRequest = {
-      requestId: "abc-123",
-      surface: "bash",
-    };
-    expect(req.requestId).toBe("abc-123");
-    expect(req.surface).toBe("bash");
-  });
-
-  it("optional fields are accepted", () => {
-    const req: PermissionsCheckRequest = {
-      requestId: "abc-123",
-      surface: "bash",
-      value: "git status",
-      agentName: "Worker",
-    };
-    expect(req.value).toBe("git status");
-    expect(req.agentName).toBe("Worker");
-  });
-});
-
-describe("type shapes (PermissionsCheckReplyData)", () => {
-  it("has result, matchedPattern, origin", () => {
-    const data: PermissionsCheckReplyData = {
-      result: "ask",
-      matchedPattern: null,
-      origin: "builtin",
-    };
-    expect(data.result).toBe("ask");
-  });
-});
-
-describe("type shapes (PermissionsPromptRequest)", () => {
-  it("minimal request requires requestId, surface, value, message", () => {
-    const req: PermissionsPromptRequest = {
-      requestId: "def-456",
-      surface: "bash",
-      value: "rm -rf /tmp",
-      message: "Allow rm -rf /tmp?",
-    };
-    expect(req.requestId).toBe("def-456");
-  });
-
-  it("optional agentName and sessionLabel are accepted", () => {
-    const req: PermissionsPromptRequest = {
-      requestId: "def-456",
-      surface: "bash",
-      value: "rm -rf /tmp",
-      message: "Allow rm -rf /tmp?",
-      agentName: "Explore",
-      sessionLabel: "Allow rm *",
-    };
-    expect(req.agentName).toBe("Explore");
-    expect(req.sessionLabel).toBe("Allow rm *");
-  });
-});
-
-describe("type shapes (PermissionsPromptReplyData)", () => {
-  it("approved reply has approved=true and state", () => {
-    const data: PermissionsPromptReplyData = {
-      approved: true,
-      state: "approved_for_session",
-    };
-    expect(data.approved).toBe(true);
-    expect(data.state).toBe("approved_for_session");
-  });
-
-  it("denied reply may include denialReason", () => {
-    const data: PermissionsPromptReplyData = {
-      approved: false,
-      state: "denied_with_reason",
-      denialReason: "Too risky",
-    };
-    expect(data.denialReason).toBe("Too risky");
   });
 });
 

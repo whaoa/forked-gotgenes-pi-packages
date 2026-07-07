@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildDirectUiPrompt,
   buildForwardedUiPrompt,
-  buildRpcUiPrompt,
 } from "#src/permission-ui-prompt";
 
 describe("buildDirectUiPrompt", () => {
@@ -60,42 +59,6 @@ describe("buildDirectUiPrompt", () => {
         target: "ignored",
       }).value,
     ).toBe("/etc/hosts");
-  });
-});
-
-describe("buildRpcUiPrompt", () => {
-  it("maps an RPC prompt to the rpc_prompt source with passthrough surface/value", () => {
-    expect(
-      buildRpcUiPrompt({
-        requestId: "req-rpc",
-        surface: "bash",
-        value: "git push",
-        agentName: "Worker",
-        message: "Allow git push?",
-      }),
-    ).toEqual({
-      requestId: "req-rpc",
-      source: "rpc_prompt",
-      surface: "bash",
-      value: "git push",
-      agentName: "Worker",
-      message: "Allow git push?",
-      forwarding: null,
-    });
-  });
-
-  it("defaults missing surface, value, and agentName to null", () => {
-    expect(
-      buildRpcUiPrompt({ requestId: "req-rpc-2", message: "Allow?" }),
-    ).toEqual({
-      requestId: "req-rpc-2",
-      source: "rpc_prompt",
-      surface: null,
-      value: null,
-      agentName: null,
-      message: "Allow?",
-      forwarding: null,
-    });
   });
 });
 

@@ -24,7 +24,6 @@ const UI_PROMPT_SOURCES = [
   "tool_call",
   "skill_input",
   "skill_read",
-  "rpc_prompt",
 ] as const satisfies readonly PermissionUiPromptSource[];
 
 /** Narrow an unknown value to a valid prompt source, or `undefined`. */

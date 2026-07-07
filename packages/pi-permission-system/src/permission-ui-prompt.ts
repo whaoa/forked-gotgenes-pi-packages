@@ -7,7 +7,7 @@
  *
  * This module is a leaf: it owns narrow input types that each call site's
  * domain object satisfies structurally, so it imports nothing from the
- * prompter, RPC, or forwarding modules (no import cycles, correct layering).
+ * prompter or forwarding modules (no import cycles, correct layering).
  */
 
 import type {
@@ -26,15 +26,6 @@ export interface DirectPromptInput {
   path?: string;
   command?: string;
   target?: string;
-}
-
-/** Input for a `permissions:rpc:prompt` forwarded UI prompt. */
-export interface RpcPromptInput {
-  requestId: string;
-  surface?: string | null;
-  value?: string | null;
-  agentName?: string | null;
-  message: string;
 }
 
 /** Input for a file-forwarded subagent prompt shown by the parent UI. */
@@ -81,21 +72,6 @@ export function buildDirectUiPrompt(
     surface: directSurface(input),
     value: directValue(input),
     agentName: input.agentName,
-    message: input.message,
-    forwarding: null,
-  };
-}
-
-/** Build the UI prompt event for an RPC-forwarded prompt. */
-export function buildRpcUiPrompt(
-  input: RpcPromptInput,
-): PermissionUiPromptEvent {
-  return {
-    requestId: input.requestId,
-    source: "rpc_prompt",
-    surface: input.surface ?? null,
-    value: input.value ?? null,
-    agentName: input.agentName ?? null,
     message: input.message,
     forwarding: null,
   };

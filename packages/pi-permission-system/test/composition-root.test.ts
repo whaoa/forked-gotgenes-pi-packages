@@ -31,10 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getGlobalConfigPath } from "#src/config-paths";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import piPermissionSystemExtension from "#src/index";
-import {
-  PERMISSIONS_READY_CHANNEL,
-  PERMISSIONS_RPC_CHECK_CHANNEL,
-} from "#src/permission-events";
+import { PERMISSIONS_READY_CHANNEL } from "#src/permission-events";
 import {
   createPermissionForwardingLocation,
   type ForwardedPermissionRequest,
@@ -401,9 +398,9 @@ describe("ready emitted after service publication", () => {
 describe("single source of truth for session state", () => {
   // Regression guard for the split-brain bug: before the fix, the gate path
   // recorded session approvals into a private SessionRules instance that the
-  // RPC check and the service never saw. After the fix, both readers use the
-  // same SessionRules the gate writes into.
-  it("gate session-approval is visible to the RPC check and the service", async () => {
+  // service never saw. After the fix, both readers use the same SessionRules
+  // the gate writes into.
+  it("gate session-approval is visible to the service", async () => {
     writeGlobalConfig({
       permission: { "*": "allow", demo: "ask" },
     });
@@ -448,30 +445,8 @@ describe("single source of truth for session state", () => {
       ctx,
     );
 
-    // RPC check — the deprecated channel must now reflect the session approval.
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentionally testing the deprecated RPC channel's session-rules visibility
-    const rpcCheckChannel: string = PERMISSIONS_RPC_CHECK_CHANNEL;
-    const requestId = "sot-rpc-1";
-    const replyPromise = new Promise<unknown>((resolve) => {
-      const unsub = pi.events.on(
-        `${rpcCheckChannel}:reply:${requestId}`,
-        (data) => {
-          unsub();
-          resolve(data);
-        },
-      );
-    });
-    pi.events.emit(rpcCheckChannel, { requestId, surface: "demo" });
-    const reply = (await replyPromise) as {
-      success: boolean;
-      data?: { result: string };
-    };
-
-    expect(reply.success).toBe(true);
-    // Before the fix this was "ask" — the RPC channel read an empty SessionRules.
-    expect(reply.data?.result).toBe("allow");
-
-    // Service accessor must also see the session approval.
+    // Service accessor must see the session approval.
+    // Before the fix this was "ask" — the service read an empty SessionRules.
     const serviceResult = getPermissionsService()!.checkPermission("demo");
     expect(serviceResult.state).toBe("allow");
 
