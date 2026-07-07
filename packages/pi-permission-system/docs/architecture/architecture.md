@@ -421,7 +421,7 @@ When `ask`-state permissions arise in a headless subagent child process, the ext
 This requires two detections:
 
 1. **Is the current process a subagent?**
-   - `isSubagentExecutionContext()` in `src/subagent-context.ts`.
+   - `isSubagentExecutionContext()` in `src/authority/subagent-context.ts`.
 2. **What is the parent session ID?**
    - `resolvePermissionForwardingTargetSessionId()` in `src/permission-forwarding.ts`.
 
@@ -824,7 +824,9 @@ src/
 ├── builtin-tool-input-formatters.ts   Built-in formatters registered at startup: formatMcpInputForPrompt keyed to "mcp" (#283)
 ├── tool-registry.ts           ToolRegistry interface + tool name validation
 ├── active-agent.ts            Agent name detection from session/system prompt
-├── subagent-context.ts        Subagent execution context detection (registry + env vars + filesystem)
+├── authority/                 Subagent detection and the cross-session authority edge (seeded #529)
+│   ├── subagent-detection.ts  SubagentDetection class - single owner of subagent detection (SubagentDetector.isSubagent + RegisteredChildDetector.isRegisteredChild); delegates to subagent-context (#529)
+│   └── subagent-context.ts    Pure subagent execution context detection (registry + env vars + filesystem)
 ├── subagent-registry.ts       SubagentSessionRegistry class + getSubagentSessionRegistry() process-global accessor - in-process subagent session tracking
 ├── subagent-lifecycle-events.ts subscribeSubagentLifecycle() - subscribes to @gotgenes/pi-subagents child lifecycle events; registers/unregisters child sessions in SubagentSessionRegistry (ADR 0002)
 ├── permission-forwarding.ts   Constants for cross-session forwarding (registry + env var resolution)
@@ -872,7 +874,7 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 | `canConfirm()` predicates                  | hasUI ∨ isSubagent ∨ yolo                    | ✅ hasUI ∨ isSubagent (selection-ready)                                 |
 | Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | 2                                                                       |
 | `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | 1 each (two classes under `src/authority/`)                             |
-| Subagent-detection dep-triple constructors | 3                                            | 1 (`SubagentDetection`)                                                 |
+| Subagent-detection dep-triple constructors | 3                                            | ✅ 1 (`SubagentDetection`)                                              |
 | fallow refactoring targets                 | 1 (`value-guards.ts`)                        | 0                                                                       |
 | Duplication                                | 6.7% (3,129 lines)                           | ≤ 5.5%                                                                  |
 
@@ -913,11 +915,13 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    `forwarding-manager.test.ts` was left unchanged — its `ExtensionContext`-cast ctx, mocked `subagent-context`, and fake-timer polling do not overlap the harness (per the plan's Non-Goals).
    Release: independent
 
-5. **Extract a `SubagentDetection` collaborator; seed `src/authority/`.**
+5. ✅ **Extract a `SubagentDetection` collaborator; seed `src/authority/`.**
    ([#529]) Target: new `src/authority/subagent-detection.ts` — a class constructed once in `index.ts` with (`subagentSessionsDir`, `platform`, `registry`), exposing `isSubagent(ctx)`; move `src/subagent-context.ts` → `src/authority/subagent-context.ts` (its consumers are all rewired by this step anyway).
    `PromptingGateway`, `ForwardingManager`, and `PermissionForwarder` drop the threaded dep triple and take the collaborator.
    Smell: Category C (dep triple threaded through three constructors) + Category E (seeds the authority domain directory).
    Outcome: one construction site for subagent detection — the input the Phase 9 Authorizer selection consumes; `src/authority/` exists.
+   Landed: `src/authority/subagent-detection.ts` holds `SubagentDetection` (implements `SubagentDetector` + `RegisteredChildDetector`), constructed once in `index.ts` and shared; it delegates to the pure functions in the moved `src/authority/subagent-context.ts`, which keep their test file intact.
+   `PromptingGateway`, `ForwardingManager`, and `PermissionForwarder` took the `SubagentDetector` seam (the forwarder keeps `registry` for target resolution only), and the scope widened to `PermissionServiceLifecycle`, which took the `RegisteredChildDetector` seam and dropped its raw registry field — so all subagent-detection predicates now have one owner.
    Release: independent
 
 6. **Split `PermissionForwarder` by direction of authority flow.**
@@ -950,7 +954,7 @@ flowchart TD
     S2["✅ Step 2 (#526)<br/>yolo into the composed ruleset"]
     S3["✅ Step 3 (#527)<br/>Delete dead yolo arms"]
     S4["✅ Step 4 (#528)<br/>Forwarding test harness"]
-    S5["Step 5 (#529)<br/>SubagentDetection + seed authority/"]
+    S5["✅ Step 5 (#529)<br/>SubagentDetection + seed authority/"]
     S6["Step 6 (#530)<br/>Split PermissionForwarder by direction"]
     S7["Step 7 (#531)<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
     S8["Step 8 (#532)<br/>Split value-guards.ts"]
