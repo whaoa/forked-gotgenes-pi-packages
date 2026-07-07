@@ -3,6 +3,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
+import sessionTools from "#src/index";
 
 function captureTools(factory: (pi: ExtensionAPI) => void) {
   const tools = new Map<
@@ -46,7 +47,6 @@ vi.mock("node:fs", () => ({
 
 describe("read_session_file tool", () => {
   it("returns a status message when the session file does not exist", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session_file")!;
     expect(tool).toBeDefined();
@@ -68,7 +68,6 @@ describe("read_session_file tool", () => {
   });
 
   it("reads and returns the session file's entries as a transcript", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session_file")!;
 
@@ -118,7 +117,6 @@ describe("read_session_file tool", () => {
   });
 
   it("supports type filtering", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session_file")!;
 
@@ -164,7 +162,6 @@ describe("read_session_file tool", () => {
   });
 
   it("supports limit filtering", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session_file")!;
 
@@ -209,7 +206,6 @@ describe("read_session_file tool", () => {
 
   describe("details", () => {
     it("returns status details when the session file is not found", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("read_session_file")!;
 
@@ -231,7 +227,6 @@ describe("read_session_file tool", () => {
     });
 
     it("returns transcript details with summary counts on success", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("read_session_file")!;
 
