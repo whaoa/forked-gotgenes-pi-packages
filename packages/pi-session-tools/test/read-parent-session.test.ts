@@ -3,6 +3,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
+import sessionTools from "#src/index";
 
 function captureTools(factory: (pi: ExtensionAPI) => void) {
   const tools = new Map<
@@ -47,7 +48,6 @@ vi.mock("node:fs", () => ({
 
 describe("read_parent_session tool", () => {
   it("returns error when not running in a subagent context", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_parent_session")!;
     expect(tool).toBeDefined();
@@ -60,7 +60,6 @@ describe("read_parent_session tool", () => {
   });
 
   it("returns error when session file is undefined", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_parent_session")!;
 
@@ -71,7 +70,6 @@ describe("read_parent_session tool", () => {
   });
 
   it("returns error when parent session file does not exist", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_parent_session")!;
 
@@ -86,7 +84,6 @@ describe("read_parent_session tool", () => {
   });
 
   it("reads and returns parent session entries as transcript", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_parent_session")!;
 
@@ -133,7 +130,6 @@ describe("read_parent_session tool", () => {
   });
 
   it("supports type filtering on parent entries before formatting", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_parent_session")!;
 
@@ -181,7 +177,6 @@ describe("read_parent_session tool", () => {
 
   describe("details", () => {
     it("returns status details when not in a subagent context", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("read_parent_session")!;
 
@@ -199,7 +194,6 @@ describe("read_parent_session tool", () => {
     });
 
     it("returns status details when parent session file is not found", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("read_parent_session")!;
 
@@ -221,7 +215,6 @@ describe("read_parent_session tool", () => {
     });
 
     it("returns transcript details with summary counts on success", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("read_parent_session")!;
 

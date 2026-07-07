@@ -3,6 +3,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
+import sessionTools from "#src/index";
 
 // We'll test the tool's execute function directly. Since the extension registers
 // tools via pi.registerTool, we capture the registered tool definitions.
@@ -37,7 +38,6 @@ function makeCtx(entries: unknown[], sessionFile?: string): ExtensionContext {
 
 describe("read_session tool", () => {
   it("returns session entries as transcript", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session");
     expect(tool).toBeDefined();
@@ -73,7 +73,6 @@ describe("read_session tool", () => {
   });
 
   it("filters entries by type before formatting", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session")!;
 
@@ -116,7 +115,6 @@ describe("read_session tool", () => {
   });
 
   it("limits to the most recent N entries before formatting", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session")!;
 
@@ -160,7 +158,6 @@ describe("read_session tool", () => {
   });
 
   it("combines type filter and limit before formatting", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session")!;
 
@@ -212,7 +209,6 @@ describe("read_session tool", () => {
   });
 
   it("returns empty string when no entries match the filter", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("read_session")!;
 
@@ -238,7 +234,6 @@ describe("read_session tool", () => {
 
   describe("details", () => {
     it("returns transcript details with summary counts", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("read_session")!;
 
@@ -296,7 +291,6 @@ describe("read_session tool", () => {
     });
 
     it("returns transcript details with zero counts when filter produces no entries", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("read_session")!;
 

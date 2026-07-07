@@ -3,6 +3,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
+import sessionTools from "#src/index";
 
 function captureTools(factory: (pi: ExtensionAPI) => void) {
   const tools = new Map<
@@ -54,7 +55,6 @@ vi.mock("node:fs", () => ({
 
 describe("list_session_files tool", () => {
   it("lists session files for a cwd, newest first", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("list_session_files")!;
     expect(tool).toBeDefined();
@@ -93,7 +93,6 @@ describe("list_session_files tool", () => {
   });
 
   it("reports no session files found for an empty directory", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("list_session_files")!;
 
@@ -112,7 +111,6 @@ describe("list_session_files tool", () => {
   });
 
   it("derives the sessions root from the current session file when available", async () => {
-    const { default: sessionTools } = await import("#src/index");
     const tools = captureTools(sessionTools);
     const tool = tools.get("list_session_files")!;
 
@@ -144,7 +142,6 @@ describe("list_session_files tool", () => {
 
   describe("details", () => {
     it("returns listing details with directory and count", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("list_session_files")!;
 
@@ -171,7 +168,6 @@ describe("list_session_files tool", () => {
     });
 
     it("returns listing details with count 0 for an empty directory", async () => {
-      const { default: sessionTools } = await import("#src/index");
       const tools = captureTools(sessionTools);
       const tool = tools.get("list_session_files")!;
 
