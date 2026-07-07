@@ -833,12 +833,12 @@ src/
 ├── session-logger.ts          `SessionLogger` interface + `PermissionSessionLogger` class; owns JSONL-writer composition, IO-failure warning dedup, and notify sink (#336, [#362])
 ├── logging.ts                 JSONL review/debug log writer
 ├── status.ts                  Footer status bar integration
-├── value-guards.ts            Runtime type guards (`toRecord`, `getNonEmptyString`, `isPermissionState`, `isDenyWithReason`)
+├── value-guards.ts            Runtime type guards (`toRecord`, `getNonEmptyString`)
 ├── yaml-frontmatter.ts        Minimal YAML/frontmatter parsing (`parseSimpleYamlMap`, `extractFrontmatter`)
-└── types.ts                   Core type definitions; the config-shape types (PermissionState, FlatPermissionConfig, etc.) are re-exported from config-schema.ts (#547)
+└── types.ts                   Core type definitions; the config-shape types (PermissionState, FlatPermissionConfig, etc.) are re-exported from config-schema.ts (#547); domain type guards `isPermissionState`, `isDenyWithReason` (#532)
 ```
 
-## Improvement roadmap — Phase 8: Tidy first for the authority spine
+## Improvement roadmap — Phase 8: Tidy first for the authority spine (complete)
 
 The [authority model](#target-the-authority-model) is the declared target: an `Authorizer` role selected once per session, yolo as recorded authority, and `PermissionForwarder` split by direction of authority flow.
 Phase 8 does not build the spine.
@@ -863,16 +863,16 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 - **The test scaffolding the spine will rewrite is duplicated.**
   `permission-manager-unified.test.ts` carries 24 clone groups (305 lines, accelerating churn); `permission-forwarder.test.ts` carries 6 groups including a 43-line clone ×2.
 
-| Metric                                     | Phase 7 close                                | Target after Phase 8                                                    |
-| ------------------------------------------ | -------------------------------------------- | ----------------------------------------------------------------------- |
-| Health score                               | 76 (B)                                       | ≥ 76 (B)                                                                |
-| yolo checks on the ask path                | 3 (prompter, gateway, serve arm)             | ✅ 1 (composition-stage rewrite) + serve arm (dissolves with the spine) |
-| `canConfirm()` predicates                  | hasUI ∨ isSubagent ∨ yolo                    | ✅ hasUI ∨ isSubagent (selection-ready)                                 |
-| Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | ✅ 2 (gate prompt, forwarded inbox)                                     |
-| `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | ✅ 1 each (two classes under `src/authority/`)                          |
-| Subagent-detection dep-triple constructors | 3                                            | ✅ 1 (`SubagentDetection`)                                              |
-| fallow refactoring targets                 | 1 (`value-guards.ts`)                        | 0                                                                       |
-| Duplication                                | 6.7% (3,129 lines)                           | ≤ 5.5%                                                                  |
+| Metric                                     | Phase 7 close                                | Target after Phase 8                                                       |
+| ------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------- |
+| Health score                               | 76 (B)                                       | ≥ 76 (B)                                                                   |
+| yolo checks on the ask path                | 3 (prompter, gateway, serve arm)             | ✅ 1 (composition-stage rewrite) + serve arm (dissolves with the spine)    |
+| `canConfirm()` predicates                  | hasUI ∨ isSubagent ∨ yolo                    | ✅ hasUI ∨ isSubagent (selection-ready)                                    |
+| Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | ✅ 2 (gate prompt, forwarded inbox)                                        |
+| `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | ✅ 1 each (two classes under `src/authority/`)                             |
+| Subagent-detection dep-triple constructors | 3                                            | ✅ 1 (`SubagentDetection`)                                                 |
+| fallow refactoring targets                 | 1 (`value-guards.ts`)                        | 1 (`value-guards.ts`; fan-in from `toRecord`/`getNonEmptyString` persists) |
+| Duplication                                | 6.7% (3,129 lines)                           | ≤ 5.5%                                                                     |
 
 ### Steps
 
@@ -937,11 +937,12 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    Landed: deleted `src/permission-event-rpc.ts` and its test; removed the RPC channel constants, request/reply payload types, the shared `PermissionsRpcReply` envelope, and `PERMISSIONS_PROTOCOL_VERSION` from `src/permission-events.ts`; removed the dead `rpc_prompt` UI-prompt source, `buildRpcUiPrompt`, and the `UI_PROMPT_SOURCES` whitelist entry; unwired registration and the two unsub handles from `src/index.ts`; repointed `docs/cross-extension-api.md` exclusively at the `Symbol.for()` service accessor; commented on [#309] narrowing its scope to the service path.
    Release: independent
 
-8. **Split `value-guards.ts` by cohesion.**
+8. ✅ **Split `value-guards.ts` by cohesion.**
    ([#532]) Target: `src/value-guards.ts`: keep the generic parsing guards (`toRecord`, `getNonEmptyString`); move the domain guards (`isPermissionState`, `isDenyWithReason`) next to the types they guard (`src/types.ts`).
    Note: [#547] already removed the config-only guards (`normalizeOptionalStringArray`, `normalizeOptionalPositiveInt`) when zod took over config validation, shrinking this target.
    Smell: Category B (high-impact file) / Category E (mixed cohesion).
-   Outcome: fallow refactoring targets 1 → 0; domain guards co-located with their types.
+   Outcome: domain guards co-located with their types; **fallow refactoring targets did not clear to 0** — `value-guards.ts` still reports as a target (19 dependents) because the fan-in came from the retained generic guards (`toRecord`/`getNonEmptyString`), not the relocated domain guards.
+   Landed: moved `isPermissionState` and `isDenyWithReason` from `src/value-guards.ts` to `src/types.ts`, beside `PermissionState`/`DenyWithReason`; repointed the three domain-guard consumers (`permission-manager.ts`, `normalize.ts`, `config-loader.ts`) to import from `./types`; moved the guard tests from `test/value-guards.test.ts` into a new `test/types.test.ts`.
    Release: independent
 
 ### Step dependency diagram
@@ -955,7 +956,7 @@ flowchart TD
     S5["✅ Step 5 (#529)<br/>SubagentDetection + seed authority/"]
     S6["✅ Step 6 (#530)<br/>Split PermissionForwarder by direction"]
     S7["✅ Step 7 (#531)<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
-    S8["Step 8 (#532)<br/>Split value-guards.ts"]
+    S8["✅ Step 8 (#532)<br/>Split value-guards.ts"]
 
     S1 --> S2
     S2 --> S3
