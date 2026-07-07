@@ -5,8 +5,9 @@
  * writer, and the `PermissionForwarderDeps` / `ForwarderContext` / UI-decision
  * builders that `test/permission-forwarder.test.ts` repeated per test.
  *
- * Consumed by permission-forwarder.test.ts (and, forward-looking, by the
- * per-class tests Phase 8 Step 6 (#530) splits out of `PermissionForwarder`).
+ * Consumed by permission-forwarder.test.ts (the escalation-up role) and
+ * test/authority/forwarded-request-server.test.ts (the serving-down role
+ * extracted by Phase 8 Step 6, #530).
  * The `{ emit, on }` events mock is not duplicated here — reuse `makeEvents`
  * from `#test/helpers/handler-fixtures`.
  */
@@ -15,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
 
+import type { ForwardedRequestServerDeps } from "#src/authority/forwarded-request-server";
 import type { ForwarderContext } from "#src/authority/forwarder-context";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import type { PermissionForwarderDeps } from "#src/forwarded-permissions/permission-forwarder";
@@ -98,6 +100,24 @@ export function makeForwarderDeps(
   return {
     forwardingDir: "/tmp/forwarding",
     detection: { isSubagent: vi.fn((): boolean => false) },
+    logger: { review: vi.fn(), debug: vi.fn() },
+    requestPermissionDecisionFromUi: vi
+      .fn()
+      .mockResolvedValue(makeUiDecision()),
+    ...overrides,
+  };
+}
+
+/**
+ * Builds `ForwardedRequestServerDeps` with an approving UI and yolo disabled.
+ * Pass `config: { current: () => ({ ...DEFAULT_EXTENSION_CONFIG, yoloMode: true }) }`
+ * to exercise the auto-approve arm.
+ */
+export function makeServerDeps(
+  overrides: Partial<ForwardedRequestServerDeps> = {},
+): ForwardedRequestServerDeps {
+  return {
+    forwardingDir: "/tmp/forwarding",
     logger: { review: vi.fn(), debug: vi.fn() },
     requestPermissionDecisionFromUi: vi
       .fn()

@@ -1,6 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { InboxProcessor } from "./authority/forwarded-request-server";
 import type { SubagentDetector } from "./authority/subagent-detection";
-import type { InboxProcessor } from "./forwarded-permissions/permission-forwarder";
 import { PERMISSION_FORWARDING_POLL_INTERVAL_MS } from "./permission-forwarding";
 
 /**

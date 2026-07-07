@@ -1,5 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, getPackageDir } from "@earendil-works/pi-coding-agent";
+import {
+  ForwardedRequestServer,
+  type ForwardedRequestServerDeps,
+} from "./authority/forwarded-request-server";
 import { SubagentDetection } from "./authority/subagent-detection";
 import { registerBuiltinToolInputFormatters } from "./builtin-tool-input-formatters";
 import { registerPermissionSystemCommand } from "./config-modal";
@@ -95,12 +99,19 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     forwardingDir: paths.forwardingDir,
     detection: subagentDetection,
     registry: subagentRegistry,
-    events: pi.events,
     logger,
+    requestPermissionDecisionFromUi,
+  };
+  const forwarder = new PermissionForwarder(forwardingDeps);
+
+  const requestServerDeps: ForwardedRequestServerDeps = {
+    forwardingDir: paths.forwardingDir,
+    logger,
+    events: pi.events,
     requestPermissionDecisionFromUi,
     config: configStore,
   };
-  const forwarder = new PermissionForwarder(forwardingDeps);
+  const requestServer = new ForwardedRequestServer(requestServerDeps);
 
   const prompter = new PermissionPrompter({
     logger,
@@ -115,7 +126,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
 
   session = new PermissionSession(
     paths,
-    new ForwardingManager(subagentDetection, forwarder),
+    new ForwardingManager(subagentDetection, requestServer),
     permissionManager,
     sessionRules,
     configStore,

@@ -10,42 +10,29 @@ import {
 } from "#src/authority/forwarder-context";
 import {
   cleanupPermissionForwardingLocationIfEmpty,
-  ensureDirectoryExists,
   ensurePermissionForwardingLocation,
-  getExistingPermissionForwardingLocation,
-  listRequestFiles,
   logPermissionForwardingError,
   logPermissionForwardingWarning,
-  readForwardedPermissionRequest,
   readForwardedPermissionResponse,
   safeDeleteFile,
   sleep,
   writeJsonFileAtomic,
 } from "#src/authority/forwarding-io";
 import type { SubagentDetector } from "#src/authority/subagent-detection";
-import type { ConfigReader } from "#src/config-store";
-import { isYoloModeEnabled } from "#src/extension-config";
 import type {
   PermissionDecisionUi,
   PermissionPromptDecision,
   RequestPermissionOptions,
 } from "#src/permission-dialog";
 import {
-  emitUiPromptEvent,
-  type PermissionEventBus,
-} from "#src/permission-events";
-import {
   type ForwardedPermissionRequest,
-  type ForwardedPermissionResponse,
   type ForwardedPromptDisplay,
-  isForwardedPermissionRequestForSession,
   PERMISSION_FORWARDING_POLL_INTERVAL_MS,
   PERMISSION_FORWARDING_TIMEOUT_MS,
   type PermissionForwardingLocation,
   resolvePermissionForwardingTargetSessionId,
   SUBAGENT_PARENT_SESSION_ENV_CANDIDATES,
 } from "#src/permission-forwarding";
-import { buildForwardedUiPrompt } from "#src/permission-ui-prompt";
 import type { DebugReviewLogger } from "#src/session-logger";
 import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
@@ -63,8 +50,6 @@ export interface PermissionForwarderDeps {
   detection: SubagentDetector;
   /** In-process subagent session registry for forwarding target resolution. */
   registry?: SubagentSessionRegistry;
-  /** Event bus used for UI prompt broadcasts. */
-  events?: PermissionEventBus;
   logger: DebugReviewLogger;
   requestPermissionDecisionFromUi: (
     ui: PermissionDecisionUi,
@@ -72,8 +57,6 @@ export interface PermissionForwarderDeps {
     message: string,
     options?: RequestPermissionOptions,
   ) => Promise<PermissionPromptDecision>;
-  /** Read current config for the retained forwarded-inbox yolo auto-approve check. */
-  config: ConfigReader;
 }
 
 // ── Module-private helpers ────────────────────────────────────────────────
@@ -99,19 +82,6 @@ function getContextSystemPrompt(ctx: ForwarderContext): string | undefined {
   }
 }
 
-function formatForwardedPermissionPrompt(
-  request: ForwardedPermissionRequest,
-): string {
-  const agentName = request.requesterAgentName || "unknown";
-  const sessionId = request.requesterSessionId || "unknown";
-  return [
-    `Subagent '${agentName}' requested permission.`,
-    `Session ID: ${sessionId}`,
-    "",
-    request.message,
-  ].join("\n");
-}
-
 // ── Public seam interfaces ────────────────────────────────────────────────
 
 /**
@@ -132,34 +102,20 @@ export interface ApprovalRequester {
   ): Promise<PermissionPromptDecision>;
 }
 
-/**
- * Narrow seam describing what `ForwardingManager` needs from the forwarder:
- * a single method that drains this session's forwarded-permission inbox.
- *
- * Depending on the interface (not the concrete `PermissionForwarder`) keeps
- * the manager's unit tests free of casts — they inject a plain
- * `{ processInbox: vi.fn() }` mock.
- */
-export interface InboxProcessor {
-  processInbox(ctx: ForwarderContext): Promise<void>;
-}
-
 // ── PermissionForwarder ───────────────────────────────────────────────────
 
 /**
- * Owner of the forwarded-permission behavior.
+ * Owner of the escalation-up role of the forwarded-permission behavior.
  *
- * Holds all forwarding state as private readonly fields and provides two
- * public methods (`requestApproval`, `processInbox`) that together encapsulate
- * the full forwarding lifecycle: deciding whether to prompt directly or
- * forward to the parent, building and persisting request files, polling for
- * responses, and processing the parent-session inbox.
+ * Holds all forwarding state as private readonly fields and provides the
+ * public `requestApproval` method: deciding whether to prompt directly or
+ * forward to the parent, building and persisting request files, and polling
+ * for responses.
  */
-export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
+export class PermissionForwarder implements ApprovalRequester {
   private readonly forwardingDir: string;
   private readonly detection: SubagentDetector;
   private readonly registry: SubagentSessionRegistry | undefined;
-  private readonly events: PermissionEventBus | undefined;
   private readonly logger: DebugReviewLogger;
   private readonly requestPermissionDecisionFromUi: (
     ui: PermissionDecisionUi,
@@ -167,16 +123,13 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
     message: string,
     options?: RequestPermissionOptions,
   ) => Promise<PermissionPromptDecision>;
-  private readonly config: ConfigReader;
 
   constructor(deps: PermissionForwarderDeps) {
     this.forwardingDir = deps.forwardingDir;
     this.detection = deps.detection;
     this.registry = deps.registry;
-    this.events = deps.events;
     this.logger = deps.logger;
     this.requestPermissionDecisionFromUi = deps.requestPermissionDecisionFromUi;
-    this.config = deps.config;
   }
 
   // ── Public seam methods ────────────────────────────────────────────────
@@ -205,64 +158,6 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
     }
 
     return this.waitForForwardedApproval(ctx, message, forwarded);
-  }
-
-  /** Drain and respond to this session's forwarded-permission inbox. */
-  async processInbox(ctx: ForwarderContext): Promise<void> {
-    if (!ctx.hasUI) {
-      return;
-    }
-
-    const currentSessionId = getSessionId(ctx);
-    const location = getExistingPermissionForwardingLocation(
-      this.forwardingDir,
-      currentSessionId,
-    );
-    if (!location) {
-      return;
-    }
-
-    const requestFiles = listRequestFiles(this.logger, location.requestsDir);
-    if (requestFiles.length === 0) {
-      return;
-    }
-
-    // Defensively recreate responses/ before writing any response — a
-    // concurrent cleanup pass may have removed it between the requestsDir
-    // existence check above and the write inside processSingleForwardedRequest
-    // (the ENOENT write loop reported in issue #398).
-    if (
-      !ensureDirectoryExists(
-        this.logger,
-        location.responsesDir,
-        "permission forwarding responses",
-      )
-    ) {
-      return;
-    }
-
-    for (const fileName of requestFiles) {
-      const requestPath = join(location.requestsDir, fileName);
-      const request = readForwardedPermissionRequest(this.logger, requestPath);
-      if (!request) {
-        safeDeleteFile(
-          this.logger,
-          requestPath,
-          `${location.label} forwarded permission request`,
-        );
-        continue;
-      }
-
-      await this.processSingleForwardedRequest(
-        ctx,
-        request,
-        location,
-        requestPath,
-        currentSessionId,
-      );
-    }
-
-    cleanupPermissionForwardingLocationIfEmpty(this.logger, location);
   }
 
   // ── Private methods ────────────────────────────────────────────────────
@@ -428,123 +323,5 @@ export class PermissionForwarder implements ApprovalRequester, InboxProcessor {
     safeDeleteFile(this.logger, requestPath, "forwarded permission request");
     cleanupPermissionForwardingLocationIfEmpty(this.logger, location);
     return { approved: false, state: "denied" };
-  }
-
-  private async processSingleForwardedRequest(
-    ctx: ForwarderContext,
-    request: ForwardedPermissionRequest,
-    location: PermissionForwardingLocation,
-    requestPath: string,
-    currentSessionId: string,
-  ): Promise<void> {
-    if (!isForwardedPermissionRequestForSession(request, currentSessionId)) {
-      logPermissionForwardingWarning(
-        this.logger,
-        `Ignoring forwarded permission request '${request.id}' because it targets session '${request.targetSessionId}' instead of '${currentSessionId}'`,
-      );
-      safeDeleteFile(
-        this.logger,
-        requestPath,
-        `${location.label} forwarded permission request`,
-      );
-      return;
-    }
-
-    const forwardedPermissionLogDetails = {
-      requestId: request.id,
-      source: location.label,
-      requesterAgentName: request.requesterAgentName,
-      requesterSessionId: request.requesterSessionId,
-      targetSessionId: request.targetSessionId,
-      requestPath,
-    };
-
-    let decision: PermissionPromptDecision = {
-      approved: false,
-      state: "denied",
-    };
-    // Last yolo check outside the composed ruleset: dissolves when
-    // processInbox is refactored onto evaluate() + Authorizer selection in
-    // the Phase 9 spine work.
-    if (isYoloModeEnabled(this.config.current())) {
-      this.logger.review(
-        "forwarded_permission.auto_approved",
-        forwardedPermissionLogDetails,
-      );
-      decision = { approved: true, state: "approved" };
-    } else {
-      this.logger.review(
-        "forwarded_permission.prompted",
-        forwardedPermissionLogDetails,
-      );
-      try {
-        const forwardedMessage = formatForwardedPermissionPrompt(request);
-        if (this.events) {
-          emitUiPromptEvent(
-            this.events,
-            buildForwardedUiPrompt({
-              requestId: request.id,
-              message: forwardedMessage,
-              requesterAgentName: request.requesterAgentName || null,
-              requesterSessionId: request.requesterSessionId || null,
-              source: request.source ?? null,
-              surface: request.surface ?? null,
-              value: request.value ?? null,
-            }),
-          );
-        }
-        decision = await this.requestPermissionDecisionFromUi(
-          ctx.ui,
-          "Permission Required (Subagent)",
-          forwardedMessage,
-        );
-      } catch (error) {
-        logPermissionForwardingError(
-          this.logger,
-          "Failed to show forwarded permission confirmation dialog",
-          error,
-        );
-        decision = { approved: false, state: "denied" };
-      }
-    }
-
-    const responsePath = join(location.responsesDir, `${request.id}.json`);
-    this.logger.review(
-      decision.approved
-        ? "forwarded_permission.approved"
-        : "forwarded_permission.denied",
-      {
-        requestId: request.id,
-        source: location.label,
-        requesterAgentName: request.requesterAgentName,
-        requesterSessionId: request.requesterSessionId,
-        targetSessionId: request.targetSessionId,
-        responsePath,
-        resolution: decision.state,
-        denialReason: decision.denialReason ?? null,
-      },
-    );
-    try {
-      writeJsonFileAtomic(this.logger, responsePath, {
-        approved: decision.approved,
-        state: decision.state,
-        denialReason: decision.denialReason,
-        responderSessionId: currentSessionId,
-        respondedAt: Date.now(),
-      } satisfies ForwardedPermissionResponse);
-    } catch (error) {
-      logPermissionForwardingError(
-        this.logger,
-        `Failed to write ${location.label} forwarded permission response '${responsePath}'`,
-        error,
-      );
-      return;
-    }
-
-    safeDeleteFile(
-      this.logger,
-      requestPath,
-      `${location.label} forwarded permission request`,
-    );
   }
 }
