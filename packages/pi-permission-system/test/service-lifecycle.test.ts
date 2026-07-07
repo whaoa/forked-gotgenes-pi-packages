@@ -1,25 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { RegisteredChildDetector } from "#src/authority/subagent-detection";
 import type { PermissionsService } from "#src/service";
 import {
   PermissionServiceLifecycle,
   type ServiceLifecycle,
 } from "#src/service-lifecycle";
-import type { SubagentSessionRegistry } from "#src/subagent-registry";
 
 import { makeCtx } from "#test/helpers/handler-fixtures";
 
 // ── module stubs ───────────────────────────────────────────────────────────
 
-const mockIsRegisteredSubagentChild = vi.hoisted(() =>
-  vi.fn<(ctx: unknown, registry: unknown) => boolean>().mockReturnValue(false),
-);
+const mockIsRegisteredChild = vi.fn<(ctx: unknown) => boolean>();
 const mockPublishPermissionsService = vi.hoisted(() => vi.fn<() => void>());
 const mockUnpublishPermissionsService = vi.hoisted(() => vi.fn<() => void>());
 const mockEmitReadyEvent = vi.hoisted(() => vi.fn<() => void>());
 
-vi.mock("#src/authority/subagent-context", () => ({
-  isRegisteredSubagentChild: mockIsRegisteredSubagentChild,
-}));
 vi.mock("#src/service", () => ({
   publishPermissionsService: mockPublishPermissionsService,
   unpublishPermissionsService: mockUnpublishPermissionsService,
@@ -39,29 +34,27 @@ function makeService(): PermissionsService {
   };
 }
 
-function makeRegistry(): SubagentSessionRegistry {
-  return {
-    has: vi.fn().mockReturnValue(false),
-  } as unknown as SubagentSessionRegistry;
+function makeDetection(): RegisteredChildDetector {
+  return { isRegisteredChild: mockIsRegisteredChild };
 }
 
 function makeLifecycle(overrides?: { subscriptions?: (() => void)[] }) {
   const service = makeService();
-  const registry = makeRegistry();
+  const detection = makeDetection();
   const events = { emit: vi.fn(), on: vi.fn() };
   const subscriptions = overrides?.subscriptions ?? [];
   const lifecycle = new PermissionServiceLifecycle(
     service,
-    registry,
+    detection,
     events,
     subscriptions,
   );
-  return { lifecycle, service, registry, events, subscriptions };
+  return { lifecycle, service, detection, events, subscriptions };
 }
 
 beforeEach(() => {
-  mockIsRegisteredSubagentChild.mockReset();
-  mockIsRegisteredSubagentChild.mockReturnValue(false);
+  mockIsRegisteredChild.mockReset();
+  mockIsRegisteredChild.mockReturnValue(false);
   mockPublishPermissionsService.mockReset();
   mockUnpublishPermissionsService.mockReset();
   mockEmitReadyEvent.mockReset();
@@ -81,7 +74,7 @@ describe("activate", () => {
   it("publishes the service for a non-child session", () => {
     const ctx = makeCtx();
     const { lifecycle, service } = makeLifecycle();
-    mockIsRegisteredSubagentChild.mockReturnValue(false);
+    mockIsRegisteredChild.mockReturnValue(false);
     lifecycle.activate(ctx);
     expect(mockPublishPermissionsService).toHaveBeenCalledWith(service);
   });
@@ -89,7 +82,7 @@ describe("activate", () => {
   it("skips publishing for a registered child session", () => {
     const ctx = makeCtx();
     const { lifecycle } = makeLifecycle();
-    mockIsRegisteredSubagentChild.mockReturnValue(true);
+    mockIsRegisteredChild.mockReturnValue(true);
     lifecycle.activate(ctx);
     expect(mockPublishPermissionsService).not.toHaveBeenCalled();
   });
@@ -97,7 +90,7 @@ describe("activate", () => {
   it("always emits the ready event, even for a child session", () => {
     const ctx = makeCtx();
     const { lifecycle, events } = makeLifecycle();
-    mockIsRegisteredSubagentChild.mockReturnValue(true);
+    mockIsRegisteredChild.mockReturnValue(true);
     lifecycle.activate(ctx);
     expect(mockEmitReadyEvent).toHaveBeenCalledWith(events);
   });
@@ -114,11 +107,11 @@ describe("activate", () => {
     expect(order).toEqual(["publish", "ready"]);
   });
 
-  it("passes ctx and registry to isRegisteredSubagentChild", () => {
+  it("consults the detector with ctx", () => {
     const ctx = makeCtx();
-    const { lifecycle, registry } = makeLifecycle();
+    const { lifecycle } = makeLifecycle();
     lifecycle.activate(ctx);
-    expect(mockIsRegisteredSubagentChild).toHaveBeenCalledWith(ctx, registry);
+    expect(mockIsRegisteredChild).toHaveBeenCalledWith(ctx);
   });
 });
 

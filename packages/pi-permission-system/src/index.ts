@@ -171,7 +171,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // requires the session id from ctx, unavailable at factory-init time.
   const serviceLifecycle = new PermissionServiceLifecycle(
     permissionsService,
-    subagentRegistry,
+    subagentDetection,
     pi.events,
     [rpcHandles.unsubCheck, rpcHandles.unsubPrompt, unsubSubagentLifecycle],
   );

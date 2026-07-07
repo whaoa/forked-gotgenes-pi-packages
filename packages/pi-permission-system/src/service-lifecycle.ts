@@ -1,12 +1,11 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { isRegisteredSubagentChild } from "./authority/subagent-context";
+import type { RegisteredChildDetector } from "./authority/subagent-detection";
 import { emitReadyEvent, type PermissionEventBus } from "./permission-events";
 import {
   type PermissionsService,
   publishPermissionsService,
   unpublishPermissionsService,
 } from "./service";
-import type { SubagentSessionRegistry } from "./subagent-registry";
 
 /** The session-scoped service lifecycle that the lifecycle handler drives. */
 export interface ServiceLifecycle {
@@ -27,13 +26,13 @@ export interface ServiceLifecycle {
 export class PermissionServiceLifecycle implements ServiceLifecycle {
   constructor(
     private readonly service: PermissionsService,
-    private readonly registry: SubagentSessionRegistry,
+    private readonly detection: RegisteredChildDetector,
     private readonly events: PermissionEventBus,
     private readonly subscriptions: readonly (() => void)[],
   ) {}
 
   activate(ctx: ExtensionContext): void {
-    if (!isRegisteredSubagentChild(ctx, this.registry)) {
+    if (!this.detection.isRegisteredChild(ctx)) {
       publishPermissionsService(this.service);
     }
     emitReadyEvent(this.events);
