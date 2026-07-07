@@ -1,8 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-
+import { isSubagentExecutionContext } from "./authority/subagent-context";
 import type { InboxProcessor } from "./forwarded-permissions/permission-forwarder";
 import { PERMISSION_FORWARDING_POLL_INTERVAL_MS } from "./permission-forwarding";
-import { isSubagentExecutionContext } from "./subagent-context";
 import type { SubagentSessionRegistry } from "./subagent-registry";
 
 /**

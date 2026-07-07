@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { SUBAGENT_ENV_HINT_KEYS } from "#src/permission-forwarding";
 import {
   isRegisteredSubagentChild,
   isSubagentExecutionContext,
   normalizeFilesystemPath,
   type SubagentDetectionContext,
-} from "#src/subagent-context";
+} from "#src/authority/subagent-context";
+import { SUBAGENT_ENV_HINT_KEYS } from "#src/permission-forwarding";
 import { SubagentSessionRegistry } from "#src/subagent-registry";
 
 afterEach(() => {

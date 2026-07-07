@@ -17,7 +17,7 @@ const mockPublishPermissionsService = vi.hoisted(() => vi.fn<() => void>());
 const mockUnpublishPermissionsService = vi.hoisted(() => vi.fn<() => void>());
 const mockEmitReadyEvent = vi.hoisted(() => vi.fn<() => void>());
 
-vi.mock("#src/subagent-context", () => ({
+vi.mock("#src/authority/subagent-context", () => ({
   isRegisteredSubagentChild: mockIsRegisteredSubagentChild,
 }));
 vi.mock("#src/service", () => ({

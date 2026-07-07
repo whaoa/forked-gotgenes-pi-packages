@@ -1,12 +1,11 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-
+import { isRegisteredSubagentChild } from "./authority/subagent-context";
 import { emitReadyEvent, type PermissionEventBus } from "./permission-events";
 import {
   type PermissionsService,
   publishPermissionsService,
   unpublishPermissionsService,
 } from "./service";
-import { isRegisteredSubagentChild } from "./subagent-context";
 import type { SubagentSessionRegistry } from "./subagent-registry";
 
 /** The session-scoped service lifecycle that the lifecycle handler drives. */

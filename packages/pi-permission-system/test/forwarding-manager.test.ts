@@ -9,7 +9,7 @@ const mockProcessInbox = vi.hoisted(() =>
 );
 const mockIsSubagentExecutionContext = vi.hoisted(() => vi.fn());
 
-vi.mock("../src/subagent-context", () => ({
+vi.mock("../src/authority/subagent-context", () => ({
   isSubagentExecutionContext: mockIsSubagentExecutionContext,
 }));
 

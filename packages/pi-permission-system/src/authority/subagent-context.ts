@@ -1,7 +1,7 @@
 import { posix as posixPath, win32 as winPath } from "node:path";
 
-import { SUBAGENT_ENV_HINT_KEYS } from "./permission-forwarding";
-import type { SubagentSessionRegistry } from "./subagent-registry";
+import { SUBAGENT_ENV_HINT_KEYS } from "#src/permission-forwarding";
+import type { SubagentSessionRegistry } from "#src/subagent-registry";
 
 /**
  * Narrow context for subagent detection — the only session-manager readers

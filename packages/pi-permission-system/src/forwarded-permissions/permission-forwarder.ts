@@ -5,6 +5,7 @@ import {
   getActiveAgentNameFromSystemPrompt,
   type SessionEntryView,
 } from "#src/active-agent";
+import { isSubagentExecutionContext } from "#src/authority/subagent-context";
 import type { ConfigReader } from "#src/config-store";
 import { isYoloModeEnabled } from "#src/extension-config";
 import type {
@@ -29,7 +30,6 @@ import {
 } from "#src/permission-forwarding";
 import { buildForwardedUiPrompt } from "#src/permission-ui-prompt";
 import type { DebugReviewLogger } from "#src/session-logger";
-import { isSubagentExecutionContext } from "#src/subagent-context";
 import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
 

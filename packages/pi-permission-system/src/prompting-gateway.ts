@@ -1,12 +1,11 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-
+import { isSubagentExecutionContext } from "./authority/subagent-context";
 import type { GatePrompter } from "./gate-prompter";
 import type { PermissionPromptDecision } from "./permission-dialog";
 import type {
   PermissionPrompterApi,
   PromptPermissionDetails,
 } from "./permission-prompter";
-import { isSubagentExecutionContext } from "./subagent-context";
 import type { SubagentSessionRegistry } from "./subagent-registry";
 
 /**
