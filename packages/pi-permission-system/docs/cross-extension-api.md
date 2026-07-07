@@ -3,14 +3,14 @@
 The extension provides two cross-extension integration surfaces:
 
 1. **Service accessor** (preferred) — a `Symbol.for()`-backed synchronous API on `globalThis` for direct policy queries.
-2. **Event bus** — broadcasts and RPC on `pi.events` for observation and prompt forwarding.
+2. **Event bus** — broadcasts on `pi.events` for observation.
 
 ---
 
 ## Service Accessor
 
 The preferred way for other extensions to query the permission policy is the `Symbol.for()`-backed service accessor.
-It provides direct, synchronous, type-safe function calls — no async RPC envelope needed.
+It provides direct, synchronous, type-safe function calls.
 
 ### Quick Start
 
@@ -286,22 +286,17 @@ The extension also emits events on Pi's `pi.events` bus so other extensions can 
 
 Fields may be added to any payload, but existing fields will not be removed or renamed without a semver-major version bump.
 The broadcast contract is defined by the published TypeScript types plus package semver — broadcast payloads (`permissions:ready`, `permissions:ui_prompt`, `permissions:decision`) carry no `protocolVersion`.
-The `PERMISSIONS_PROTOCOL_VERSION` constant is exported from `src/permission-events.ts` and embedded only in the RPC reply envelope, where per-call request/reply negotiation is load-bearing.
 Consumers should read broadcast payloads defensively (field-presence checks) rather than version-gating — that is robust to any shape skew between independently-versioned sibling extensions.
 
 All three broadcasts are best-effort: a throwing listener cannot block permission handling, session startup, or gate resolution.
 
 ## Channel Reference
 
-| Channel                                    | Direction | When                              | Payload type                                      |
-| ------------------------------------------ | --------- | --------------------------------- | ------------------------------------------------- |
-| `permissions:ready`                        | Broadcast | At `session_start`, after publish | `PermissionsReadyEvent`                           |
-| `permissions:ui_prompt`                    | Broadcast | Before active UI prompt           | `PermissionUiPromptEvent`                         |
-| `permissions:decision`                     | Broadcast | After every gate resolution       | `PermissionDecisionEvent`                         |
-| `permissions:rpc:check`                    | Request   | On-demand                         | `PermissionsCheckRequest`                         |
-| `permissions:rpc:check:reply:<requestId>`  | Reply     | After each check request          | `PermissionsRpcReply<PermissionsCheckReplyData>`  |
-| `permissions:rpc:prompt`                   | Request   | On-demand                         | `PermissionsPromptRequest`                        |
-| `permissions:rpc:prompt:reply:<requestId>` | Reply     | After prompt is resolved          | `PermissionsRpcReply<PermissionsPromptReplyData>` |
+| Channel                 | Direction | When                              | Payload type              |
+| ----------------------- | --------- | --------------------------------- | ------------------------- |
+| `permissions:ready`     | Broadcast | At `session_start`, after publish | `PermissionsReadyEvent`   |
+| `permissions:ui_prompt` | Broadcast | Before active UI prompt           | `PermissionUiPromptEvent` |
+| `permissions:decision`  | Broadcast | After every gate resolution       | `PermissionDecisionEvent` |
 
 ---
 
@@ -333,15 +328,15 @@ pi.events.on("permissions:ui_prompt", (raw) => {
 
 ### Payload Fields
 
-| Field        | Type                             | Description                                                                      |
-| ------------ | -------------------------------- | -------------------------------------------------------------------------------- |
-| `requestId`  | `string`                         | Unique ID for the permission request being prompted                              |
-| `source`     | `PermissionUiPromptSource`       | Prompt origin: `"tool_call"`, `"skill_input"`, `"skill_read"`, or `"rpc_prompt"` |
-| `surface`    | `string \| null`                 | Normalized display surface (e.g. `"bash"`, `"skill"`), when known                |
-| `value`      | `string \| null`                 | Normalized display value (command, path, skill name, etc.), when known           |
-| `agentName`  | `string \| null`                 | Active/requesting agent name, when known                                         |
-| `message`    | `string`                         | Message displayed in the permission prompt                                       |
-| `forwarding` | `ForwardedPromptContext \| null` | Forwarding context, or `null` for a direct prompt                                |
+| Field        | Type                             | Description                                                            |
+| ------------ | -------------------------------- | ---------------------------------------------------------------------- |
+| `requestId`  | `string`                         | Unique ID for the permission request being prompted                    |
+| `source`     | `PermissionUiPromptSource`       | Prompt origin: `"tool_call"`, `"skill_input"`, or `"skill_read"`       |
+| `surface`    | `string \| null`                 | Normalized display surface (e.g. `"bash"`, `"skill"`), when known      |
+| `value`      | `string \| null`                 | Normalized display value (command, path, skill name, etc.), when known |
+| `agentName`  | `string \| null`                 | Active/requesting agent name, when known                               |
+| `message`    | `string`                         | Message displayed in the permission prompt                             |
+| `forwarding` | `ForwardedPromptContext \| null` | Forwarding context, or `null` for a direct prompt                      |
 
 Forwarding is orthogonal to origin: a forwarded subagent prompt keeps its original `source` and is identified by a non-null `forwarding` field, not by a dedicated source value.
 
@@ -400,117 +395,13 @@ pi.events.on("permissions:decision", (raw) => {
 
 ---
 
-## Policy Query RPC (deprecated)
-
-> **Deprecated**: prefer the [Service Accessor](#service-accessor) above.
-> The event-bus RPC remains available as a zero-dependency fallback.
-
-Other extensions can evaluate the current permission policy without importing this package.
-The call is synchronous-style: emit a request, listen on a scoped reply channel.
-
-```typescript
-const requestId = crypto.randomUUID();
-
-// Listen for the reply first
-const unsub = pi.events.on(
-  `permissions:rpc:check:reply:${requestId}`,
-  (raw) => {
-    unsub();
-    const reply = raw as import("@gotgenes/pi-permission-system").PermissionsRpcReply<
-      import("@gotgenes/pi-permission-system").PermissionsCheckReplyData
-    >;
-    if (reply.success) {
-      console.log(reply.data?.result); // "allow" | "deny" | "ask"
-    }
-  },
-);
-
-// Then emit the request
-pi.events.emit("permissions:rpc:check", {
-  requestId,
-  surface: "bash",
-  value: "git push",
-  agentName: "Worker", // optional
-});
-```
-
-If the extension is not loaded, no reply arrives.
-Callers should implement a timeout and treat no-reply as `deny` (graceful degradation).
-
-### Request Fields
-
-| Field       | Required | Description                                                |
-| ----------- | -------- | ---------------------------------------------------------- |
-| `requestId` | Yes      | Unique string; scopes the reply channel                    |
-| `surface`   | Yes      | Permission surface to evaluate                             |
-| `value`     | No       | Value to evaluate (command, name, path); defaults to `"*"` |
-| `agentName` | No       | Agent name for per-agent policy resolution                 |
-
-As with the `checkPermission` service method, a path-shaped surface (`path`, `external_directory`, or a path-bearing tool) matches the `value` against both the path as given and its canonical (symlink-resolved) form.
-
-### Reply Data Fields (`PermissionsCheckReplyData`)
-
-| Field            | Type                         | Description                                      |
-| ---------------- | ---------------------------- | ------------------------------------------------ |
-| `result`         | `"allow" \| "deny" \| "ask"` | Policy decision (including active session rules) |
-| `matchedPattern` | `string \| null`             | Matched rule pattern                             |
-| `origin`         | `string \| null`             | Config scope of the winning rule                 |
-
----
-
-## Prompt Forwarding RPC
-
-In-process child sessions (e.g. tintinweb/pi-subagents running via `createAgentSession()`) cannot use file-based permission forwarding because no child process is spawned.
-They can instead forward permission prompts to the parent session's UI via this RPC.
-
-```typescript
-const requestId = crypto.randomUUID();
-
-const unsub = pi.events.on(
-  `permissions:rpc:prompt:reply:${requestId}`,
-  (raw) => {
-    unsub();
-    const reply = raw as import("@gotgenes/pi-permission-system").PermissionsRpcReply<
-      import("@gotgenes/pi-permission-system").PermissionsPromptReplyData
-    >;
-    if (reply.success && reply.data?.approved) {
-      // proceed
-    } else {
-      // deny — either user denied or no UI was available (error: "no_ui")
-    }
-  },
-);
-
-pi.events.emit("permissions:rpc:prompt", {
-  requestId,
-  surface: "bash",
-  value: "rm -rf /tmp/build",
-  message: "Allow rm -rf /tmp/build?",
-  agentName: "Explore",      // optional
-  sessionLabel: "Allow rm *", // optional — label for the "for this session" option
-});
-```
-
-The handler replies with `{ success: false, error: "no_ui" }` when no interactive session is available.
-
-### Successful Reply Fields
-
-| Field          | Type                | Description                                                                   |
-| -------------- | ------------------- | ----------------------------------------------------------------------------- |
-| `approved`     | `boolean`           | Whether the user approved                                                     |
-| `state`        | `string`            | `"approved"`, `"approved_for_session"`, `"denied"`, or `"denied_with_reason"` |
-| `denialReason` | `string` (optional) | User-provided denial reason                                                   |
-
----
-
 ## Ready Event
 
 The extension emits `permissions:ready` at `session_start`, right after the service is published — so a consumer reacting to it can immediately resolve `getPermissionsService()`.
 It fires once per `session_start` (including `/reload`).
-Consumers that start after the extension can check via a ping-style RPC check — the `permissions:rpc:check` handler is active as long as the extension is loaded.
 
 The payload is intentionally empty (`Record<string, never>`): the channel is a pure readiness signal.
-It carries no `protocolVersion` — version negotiation lives in the RPC reply envelope, and the broadcast contract is defined by the published types plus package semver.
+It carries no `protocolVersion` — the broadcast contract is defined by the published types plus package semver.
 
 ```typescript
 pi.events.on("permissions:ready", () => {

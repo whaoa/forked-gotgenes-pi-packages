@@ -29,7 +29,6 @@ The main interactive session polls for forwarded requests, shows the confirmatio
 This keeps `ask` policies usable even when the original permission check happens inside a non-UI execution context.
 
 For in-process child sessions, detection and forwarding use the event-driven registration described above.
-The [Prompt Forwarding RPC](cross-extension-api.md#prompt-forwarding-rpc) remains available as an alternative for extensions that cannot use the service accessor.
 
 ---
 

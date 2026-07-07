@@ -31,7 +31,7 @@ This is purely a documentation change — no code dependency on pi-permission-sy
 - **Three-state policy**: `allow`, `ask` (prompt the user), or `deny` — richer than binary allow/deny
 - **Multiple surfaces**: tools, bash commands (glob patterns), MCP operations, skills, external directories
 - **Prompt forwarding**: `ask` decisions in headless child agents surface in the parent session's UI
-- **Event bus API**: other extensions can query policy at runtime without importing the package
+- **Service accessor API**: other extensions can query policy at runtime via a `Symbol.for()`-backed accessor, with only a dynamic `import()` and no required peer dependency
 
 ### Example
 
@@ -99,7 +99,7 @@ No code changes, no new dependency, no schema enforcement.
 | `{{your-key}}`       | `disallowed_tools` |
 | `{{example-value}}`  | `write_file,bash`  |
 
-Additional note for tintinweb: since this extension runs subagents in-process via `createAgentSession()`, mention the [Event Bus RPC](https://github.com/gotgenes/pi-permission-system/blob/main/docs/cross-extension-api.md#policy-query-rpc-deprecated) as an optional runtime integration path for querying or forwarding permission prompts without spawning a subprocess.
+Additional note for tintinweb: since this extension runs subagents in-process via `createAgentSession()`, mention the [service accessor](https://github.com/gotgenes/pi-permission-system/blob/main/docs/cross-extension-api.md#service-accessor) as an optional runtime integration path for querying policy without spawning a subprocess.
 
 ### HazAT/pi-interactive-subagents
 

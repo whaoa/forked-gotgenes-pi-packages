@@ -488,10 +488,7 @@ The `PermissionsService` interface exposes three methods:
 - `getToolPermission(toolName, agentName?)` - tool-level permission state (`allow`/`deny`/`ask`) for pre-filtering.
 - `registerToolInputFormatter(toolName, formatter)` - register a custom ask-prompt preview for a tool name; returns a disposer (#283).
 
-The event-bus RPC (`permissions:rpc:check`) remains as a zero-dependency fallback for consumers who do not want to add an optional peer dep.
-It is deprecated in favor of the service accessor.
-
-`permissions:decision` broadcasts and `permissions:rpc:prompt` remain on the event bus - fire-and-forget observation and async prompt forwarding are the right abstractions for those channels.
+`permissions:decision` and `permissions:ui_prompt` broadcasts remain on the event bus - fire-and-forget observation is the right abstraction for those channels ([#531] removed the event-bus RPC channel; the service accessor is now the sole cross-extension policy/prompt surface).
 
 ## Target: the authority model
 
@@ -791,7 +788,6 @@ src/
 ├── service-lifecycle.ts      `ServiceLifecycle` interface + `PermissionServiceLifecycle` class — owns the process-global service publish (#302 child-gated), ready emit, and session teardown ordering (#320)
 ├── service.ts                PermissionsService interface, Symbol.for() accessor (cross-extension API)
 ├── permission-events.ts      Event channel constants, payload types, emit helpers
-├── permission-event-rpc.ts   permissions:rpc:check (deprecated) and permissions:rpc:prompt handlers; the check handler routes path-surface queries through the resolver as an `access-path` intent (canonical parity, #503)
 ├── permission-ui-prompt.ts   Centralized construction for `permissions:ui_prompt` event payloads - single source for the emitted contract shape
 ├── config-store.ts           `ConfigStore` class — owns `config` + `lastConfigWarning`; `ConfigReader`, `SessionConfigStore`, `CommandConfigStore` narrow interfaces (#335, #337)
 ├── config-loader.ts          File I/O, format detection, strict zod validation (fail-closed) for config files
@@ -872,7 +868,7 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
 | Health score                               | 76 (B)                                       | ≥ 76 (B)                                                                |
 | yolo checks on the ask path                | 3 (prompter, gateway, serve arm)             | ✅ 1 (composition-stage rewrite) + serve arm (dissolves with the spine) |
 | `canConfirm()` predicates                  | hasUI ∨ isSubagent ∨ yolo                    | ✅ hasUI ∨ isSubagent (selection-ready)                                 |
-| Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | 2                                                                       |
+| Elicitation paths the spine must adapt     | 3 (gate prompt, forwarded inbox, RPC prompt) | ✅ 2 (gate prompt, forwarded inbox)                                     |
 | `PermissionForwarder` roles per class      | 2 (escalation + serving, 591 LOC)            | ✅ 1 each (two classes under `src/authority/`)                          |
 | Subagent-detection dep-triple constructors | 3                                            | ✅ 1 (`SubagentDetection`)                                              |
 | fallow refactoring targets                 | 1 (`value-guards.ts`)                        | 0                                                                       |
@@ -932,12 +928,13 @@ The trace from `GateRunner` down to the UI dialog and forwarding files confirmed
    Landed: `src/authority/forwarder-context.ts` holds the shared `ForwarderContext` read-interface and `getSessionId`; `ApprovalEscalator` (escalation-up, `ApprovalRequester`) and `ForwardedRequestServer` (serving-down, `InboxProcessor`) each construct with only their own dependencies — the escalator dropped `config`/`events`, the server dropped `detection`/`registry`; `src/forwarded-permissions/` and `test/forwarded-permissions/` both dissolved.
    Release: independent
 
-7. **Remove the deprecated `permissions:rpc:check` / `permissions:rpc:prompt` event-bus channel.**
+7. ✅ **Remove the deprecated `permissions:rpc:check` / `permissions:rpc:prompt` event-bus channel.**
    ([#531]) Target: delete `src/permission-event-rpc.ts` and `test/permission-event-rpc.test.ts`; remove the deprecated request/reply payload types and channel constants from `src/permission-events.ts`; unwire from `index.ts` / `PermissionServiceLifecycle`; update the cross-extension docs to point exclusively at the `Symbol.for()` service accessor.
    Before writing the migration note, verify the named replacement methods on the real `PermissionsService` type.
    Narrows [#309] to the service path only — leave a comment on that issue.
    Smell: Category A (deprecated subsystem) / Category F (duplicate cross-extension surface).
    Outcome: one cross-extension policy/prompt surface; the spine adapts two elicitation paths instead of three; **breaking** for event-bus RPC consumers.
+   Landed: deleted `src/permission-event-rpc.ts` and its test; removed the RPC channel constants, request/reply payload types, the shared `PermissionsRpcReply` envelope, and `PERMISSIONS_PROTOCOL_VERSION` from `src/permission-events.ts`; removed the dead `rpc_prompt` UI-prompt source, `buildRpcUiPrompt`, and the `UI_PROMPT_SOURCES` whitelist entry; unwired registration and the two unsub handles from `src/index.ts`; repointed `docs/cross-extension-api.md` exclusively at the `Symbol.for()` service accessor; commented on [#309] narrowing its scope to the service path.
    Release: independent
 
 8. **Split `value-guards.ts` by cohesion.**
@@ -957,7 +954,7 @@ flowchart TD
     S4["✅ Step 4 (#528)<br/>Forwarding test harness"]
     S5["✅ Step 5 (#529)<br/>SubagentDetection + seed authority/"]
     S6["✅ Step 6 (#530)<br/>Split PermissionForwarder by direction"]
-    S7["Step 7 (#531)<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
+    S7["✅ Step 7 (#531)<br/>Remove deprecated event-bus RPC<br/>(breaking)"]
     S8["Step 8 (#532)<br/>Split value-guards.ts"]
 
     S1 --> S2

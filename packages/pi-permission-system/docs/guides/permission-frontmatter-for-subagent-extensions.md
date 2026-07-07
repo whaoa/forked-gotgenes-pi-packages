@@ -127,61 +127,29 @@ The permission system handles all evaluation, prompt dialogs, and policy enforce
 
 ## Runtime Integration (Optional)
 
-If your extension runs subagents in-process (e.g. via `createAgentSession()`), you can optionally query the permission system's policy at runtime via the event bus API — no package import needed.
+If your extension runs subagents in-process (e.g. via `createAgentSession()`), you can optionally query the permission system's policy at runtime via the `Symbol.for()`-backed service accessor — no required peer dependency, just a dynamic `import()`.
 
 ### Querying policy
 
 ```typescript
-const requestId = crypto.randomUUID();
-
-pi.events.on(
-  `permissions:rpc:check:reply:${requestId}`,
-  (raw) => {
-    const reply = raw as { success: boolean; data?: { result: string } };
-    if (reply.success) {
-      console.log(reply.data?.result); // "allow" | "deny" | "ask"
-    }
-  },
-);
-
-pi.events.emit("permissions:rpc:check", {
-  requestId,
-  surface: "bash",
-  value: "git push",
-  agentName: "Worker",
-});
+try {
+  const { getPermissionsService } = await import(
+    "@gotgenes/pi-permission-system"
+  );
+  const permissions = getPermissionsService();
+  if (permissions) {
+    const result = permissions.checkPermission("bash", "git push", "Worker");
+    console.log(result.state); // "allow" | "deny" | "ask"
+  }
+} catch {
+  // Not installed — graceful degradation
+}
 ```
 
-### Forwarding permission prompts
+If `pi-permission-system` is not installed, `import()` throws; if it has not published a service yet (or has been unloaded), `getPermissionsService()` returns `undefined`.
+Guard both cases as shown above.
 
-When a child agent encounters an `ask` permission and has no UI, the prompt can be forwarded to the parent session:
-
-```typescript
-const requestId = crypto.randomUUID();
-
-pi.events.on(
-  `permissions:rpc:prompt:reply:${requestId}`,
-  (raw) => {
-    const reply = raw as { success: boolean; data?: { approved: boolean } };
-    if (reply.success && reply.data?.approved) {
-      // proceed
-    } else {
-      // deny
-    }
-  },
-);
-
-pi.events.emit("permissions:rpc:prompt", {
-  requestId,
-  surface: "bash",
-  value: "rm -rf /tmp/build",
-  message: "Allow rm -rf /tmp/build?",
-  agentName: "Worker",
-});
-```
-
-If `pi-permission-system` is not installed, no reply arrives.
-Implement a timeout and treat no-reply as `deny` for graceful degradation.
+Prompt forwarding for headless child agents is an internal subagent-to-parent mechanism, not a public cross-extension operation — there is no service-accessor equivalent to call directly.
 
 For full API documentation, see [Cross-extension API](../cross-extension-api.md).
 
@@ -191,11 +159,11 @@ For full API documentation, see [Cross-extension API](../cross-extension-api.md)
 2. **Unified config** — one `permission:` block per agent instead of separate restriction keys in multiple extensions.
 3. **Surface coverage** — policy covers bash patterns, MCP tools, skills, external directories, and special operations, not just tool names.
 4. **Forwarding** — permission prompts from headless child agents surface in the parent session's UI.
-5. **Programmatic access** — the event bus API lets your extension query policy at runtime without importing the package.
+5. **Programmatic access** — the `Symbol.for()` service accessor lets your extension query policy at runtime with only a dynamic `import()`, no required peer dependency.
 
 ## Further Reading
 
 - [Subagent Integration](../subagent-integration.md) — full coexistence documentation and interaction rules
-- [Cross-extension API](../cross-extension-api.md) — service accessor, event bus reference (decision broadcasts, RPC check, RPC prompt)
+- [Cross-extension API](../cross-extension-api.md) — service accessor, event bus reference (decision and UI-prompt broadcasts)
 - [Configuration](../configuration.md) — full policy reference including merge precedence
 - [Schema](../../schemas/permissions.schema.json) — canonical JSON Schema for the flat permission format
