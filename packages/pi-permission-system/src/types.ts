@@ -63,3 +63,23 @@ export interface PermissionCheckResult {
    */
   commandContext?: BashCommandContext;
 }
+
+export function isPermissionState(value: unknown): value is PermissionState {
+  return value === "allow" || value === "deny" || value === "ask";
+}
+
+/**
+ * Narrow type guard: a raw value representing a DenyWithReason object.
+ * Accepts `{ action: "deny" }` and `{ action: "deny", reason: "…" }`.
+ * Rejects a non-string `reason` to keep malformed config out of the rule set.
+ */
+export function isDenyWithReason(value: unknown): value is DenyWithReason {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    record.action === "deny" &&
+    (record.reason === undefined || typeof record.reason === "string")
+  );
+}

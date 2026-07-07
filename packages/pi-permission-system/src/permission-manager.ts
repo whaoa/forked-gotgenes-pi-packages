@@ -34,7 +34,7 @@ import type {
   PermissionCheckResult,
   PermissionState,
 } from "./types";
-import { isPermissionState } from "./value-guards";
+import { isPermissionState } from "./types";
 import { wildcardMatch } from "./wildcard-matcher";
 
 const BUILT_IN_TOOL_PERMISSION_NAMES = new Set([

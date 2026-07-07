@@ -1,6 +1,6 @@
 import type { Rule, Ruleset } from "./rule";
 import type { FlatPermissionConfig } from "./types";
-import { isDenyWithReason, isPermissionState } from "./value-guards";
+import { isDenyWithReason, isPermissionState } from "./types";
 
 /**
  * Convert a flat permission config into a Ruleset.

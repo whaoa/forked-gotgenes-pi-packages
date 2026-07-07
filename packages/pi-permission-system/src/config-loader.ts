@@ -14,7 +14,7 @@ import {
 } from "./config-schema";
 import { mergeFlatPermissions } from "./permission-merge";
 import type { FlatPermissionConfig, PatternValue } from "./types";
-import { isDenyWithReason, isPermissionState } from "./value-guards";
+import { isDenyWithReason, isPermissionState } from "./types";
 
 // The unified config shape is derived from the zod schema (config-schema.ts,
 // the single source of truth) and re-exported so existing importers keep their
