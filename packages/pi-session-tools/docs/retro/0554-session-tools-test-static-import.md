@@ -22,3 +22,20 @@ The plan moves the import to a single static top-level `import sessionTools from
   `session-file.test.ts` uses per-test dynamic imports too but of `#src/session-file`, which pulls only node built-ins — left out of scope.
 - Rejected the issue's fallback options (`testTimeout` bump / `beforeAll` hook) as Non-Goals; the primary fix removes the cost from the timed region entirely, so a timeout override would only mask the underlying edge.
 - `test:` commits are a `hidden` changelog type, so this ships independently but will not cut a release on its own — it auto-batches into the next release.
+
+## Stage: Implementation — TDD (2026-07-07T16:50:00Z)
+
+### Session summary
+
+Implemented both TDD steps from the plan: converted `read-session-file.test.ts` first (in isolation) to a static top-level `import sessionTools from "#src/index"`, verified the hoisted `vi.mock("node:fs", …)` still applies, then rolled the same mechanical change across `read-parent-session.test.ts`, `list-session-files.test.ts`, and `read-session.test.ts`.
+Two `test:` commits, both `(#554)`.
+Test count unchanged at 110 (8 files) before and after; no production `src/` files touched.
+
+### Observations
+
+- The plan's central empirical assumption held exactly as predicted: vitest hoists `vi.mock()`/`vi.hoisted()` above a static `import`, so every mock-dependent assertion in the three mocked files kept passing after the import moved to module scope.
+- No deviations from the plan — both steps applied cleanly with no unanticipated test breakage, and `grep -rn 'await import("#src/index")' test/` confirmed zero stale occurrences after Step 2.
+- Local timing evidence supports the fix's premise: `vitest run` for the package now reports `tests` phase in the tens of milliseconds versus `transform`/`import` phases in the hundreds of ms to low seconds — the heavy cost sits entirely outside the per-test timed window now.
+- Pre-completion reviewer: **PASS**.
+  All deterministic checks (`pnpm run check`, root `pnpm run lint`, `vitest run` for `pi-session-tools`, `pnpm fallow dead-code`) passed; commit messages, code design, and doc surfaces (none reference the old per-test-import idiom) all verified clean.
+  No WARN findings.
