@@ -3,8 +3,25 @@ import { join } from "node:path";
 import {
   getActiveAgentName,
   getActiveAgentNameFromSystemPrompt,
-  type SessionEntryView,
 } from "#src/active-agent";
+import {
+  type ForwarderContext,
+  getSessionId,
+} from "#src/authority/forwarder-context";
+import {
+  cleanupPermissionForwardingLocationIfEmpty,
+  ensureDirectoryExists,
+  ensurePermissionForwardingLocation,
+  getExistingPermissionForwardingLocation,
+  listRequestFiles,
+  logPermissionForwardingError,
+  logPermissionForwardingWarning,
+  readForwardedPermissionRequest,
+  readForwardedPermissionResponse,
+  safeDeleteFile,
+  sleep,
+  writeJsonFileAtomic,
+} from "#src/authority/forwarding-io";
 import type { SubagentDetector } from "#src/authority/subagent-detection";
 import type { ConfigReader } from "#src/config-store";
 import { isYoloModeEnabled } from "#src/extension-config";
@@ -33,40 +50,6 @@ import type { DebugReviewLogger } from "#src/session-logger";
 import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
 
-import {
-  cleanupPermissionForwardingLocationIfEmpty,
-  ensureDirectoryExists,
-  ensurePermissionForwardingLocation,
-  getExistingPermissionForwardingLocation,
-  listRequestFiles,
-  logPermissionForwardingError,
-  logPermissionForwardingWarning,
-  readForwardedPermissionRequest,
-  readForwardedPermissionResponse,
-  safeDeleteFile,
-  sleep,
-  writeJsonFileAtomic,
-} from "./io";
-
-/**
- * Narrow context the forwarder reads: the UI gate (`hasUI`), the dialog UI
- * surface, and the three session-manager readers it uses directly or via
- * {@link SubagentDetector} / {@link getActiveAgentName}.
- *
- * `getSystemPrompt` is read reflectively (see `getContextSystemPrompt`), so it
- * is intentionally not a typed member. A full `ExtensionContext` satisfies this
- * structurally, so production callers pass `ctx` unchanged.
- */
-export interface ForwarderContext {
-  hasUI: boolean;
-  ui: PermissionDecisionUi;
-  sessionManager: {
-    getSessionId(): string;
-    getSessionDir(): string;
-    getEntries(): readonly SessionEntryView[];
-  };
-}
-
 /**
  * Constructor config for `PermissionForwarder`.
  *
@@ -94,17 +77,6 @@ export interface PermissionForwarderDeps {
 }
 
 // ── Module-private helpers ────────────────────────────────────────────────
-
-function getSessionId(ctx: ForwarderContext): string {
-  try {
-    const sessionId = ctx.sessionManager.getSessionId();
-    if (typeof sessionId === "string" && sessionId.trim()) {
-      return sessionId.trim();
-    }
-  } catch {}
-
-  return "unknown";
-}
 
 function getContextSystemPrompt(ctx: ForwarderContext): string | undefined {
   const getSystemPrompt = toRecord(ctx).getSystemPrompt;

@@ -15,11 +15,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
 
+import type { ForwarderContext } from "#src/authority/forwarder-context";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
-import type {
-  ForwarderContext,
-  PermissionForwarderDeps,
-} from "#src/forwarded-permissions/permission-forwarder";
+import type { PermissionForwarderDeps } from "#src/forwarded-permissions/permission-forwarder";
 import type { PermissionPromptDecision } from "#src/permission-dialog";
 import {
   createPermissionForwardingLocation,
