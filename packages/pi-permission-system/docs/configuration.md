@@ -363,6 +363,9 @@ When the current working directory is known, relative bash tokens are matched wi
 A bare filename with no path shape at all (e.g. `id_rsa` in `cat id_rsa`) is also gated when it matches an active, specific (non-`*`) `path` deny/ask rule — so `"id_rsa": "deny"` or `"*.pem": "deny"` blocks the file whether it is referenced by a bare name, a relative path, or the `read` tool.
 A bare token that matches no specific `path` rule (e.g. `status` in `git status`) is left alone, and this promotion never fires against a `"*"` catch-all — only a config that already declares a specific `path` rule is affected.
 
+On Windows, where a backslash is a path separator, a backslash-relative bash argument (e.g. `dir\file` in `cat dir\file`) is gated by a `path` rule the same as its forward-slash equivalent (`dir/file`) and the same as the file accessed through the `read` tool.
+On other platforms a backslash is a legal filename character, so such a token is not treated as a path.
+
 Four orthogonal layers compose with most-restrictive-wins:
 
 | Layer                   | Question                                | Applies to       |
