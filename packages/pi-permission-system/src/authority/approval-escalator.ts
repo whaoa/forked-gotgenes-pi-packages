@@ -18,12 +18,7 @@ import {
   sleep,
   writeJsonFileAtomic,
 } from "#src/authority/forwarding-io";
-import type { SubagentDetector } from "#src/authority/subagent-detection";
-import type {
-  PermissionDecisionUi,
-  PermissionPromptDecision,
-  RequestPermissionOptions,
-} from "#src/permission-dialog";
+import type { PermissionPromptDecision } from "#src/permission-dialog";
 import {
   type ForwardedPermissionRequest,
   type ForwardedPromptDisplay,
@@ -39,28 +34,6 @@ import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
 import type { Authorizer } from "./authorizer";
 import type { PromptPermissionDetails } from "./permission-prompter";
-
-/**
- * Constructor config for `ApprovalEscalator`.
- *
- * Replaces the `PermissionForwardingDeps` interface that was previously
- * threaded into free functions in `polling.ts`.  The escalator consumes it
- * once at construction and stores each member as a private readonly field.
- */
-export interface ApprovalEscalatorDeps {
-  forwardingDir: string;
-  /** Single owner of subagent detection; gates the forward-vs-deny decision. */
-  detection: SubagentDetector;
-  /** In-process subagent session registry for forwarding target resolution. */
-  registry?: SubagentSessionRegistry;
-  logger: DebugReviewLogger;
-  requestPermissionDecisionFromUi: (
-    ui: PermissionDecisionUi,
-    title: string,
-    message: string,
-    options?: RequestPermissionOptions,
-  ) => Promise<PermissionPromptDecision>;
-}
 
 // ── Module-private helpers ────────────────────────────────────────────────
 
@@ -85,82 +58,51 @@ function getContextSystemPrompt(ctx: ForwarderContext): string | undefined {
   }
 }
 
-// ── Public seam interfaces ────────────────────────────────────────────────
+// ── ParentAuthorizer ────────────────────────────────────────────────────
 
-/**
- * Narrow seam describing what `PermissionPrompter` needs from the escalator:
- * a single method that resolves a permission decision for the current context
- * (prompt directly when the session has UI, otherwise forward to the parent).
- *
- * Depending on the interface (not the concrete `ApprovalEscalator`) keeps
- * the prompter's unit tests free of casts — they inject a plain
- * `{ requestApproval: vi.fn() }` mock.
- */
-export interface ApprovalRequester {
-  requestApproval(
-    ctx: ForwarderContext,
-    message: string,
-    options?: RequestPermissionOptions,
-    forwarded?: ForwardedPromptDisplay,
-  ): Promise<PermissionPromptDecision>;
+/** Constructor config for {@link ParentAuthorizer}. */
+export interface ParentAuthorizerDeps {
+  forwardingDir: string;
+  /** In-process subagent session registry for forwarding target resolution. */
+  registry?: SubagentSessionRegistry;
+  logger: DebugReviewLogger;
 }
 
-// ── ApprovalEscalator ────────────────────────────────────────────────
-
 /**
- * Owner of the escalation-up role of the forwarded-permission behavior.
+ * Authorizer for a subagent session: escalate the ask up the tree to the
+ * parent's authority.
  *
- * Holds all forwarding state as private readonly fields and provides the
- * public `requestApproval` method: deciding whether to prompt directly or
- * forward to the parent, building and persisting request files, and polling
- * for responses.
+ * Owns the escalation-up role of the forwarded-permission behavior: builds
+ * and persists a request file, then polls for the parent session's
+ * response. `ctx` is bound once at construction — `selectAuthorizer` only
+ * constructs a `ParentAuthorizer` for a context it has already confirmed has
+ * no UI and is a subagent, so `authorize` never re-derives that dispatch
+ * (formerly `ApprovalEscalator.requestApproval`'s `hasUI` / `!isSubagent`
+ * arms, both dead once every caller routes through `selectAuthorizer`).
  */
-export class ApprovalEscalator implements ApprovalRequester {
+export class ParentAuthorizer implements Authorizer {
   private readonly forwardingDir: string;
-  private readonly detection: SubagentDetector;
   private readonly registry: SubagentSessionRegistry | undefined;
   private readonly logger: DebugReviewLogger;
-  private readonly requestPermissionDecisionFromUi: (
-    ui: PermissionDecisionUi,
-    title: string,
-    message: string,
-    options?: RequestPermissionOptions,
-  ) => Promise<PermissionPromptDecision>;
 
-  constructor(deps: ApprovalEscalatorDeps) {
+  constructor(
+    private readonly ctx: ForwarderContext,
+    deps: ParentAuthorizerDeps,
+  ) {
     this.forwardingDir = deps.forwardingDir;
-    this.detection = deps.detection;
     this.registry = deps.registry;
     this.logger = deps.logger;
-    this.requestPermissionDecisionFromUi = deps.requestPermissionDecisionFromUi;
   }
 
-  // ── Public seam methods ────────────────────────────────────────────────
-
-  /**
-   * Resolve a permission decision for the current context: prompt directly
-   * when this session has UI, otherwise forward to the parent session.
-   */
-  requestApproval(
-    ctx: ForwarderContext,
-    message: string,
-    options?: RequestPermissionOptions,
-    forwarded?: ForwardedPromptDisplay,
+  authorize(
+    details: PromptPermissionDetails,
   ): Promise<PermissionPromptDecision> {
-    if (ctx.hasUI) {
-      return this.requestPermissionDecisionFromUi(
-        ctx.ui,
-        "Permission Required",
-        message,
-        options,
-      );
-    }
-
-    if (!this.detection.isSubagent(ctx)) {
-      return Promise.resolve({ approved: false, state: "denied" });
-    }
-
-    return this.waitForForwardedApproval(ctx, message, forwarded);
+    const uiPrompt = buildDirectUiPrompt(details);
+    return this.waitForForwardedApproval(this.ctx, details.message, {
+      source: uiPrompt.source,
+      surface: uiPrompt.surface,
+      value: uiPrompt.value,
+    });
   }
 
   // ── Private methods ────────────────────────────────────────────────────
@@ -173,7 +115,10 @@ export class ApprovalEscalator implements ApprovalRequester {
     const requesterSessionId = getSessionId(ctx);
     const targetSessionId = resolvePermissionForwardingTargetSessionId({
       hasUI: ctx.hasUI,
-      isSubagent: this.detection.isSubagent(ctx),
+      // Invariant: selectAuthorizer only selects ParentAuthorizer for a
+      // no-UI subagent context, so this is always true — no detection dep
+      // needed to re-derive it here.
+      isSubagent: true,
       currentSessionId: requesterSessionId,
       env: process.env,
       sessionId: requesterSessionId,
@@ -326,41 +271,5 @@ export class ApprovalEscalator implements ApprovalRequester {
     safeDeleteFile(this.logger, requestPath, "forwarded permission request");
     cleanupPermissionForwardingLocationIfEmpty(this.logger, location);
     return { approved: false, state: "denied" };
-  }
-}
-
-// ── ParentAuthorizer ──────────────────────────────────────────
-
-/**
- * Authorizer for a subagent session: escalate the ask up the tree to the
- * parent's authority.
- *
- * Step 1 (#555) wraps an existing `ApprovalEscalator` instance, binding
- * `ctx` once at construction instead of threading it per call. Step 2 folds
- * the escalator's forwarding machinery directly into this class and removes
- * this wrapper plus the now-dead `ctx.hasUI` / `!isSubagent` arms on
- * `ApprovalEscalator` (see the #555 plan) — this constructor shape is
- * transitional, not the final one.
- */
-export class ParentAuthorizer implements Authorizer {
-  constructor(
-    private readonly ctx: ForwarderContext,
-    private readonly escalator: ApprovalRequester,
-  ) {}
-
-  authorize(
-    details: PromptPermissionDetails,
-  ): Promise<PermissionPromptDecision> {
-    const uiPrompt = buildDirectUiPrompt(details);
-    return this.escalator.requestApproval(
-      this.ctx,
-      details.message,
-      details.sessionLabel ? { sessionLabel: details.sessionLabel } : undefined,
-      {
-        source: uiPrompt.source,
-        surface: uiPrompt.surface,
-        value: uiPrompt.value,
-      },
-    );
   }
 }

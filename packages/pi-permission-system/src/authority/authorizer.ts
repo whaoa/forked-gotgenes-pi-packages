@@ -4,7 +4,9 @@ import type {
   requestPermissionDecisionFromUi,
 } from "#src/permission-dialog";
 import type { PermissionEventBus } from "#src/permission-events";
-import { type ApprovalRequester, ParentAuthorizer } from "./approval-escalator";
+import type { DebugReviewLogger } from "#src/session-logger";
+import type { SubagentSessionRegistry } from "#src/subagent-registry";
+import { ParentAuthorizer } from "./approval-escalator";
 import { DenyingAuthorizer } from "./denying-authorizer";
 import { LocalUserAuthorizer } from "./local-user-authorizer";
 import type { PromptPermissionDetails } from "./permission-prompter";
@@ -25,14 +27,7 @@ export interface Authorizer {
   ): Promise<PermissionPromptDecision>;
 }
 
-/**
- * Construction inputs for {@link selectAuthorizer}.
- *
- * Transitional (Step 1, #555): `escalator` is the composition root's shared
- * `ApprovalEscalator` instance, wrapped by `ParentAuthorizer`. Step 2 removes
- * this field once the escalator's forwarding machinery folds directly into
- * `ParentAuthorizer`.
- */
+/** Construction inputs for {@link selectAuthorizer}. */
 export interface AuthorizerSelectionDeps {
   /** Single owner of subagent detection; the ParentAuthorizer-selection predicate. */
   detection: SubagentDetector;
@@ -40,8 +35,11 @@ export interface AuthorizerSelectionDeps {
   events: PermissionEventBus;
   /** Injected for testability; production callers pass the real function. */
   requestPermissionDecisionFromUi: typeof requestPermissionDecisionFromUi;
-  /** Shared escalator instance `ParentAuthorizer` forwards through. */
-  escalator: ApprovalRequester;
+  /** Forwarding directory `ParentAuthorizer` reads/writes request and response files under. */
+  forwardingDir: string;
+  /** In-process subagent session registry for forwarding target resolution. */
+  registry?: SubagentSessionRegistry;
+  logger: DebugReviewLogger;
 }
 
 /**
@@ -64,7 +62,11 @@ export function selectAuthorizer(
     });
   }
   if (deps.detection.isSubagent(ctx)) {
-    return new ParentAuthorizer(ctx, deps.escalator);
+    return new ParentAuthorizer(ctx, {
+      forwardingDir: deps.forwardingDir,
+      registry: deps.registry,
+      logger: deps.logger,
+    });
   }
   return new DenyingAuthorizer();
 }

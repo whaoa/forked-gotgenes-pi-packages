@@ -1,9 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, getPackageDir } from "@earendil-works/pi-coding-agent";
-import {
-  ApprovalEscalator,
-  type ApprovalEscalatorDeps,
-} from "./authority/approval-escalator";
 import { AuthorizerSelection } from "./authority/authorizer-selection";
 import {
   ForwardedRequestServer,
@@ -94,15 +90,6 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     logger,
   });
 
-  const escalatorDeps: ApprovalEscalatorDeps = {
-    forwardingDir: paths.forwardingDir,
-    detection: subagentDetection,
-    registry: subagentRegistry,
-    logger,
-    requestPermissionDecisionFromUi,
-  };
-  const escalator = new ApprovalEscalator(escalatorDeps);
-
   const requestServerDeps: ForwardedRequestServerDeps = {
     forwardingDir: paths.forwardingDir,
     logger,
@@ -118,7 +105,9 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     detection: subagentDetection,
     events: pi.events,
     requestPermissionDecisionFromUi,
-    escalator,
+    forwardingDir: paths.forwardingDir,
+    registry: subagentRegistry,
+    logger,
     prompter,
   });
 

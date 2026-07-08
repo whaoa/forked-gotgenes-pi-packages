@@ -8,7 +8,7 @@ import type { SubagentSessionRegistry } from "#src/subagent-registry";
 /**
  * Narrow seam for the ask-path consumers: "is the current session a subagent?"
  *
- * `PromptingGateway`, `ForwardingManager`, and `ApprovalEscalator` depend on
+ * `selectAuthorizer`/`AuthorizerSelection` and `ForwardingManager` depend on
  * this single-method view so their unit tests inject a one-field fake without
  * casts. It is the Authorizer-selection predicate the Phase 9 spine consumes.
  */

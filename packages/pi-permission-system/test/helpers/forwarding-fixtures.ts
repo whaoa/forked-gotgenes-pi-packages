@@ -2,13 +2,13 @@
  * Shared fixtures for the forwarding subsystem's test files.
  *
  * Collapses the temp forwarding-directory scaffolding, the forwarded-request
- * writer, and the `ApprovalEscalatorDeps` / `ForwardedRequestServerDeps` /
+ * writer, and the `ParentAuthorizerDeps` / `ForwardedRequestServerDeps` /
  * `ForwarderContext` / UI-decision builders that the split-out per-class test
  * files repeated per test.
  *
  * Consumed by test/authority/approval-escalator.test.ts (the escalation-up
- * role) and test/authority/forwarded-request-server.test.ts (the
- * serving-down role) — both extracted from `PermissionForwarder` by Phase 8
+ * role, ParentAuthorizer since #555) and test/authority/forwarded-request-server.test.ts
+ * (the serving-down role) — both extracted from `PermissionForwarder` by Phase 8
  * Step 6 (#530).
  * The `{ emit, on }` events mock is not duplicated here — reuse `makeEvents`
  * from `#test/helpers/handler-fixtures`.
@@ -18,7 +18,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
 
-import type { ApprovalEscalatorDeps } from "#src/authority/approval-escalator";
 import type { ForwardedRequestServerDeps } from "#src/authority/forwarded-request-server";
 import type { ForwarderContext } from "#src/authority/forwarder-context";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
@@ -35,7 +34,7 @@ import {
 
 /** Handle over a temp forwarding directory; register `cleanup` in `afterEach`. */
 export interface ForwardingTempDir {
-  /** Absolute path passed as `forwardingDir` to `ApprovalEscalatorDeps` / `ForwardedRequestServerDeps`. */
+  /** Absolute path passed as `forwardingDir` to `ParentAuthorizerDeps` / `ForwardedRequestServerDeps`. */
   forwardingDir: string;
   /** The session's request/response location under `forwardingDir`. */
   location: PermissionForwardingLocation;
@@ -88,25 +87,6 @@ export function createForwardingTempDir(
     cleanup() {
       rmSync(root, { recursive: true, force: true });
     },
-  };
-}
-
-/**
- * Builds `ApprovalEscalatorDeps` with a non-subagent detector and an
- * approving UI. Pass `detection: { isSubagent: () => true }` to exercise the
- * forwarded path.
- */
-export function makeEscalatorDeps(
-  overrides: Partial<ApprovalEscalatorDeps> = {},
-): ApprovalEscalatorDeps {
-  return {
-    forwardingDir: "/tmp/forwarding",
-    detection: { isSubagent: vi.fn((): boolean => false) },
-    logger: { review: vi.fn(), debug: vi.fn() },
-    requestPermissionDecisionFromUi: vi
-      .fn()
-      .mockResolvedValue(makeUiDecision()),
-    ...overrides,
   };
 }
 

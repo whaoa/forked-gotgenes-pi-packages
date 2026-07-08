@@ -39,11 +39,9 @@ function makeDeps(
     requestPermissionDecisionFromUi:
       overrides.requestPermissionDecisionFromUi ??
       vi.fn().mockResolvedValue({ approved: true, state: "approved" }),
-    escalator: overrides.escalator ?? {
-      requestApproval: vi
-        .fn()
-        .mockResolvedValue({ approved: false, state: "denied" }),
-    },
+    forwardingDir: overrides.forwardingDir ?? "/tmp/forwarding",
+    registry: overrides.registry,
+    logger: overrides.logger ?? { review: vi.fn(), debug: vi.fn() },
   };
 }
 
