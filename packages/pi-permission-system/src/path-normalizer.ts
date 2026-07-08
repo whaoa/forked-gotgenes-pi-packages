@@ -113,6 +113,18 @@ export class PathNormalizer {
   }
 
   /**
+   * True when the host platform treats a backslash as a path separator (win32).
+   *
+   * The bash rule-candidate classifier reads this to decide whether a
+   * backslash-relative token (`dir\file`) is path-shaped: on win32 `\` is a
+   * separator, but on POSIX it is a legal filename character (#520). Keeping the
+   * decision here means no bash-layer module re-reads `process.platform`.
+   */
+  usesWindowsSeparators(): boolean {
+    return this.platform === "win32";
+  }
+
+  /**
    * Interpret a literal `cd` target's effect on the effective base.
    *
    * On win32 the target carries Git Bash/MSYS semantics: a drive mount

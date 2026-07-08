@@ -426,6 +426,10 @@ export class BashPathResolver {
    * classifier (`classifyPromotedRuleCandidate`, #509) for a bare token the
    * broad classifier rejects for shape — promoted only when the injected
    * `isPromotablePathToken` predicate matches an active, specific `path` rule.
+   * On win32 the broad classifier is told to treat a backslash as a path
+   * separator, so a backslash-relative token (`dir\file`) is recognized as a
+   * rule candidate the same as its forward-slash equivalent (#520); on POSIX
+   * `\` is a legal filename character, so the token stays bare there.
    * Pairs each qualifying token with its set of policy values (absolute +
    * project-relative + raw).
    * A token after a non-literal `cd` keeps only its literal value so no
@@ -436,10 +440,11 @@ export class BashPathResolver {
   ): BashPathRuleCandidate[] {
     const seen = new Set<string>();
     const result: BashPathRuleCandidate[] = [];
+    const windowsSeparators = this.normalizer.usesWindowsSeparators();
 
     for (const { token, base } of candidates) {
       const candidate =
-        classifyTokenAsRuleCandidate(token) ??
+        classifyTokenAsRuleCandidate(token, { windowsSeparators }) ??
         classifyPromotedRuleCandidate(token, this.isPromotablePathToken);
       if (!candidate) continue;
 

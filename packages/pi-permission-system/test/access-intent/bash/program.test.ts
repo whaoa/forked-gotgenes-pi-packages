@@ -240,6 +240,48 @@ describe("BashProgram", () => {
         );
         expect(program.externalPaths()).toHaveLength(0);
       });
+
+      it("recognizes a backslash-relative token as a path rule candidate (#520)", async () => {
+        const program = await BashProgram.parse("cat dir\\file", winNormalizer);
+        const candidate = program.pathRuleCandidates()[0];
+        expect(candidate.token).toBe("dir\\file");
+      });
+
+      it("resolves a backslash-relative token to the same win32 aliases its forward-slash equivalent matches (#520)", async () => {
+        const backslashProgram = await BashProgram.parse(
+          "cat dir\\file",
+          winNormalizer,
+        );
+        const forwardSlashProgram = await BashProgram.parse(
+          "cat dir/file",
+          winNormalizer,
+        );
+        const backslashAliases = backslashProgram
+          .pathRuleCandidates()[0]
+          .path.matchValues();
+        // The backslash token resolves to the canonical win32 path plus its
+        // win32-normalized relative alias.
+        expect(backslashAliases).toEqual([
+          "c:\\projects\\app\\dir\\file",
+          "dir\\file",
+        ]);
+        // The forward-slash equivalent carries the same aliases plus a redundant
+        // raw "dir/file" that folds to "dir\file" under win32 separator folding,
+        // so every path rule matches both forms identically (#520).
+        const forwardSlashAliases = forwardSlashProgram
+          .pathRuleCandidates()[0]
+          .path.matchValues();
+        for (const alias of backslashAliases) {
+          expect(forwardSlashAliases).toContain(alias);
+        }
+      });
+    });
+
+    describe("posix backslash-relative tokens stay bare (#520)", () => {
+      it("does not treat a backslash-relative token as a path rule candidate on posix", async () => {
+        const program = await BashProgram.parse("cat dir\\file", normalizer);
+        expect(program.pathRuleCandidates()).toHaveLength(0);
+      });
     });
 
     describe("effective working directory projection", () => {

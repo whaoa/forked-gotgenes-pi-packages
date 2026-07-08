@@ -57,6 +57,10 @@ describe("PathNormalizer", () => {
       expect(normalizer.isAbsolute("rel/path")).toBe(false);
     });
 
+    test("usesWindowsSeparators is false on posix (#520)", () => {
+      expect(normalizer.usesWindowsSeparators()).toBe(false);
+    });
+
     test("resolveBase resolves an offset against the baked cwd", () => {
       expect(normalizer.resolveBase("sub")).toBe("/projects/my-app/sub");
       expect(normalizer.resolveBase("/abs")).toBe("/abs");
@@ -164,6 +168,10 @@ describe("PathNormalizer", () => {
     test("isAbsolute uses win32 rules", () => {
       expect(normalizer.isAbsolute("C:\\Users\\foo")).toBe(true);
       expect(normalizer.isAbsolute("rel\\path")).toBe(false);
+    });
+
+    test("usesWindowsSeparators is true on win32 (#520)", () => {
+      expect(normalizer.usesWindowsSeparators()).toBe(true);
     });
 
     test("resolveBase resolves an offset against the baked cwd", () => {
