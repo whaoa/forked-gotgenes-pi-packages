@@ -169,6 +169,14 @@ File nothing speculative — only follow-ups the plan concretely names.
 
 ## Commit
 
+Lint the plan file first so a markdown slip is caught here, not at the next stage's baseline (a `[#N]` mention inside backticks is a code span, not a reference, so its `[#N]:` definition trips `MD053`):
+
+```bash
+pnpm exec rumdl check <plan-file>
+```
+
+Fix any findings, then commit:
+
 ```bash
 git add <plan-file>
 git commit -m "docs: plan <short summary> (#$1)"
