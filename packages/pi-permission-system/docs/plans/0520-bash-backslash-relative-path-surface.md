@@ -210,7 +210,6 @@ The classifier parameter is optional and the normalizer accessor lands with its 
 None.
 The design reuses the established `windowsSeparators` option convention and the `PathNormalizer` platform seam; no follow-up work is deferred.
 
-[#393]: https://github.com/gotgenes/pi-packages/issues/393
 [#418]: https://github.com/gotgenes/pi-packages/issues/418
 [#475]: https://github.com/gotgenes/pi-packages/issues/475
 [#508]: https://github.com/gotgenes/pi-packages/issues/508
