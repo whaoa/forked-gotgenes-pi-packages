@@ -80,6 +80,8 @@ Do not copy a doc metric forward — recompute it:
 - "Total LOC" / "Source LOC" counts `src/` only (`find packages/$1/src -name '*.ts' | wc -l` for the file count; `… -exec wc -l {} +` for LOC).
   Test counts come from `pnpm --filter @gotgenes/$1 run test`.
 - If a doc metric carries a mid-phase label ("as of Step N", "Phase N Step M"), replace it with the end-of-phase value and drop the label — the archived doc should read as the settled post-phase baseline, not a snapshot.
+- When the phase findings table records a recompute command for a target metric (a `grep -c`, `wc -l`, or fallow field), run it and record predicted vs. delivered in the completion summary.
+  Report misses honestly — they are retro input for the next planning round, not something to paper over (the Phase 8 precedent: "fallow refactoring targets did not clear to 0" was recorded verbatim).
 
 ### Stop versus fix
 

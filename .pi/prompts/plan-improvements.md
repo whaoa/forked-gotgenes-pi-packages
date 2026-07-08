@@ -50,6 +50,7 @@ If the architecture document already declares a direction for Phase N (e.g. a de
 
 Before touching any tool, write down a **cause hypothesis**: the first-principles structural problem you expect the next phase to dissolve (structural fusion, a coupling/boundary flaw, a dead subsystem), read against the architecture doc's first-principles section.
 The later steps corroborate, refine, or refute it — they do not replace it.
+A cause-level finding must trace to a named target concept in the architecture doc's first-principles section; when no such section exists, writing one — naming the organizing concept and recording resolved design directions — is itself a phase deliverable.
 
 ### Step 2: Sweep open issues
 
@@ -60,6 +61,7 @@ gh issue list --label "pkg:$1" --state open
 ```
 
 Cross-check each open issue against the architecture doc's claims about which issues remain open, and note any that are parked candidates for this phase or already-filed work you must not re-plan.
+Track repeat deferrals: an issue swept as out-of-scope across multiple consecutive phases (check the prior phase retros/roadmaps) gets an explicit decision this phase — schedule it, or recommend closing it as not-planned — never a silent re-defer.
 
 ### Step 3: Run fallow for corroboration and baseline
 
@@ -117,6 +119,7 @@ Identify dependency ordering and parallel tracks.
 If discovery surfaced no cause-level finding (Category A–C — structural fusion, coupling/boundary flaws, dead subsystems) and the candidate list is polish-only (Category B unit-size, Category D, Category E symptoms), say so plainly and present **"defer"** and **"lean phase"** as first-class `ask_user` options alongside a full phase.
 This is deliberately **not** a numeric threshold — the priority score ranks findings *within* a phase, it does not decide *whether* a phase exists.
 The honest framing ("discovery yielded only polish") is the point; do not manufacture a full phase to fill the ceiling.
+When the architecture doc's declared target is complete and discovery yields only polish, the fired gate is the improvement process reaching its intended terminal state — report it as success, not as a failure to find work; the next phase's trigger is a new cause, not the calendar.
 
 **Feasibility probe.**
 Before committing any step whose outcome claim depends on the SDK/type surface (e.g. "remove the file-level `eslint-disable` once the SDK exports usable types"), confirm the named type or export actually exists in the real surface (SDK `.d.ts`, `--help`, schema).
@@ -129,6 +132,7 @@ Write the proposed plan as a new section in `packages/$1/docs/architecture/archi
 The section should include:
 
 1. A summary of findings (updated health metrics table).
+   Prefer cause-level metrics recomputable by a single command (a `grep -c`, `wc -l`, or fallow field) and record the recompute command with the metric, so `/finish-phase` can verify delivered vs. predicted deterministically.
 2. Numbered steps with:
    - Title
    - Target files/functions — when a step extracts or moves code and a domain directory applies (Step 6), name the destination path (e.g. `src/<domain>/<file>.ts`) so directory placement rides along with the change rather than landing flat and being moved later.

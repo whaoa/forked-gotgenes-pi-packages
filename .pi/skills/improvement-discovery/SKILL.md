@@ -23,10 +23,14 @@ Load `docs/architecture/architecture.md` for the current domain model, health me
 Check which bags/hotspots have already been addressed vs. remain open.
 Before touching any tool, write down a **cause hypothesis** — the first-principles structural problem the next phase should dissolve (structural fusion, a coupling/boundary flaw, a dead subsystem).
 The later steps corroborate, refine, or refute it.
+A cause-level finding must trace to a named target concept in the architecture doc's first-principles section (the pattern: pi-permission-system's "Target: the authority model").
+When no such section exists, writing one — naming the organizing concept and recording resolved design directions — is itself a phase deliverable, not an emergent artifact: settled-in-writing directions are what make the next phase's plan cheap.
 
 ### 2. Sweep open issues
 
 Run `gh issue list --label "pkg:<PKG>" --state open` and cross-check it against the architecture doc's claims about which issues remain open — doc/tracker drift otherwise causes re-planning filed work or missing a parked candidate.
+Track repeat deferrals: an issue swept as out-of-scope across multiple consecutive phases gets an explicit decision this phase — schedule it into the phase, or recommend closing it as not-planned — never a silent re-defer.
+Structural phases must not starve feature and bug work indefinitely.
 
 ### 3. Run fallow for corroboration and baseline
 
@@ -67,6 +71,8 @@ For each imported module, note:
 
 Nine steps is a ceiling, not a target — a phase may have one step, or none.
 If discovery surfaced no cause-level finding (Category A–C) and the candidates are polish-only (Category B unit-size, D, E symptoms), say so and present **defer** and **lean phase** as first-class `ask_user` options rather than manufacturing a full phase.
+When the architecture doc's declared target is complete and discovery yields only polish, the fired gate is the improvement process reaching its intended terminal state — report it as success, not as a failure to find work.
+The next phase's trigger is then a new cause (a feature's structural needs, a bug cluster, a newly named concept), not the calendar.
 Before committing any step whose outcome depends on the SDK/type surface, feasibility-probe it — confirm the named type or export exists in the real surface before promising the outcome.
 
 ## Smell taxonomy
@@ -172,6 +178,8 @@ Priority = Impact × (6 − Risk)
 The plan should produce:
 
 1. **Updated health metrics** — table comparing before/after for the phase.
+   Prefer cause-level metrics recomputable by a single command (a `grep -c`, `wc -l`, or fallow field — e.g. `canConfirm` occurrences in `src/`, role-interface count) and record the recompute command with the metric, so `/finish-phase` can verify delivered vs. predicted deterministically.
+   The fallow health score alone is a poor phase metric — it is blind to the type-level wins (a bug class made unrepresentable) that cause-driven phases produce.
 2. **Step list** — numbered steps, each with:
    - Title and issue reference
    - **Cause** — the first-principles structural cause the step dissolves (name it explicitly), with any fallow signal cited as the _symptom_ of that cause, not the motivation.
