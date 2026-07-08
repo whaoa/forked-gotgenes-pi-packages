@@ -10,6 +10,7 @@
 2. **`authorizer.authorize(details)`** — the selected `Authorizer` (`LocalUserAuthorizer`, `ParentAuthorizer`, or `DenyingAuthorizer`) resolves the decision.
    The UI-prompt broadcast and the UI/forwarding branching this class previously owned now live on the individual `Authorizer` implementations — see [architecture.md's authority model](architecture.md#target-the-authority-model).
 3. **Review log — outcome** — write `permission_request.approved` or `permission_request.denied` with the final decision state and any denial reason.
+   The denied entry's `resolution` is the decision state, or `confirmation_unavailable` when the decision carries that marker — a `DenyingAuthorizer` denial, i.e. no live authority was reachable (a no-UI, non-subagent session) ([#556]).
 
 Yolo-mode auto-approval is resolved upstream, at the composition stage (`PermissionManager.check`'s `rewriteAsksToYolo`) — an `ask` never reaches this class under yolo, so `PermissionPrompter` has no yolo-mode knowledge.
 
@@ -70,7 +71,9 @@ const authorizerSelection = new AuthorizerSelection({
 });
 ```
 
-`authorizerSelection` implements `GatePrompter` and is passed to both `PermissionSession` (as the `activate`/`deactivate` lifecycle) and `GateRunner` (as the `canConfirm()`/`prompt(details)` role).
-`GateRunner` calls `this.prompter.prompt(details)` on the gate-prompter role exactly as before — the Authorizer spine is entirely behind that seam.
+`authorizerSelection` implements `AskEscalator` and is passed to both `PermissionSession` (as the `activate`/`deactivate` lifecycle) and `GateRunner` (as the `escalate(details)` ask-escalation role).
+`GateRunner` calls `this.prompter.escalate(details)` for every `ask` — there is no `canConfirm()` pre-check ([#556] dissolved it); the selected `Authorizer` always answers, the `DenyingAuthorizer` by denying with the `confirmationUnavailable` marker.
+The Authorizer spine is entirely behind that seam.
 
 [#555]: https://github.com/gotgenes/pi-packages/issues/555
+[#556]: https://github.com/gotgenes/pi-packages/issues/556

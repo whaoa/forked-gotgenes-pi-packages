@@ -494,7 +494,7 @@ The `PermissionsService` interface exposes three methods:
 
 The sections above describe the current implementation.
 This section records the organizing concept the package is moving toward — the spine that the elicitation, forwarding, and yolo machinery should collapse into.
-It is a target, not current state: the `Authorizer` interface, its three implementations, and once-per-activation selection landed in Phase 9 Step 1 ([#555]); serving (`ForwardedRequestServer`) is not yet rebuilt onto `evaluate()` + the serving `Authorizer` (Phase 9 Step 3, [#557]), and `canConfirm()` still survives as a transitional predicate (Phase 9 Step 2, [#556]).
+It is a target, not current state: the `Authorizer` interface, its three implementations, and once-per-activation selection landed in Phase 9 Step 1 ([#555]), and `canConfirm()` was dissolved in Phase 9 Step 2 ([#556]) — the ask path now always escalates to the selected `Authorizer`; serving (`ForwardedRequestServer`) is not yet rebuilt onto `evaluate()` + the serving `Authorizer` (Phase 9 Step 3, [#557]).
 
 ### Why this is worth doing
 
@@ -736,7 +736,6 @@ src/
 ├── permission-resolver.ts    `ScopedPermissionResolver` interface - the single `{ resolve(intent) }` role the gate factories / runner / pipeline depend on (#478); `PermissionResolver` concrete class - holds `ScopedPermissionManager` + `SessionRules`, owns `resolve(intent)` (unwraps an `access-path` `AccessIntent` via `matchValues()` before calling `manager.check`) / raw `checkPermission` (implements `SkillPermissionChecker`, no session rules) / `getToolPermission` / `getConfigIssues`; extracted from `PermissionSession` (#340); the query methods (`getToolPermission` / `getConfigIssues`) are now consumed by `AgentPrepHandler` / `SessionLifecycleHandler` (#341)
 ├── decision-reporter.ts      `DecisionReporter` interface + `GateDecisionReporter` class - owns `SessionLogger` and event bus; writes review-log entries and emits decision events (#322)
 ├── decision-audit.ts         `DecisionRecorder` / `DecisionSummaryWriter` / `AuditLogger` interfaces + `DecisionAudit` class - per-session decision counters (`recordDecision` / `recordError`); `writeSummary` emits a `permission.session_summary` debug line on shutdown and warns on a `toolCalls != allowed + blocked + errors` invariant violation (#452)
-├── gate-prompter.ts          `GatePrompter` interface - `canConfirm()` + `prompt(details)`; the prompting role `GateRunner` needs, bound to context by the implementor (#323)
 ├── session-approval-recorder.ts `SessionApprovalRecorder` interface - records a granted session-scoped approval into the session ruleset; implemented by `SessionRules` (#323, #341)
 │
 ├── permission-session.ts     `PermissionSession` class - state/lifecycle owner: owns context lifecycle, session-rule lifecycle (`reset`/`shutdown`/`reload`), skill entries, agent-name resolution, the config gateway, the Tell-Don't-Ask gate inputs, and `notify(message)` (Tell-Don't-Ask UI warn over the owned context, no-op before activation — dissolves the `index.ts` forward-reference cycle, #363); `implements ToolCallGateInputs` (the pipeline's input contract); the resolve role moved to `PermissionResolver` (#340), the recorder role to `SessionRules`, and the three fig-leaf handler role interfaces (`GateHandlerSession` / `AgentPrepSession` / `SessionLifecycleSession`) were retired — handlers depend on the concrete class + `PermissionResolver` (#341)
@@ -763,7 +762,7 @@ src/
 │   └── gates/               Pure descriptor factories + runner
 │       ├── types.ts          GateOutcome, ToolCallContext
 │       ├── descriptor.ts     GateDescriptor (with DenialContext), GateBypass, GateResult types
-│       ├── runner.ts         GateRunner class — constructed with three distinct collaborators: `ScopedPermissionResolver` (resolver), `SessionApprovalRecorder` (`SessionRules` recorder), `GatePrompter` (`AuthorizerSelection`, #555), plus `DecisionReporter`; `run(gate, agentName, toolCallId)` dispatches null / bypass / descriptor (#341)
+│       ├── runner.ts         GateRunner class — constructed with three distinct collaborators: `ScopedPermissionResolver` (resolver), `SessionApprovalRecorder` (`SessionRules` recorder), `AskEscalator` (`AuthorizerSelection`, #555, #556; the single-method ask-escalation seam that replaced `GatePrompter`), plus `DecisionReporter`; `run(gate, agentName, toolCallId)` dispatches null / bypass / descriptor (#341)
 │       ├── tool-call-gate-pipeline.ts `ToolCallGateInputs` interface (query methods: `getActiveSkillEntries`, `getInfrastructureReadDirs`, `getToolPreviewLimits`, `getPathNormalizer`, `getPromotablePathTokenMatcher`) + `ToolCallGatePipeline` class — constructed with `ScopedPermissionResolver` + `ToolCallGateInputs`; owns bash-command extraction + single `BashProgram.parse` (fed the session `PathNormalizer` and the agent-scoped `getPromotablePathTokenMatcher()` predicate, #510, #509), `ToolPreviewFormatter` construction, infra-dir list, the six gate producers, and the run loop; `evaluate(tcc, runner)` returns the first block outcome or allow (#327, #340)
 │       ├── skill-input-gate-pipeline.ts `SkillInputGateInputs` + `GateNotifier` interfaces + `SkillInputGatePipeline` class — constructed once in the composition root and injected into `PermissionGateHandler`; owns raw `checkPermission` pre-check, deny notify, `describeSkillInputGate` descriptor, request-id mint (`createSkillInputRequestId`), and `runner.run`; `evaluate(skillName, agentName, notifier, runner)` makes the `input` path symmetric with the `tool_call` path (#329, absorbs #330)
 │       ├── helpers.ts        deriveDecisionValue, deriveResolution, buildDecisionEvent
@@ -820,8 +819,8 @@ src/
 ├── authority/                 Subagent detection, the Authorizer spine, and forwarded-permission escalation (seeded #529; forwarding subsystem relocated here #530; Authorizer spine landed #555)
 │   ├── authorizer.ts          `Authorizer` interface (`authorize(details): Promise<PermissionPromptDecision>`) + `AuthorizerSelectionDeps` + `selectAuthorizer(ctx, deps)` - the once-per-activation hasUI/isSubagent/deny dispatch, replacing its re-derivation across the former `PromptingGateway`/`PermissionPrompter`/`ApprovalEscalator` (#555)
 │   ├── local-user-authorizer.ts `LocalUserAuthorizer` class - Authorizer for a session with UI: emits the `permissions:ui_prompt` broadcast, then shows the dialog (#555)
-│   ├── denying-authorizer.ts  `DenyingAuthorizer` class - least-privilege Authorizer for a session with no reachable authority (#555)
-│   ├── authorizer-selection.ts `AuthorizerSelection` class - context-owning `GatePrompter` implementation; selects the `Authorizer` once per activation and delegates `prompt(details)` to it via `PermissionPrompter`; rewrite of `PromptingGateway` (#555)
+│   ├── denying-authorizer.ts  `DenyingAuthorizer` class - least-privilege Authorizer for a session with no reachable authority; denies with the `confirmationUnavailable` marker so the ask path derives the `confirmation_unavailable` resolution (#555, #556)
+│   ├── authorizer-selection.ts `AuthorizerSelection` class - context-owning `AskEscalator` implementation (`escalate(details)`); selects the `Authorizer` once per activation and delegates to it via `PermissionPrompter`; rewrite of `PromptingGateway`; `canConfirm()` dissolved (#555, #556)
 │   ├── permission-prompter.ts `PermissionPrompter` class (`PermissionPrompterApi`) - review-log bracketing (waiting → approved/denied) around `authorizer.authorize(details)`; `PromptPermissionDetails` type; relocated from `src/permission-prompter.ts`, drops per-call `ctx` threading (#555)
 │   ├── subagent-detection.ts  SubagentDetection class - single owner of subagent detection (SubagentDetector.isSubagent + RegisteredChildDetector.isRegisteredChild); delegates to subagent-context (#529)
 │   ├── subagent-context.ts    Pure subagent execution context detection (registry + env vars + filesystem)
@@ -879,11 +878,14 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
    Impact 5 / Risk 3 / Priority 15.
    Release: independent
 
-2. **Dissolve `canConfirm()`: the ask path always escalates.**
+2. ✅ **Dissolve `canConfirm()`: the ask path always escalates.**
    ([#556]) Cause: "can anyone answer" is a pre-check duplicating the selection knowledge; with `DenyingAuthorizer`, absent authority is an authorizer that answers, not a boolean smeared across the gateway, gate, and runner.
-   Target: delete `src/gate-prompter.ts`; `src/permission-gate.ts` drops the `canConfirm` param (`ask` always awaits `promptForApproval`); `src/handlers/gates/runner.ts` drops the pre-check; `src/handlers/gates/helpers.ts` derives `confirmation_unavailable` from a marker on the `DenyingAuthorizer`'s decision (mirroring the existing `autoApproved` marker) so review-log/decision-event parity holds.
+   Target: delete `src/gate-prompter.ts`; `src/permission-gate.ts` drops the `canConfirm` param (`ask` always awaits `promptForApproval`); `src/handlers/gates/runner.ts` drops the pre-check; `src/handlers/gates/helpers.ts` derives `confirmation_unavailable` from a marker on the `DenyingAuthorizer`'s decision (mirroring the existing `autoApproved` marker).
+   Landed: `GatePrompter` deleted and replaced by the single-method `AskEscalator` seam (`escalate(details)`, `authorizer-selection.ts`); `permission-gate.ts`/`runner.ts`/`helpers.ts` shed the `canConfirm` plumbing; `DenyingAuthorizer` denies with a `confirmationUnavailable` marker and `PermissionPrompter` surfaces it as the denied entry's `resolution`.
    Smell: Category C (scattered boolean policy) / Category A (parameter dead after Step 1).
-   Outcome: `canConfirm` occurrences in `src/` drop 15 → 0; `runDescriptor` sheds the pre-check plumbing; blocked-when-unavailable review entries byte-identical to today.
+   Outcome: `canConfirm` occurrences in `src/` drop 15 → 0; `runDescriptor` sheds the pre-check plumbing.
+   The ask path now escalates uniformly — the `DenyingAuthorizer` is bracketed like any authorizer — so the unavailable path is recorded as the prompter's `waiting`/`denied` entries (`resolution: confirmation_unavailable`, preserved via the marker) rather than a standalone gate-written `blocked` entry; the `confirmation_unavailable` decision event is unchanged.
+   This is a deliberate design decision (uniform escalation over byte-identical review-log shape), so the review log differs from Step 1's target wording.
    Impact 4 / Risk 2 / Priority 16.
    Release: independent
 
@@ -916,7 +918,7 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
 ```mermaid
 flowchart TD
     S1["✅ Step 1 (#555)<br/>Authorizer interface + selection"]
-    S2["Step 2 (#556)<br/>Dissolve canConfirm"]
+    S2["✅ Step 2 (#556)<br/>Dissolve canConfirm"]
     S3["Step 3 (#557)<br/>Serving is resolution"]
     S4["Step 4 (#558)<br/>Grant-scope selection"]
     S5["Step 5 (#559)<br/>Complete authority/ migration"]
