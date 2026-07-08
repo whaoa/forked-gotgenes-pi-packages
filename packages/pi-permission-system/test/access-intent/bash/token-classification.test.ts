@@ -268,6 +268,48 @@ describe("classifyTokenAsRuleCandidate", () => {
     });
   });
 
+  describe("Windows backslash-relative acceptance gate (windowsSeparators option, #520)", () => {
+    test("backslash-relative token accepted with windowsSeparators: true", () => {
+      expect(
+        classifyTokenAsRuleCandidate("dir\\file", { windowsSeparators: true }),
+      ).toBe("dir\\file");
+    });
+
+    test("backslash-relative token rejected with no options (default unchanged)", () => {
+      expect(classifyTokenAsRuleCandidate("dir\\file")).toBeNull();
+    });
+
+    test("backslash-relative token rejected with windowsSeparators: false", () => {
+      expect(
+        classifyTokenAsRuleCandidate("dir\\file", {
+          windowsSeparators: false,
+        }),
+      ).toBeNull();
+    });
+
+    test("backslash regex-metacharacter token still rejected under the flag", () => {
+      // rejectNonPathToken's REGEX_METACHAR_PATTERN fires before the new
+      // branch is reached, regardless of windowsSeparators.
+      expect(
+        classifyTokenAsRuleCandidate("a\\|b", { windowsSeparators: true }),
+      ).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("\\(group\\)", {
+          windowsSeparators: true,
+        }),
+      ).toBeNull();
+    });
+
+    test("backslash traversal accepted regardless of the flag (already via ..)", () => {
+      expect(classifyTokenAsRuleCandidate("..\\secret")).toBe("..\\secret");
+      expect(
+        classifyTokenAsRuleCandidate("..\\secret", {
+          windowsSeparators: false,
+        }),
+      ).toBe("..\\secret");
+    });
+  });
+
   describe("rule-vs-path divergence", () => {
     const dotFiles = [".env", ".gitignore", ".eslintrc"];
     const relPaths = ["src/index.ts", "lib/utils.js", "config/settings.json"];

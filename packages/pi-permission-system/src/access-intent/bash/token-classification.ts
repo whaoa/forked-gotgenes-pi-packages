@@ -18,6 +18,14 @@
  * gated by the `path` surface; on Windows the `PathNormalizer` routes it through
  * the absolute-path branch. Shape recognition is platform-independent string
  * matching; the platform-sensitive absoluteness decision belongs to `PathNormalizer`.
+ *
+ * `classifyTokenAsRuleCandidate` also accepts a `RuleCandidateOptions.windowsSeparators`
+ * flag: when `true`, a backslash-relative token (`dir\file`, no leading `.`, no
+ * `/`, no `..`, not a drive-letter absolute) is accepted as path-shaped (#520).
+ * This is the one genuinely platform-sensitive shape rule the classifier owns —
+ * on POSIX `\` is a legal filename character, so the caller (`BashPathResolver`)
+ * derives the flag from `PathNormalizer.usesWindowsSeparators()` rather than the
+ * classifier reading `process.platform` itself.
  */
 import type { PathRuleTokenMatcher } from "#src/types";
 
@@ -46,12 +54,29 @@ export function classifyTokenAsPathCandidate(token: string): string | null {
 }
 
 /**
+ * Platform-sensitive options for {@link classifyTokenAsRuleCandidate}.
+ */
+export interface RuleCandidateOptions {
+  /**
+   * True when the host platform treats `\` as a path separator (win32), so a
+   * backslash-relative token (`dir\file`) is accepted as path-shaped (#520).
+   * On POSIX `\` is a legal filename character, so omit this (or pass
+   * `false`) to keep such a token bare.
+   */
+  readonly windowsSeparators?: boolean;
+}
+
+/**
  * Broader token classifier for cross-cutting `path` permission rules.
  *
  * Accepts the same shapes as `classifyTokenAsPathCandidate`, plus:
  * - Dot-files and `./`-relative paths (starting with `.`)
  * - Any relative path containing `/` (e.g. `src/foo.ts`)
  * - Windows drive-letter absolute paths (`C:/…` or `C:\…`)
+ * - A backslash-relative token (`dir\file`) when `options.windowsSeparators`
+ *   is `true` (#520) — the caller (`BashPathResolver`) derives this from
+ *   `PathNormalizer.usesWindowsSeparators()` so the platform bit has a single
+ *   home; this classifier never reads `process.platform`.
  *
  * The `~/foo` case is covered by `includes("/")` — no separate `~/` branch needed.
  * The forward-slash drive form (`C:/…`) is also caught by `includes("/")`, but the
@@ -64,13 +89,17 @@ export function classifyTokenAsPathCandidate(token: string): string | null {
  *
  * Returns the raw token string if it qualifies, or `null` to skip.
  */
-export function classifyTokenAsRuleCandidate(token: string): string | null {
+export function classifyTokenAsRuleCandidate(
+  token: string,
+  options?: RuleCandidateOptions,
+): string | null {
   if (rejectNonPathToken(token)) return null;
 
   if (token.startsWith(".")) return token;
   if (token.includes("/")) return token; // covers ~/ paths and all relative paths with /
   if (token.includes("..")) return token; // bare ".." (no slash)
   if (WINDOWS_DRIVE_PATH_PATTERN.test(token)) return token; // backslash-only drive form
+  if (options?.windowsSeparators && token.includes("\\")) return token;
 
   return null;
 }
