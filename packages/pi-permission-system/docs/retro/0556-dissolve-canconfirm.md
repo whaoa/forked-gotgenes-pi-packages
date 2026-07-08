@@ -35,3 +35,29 @@ Plan committed as `0556-dissolve-canconfirm.md`; TDD order is 3 steps (additive 
 - **Grep surface enumerated.**
   Only `authorizer-selection.ts` and `runner.ts` import `GatePrompter` in `src/`; `index.ts` and `permission-session.ts` are untouched (they hold `AuthorizerSelection` by value / via `AuthorizerSelectionLifecycle`).
   Docs to update: `architecture.md`, `permission-prompter.md`, package SKILL fixture note.
+
+## Stage: Implementation — TDD (2026-07-08T13:32:00Z)
+
+### Session summary
+
+Executed all three planned TDD cycles: (1) additive `confirmationUnavailable` marker on `PermissionPromptDecision` + `DenyingAuthorizer` + `PermissionPrompter` preserve-signal; (2) the atomic dissolve — deleted `gate-prompter.ts`, introduced the single-method `AskEscalator` seam (`escalate`), stripped `canConfirm` from `permission-gate.ts`/`runner.ts`/`helpers.ts`/`authorizer-selection.ts`, and migrated ~11 test files + 3 fixtures off the two-method `{ canConfirm, prompt }` mock; (3) docs — marked Phase 9 Step 2 `✅` (heading + Mermaid node), corrected the roadmap Outcome to the uniform-escalation reality, updated `permission-prompter.md` and the package SKILL.
+Test count: 2287 → 2280 in `pi-permission-system` (net -7); full suite, `tsc`, root lint, and `fallow dead-code` all green.
+
+### Observations
+
+- **`canConfirm` fully dissolved to 0 in `src/`** — the only surviving mentions are two historical references in the `authorizer-selection.ts` doc comment (explaining what `AskEscalator` replaced).
+- **Method renamed `prompt` → `escalate` on the gate seam.**
+  Deviated slightly toward more churn than a bare `prompt`-keeping rename, but the per-file `prompter.prompt` sites were disjoint (AskEscalator mocks vs `PermissionPrompterApi` mocks live in different files), so per-file `sed` was unambiguous.
+  `PermissionPrompter.prompt(authorizer, details)` keeps its name — `AuthorizerSelection.escalate()` now reads as calling `PermissionPrompter.prompt()`, a clean disambiguation.
+- **Deviation 1 (test removed):** dropped the `external-directory-integration.test.ts` test "writes review-log entry with confirmation_unavailable when no UI".
+  Under uniform escalation with an injected fake `AskEscalator`, the gate no longer writes a standalone `blocked` entry and the fake bypasses `PermissionPrompter`, so the integration layer cannot assert that entry; the behavior moved to the new `permission-prompter.test.ts` unit test (Step 1).
+  Reviewer confirmed this is legitimately redundant, not lost coverage.
+- **Deviation 2 (files not enumerated):** also migrated `external-directory-session-dedup.test.ts` and `external-directory-integration.test.ts` as consumers of `external-directory-fixtures.ts` (whose exported prompter type changed `GatePrompter` → `AskEscalator`).
+  A plan file-list gap, not an implementation gap — `tsc` would have caught a miss.
+  Also updated `makeDedupWiring`/`makeDeduplicatingHandler` signatures in the fixture (the plan named the fixture but not these two helpers).
+- **Review-log behavior change is intentional.**
+  The unavailable path is now `waiting` + `denied` (`resolution: confirmation_unavailable`, preserved via the marker) instead of a single `blocked`/`confirmation_unavailable` entry; the `permissions:decision` broadcast is unchanged.
+  Recorded in the corrected roadmap Outcome so it is not later read as a regression.
+- **Pre-completion reviewer: PASS.**
+  Mermaid (4 charts parse), dead code (fallow zero), cross-step invariants (all four Step-1 invariants verified intact: waiting-before-consult ordering, no UI-event from `DenyingAuthorizer`, yolo single `auto_approved`, `confirmation_unavailable` decision event now marker-driven).
+  No warnings.
