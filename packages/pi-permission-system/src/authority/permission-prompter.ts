@@ -75,7 +75,9 @@ export class PermissionPrompter implements PermissionPrompterApi {
         : "permission_request.denied",
       {
         ...details,
-        resolution: decision.state,
+        resolution: decision.confirmationUnavailable
+          ? "confirmation_unavailable"
+          : decision.state,
         denialReason: decision.denialReason,
       },
     );

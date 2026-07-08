@@ -3,7 +3,7 @@ import type { Authorizer } from "#src/authority/authorizer";
 import { DenyingAuthorizer } from "#src/authority/denying-authorizer";
 
 describe("DenyingAuthorizer", () => {
-  it("denies without approval, regardless of details", async () => {
+  it("denies with the confirmation-unavailable marker, regardless of details", async () => {
     const authorizer: Authorizer = new DenyingAuthorizer();
 
     const decision = await authorizer.authorize({
@@ -13,7 +13,11 @@ describe("DenyingAuthorizer", () => {
       message: "Allow this?",
     });
 
-    expect(decision).toEqual({ approved: false, state: "denied" });
+    expect(decision).toEqual({
+      approved: false,
+      state: "denied",
+      confirmationUnavailable: true,
+    });
   });
 
   it("denies the same way for a skill-sourced request", async () => {
@@ -27,6 +31,10 @@ describe("DenyingAuthorizer", () => {
       skillName: "deploy-helper",
     });
 
-    expect(decision).toEqual({ approved: false, state: "denied" });
+    expect(decision).toEqual({
+      approved: false,
+      state: "denied",
+      confirmationUnavailable: true,
+    });
   });
 });

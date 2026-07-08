@@ -14,6 +14,14 @@ export type PermissionPromptDecision = {
    * rather than "user_approved" in the permissions:decision broadcast.
    */
   autoApproved?: true;
+  /**
+   * True when no live authority was reachable and the DenyingAuthorizer denied
+   * this ask (a no-UI, non-subagent session). Consumed by deriveResolution (the
+   * decision-event resolution), the gate (block reason), and PermissionPrompter
+   * (review-entry resolution) to emit "confirmation_unavailable" rather than a
+   * plain user denial.
+   */
+  confirmationUnavailable?: true;
 };
 
 export interface PermissionDecisionUi {

@@ -99,6 +99,25 @@ describe("PermissionPrompter", () => {
       );
     });
 
+    it("logs confirmation_unavailable resolution when the decision carries the marker", async () => {
+      const logger = { review: vi.fn() };
+      const prompter = new PermissionPrompter(makeDeps({ logger }));
+      const authorizer = makeAuthorizer({
+        approved: false,
+        state: "denied",
+        confirmationUnavailable: true,
+      });
+
+      await prompter.prompt(authorizer, makeDetails());
+
+      expect(logger.review).toHaveBeenCalledWith(
+        "permission_request.denied",
+        expect.objectContaining({
+          resolution: "confirmation_unavailable",
+        }),
+      );
+    });
+
     it("logs permission_request.denied with denialReason when present", async () => {
       const logger = { review: vi.fn() };
       const prompter = new PermissionPrompter(makeDeps({ logger }));
