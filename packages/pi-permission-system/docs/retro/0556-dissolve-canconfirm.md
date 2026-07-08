@@ -61,3 +61,51 @@ Test count: 2287 → 2280 in `pi-permission-system` (net -7); full suite, `tsc`,
 - **Pre-completion reviewer: PASS.**
   Mermaid (4 charts parse), dead code (fallow zero), cross-step invariants (all four Step-1 invariants verified intact: waiting-before-consult ordering, no UI-event from `DenyingAuthorizer`, yolo single `auto_approved`, `confirmation_unavailable` decision event now marker-driven).
   No warnings.
+
+## Stage: Final Retrospective (2026-07-08T14:05:00Z)
+
+### Session summary
+
+Phase 9 Step 2 shipped end-to-end across planning, TDD, and ship stages: `canConfirm()` dissolved (15 → 0 in `src/`), `GatePrompter` replaced by the single-method `AskEscalator` seam, and the `ask` path now uniformly escalates to the selected `Authorizer`.
+Three `refactor:`/`docs:` commits landed on `main` with green CI; the work is a non-releasing batch (auto-batches into the next `feat:`/`fix:`), so no release-please PR was cut.
+The session was clean — no rework, no user corrections; all friction was self-corrected tool slips caught immediately by existing feedback loops.
+
+### Observations
+
+#### What went well
+
+- **The planning `ask_user` caught a self-conflicting constraint in the issue itself, not just an ambiguity.**
+  Tracing the code before planning revealed the issue's "blocked-when-unavailable review entries byte-identical to today's" requirement conflicts with routing `DenyingAuthorizer` through `PermissionPrompter` (which writes `waiting` before it can read the post-`authorize` marker).
+  Surfacing that tension let the operator relax the byte-identical constraint, which unlocked the simplest design (uniform escalation) instead of a bypass branch or a `waiting`-reorder.
+  The win was reading the code first so the fork was framed concretely, not abstractly.
+- **Tidy-first additive marker step shrank the atomic commit as designed.**
+  Step 1 (add `confirmationUnavailable` to `PermissionPromptDecision` + `DenyingAuthorizer` + `PermissionPrompter`) was production-behavior-neutral and unit-testable on its own, so Step 2's unavoidable ~11-file fan-out landed against a smaller diff.
+- **Exemplary incremental verification.**
+  `vitest` per file after each red/green, `pnpm run check` immediately after the shared-interface change in Step 2 (which caught three residual `GatePrompter` type refs in `external-directory-fixtures.ts`), then full suite + root lint + `fallow` after the last step.
+  Every type-level break surfaced within one commit, never at the end.
+
+#### What caused friction (agent side)
+
+- `missing-context` (planning) — the plan's grep-surface note scoped `GatePrompter`-importer enumeration to `src/` and listed the test fixtures generically, missing three `GatePrompter` type-annotation sites inside `external-directory-fixtures.ts` (`makeDedupWiring`/`makeDeduplicatingHandler` helper signatures) and the two fixture-consumer test files.
+  Impact: low — `pnpm run check` flagged all three during Step 2 and they folded into the same commit; no rework, no extra commit.
+  The existing `/plan-issue` guidance already says to grep `src/` **and** `test/` for a removed symbol; this was an execution scoping slip, not a missing rule.
+- `other` (tool slip) — emitted a non-existent `oldText2` property on the `Edit` tool twice while editing `architecture.md`.
+  Impact: negligible — the tool rejected the call, re-issued correctly; no file left in a bad state.
+- `other` (environment) — used BSD-unsupported `\b` word boundary in a `sed` rename; matched nothing.
+  Impact: negligible — a follow-up `grep` showed zero replacements, switched to a `prompter.prompt)` literal immediately.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's two planning answers (relax byte-identical; preserve the signal in the review entry) were decisive and correctly scoped, and were the pivot that produced the cleanest design.
+  No mid-implementation intervention was needed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — one subagent dispatch (the `pre-completion-reviewer`) ran on `anthropic/claude-sonnet-5`, a strong reasoning model appropriate for the judgment-heavy invariant/deviation review; no mismatch.
+- **Escalation-delay / unused-tool / feedback-loop lenses** — nothing notable: no error ran past one tool call, no rabbit-hole warranted a subagent, and verification ran incrementally (see "Exemplary incremental verification" above), not just at the end.
+
+### Changes made
+
+1. `packages/pi-permission-system/docs/retro/0556-dissolve-canconfirm.md` — added this Final Retrospective stage entry.
+   No `AGENTS.md` or prompt changes: the session's only friction was self-corrected tool slips already caught by existing feedback loops, and the one planning `missing-context` slip is already covered by `/plan-issue`'s existing "grep `src/` and `test/`" guidance.
