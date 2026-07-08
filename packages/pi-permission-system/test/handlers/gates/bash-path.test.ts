@@ -43,13 +43,23 @@ async function describeGate(
   tcc: ToolCallContext,
   resolver: ScopedPermissionResolver,
 ): Promise<GateResult> {
+  return describeGateOnPlatform(process.platform, tcc, resolver);
+}
+
+/**
+ * Variant of {@link describeGate} that injects an explicit host platform, so a
+ * win32-specific decision can be exercised on a POSIX CI host (and vice versa)
+ * without mocking `node:path` (#520).
+ */
+async function describeGateOnPlatform(
+  platform: NodeJS.Platform,
+  tcc: ToolCallContext,
+  resolver: ScopedPermissionResolver,
+): Promise<GateResult> {
   const command = getNonEmptyString(toRecord(tcc.input).command);
   const bashProgram =
     tcc.toolName === "bash" && command
-      ? await BashProgram.parse(
-          command,
-          new PathNormalizer(process.platform, tcc.cwd),
-        )
+      ? await BashProgram.parse(command, new PathNormalizer(platform, tcc.cwd))
       : null;
   return describeBashPathGate(tcc, bashProgram, resolver);
 }
@@ -342,5 +352,65 @@ describe("describeBashPathGate — home-relative paths", () => {
       kind: "bash_path",
       pathValue: "$HOME/.ssh/config",
     });
+  });
+});
+
+// Win32 backslash-relative path gating (#520) ──────────────────────────────
+//
+// On Windows a backslash is a path separator, so a backslash-relative bash
+// argument (`cat dir\file`) must be gated by a `path` rule the same as its
+// forward-slash equivalent (`dir/file`). On POSIX `\` is a legal filename
+// character, so the token stays bare and is not gated.
+
+describe("describeBashPathGate — win32 backslash-relative paths", () => {
+  it("denies a backslash-relative token matching a path rule on win32", async () => {
+    // The win32 normalizer resolves `dir\file` to matchValues including the
+    // relative `dir\file` alias, which the rule (`dir/file`, folded to
+    // `dir\file` under win32 separators) matches.
+    const resolver = makePathDispatchResolver(
+      {
+        "dir\\file": makeCheckResult({
+          state: "deny",
+          matchedPattern: "dir/file",
+        }),
+      },
+      makeCheckResult({ state: "allow" }),
+    );
+    const result = (await describeGateOnPlatform(
+      "win32",
+      makeTcc({
+        input: { command: "cat dir\\file" },
+        cwd: "C:\\Projects\\App",
+      }),
+      resolver,
+    )) as GateDescriptor;
+
+    expect(isGateDescriptor(result)).toBe(true);
+    expect(result.preCheck?.state).toBe("deny");
+    expect(result.denialContext).toMatchObject({
+      kind: "bash_path",
+      pathValue: "dir\\file",
+    });
+  });
+
+  it("does not gate a backslash-relative token on posix (stays bare)", async () => {
+    const resolver = makePathDispatchResolver(
+      {
+        "dir\\file": makeCheckResult({
+          state: "deny",
+          matchedPattern: "dir/file",
+        }),
+      },
+      makeCheckResult({ state: "allow" }),
+    );
+    const result = await describeGateOnPlatform(
+      "linux",
+      makeTcc({
+        input: { command: "cat dir\\file" },
+        cwd: "/projects/app",
+      }),
+      resolver,
+    );
+    expect(result).toBeNull();
   });
 });
