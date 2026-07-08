@@ -44,6 +44,14 @@ pnpm fallow dupes --workspace @gotgenes/<PKG> 2>&1 || true
 ```
 
 Capture: health score, dead exports, duplication (production vs. test), hotspots, refactoring targets.
+
+Fallow is blind to repeated discriminators — scattered one-line conditionals never form a token-run clone — so sweep for them alongside it:
+
+```bash
+grep -rhoE '[A-Za-z_.]+ [!=]== "[a-z0-9_-]+"' packages/<PKG>/src --include="*.ts" | sort | uniq -c | sort -rn | awk '$1 >= 3'
+```
+
+Read each family with 3+ production sites and judge it against the Category C "Repeated discriminator" row; a single `never`-exhaustive switch at one dispatch site, per-variant presentation dispatch, and validation-edge type guards are idiomatic, not findings.
 The phase spine must not be fallow-sourced-only: at least the primary cause must trace to the Step 1 reading, with fallow signals cited as symptoms of that cause, not as a step's motivation.
 
 ### 4. Start from the entry point and work inward
@@ -101,16 +109,17 @@ They are ordered from most impactful (structural) to least (cosmetic).
 
 ### Category C: Coupling and boundaries
 
-| Signal                        | Evidence                                                                   | Typical fix                                            |
-| ----------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Anemic domain model           | Manager reaches into data objects 10+× to check state and call transitions | Move behavior onto the domain object (Tell-Don't-Ask)  |
-| Mutable closure state         | `let` variables shared across closures/callbacks                           | Introduce a lifecycle object that owns the state       |
-| Relay-only dependencies       | Class stores fields it only passes to another object                       | Move the fields to the consumer's construction         |
-| Platform type threading       | `ExtensionContext` or SDK types deep in domain                             | Push to boundary, capture snapshot/value object        |
-| Wide parameter lists          | Functions with 5+ params, some always travel together                      | Group into value objects or extract into class         |
-| Forward references            | Closure captures a variable before it's assigned                           | Reorder initialization or use post-construction wiring |
-| Adapter closure density (40+) | Entry point full of `(x) => obj.method(x)`                                 | Create intermediate factory objects or use `.bind()`   |
-| Cross-layer imports           | UI importing from lifecycle internals                                      | Add a public interface layer                           |
+| Signal                        | Evidence                                                                      | Typical fix                                                                                                               |
+| ----------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Anemic domain model           | Manager reaches into data objects 10+× to check state and call transitions    | Move behavior onto the domain object (Tell-Don't-Ask)                                                                     |
+| Mutable closure state         | `let` variables shared across closures/callbacks                              | Introduce a lifecycle object that owns the state                                                                          |
+| Relay-only dependencies       | Class stores fields it only passes to another object                          | Move the fields to the consumer's construction                                                                            |
+| Platform type threading       | `ExtensionContext` or SDK types deep in domain                                | Push to boundary, capture snapshot/value object                                                                           |
+| Wide parameter lists          | Functions with 5+ params, some always travel together                         | Group into value objects or extract into class                                                                            |
+| Forward references            | Closure captures a variable before it's assigned                              | Reorder initialization or use post-construction wiring                                                                    |
+| Adapter closure density (40+) | Entry point full of `(x) => obj.method(x)`                                    | Create intermediate factory objects or use `.bind()`                                                                      |
+| Cross-layer imports           | UI importing from lifecycle internals                                         | Add a public interface layer                                                                                              |
+| Repeated discriminator        | Same condition at 3+ sites across modules (grep sweep; fallow is blind to it) | Decide once at a boundary: strategy/flavor object, predicate on the owning object, or behavior on the discriminated value |
 
 ### Category D: Testability
 
@@ -238,6 +247,8 @@ These are failure modes and corrections discovered empirically.
 - **Pure function > method on wide class** — if the logic doesn't need instance state, extract it.
 - **Lifecycle object > method extraction** — when mutable `let` variables are shared across closures, the fix is an object that owns that state, not extracting methods that still close over the variables.
 - **Behavior on domain object > orchestration in manager** — when a manager reaches into a data object 10+× to check status and perform transitions, the object is anemic; move the behavior to the object itself.
+- **Dispatch once > re-derived discriminator** — when the same semantic condition (`platform === "win32"`, `status === "running" || status === "queued"`) is evaluated at 3+ sites, capture the decision at a boundary and hand consumers its product; severity rises when the sites must agree (a re-derived case-fold that diverges is a silent bug) and when the branching is silent `===` rather than a compiler-enforced exhaustive switch.
+- **Pass the resolved capability, not the raw discriminator** — when every consumer of a parameter opens with the same mapping (`platform === "win32" ? winPath : posixPath`), thread the mapping's product (the impl, the flavor object, the options literal) instead of the raw string.
 - **Events > outbound bridges** — when package A needs to notify package B, prefer emitting events that B listens for over A calling B directly via a bridge module.
   This keeps A closed for modification when new consumers (C, D, …) arrive.
 - **Single source of truth for policy** — when two packages both enforce the same kind of restriction (tool filtering, access control), the duplication creates confusion about where to configure it.

@@ -60,6 +60,16 @@ Each function, class, and module should do one thing well.
 When a unit of code has multiple reasons to change, split it.
 A function that parses input _and_ processes it should be two functions; a module that handles both HTTP routing and business logic should be two modules.
 
+### Open/Closed (OCP) — decide once
+
+Behavior variation belongs behind one dispatch point, not scattered conditionals.
+When the same semantic condition (`platform === "win32"`, `toolName === "mcp"`, `status === "running" || status === "queued"`) is evaluated at three or more sites across module boundaries, adding a variant means finding and editing every site — the code is open for modification instead of extension.
+Capture the decision once at a boundary and hand consumers its product: a strategy or flavor object, a predicate on the owning object, or behavior on the discriminated value.
+Severity scales with: the number of sites; whether the sites must agree (re-derived algorithms like a case-fold are connascence of algorithm — one divergent site is a silent bug, and in a permission system a bypass); whether the branching is silent `===` comparisons a new variant sails past, versus compiler-enforced; and whether the variant set is open.
+
+A conditional is not the smell — scattered re-decision is.
+A single `never`-exhaustive `switch` over a discriminated union at one dispatch site _is_ the dispatch point, and is often better TypeScript than class polymorphism; per-variant presentation dispatch (one renderer arm per status) and validation-edge `typeof` guards are likewise idiomatic.
+
 ### Interface Segregation (ISP)
 
 Prefer small, focused interfaces over large ones.
@@ -100,10 +110,20 @@ Encapsulate the mutation behind a method.
 
 When the same set of fields is reset to the same values in multiple places, extract a single method (`reset()`, `shutdown()`) on the owning object.
 
+### Scattered decisions
+
+The decision analog of scattered resets: when the same condition is evaluated in multiple places, extract the decision to a single point.
+Prefer a predicate on the object that owns the data (`isActive()`, not `status === "running" || status === "queued"` at every consumer) or a component selected once at the boundary (see the OCP section).
+
 ### Parameter relay
 
 When a new parameter must flow through a callback chain, check whether the intermediaries actually need it.
 If they only relay it, the parameter belongs on an object the endpoints share — not threaded through every layer.
+
+### Thread decisions, not discriminators
+
+When every consumer of a parameter opens with the same mapping (`const impl = platform === "win32" ? winPath : posixPath`), the parameter is a raw discriminator each site re-interprets.
+Hoist the mapping to the parameter's producer and pass the product — the resolved implementation, capability, or options object — so the interpretation has one home and the sites cannot diverge.
 
 ### Unbounded loops
 

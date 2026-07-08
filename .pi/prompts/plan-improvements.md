@@ -67,6 +67,7 @@ Track repeat deferrals: an issue swept as out-of-scope across multiple consecuti
 
 Fallow **corroborates** the cause hypothesis and supplies outcome baselines (LOC, complexity, dead code, duplication) — it does not set the agenda.
 Run the full suite from the repo root (the exact commands and interpretation live in the `fallow` and `improvement-discovery` skills you loaded); record the health score, dead-code findings, production/test duplication, hotspots, and refactoring targets.
+Also run the repeated-discriminator sweep from the `improvement-discovery` skill (the `grep … | uniq -c` one-liner in its Step 3) — fallow is blind to that smell class, so the sweep is the only detector.
 
 **The phase spine must not be fallow-sourced-only.**
 At least the primary cause must trace to the principle-driven reading of Step 1, not to a syntactic fallow finding — cite fallow signals as symptoms of that cause, not as the motivation for a step.
@@ -77,7 +78,7 @@ Read `packages/$1/src/index.ts` and trace its dependency graph:
 
 - For each import, read the target module
 - Note size, exports, fan-out, code smells
-- Pay special attention to: `as any` casts, adapter closure density, forward references, wide parameter lists, mixed responsibilities, anemic domain objects (data classes that a manager reaches into instead of telling)
+- Pay special attention to: `as any` casts, adapter closure density, forward references, wide parameter lists, mixed responsibilities, anemic domain objects (data classes that a manager reaches into instead of telling), repeated discriminators (the same comparison re-evaluated across modules instead of decided once at a boundary)
 
 ### Step 5: Read the tests as evidence of constructibility
 
