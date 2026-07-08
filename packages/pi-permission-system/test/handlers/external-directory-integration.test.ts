@@ -200,7 +200,7 @@ describe("external_directory — allow external reads, gate external writes (#14
     const result = await handler.handleToolCall(event, makeCtx());
     // external_directory passes; write gate prompts and user approves
     expect(result).toEqual({ action: "allow" });
-    expect(prompter.prompt).toHaveBeenCalledOnce();
+    expect(prompter.escalate).toHaveBeenCalledOnce();
   });
 
   it("blocks write to external path when external_directory allows but write is deny", async () => {
@@ -375,21 +375,6 @@ describe("external_directory policy state — ask", () => {
     expect((result as { reason?: string }).reason).toContain(
       "outside the working directory",
     );
-  });
-
-  it("writes review-log entry with confirmation_unavailable when no UI", async () => {
-    const { handler, logger } = makeHandler({
-      session: { checkPermission: makeExtDirCheck("ask") },
-      prompter: makeUnavailablePrompter(),
-      tools: ALL_TOOLS,
-    });
-    const event = makeToolCallEvent("read", { input: { path: EXTERNAL_PATH } });
-    await handler.handleToolCall(event, makeCtx({ hasUI: false }));
-    const entries = blockReviewEntries(logger);
-    expect(entries.length).toBeGreaterThanOrEqual(1);
-    expect(entries[0][1]).toMatchObject({
-      resolution: "confirmation_unavailable",
-    });
   });
 
   it("emits confirmation_unavailable decision when no UI", async () => {

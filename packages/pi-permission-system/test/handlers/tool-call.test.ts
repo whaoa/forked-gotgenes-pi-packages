@@ -314,8 +314,11 @@ describe("handleToolCall — bash external-directory policy states", () => {
       },
       tools: ["bash"],
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(false),
-        prompt: vi.fn().mockResolvedValue({ approved: false, state: "denied" }),
+        escalate: vi.fn().mockResolvedValue({
+          approved: false,
+          state: "denied",
+          confirmationUnavailable: true,
+        }),
       },
     });
     const event = makeToolCallEvent("bash", {
@@ -378,16 +381,17 @@ describe("handleToolCall — generic ask prompt content", () => {
       },
       tools: ["weather_lookup"],
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi.fn().mockResolvedValue({ approved: false, state: "denied" }),
+        escalate: vi
+          .fn()
+          .mockResolvedValue({ approved: false, state: "denied" }),
       },
     });
     const event = makeToolCallEvent("weather_lookup", {
       input: { city: "Chicago", units: "metric" },
     });
     await handler.handleToolCall(event, makeCtx());
-    expect(vi.mocked(prompter.prompt)).toHaveBeenCalledTimes(1);
-    const promptDetails = vi.mocked(prompter.prompt).mock.calls[0][0];
+    expect(vi.mocked(prompter.escalate)).toHaveBeenCalledTimes(1);
+    const promptDetails = vi.mocked(prompter.escalate).mock.calls[0][0];
     expect(promptDetails.message).toMatch(
       /\{"city":"Chicago","units":"metric"\}/,
     );

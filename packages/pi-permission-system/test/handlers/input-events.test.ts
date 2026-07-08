@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { GatePrompter } from "#src/gate-prompter";
+import type { AskEscalator } from "#src/authority/authorizer-selection";
 import {
   getDecisionEvents,
   makeCheckResult,
@@ -73,9 +73,8 @@ describe("handleInput decision events — skill gate", () => {
         checkPermission: makeSkillCheckPermission("ask"),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi
-          .fn<GatePrompter["prompt"]>()
+        escalate: vi
+          .fn<AskEscalator["escalate"]>()
           .mockResolvedValue({ approved: true, state: "approved" }),
       },
     });
@@ -97,9 +96,8 @@ describe("handleInput decision events — skill gate", () => {
         checkPermission: makeSkillCheckPermission("ask"),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi
-          .fn<GatePrompter["prompt"]>()
+        escalate: vi
+          .fn<AskEscalator["escalate"]>()
           .mockResolvedValue({ approved: false, state: "denied" }),
       },
     });
@@ -121,8 +119,11 @@ describe("handleInput decision events — skill gate", () => {
         checkPermission: makeSkillCheckPermission("ask"),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(false),
-        prompt: vi.fn<GatePrompter["prompt"]>(),
+        escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
+          approved: false,
+          state: "denied",
+          confirmationUnavailable: true,
+        }),
       },
     });
     await handler.handleInput(
@@ -146,8 +147,7 @@ describe("handleInput decision events — skill gate", () => {
         checkPermission: makeSkillCheckPermission("ask"),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi.fn<GatePrompter["prompt"]>().mockResolvedValue({
+        escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
           approved: true,
           state: "approved",
           autoApproved: true,

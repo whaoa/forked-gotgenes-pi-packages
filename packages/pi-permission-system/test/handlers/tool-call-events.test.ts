@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { GatePrompter } from "#src/gate-prompter";
+import type { AskEscalator } from "#src/authority/authorizer-selection";
 import {
   getDecisionEvents,
   makeCheckResult,
@@ -113,9 +113,8 @@ describe("handleToolCall decision events — user_approved", () => {
           .mockReturnValue(makeCheckResult({ state: "ask" })),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi
-          .fn<GatePrompter["prompt"]>()
+        escalate: vi
+          .fn<AskEscalator["escalate"]>()
           .mockResolvedValue({ approved: true, state: "approved" }),
       },
     });
@@ -138,8 +137,7 @@ describe("handleToolCall decision events — user_approved", () => {
           .mockReturnValue(makeCheckResult({ state: "ask" })),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi.fn<GatePrompter["prompt"]>().mockResolvedValue({
+        escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
           approved: true,
           state: "approved_for_session",
         }),
@@ -168,9 +166,8 @@ describe("handleToolCall decision events — user_denied", () => {
           .mockReturnValue(makeCheckResult({ state: "ask" })),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi
-          .fn<GatePrompter["prompt"]>()
+        escalate: vi
+          .fn<AskEscalator["escalate"]>()
           .mockResolvedValue({ approved: false, state: "denied" }),
       },
     });
@@ -197,8 +194,11 @@ describe("handleToolCall decision events — confirmation_unavailable", () => {
           .mockReturnValue(makeCheckResult({ state: "ask" })),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(false),
-        prompt: vi.fn<GatePrompter["prompt"]>(),
+        escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
+          approved: false,
+          state: "denied",
+          confirmationUnavailable: true,
+        }),
       },
     });
 
@@ -256,8 +256,7 @@ describe("handleToolCall decision events — auto_approved", () => {
           .mockReturnValue(makeCheckResult({ state: "ask" })),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi.fn<GatePrompter["prompt"]>().mockResolvedValue({
+        escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
           approved: true,
           state: "approved",
           autoApproved: true,

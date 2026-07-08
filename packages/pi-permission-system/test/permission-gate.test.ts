@@ -10,7 +10,6 @@ function makeParams(
 ): PermissionGateParams {
   return {
     state: "allow",
-    canConfirm: true,
     promptForApproval: vi.fn<() => Promise<PermissionPromptDecision>>(),
     writeLog: vi.fn(),
     logContext: { source: "test" },
@@ -61,9 +60,18 @@ describe("applyPermissionGate", () => {
     });
   });
 
-  describe("ask branch — unavailable", () => {
-    it("returns block with unavailable reason when canConfirm is false", async () => {
-      const params = makeParams({ state: "ask", canConfirm: false });
+  describe("ask branch — confirmation unavailable", () => {
+    const unavailableDecision: PermissionPromptDecision = {
+      approved: false,
+      state: "denied",
+      confirmationUnavailable: true,
+    };
+
+    it("returns block with unavailable reason when the decision is confirmation-unavailable", async () => {
+      const params = makeParams({
+        state: "ask",
+        promptForApproval: vi.fn().mockResolvedValue(unavailableDecision),
+      });
       const result = await applyPermissionGate(params);
       expect(result).toEqual({
         action: "block",
@@ -71,28 +79,14 @@ describe("applyPermissionGate", () => {
       });
     });
 
-    it("calls writeLog with confirmation_unavailable resolution", async () => {
+    it("does not call writeLog when confirmation is unavailable (logged by the prompter)", async () => {
       const params = makeParams({
         state: "ask",
-        canConfirm: false,
+        promptForApproval: vi.fn().mockResolvedValue(unavailableDecision),
         logContext: { source: "skill_read", skillName: "foo" },
       });
       await applyPermissionGate(params);
-      expect(params.writeLog).toHaveBeenCalledOnce();
-      expect(params.writeLog).toHaveBeenCalledWith(
-        "permission_request.blocked",
-        {
-          source: "skill_read",
-          skillName: "foo",
-          resolution: "confirmation_unavailable",
-        },
-      );
-    });
-
-    it("does not call promptForApproval when canConfirm is false", async () => {
-      const params = makeParams({ state: "ask", canConfirm: false });
-      await applyPermissionGate(params);
-      expect(params.promptForApproval).not.toHaveBeenCalled();
+      expect(params.writeLog).not.toHaveBeenCalled();
     });
   });
 
@@ -105,7 +99,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
       });
       const result = await applyPermissionGate(params);
@@ -121,7 +114,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
       });
       const result = await applyPermissionGate(params);
@@ -139,7 +131,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
       });
       await applyPermissionGate(params);
@@ -156,7 +147,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
       });
       const result = await applyPermissionGate(params);
@@ -171,7 +161,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
       });
       await applyPermissionGate(params);
@@ -188,7 +177,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
         sessionApproval: { surface: "bash", pattern: "git *" },
       });
@@ -207,7 +195,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
         sessionApproval: { surface: "bash", pattern: "git *" },
       });
@@ -223,7 +210,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
       });
       const result = await applyPermissionGate(params);
@@ -238,7 +224,6 @@ describe("applyPermissionGate", () => {
       const promptForApproval = vi.fn().mockResolvedValue(decision);
       const params = makeParams({
         state: "ask",
-        canConfirm: true,
         promptForApproval,
         sessionApproval: { surface: "bash", pattern: "git *" },
       });

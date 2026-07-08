@@ -2,9 +2,9 @@
  * Shared gate-level test fixtures for gate descriptor and runner tests.
  */
 import { vi } from "vitest";
+import type { AskEscalator } from "#src/authority/authorizer-selection";
 import type { DecisionReporter } from "#src/decision-reporter";
 import type { DenialContext } from "#src/denial-messages";
-import type { GatePrompter } from "#src/gate-prompter";
 import type { GateDescriptor } from "#src/handlers/gates/descriptor";
 import { GateRunner } from "#src/handlers/gates/runner";
 import type { SkillInputGateInputs } from "#src/handlers/gates/skill-input-gate-pipeline";
@@ -94,8 +94,7 @@ export function makeGateRunner(
     resolveResult?: PermissionCheckResult;
     resolve?: ScopedPermissionResolver["resolve"];
     recordSessionApproval?: SessionApprovalRecorder["recordSessionApproval"];
-    canConfirm?: GatePrompter["canConfirm"];
-    prompt?: GatePrompter["prompt"];
+    escalate?: AskEscalator["escalate"];
     reporter?: Partial<DecisionReporter>;
   } = {},
 ) {
@@ -110,18 +109,15 @@ export function makeGateRunner(
   const recordSessionApproval =
     overrides.recordSessionApproval ??
     (vi.fn() as SessionApprovalRecorder["recordSessionApproval"]);
-  const canConfirm =
-    overrides.canConfirm ??
-    (vi.fn().mockReturnValue(true) as GatePrompter["canConfirm"]);
-  const prompt =
-    overrides.prompt ??
+  const escalate =
+    overrides.escalate ??
     vi
-      .fn<GatePrompter["prompt"]>()
+      .fn<AskEscalator["escalate"]>()
       .mockResolvedValue({ approved: true, state: "approved" });
   const runner = new GateRunner(
     { resolve },
     { recordSessionApproval },
-    { canConfirm, prompt },
+    { escalate },
     reporter,
   );
   return {
@@ -129,8 +125,7 @@ export function makeGateRunner(
     deps: {
       resolve,
       recordSessionApproval,
-      canConfirm,
-      prompt,
+      escalate,
       reporter,
     },
   };

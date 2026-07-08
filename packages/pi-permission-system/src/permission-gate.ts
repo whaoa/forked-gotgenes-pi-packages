@@ -10,10 +10,11 @@ export interface PermissionGateParams {
   /** The resolved permission state from checkPermission(). */
   state: "allow" | "deny" | "ask";
 
-  /** Whether the current context supports interactive prompts. */
-  canConfirm: boolean;
-
-  /** Prompt the user for approval. Only called when state === "ask" and canConfirm is true. */
+  /**
+   * Escalate the ask to the session's Authorizer for a decision. Called for
+   * every `ask`; the DenyingAuthorizer answers by denying with the
+   * `confirmationUnavailable` marker when no live authority is reachable.
+   */
   promptForApproval: () => Promise<PermissionPromptDecision>;
 
   /**
@@ -45,14 +46,7 @@ export interface PermissionGateParams {
 export async function applyPermissionGate(
   params: PermissionGateParams,
 ): Promise<PermissionGateResult> {
-  const {
-    state,
-    canConfirm,
-    promptForApproval,
-    writeLog,
-    logContext,
-    messages,
-  } = params;
+  const { state, promptForApproval, writeLog, logContext, messages } = params;
 
   if (state === "deny") {
     writeLog("permission_request.blocked", {
@@ -63,17 +57,17 @@ export async function applyPermissionGate(
   }
 
   if (state === "ask") {
-    if (!canConfirm) {
-      writeLog("permission_request.blocked", {
-        ...logContext,
-        resolution: "confirmation_unavailable",
-      });
-      return { action: "block", reason: messages.unavailableReason };
-    }
-
     const decision = await promptForApproval();
     if (!decision.approved) {
-      return { action: "block", reason: messages.userDeniedReason(decision) };
+      // The gate writes no review entry for an ask denial — the prompter
+      // brackets it (waiting/denied). The block reason distinguishes an
+      // absent-authority denial (confirmationUnavailable) from a user denial.
+      return {
+        action: "block",
+        reason: decision.confirmationUnavailable
+          ? messages.unavailableReason
+          : messages.userDeniedReason(decision),
+      };
     }
     if (decision.state === "approved_for_session" && params.sessionApproval) {
       return { action: "allow", sessionApproval: params.sessionApproval };

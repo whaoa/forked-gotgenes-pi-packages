@@ -37,13 +37,13 @@ describe("external-directory session dedup", () => {
       const event1 = makeExtDirToolEvent("read", externalPath, "tc-1");
       const result1 = await handler.handleToolCall(event1, ctx);
       expect(result1).toEqual({ action: "allow" });
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
 
       // Second call — same path, should hit session rule, no prompt
       const event2 = makeExtDirToolEvent("read", externalPath, "tc-2");
       const result2 = await handler.handleToolCall(event2, ctx);
       expect(result2).toEqual({ action: "allow" });
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
     });
 
     it("does not re-prompt for a different file in the same external directory", async () => {
@@ -57,7 +57,7 @@ describe("external-directory session dedup", () => {
         "tc-1",
       );
       await handler.handleToolCall(event1, ctx);
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
 
       // Second call — /outside/project/b.txt is in the same directory
       const event2 = makeExtDirToolEvent(
@@ -66,7 +66,7 @@ describe("external-directory session dedup", () => {
         "tc-2",
       );
       await handler.handleToolCall(event2, ctx);
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
     });
 
     it("does prompt for a file in a different external directory", async () => {
@@ -80,7 +80,7 @@ describe("external-directory session dedup", () => {
         "tc-1",
       );
       await handler.handleToolCall(event1, ctx);
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
 
       // Second call — /outside/beta/file.txt is a different directory
       const event2 = makeExtDirToolEvent(
@@ -89,7 +89,7 @@ describe("external-directory session dedup", () => {
         "tc-2",
       );
       await handler.handleToolCall(event2, ctx);
-      expect(prompter.prompt).toHaveBeenCalledTimes(2);
+      expect(prompter.escalate).toHaveBeenCalledTimes(2);
     });
 
     it("re-prompts when user approved once (not for session)", async () => {
@@ -101,12 +101,12 @@ describe("external-directory session dedup", () => {
       // First call — prompt, approved once
       const event1 = makeExtDirToolEvent("read", externalPath, "tc-1");
       await handler.handleToolCall(event1, ctx);
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
 
       // Second call — no session rule recorded, should prompt again
       const event2 = makeExtDirToolEvent("read", externalPath, "tc-2");
       await handler.handleToolCall(event2, ctx);
-      expect(prompter.prompt).toHaveBeenCalledTimes(2);
+      expect(prompter.escalate).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -119,13 +119,13 @@ describe("external-directory session dedup", () => {
       const event1 = makeExtDirBashEvent("echo hello > /tmp/out.txt", "tc-1");
       const result1 = await handler.handleToolCall(event1, ctx);
       expect(result1).toEqual({ action: "allow" });
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
 
       // Second call — different bash command, same external path
       const event2 = makeExtDirBashEvent("cat /tmp/out.txt", "tc-2");
       const result2 = await handler.handleToolCall(event2, ctx);
       expect(result2).toEqual({ action: "allow" });
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
     });
 
     it("does not re-prompt for read after bash already approved the same directory", async () => {
@@ -135,12 +135,12 @@ describe("external-directory session dedup", () => {
       // First call — bash writes to /tmp/out.txt
       const event1 = makeExtDirBashEvent("echo hello > /tmp/out.txt", "tc-1");
       await handler.handleToolCall(event1, ctx);
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
 
       // Second call — read from /tmp/out.txt (same directory, different tool)
       const event2 = makeExtDirToolEvent("read", "/tmp/out.txt", "tc-2");
       await handler.handleToolCall(event2, ctx);
-      expect(prompter.prompt).toHaveBeenCalledTimes(1);
+      expect(prompter.escalate).toHaveBeenCalledTimes(1);
     });
   });
 });
@@ -159,17 +159,17 @@ describe("session shutdown clears external-directory approvals", () => {
 
     // First access: prompt fires and records session approval.
     await handler.handleToolCall(event, ctx);
-    expect(vi.mocked(prompter.prompt)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prompter.escalate)).toHaveBeenCalledTimes(1);
 
     // Second access: covered by session approval — no re-prompt.
     await handler.handleToolCall({ ...event, toolCallId: "tc-2" }, ctx);
-    expect(vi.mocked(prompter.prompt)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prompter.escalate)).toHaveBeenCalledTimes(1);
 
     // Shutdown clears session approvals.
     session.shutdown();
 
     // Third access: session rules cleared — must re-prompt.
     await handler.handleToolCall({ ...event, toolCallId: "tc-3" }, ctx);
-    expect(vi.mocked(prompter.prompt)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(prompter.escalate)).toHaveBeenCalledTimes(2);
   });
 });

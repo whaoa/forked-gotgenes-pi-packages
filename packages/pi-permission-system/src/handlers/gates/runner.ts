@@ -1,10 +1,10 @@
+import type { AskEscalator } from "#src/authority/authorizer-selection";
 import type { DecisionReporter } from "#src/decision-reporter";
 import {
   formatDenyReason,
   formatUnavailableReason,
   formatUserDeniedReason,
 } from "#src/denial-messages";
-import type { GatePrompter } from "#src/gate-prompter";
 import type { PermissionPromptDecision } from "#src/permission-dialog";
 import { applyPermissionGate } from "#src/permission-gate";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
@@ -30,7 +30,7 @@ export class GateRunner {
   constructor(
     private readonly resolver: ScopedPermissionResolver,
     private readonly recorder: SessionApprovalRecorder,
-    private readonly prompter: GatePrompter,
+    private readonly prompter: AskEscalator,
     private readonly reporter: DecisionReporter,
   ) {}
 
@@ -127,8 +127,8 @@ export class GateRunner {
       return { action: "allow" };
     }
 
-    // 3. Apply the deny/ask/allow gate
-    const canConfirm = this.prompter.canConfirm();
+    // 3. Apply the deny/ask/allow gate — always escalate on ask; the selected
+    // Authorizer answers (the DenyingAuthorizer by denying with a marker).
 
     // Construct messages from the centralized formatter.
     const messages = {
@@ -139,16 +139,17 @@ export class GateRunner {
     };
 
     let autoApproved = false;
+    let confirmationUnavailable = false;
     const gateResult = await applyPermissionGate({
       state: check.state,
-      canConfirm,
       sessionApproval: descriptor.sessionApproval?.toGateApproval(),
       promptForApproval: async () => {
-        const decision = await this.prompter.prompt({
+        const decision = await this.prompter.escalate({
           requestId: toolCallId,
           ...descriptor.promptDetails,
         });
         autoApproved = decision.autoApproved === true;
+        confirmationUnavailable = decision.confirmationUnavailable === true;
         return decision;
       },
       writeLog: (event, details) =>
@@ -172,7 +173,7 @@ export class GateRunner {
           check.state,
           gateResult.action,
           hasSessionApproval,
-          canConfirm,
+          confirmationUnavailable,
           autoApproved,
         ),
       ),

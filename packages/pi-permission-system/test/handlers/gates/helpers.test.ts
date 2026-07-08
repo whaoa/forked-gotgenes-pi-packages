@@ -80,12 +80,12 @@ describe("deriveResolution", () => {
     );
   });
 
-  it("returns user_denied for ask + block with canConfirm", () => {
-    expect(deriveResolution("ask", "block", false, true)).toBe("user_denied");
+  it("returns user_denied for ask + block when confirmation was available", () => {
+    expect(deriveResolution("ask", "block", false, false)).toBe("user_denied");
   });
 
-  it("returns confirmation_unavailable for ask + block without canConfirm", () => {
-    expect(deriveResolution("ask", "block", false, false)).toBe(
+  it("returns confirmation_unavailable for ask + block when confirmation was unavailable", () => {
+    expect(deriveResolution("ask", "block", false, true)).toBe(
       "confirmation_unavailable",
     );
   });

@@ -88,7 +88,7 @@ describe("GateRunner — descriptor path", () => {
     });
     const result = await runner.run(makeDescriptor(), null, "tc-1");
     expect(result).toEqual({ action: "allow" });
-    expect(deps.prompt).not.toHaveBeenCalled();
+    expect(deps.escalate).not.toHaveBeenCalled();
     expect(deps.reporter.writeReviewLog).toHaveBeenCalledWith(
       "permission_request.auto_approved",
       expect.objectContaining({ resolution: "auto_approved" }),
@@ -105,7 +105,9 @@ describe("GateRunner — descriptor path", () => {
   it("returns allow and emits user_approved when ask + user approves", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-      prompt: vi.fn().mockResolvedValue({ approved: true, state: "approved" }),
+      escalate: vi
+        .fn()
+        .mockResolvedValue({ approved: true, state: "approved" }),
     });
     const result = await runner.run(makeDescriptor(), null, "tc-1");
     expect(result).toEqual({ action: "allow" });
@@ -120,7 +122,7 @@ describe("GateRunner — descriptor path", () => {
   it("returns allow, emits user_approved_for_session, and records session rule on approved_for_session", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-      prompt: vi
+      escalate: vi
         .fn()
         .mockResolvedValue({ approved: true, state: "approved_for_session" }),
     });
@@ -142,7 +144,7 @@ describe("GateRunner — descriptor path", () => {
   it("calls recordSessionApproval once with the full SessionApproval when sessionApproval has multiple patterns", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-      prompt: vi
+      escalate: vi
         .fn()
         .mockResolvedValue({ approved: true, state: "approved_for_session" }),
     });
@@ -160,7 +162,7 @@ describe("GateRunner — descriptor path", () => {
   it("returns block and emits user_denied when ask + user denies", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-      prompt: vi.fn().mockResolvedValue({ approved: false, state: "denied" }),
+      escalate: vi.fn().mockResolvedValue({ approved: false, state: "denied" }),
     });
     const result = await runner.run(makeDescriptor(), null, "tc-1");
     expect(result).toMatchObject({ action: "block" });
@@ -175,7 +177,11 @@ describe("GateRunner — descriptor path", () => {
   it("returns block and emits confirmation_unavailable when ask + no UI", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-      canConfirm: vi.fn().mockReturnValue(false),
+      escalate: vi.fn().mockResolvedValue({
+        approved: false,
+        state: "denied",
+        confirmationUnavailable: true,
+      }),
     });
     const result = await runner.run(makeDescriptor(), null, "tc-1");
     expect(result).toMatchObject({ action: "block" });
@@ -190,7 +196,7 @@ describe("GateRunner — descriptor path", () => {
   it("emits auto_approved resolution when decision has autoApproved flag", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-      prompt: vi.fn().mockResolvedValue({
+      escalate: vi.fn().mockResolvedValue({
         approved: true,
         state: "approved",
         autoApproved: true,
@@ -257,7 +263,7 @@ describe("GateRunner — descriptor path", () => {
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
     });
     await runner.run(makeDescriptor(), null, "tc-42");
-    expect(deps.prompt).toHaveBeenCalledWith(
+    expect(deps.escalate).toHaveBeenCalledWith(
       expect.objectContaining({ requestId: "tc-42" }),
     );
   });
@@ -265,7 +271,9 @@ describe("GateRunner — descriptor path", () => {
   it("does not call recordSessionApproval when user approves once (no sessionApproval)", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-      prompt: vi.fn().mockResolvedValue({ approved: true, state: "approved" }),
+      escalate: vi
+        .fn()
+        .mockResolvedValue({ approved: true, state: "approved" }),
     });
     await runner.run(makeDescriptor(), null, "tc-1");
     expect(deps.recordSessionApproval).not.toHaveBeenCalled();
@@ -295,7 +303,7 @@ describe("GateRunner — descriptor path", () => {
   it("does not call recordSessionApproval when user approves for session but no sessionApproval on descriptor", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-      prompt: vi
+      escalate: vi
         .fn()
         .mockResolvedValue({ approved: true, state: "approved_for_session" }),
     });
@@ -329,7 +337,11 @@ describe("GateRunner — descriptor path", () => {
     it("uses denialContext to format unavailableReason with extension tag", async () => {
       const { runner } = makeGateRunner({
         resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-        canConfirm: vi.fn().mockReturnValue(false),
+        escalate: vi.fn().mockResolvedValue({
+          approved: false,
+          state: "denied",
+          confirmationUnavailable: true,
+        }),
       });
       const ctx: DenialContext = {
         kind: "tool",
@@ -346,7 +358,7 @@ describe("GateRunner — descriptor path", () => {
     it("uses denialContext to format userDeniedReason with extension tag", async () => {
       const { runner } = makeGateRunner({
         resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
-        prompt: vi.fn().mockResolvedValue({
+        escalate: vi.fn().mockResolvedValue({
           approved: false,
           state: "denied",
           denialReason: "too risky",

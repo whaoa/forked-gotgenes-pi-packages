@@ -53,13 +53,14 @@ export function buildDecisionEvent(
  * @param action    - The gate's resulting action ("allow" | "block").
  * @param hasSession - True when the gate result carries a sessionApproval
  *                    (indicates the user chose "for this session").
- * @param canConfirm - Whether an interactive prompt was available.
+ * @param confirmationUnavailable - True when the denial came from the
+ *                    DenyingAuthorizer (no live authority was reachable).
  */
 export function deriveResolution(
   state: "allow" | "deny" | "ask",
   action: "allow" | "block",
   hasSession: boolean,
-  canConfirm: boolean,
+  confirmationUnavailable: boolean,
   autoApproved = false,
 ): PermissionDecisionResolution {
   if (state === "allow") return autoApproved ? "auto_approved" : "policy_allow";
@@ -69,5 +70,5 @@ export function deriveResolution(
     if (autoApproved) return "auto_approved";
     return hasSession ? "user_approved_for_session" : "user_approved";
   }
-  return canConfirm ? "user_denied" : "confirmation_unavailable";
+  return confirmationUnavailable ? "confirmation_unavailable" : "user_denied";
 }

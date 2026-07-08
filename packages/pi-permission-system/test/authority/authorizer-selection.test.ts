@@ -2,8 +2,8 @@
  * Unit tests for AuthorizerSelection.
  *
  * AuthorizerSelection owns the stored ExtensionContext and is the sole
- * implementation of the GatePrompter role. These tests exercise canConfirm()
- * across all policy permutations and verify the prompt/reject contract.
+ * implementation of the AskEscalator role. These tests verify the
+ * escalate/reject contract across activation state.
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
@@ -85,53 +85,11 @@ function makeDeps(overrides: Partial<SelectionDeps> = {}): SelectionDeps {
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 describe("AuthorizerSelection", () => {
-  describe("canConfirm", () => {
-    it("returns false before activate", () => {
-      const selection = new AuthorizerSelection(makeDeps());
-      expect(selection.canConfirm()).toBe(false);
-    });
-
-    it("returns true after activate when context has UI", () => {
-      const selection = new AuthorizerSelection(makeDeps());
-      selection.activate(makeCtx({ hasUI: true }));
-      expect(selection.canConfirm()).toBe(true);
-    });
-
-    it("returns false when context has no UI and is not a subagent", () => {
-      const selection = new AuthorizerSelection(makeDeps());
-      selection.activate(makeCtx({ hasUI: false }));
-      expect(selection.canConfirm()).toBe(false);
-    });
-
-    it("returns true when the detector reports a subagent context", () => {
-      const selection = new AuthorizerSelection(
-        makeDeps({ detection: makeDetection(true) }),
-      );
-      selection.activate(makeCtx({ hasUI: false }));
-      expect(selection.canConfirm()).toBe(true);
-    });
-
-    it("returns false after deactivate", () => {
-      const selection = new AuthorizerSelection(makeDeps());
-      selection.activate(makeCtx({ hasUI: true }));
-      selection.deactivate();
-      expect(selection.canConfirm()).toBe(false);
-    });
-
-    it("returns true after re-activate following deactivate", () => {
-      const selection = new AuthorizerSelection(makeDeps());
-      selection.activate(makeCtx({ hasUI: true }));
-      selection.deactivate();
-      selection.activate(makeCtx({ hasUI: true }));
-      expect(selection.canConfirm()).toBe(true);
-    });
-  });
-
-  describe("prompt", () => {
+  describe("escalate", () => {
     it("rejects before activate", async () => {
       const selection = new AuthorizerSelection(makeDeps());
-      await expect(selection.prompt(makeDetails())).rejects.toThrow(
-        "prompt called before the session was activated",
+      await expect(selection.escalate(makeDetails())).rejects.toThrow(
+        "escalate called before the session was activated",
       );
     });
 
@@ -142,7 +100,7 @@ describe("AuthorizerSelection", () => {
       selection.activate(ctx);
       const details = makeDetails();
 
-      const result = await selection.prompt(details);
+      const result = await selection.escalate(details);
 
       expect(prompter.prompt).toHaveBeenCalledWith(
         expect.any(LocalUserAuthorizer),
@@ -157,7 +115,7 @@ describe("AuthorizerSelection", () => {
       selection.activate(makeCtx({ hasUI: false }));
       selection.activate(makeCtx({ hasUI: true }));
 
-      await selection.prompt(makeDetails());
+      await selection.escalate(makeDetails());
 
       expect(prompter.prompt).toHaveBeenCalledWith(
         expect.any(LocalUserAuthorizer),
@@ -169,8 +127,8 @@ describe("AuthorizerSelection", () => {
       const selection = new AuthorizerSelection(makeDeps());
       selection.activate(makeCtx());
       selection.deactivate();
-      await expect(selection.prompt(makeDetails())).rejects.toThrow(
-        "prompt called before the session was activated",
+      await expect(selection.escalate(makeDetails())).rejects.toThrow(
+        "escalate called before the session was activated",
       );
     });
 
@@ -185,28 +143,31 @@ describe("AuthorizerSelection", () => {
       const selection = new AuthorizerSelection(makeDeps({ prompter }));
       selection.activate(makeCtx());
 
-      const result = await selection.prompt(makeDetails());
+      const result = await selection.escalate(makeDetails());
 
       expect(result).toEqual(decision);
     });
   });
 
   describe("lifecycle", () => {
-    it("activate then deactivate clears the stored context", () => {
+    it("activate then deactivate rejects a subsequent escalate", async () => {
       const selection = new AuthorizerSelection(makeDeps());
       selection.activate(makeCtx());
       selection.deactivate();
-      expect(selection.canConfirm()).toBe(false);
+      await expect(selection.escalate(makeDetails())).rejects.toThrow(
+        "escalate called before the session was activated",
+      );
     });
 
-    it("multiple activate calls update the stored context", () => {
+    it("multiple activate calls escalate against the most recent context", async () => {
       const prompter = makePrompterApi();
       const selection = new AuthorizerSelection(makeDeps({ prompter }));
-      const ctx2 = makeCtx({ cwd: "/new" });
       selection.activate(makeCtx({ cwd: "/old" }));
-      selection.activate(ctx2);
+      selection.activate(makeCtx({ cwd: "/new" }));
 
-      expect(selection.canConfirm()).toBe(true);
+      await selection.escalate(makeDetails());
+
+      expect(prompter.prompt).toHaveBeenCalledOnce();
     });
   });
 });

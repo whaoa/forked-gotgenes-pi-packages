@@ -11,8 +11,8 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
+import type { AskEscalator } from "#src/authority/authorizer-selection";
 import { GateDecisionReporter } from "#src/decision-reporter";
-import type { GatePrompter } from "#src/gate-prompter";
 import { GateRunner } from "#src/handlers/gates/runner";
 import {
   type SkillInputGateInputs,
@@ -225,8 +225,8 @@ export function makeHandler(overrides?: {
       systemPrompt?: string,
     ) => string | null;
   };
-  /** Override the GatePrompter passed to GateRunner. Defaults to an allow-all stub. */
-  prompter?: GatePrompter;
+  /** Override the AskEscalator passed to GateRunner. Defaults to an allow-all stub. */
+  prompter?: AskEscalator;
   toolRegistry?: Partial<ToolRegistry>;
   /** Sugar: builds the `getAll` mock from a list of tool names. */
   tools?: string[];
@@ -296,10 +296,9 @@ export function makeHandler(overrides?: {
   const pipeline = new ToolCallGatePipeline(resolver, session);
   const skillInputPipeline = new SkillInputGatePipeline(resolver);
   const reporter = new GateDecisionReporter(logger, events);
-  const prompter: GatePrompter = overrides?.prompter ?? {
-    canConfirm: vi.fn().mockReturnValue(true),
-    prompt: vi
-      .fn<GatePrompter["prompt"]>()
+  const prompter: AskEscalator = overrides?.prompter ?? {
+    escalate: vi
+      .fn<AskEscalator["escalate"]>()
       .mockResolvedValue({ approved: true, state: "approved" }),
   };
   const runner = new GateRunner(resolver, recorder, prompter, reporter);

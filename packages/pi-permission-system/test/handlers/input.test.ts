@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GatePrompter } from "#src/gate-prompter";
+import type { AskEscalator } from "#src/authority/authorizer-selection";
 import { extractSkillNameFromInput } from "#src/handlers/permission-gate-handler";
 
 import { makeCtx, makeHandler } from "#test/helpers/handler-fixtures";
@@ -123,8 +123,11 @@ describe("handleInput", () => {
         checkPermission: vi.fn().mockReturnValue({ state: "ask" }),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(false),
-        prompt: vi.fn<GatePrompter["prompt"]>(),
+        escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
+          approved: false,
+          state: "denied",
+          confirmationUnavailable: true,
+        }),
       },
     });
     const result = await handler.handleInput(
@@ -136,15 +139,14 @@ describe("handleInput", () => {
 
   it("prompts and returns continue when skill ask is approved", async () => {
     const approvePrompt = vi
-      .fn<GatePrompter["prompt"]>()
+      .fn<AskEscalator["escalate"]>()
       .mockResolvedValue({ approved: true, state: "approved" });
     const { handler, prompter } = makeHandler({
       session: {
         checkPermission: vi.fn().mockReturnValue({ state: "ask" }),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: approvePrompt,
+        escalate: approvePrompt,
       },
     });
     const result = await handler.handleInput(
@@ -152,7 +154,7 @@ describe("handleInput", () => {
       makeCtx(),
     );
     expect(result).toEqual({ action: "continue" });
-    expect(prompter.prompt).toHaveBeenCalledOnce();
+    expect(prompter.escalate).toHaveBeenCalledOnce();
   });
 
   it("returns handled when skill ask is denied by user", async () => {
@@ -161,9 +163,8 @@ describe("handleInput", () => {
         checkPermission: vi.fn().mockReturnValue({ state: "ask" }),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: vi
-          .fn<GatePrompter["prompt"]>()
+        escalate: vi
+          .fn<AskEscalator["escalate"]>()
           .mockResolvedValue({ approved: false, state: "denied" }),
       },
     });
@@ -176,7 +177,7 @@ describe("handleInput", () => {
 
   it("passes agentName in the prompt permission request", async () => {
     const approvePrompt = vi
-      .fn<GatePrompter["prompt"]>()
+      .fn<AskEscalator["escalate"]>()
       .mockResolvedValue({ approved: true, state: "approved" });
     const { handler, prompter } = makeHandler({
       session: {
@@ -184,12 +185,11 @@ describe("handleInput", () => {
         resolveAgentName: vi.fn().mockReturnValue("code-agent"),
       },
       prompter: {
-        canConfirm: vi.fn().mockReturnValue(true),
-        prompt: approvePrompt,
+        escalate: approvePrompt,
       },
     });
     await handler.handleInput(makeInputEvent("/skill:librarian"), makeCtx());
-    expect(prompter.prompt).toHaveBeenCalledWith(
+    expect(prompter.escalate).toHaveBeenCalledWith(
       expect.objectContaining({
         agentName: "code-agent",
         skillName: "librarian",

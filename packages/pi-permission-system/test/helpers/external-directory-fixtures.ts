@@ -6,9 +6,8 @@
  * external-directory-session-dedup.test.ts.
  */
 import { vi } from "vitest";
-
+import type { AskEscalator } from "#src/authority/authorizer-selection";
 import { GateDecisionReporter } from "#src/decision-reporter";
-import type { GatePrompter } from "#src/gate-prompter";
 import { GateRunner } from "#src/handlers/gates/runner";
 import { SkillInputGatePipeline } from "#src/handlers/gates/skill-input-gate-pipeline";
 import { ToolCallGatePipeline } from "#src/handlers/gates/tool-call-gate-pipeline";
@@ -75,26 +74,24 @@ export function makeExtDirCheck(
   );
 }
 
-/** GatePrompter stub that approves with `state: "approved"`. */
-export function makeApprovingPrompter(): GatePrompter {
+/** AskEscalator stub that approves with `state: "approved"`. */
+export function makeApprovingPrompter(): AskEscalator {
   return {
-    canConfirm: vi.fn().mockReturnValue(true),
-    prompt: vi
-      .fn<GatePrompter["prompt"]>()
+    escalate: vi
+      .fn<AskEscalator["escalate"]>()
       .mockResolvedValue({ approved: true, state: "approved" }),
   };
 }
 
 /**
- * GatePrompter stub that denies.
+ * AskEscalator stub that denies.
  *
  * Pass `denialReason` to simulate a user who explains the refusal.
  */
-export function makeDenyingPrompter(denialReason?: string): GatePrompter {
+export function makeDenyingPrompter(denialReason?: string): AskEscalator {
   return {
-    canConfirm: vi.fn().mockReturnValue(true),
-    prompt: vi
-      .fn<GatePrompter["prompt"]>()
+    escalate: vi
+      .fn<AskEscalator["escalate"]>()
       .mockResolvedValue(
         denialReason !== undefined
           ? { approved: false, state: "denied", denialReason }
@@ -103,11 +100,17 @@ export function makeDenyingPrompter(denialReason?: string): GatePrompter {
   };
 }
 
-/** GatePrompter stub that reports no UI is available (`canConfirm: false`). */
-export function makeUnavailablePrompter(): GatePrompter {
+/**
+ * AskEscalator stub for a session with no reachable authority: the
+ * DenyingAuthorizer denies with the `confirmationUnavailable` marker.
+ */
+export function makeUnavailablePrompter(): AskEscalator {
   return {
-    canConfirm: vi.fn().mockReturnValue(false),
-    prompt: vi.fn<GatePrompter["prompt"]>(),
+    escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
+      approved: false,
+      state: "denied",
+      confirmationUnavailable: true,
+    }),
   };
 }
 
@@ -180,12 +183,11 @@ export function makeExtDirDedupCheck(
   );
 }
 
-/** GatePrompter stub that approves for the session (`state: "approved_for_session"`). */
-function makeSessionApprovingPrompter(): GatePrompter {
+/** AskEscalator stub that approves for the session (`state: "approved_for_session"`). */
+function makeSessionApprovingPrompter(): AskEscalator {
   return {
-    canConfirm: vi.fn().mockReturnValue(true),
-    prompt: vi
-      .fn<GatePrompter["prompt"]>()
+    escalate: vi
+      .fn<AskEscalator["escalate"]>()
       .mockResolvedValue({ approved: true, state: "approved_for_session" }),
   };
 }
@@ -198,14 +200,14 @@ function makeSessionApprovingPrompter(): GatePrompter {
  *
  * Returns `{ handler, prompter, session }`.
  */
-export function makeDedupWiring(prompter?: GatePrompter) {
+export function makeDedupWiring(prompter?: AskEscalator) {
   const { session, permissionManager, sessionRules, logger } =
     makeRealSession();
   const { resolver } = makeRealResolver(permissionManager, sessionRules);
   makeExtDirDedupCheck(permissionManager);
   const events = makeEvents();
   const reporter = new GateDecisionReporter(logger, events);
-  const resolvedPrompter: GatePrompter =
+  const resolvedPrompter: AskEscalator =
     prompter ?? makeSessionApprovingPrompter();
   const runner = new GateRunner(
     resolver,
@@ -238,7 +240,7 @@ export function makeDedupWiring(prompter?: GatePrompter) {
  * Wraps `makeDedupWiring`; returns `{ handler, prompter }`.
  * Use `makeDedupWiring` when the test also needs `session.shutdown()`.
  */
-export function makeDeduplicatingHandler(prompter?: GatePrompter) {
+export function makeDeduplicatingHandler(prompter?: AskEscalator) {
   const { handler, prompter: resolvedPrompter } = makeDedupWiring(prompter);
   return { handler, prompter: resolvedPrompter };
 }

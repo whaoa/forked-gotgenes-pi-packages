@@ -1,5 +1,4 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { GatePrompter } from "#src/gate-prompter";
 import type { PermissionPromptDecision } from "#src/permission-dialog";
 import {
   type Authorizer,
@@ -24,22 +23,33 @@ export interface AuthorizerSelectionLifecycle {
 }
 
 /**
+ * The ask-escalation seam `GateRunner` depends on: escalate a single ask to
+ * the session's selected `Authorizer` and return its decision.
+ *
+ * Replaces the two-method `GatePrompter` role (#556). There is no
+ * "can anyone answer" pre-check: absent authority is the `DenyingAuthorizer`,
+ * which answers by denying with a `confirmationUnavailable` marker.
+ */
+export interface AskEscalator {
+  escalate(details: PromptPermissionDetails): Promise<PermissionPromptDecision>;
+}
+
+/**
  * Context-owning selection root for the Authorizer spine.
  *
  * The rewrite of `PromptingGateway`: owns the stored `ExtensionContext`, runs
- * `selectAuthorizer` once per activation, and implements `GatePrompter` by
+ * `selectAuthorizer` once per activation, and implements `AskEscalator` by
  * delegating to the selected `Authorizer` via `PermissionPrompter`.
  *
- * `canConfirm()` survives this step (dissolved in #556): it is recomputed
- * transitionally alongside `selectAuthorizer`'s own branch, rather than
- * derived from the selected authorizer, to keep the ask path byte-identical
- * until #556 derives confirmability from a `DenyingAuthorizer` marker.
+ * `selectAuthorizer` encodes the liveness decision in *which* `Authorizer` it
+ * returns (`LocalUserAuthorizer` / `ParentAuthorizer` when authority is
+ * reachable, `DenyingAuthorizer` otherwise), so no separate confirmability
+ * predicate survives (#556 dissolved `canConfirm()`).
  */
 export class AuthorizerSelection
-  implements GatePrompter, AuthorizerSelectionLifecycle
+  implements AskEscalator, AuthorizerSelectionLifecycle
 {
   private selected: Authorizer | null = null;
-  private confirmable = false;
 
   constructor(
     private readonly deps: AuthorizerSelectionDeps & {
@@ -47,39 +57,28 @@ export class AuthorizerSelection
     },
   ) {}
 
-  /** Select the Authorizer for `ctx` and store both it and the confirmable predicate. */
+  /** Select the Authorizer for `ctx` and store it. */
   activate(ctx: ExtensionContext): void {
     this.selected = selectAuthorizer(ctx, this.deps);
-    this.confirmable = ctx.hasUI || this.deps.detection.isSubagent(ctx);
   }
 
   /** Clear the stored selection. */
   deactivate(): void {
     this.selected = null;
-    this.confirmable = false;
   }
 
   /**
-   * Whether an interactive permission prompt can be shown.
+   * Escalate an ask to the selected authorizer and return its decision.
    *
-   * Returns false when no authorizer has been selected. Otherwise true when
-   * the context had UI or was a forwarding subagent at selection time — the
-   * two Authorizer-selection predicates, evaluated once at `activate`.
+   * Rejects if no authorizer has been selected — i.e. before the session was
+   * activated. Implements {@link AskEscalator}.
    */
-  canConfirm(): boolean {
-    return this.selected !== null && this.confirmable;
-  }
-
-  /**
-   * Prompt for a permission decision using the selected authorizer.
-   *
-   * Rejects if no authorizer has been selected — `canConfirm()` guards this
-   * in normal use. Implements {@link GatePrompter}.
-   */
-  prompt(details: PromptPermissionDetails): Promise<PermissionPromptDecision> {
+  escalate(
+    details: PromptPermissionDetails,
+  ): Promise<PermissionPromptDecision> {
     if (this.selected === null) {
       return Promise.reject(
-        new Error("prompt called before the session was activated"),
+        new Error("escalate called before the session was activated"),
       );
     }
     return this.deps.prompter.prompt(this.selected, details);
