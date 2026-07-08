@@ -60,3 +60,58 @@ Pre-completion reviewer: **PASS** (one non-blocking WARN, see below).
 [#526]: https://github.com/gotgenes/pi-packages/issues/526
 [#530]: https://github.com/gotgenes/pi-packages/issues/530
 [#556]: https://github.com/gotgenes/pi-packages/issues/556
+
+## Stage: Final Retrospective (2026-07-07T22:05:00Z)
+
+### Session summary
+
+One continuous session carried #555 from planning through TDD, ship, and this retrospective: a behavior-neutral Phase 9 Step 1 refactor introducing the `Authorizer` spine.
+Execution closely tracked a thorough plan — two `refactor:` commits plus a docs commit, pre-completion **PASS**, CI green, issue closed, no release (auto-batched, all commits hidden-type or excluded-path docs).
+Friction was minor and self-caught: a false-green forwarding test, a cluster of type-wiring fixups during the big rewire, and a stale test mock surfaced by the intended eager-evaluation timing change.
+
+### Observations
+
+#### What went well
+
+- **False-green caught by a paired positive assertion.**
+  Step 2's new `ParentAuthorizer` round-trip test first passed the deny path for the wrong reason: a response fixture missing `responderSessionId` fails `readForwardedPermissionResponse`'s validation and falls back to the exact `{ approved: false, state: "denied" }` the deny test asserted.
+  It only surfaced because the *approve*-path test failed identically — the two tests sharing a fixture shape made the invalid fixture loud on the positive path.
+  Completing the payload turned both into real assertions.
+- **Transitional-wrapper split landed clean.**
+  The plan's two-commit lift-and-shift (Step 1 wraps the intact `ApprovalEscalator`; Step 2 folds it in and deletes the dead arms) held exactly as designed — each commit green, no `fallow dead-code` failure from unwired modules, no megacommit.
+- **`tsc`/lint as an incremental safety net.**
+  Every type-wiring slip during the large rewire (the `DenyingAuthorizer` zero-arg-vs-interface `TS2554`, the `AuthorizerSelectionDeps` import path, the `prompter` intersection type, the unused `DebugReviewLogger` import) was caught by a `pnpm run check` or `pnpm run lint` run immediately after the step, not deferred to the end.
+
+#### What caused friction (agent side)
+
+- `missing-context` — wrote the forwarded-response fixture without first checking `readForwardedPermissionResponse`'s required fields (`responderSessionId`), so the deny-path test false-greened.
+  Impact: two extra test iterations in Step 2 (timeout → registry fix → `responderSessionId` fix); no production rework, and the paired positive test caught it before commit.
+- `other` (mechanical type-wiring during a wide rewire) — four small fixups in Step 1 (`DenyingAuthorizer` signature, a test import path, a deps intersection type, an unused import).
+  Impact: ~4 quick edits, each caught by `tsc`/lint within the same step; no rework.
+- `missing-context` (mild) — the `resolvePermissionForwardingTargetSessionId` path needs either a registry entry or an env var, which the first round-trip fixture supplied via neither, so the request file was never written and the test timed out.
+  Impact: one iteration; fixed by adding a `makeSubagentRegistry` child→parent mapping.
+
+#### What caused friction (user side)
+
+- None.
+  The plan was detailed enough to run unattended through TDD and ship; no mid-session redirection was needed.
+  This is the intended payoff of front-loading design into `/plan-issue` — the operator's involvement was confirmation, not steering.
+
+### Diagnostic details
+
+- **Feedback-loop gap analysis** — no gap: `pnpm run check` ran after each of the two implementation steps (both shared-interface changes), the affected test file ran Red-first before each implementation, and the full package suite plus root `lint`/`check`/`fallow` ran before each push.
+  Verification was incremental, not end-loaded.
+- **Escalation-delay tracking** — the Step 2 forwarding test took three iterations (timeout, denied-mismatch, `toMatchObject` for the live timestamp), but each was a distinct root cause diagnosed in one or two tool calls, never 5+ consecutive calls on the same error.
+  No subagent dispatch warranted.
+- **Model-performance correlation** — only one subagent ran, the `pre-completion-reviewer` (its own `model:` frontmatter), on judgment-heavy work (design-deviation review, invariant preservation, doc-staleness grep); appropriate match, no mismatch.
+- **Unused-tool detection** — none: no `rabbit-hole` deep enough to have wanted an Explore/`colgrep` dispatch that was skipped.
+
+### Follow-up
+
+- None filed.
+  The reviewer's one WARN (a design choice — no `events` field on `Denying`/`Parent` deps — structurally obsoleting the plan's requested "does-not-emit" test) is recorded in the TDD stage and needs no code change.
+- Next roadmap step: Phase 9 Step 2 ([#556], dissolve `canConfirm()`), unblocked by this issue.
+
+### Changes made
+
+1. `.pi/skills/testing/SKILL.md` — added a bullet under § "Test assertions" on the false-green class where a validation/parse step's invalid-input fallback coincides with a negative-path test's expected value (assert the positive path against the same fixture builder, or assert a discriminating field).

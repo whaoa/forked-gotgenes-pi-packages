@@ -56,6 +56,8 @@ Load this skill when writing, debugging, or planning tests.
 - Prefer strong assertions that match the **entire** expected value (`toBe`, `toEqual`) over subset matchers (`toContain`, `toMatchObject`, `expect.objectContaining`).
   Weak assertions hide unexpected values and make tests less useful as documentation.
   When a weak assertion is necessary (third-party output, non-deterministic ordering), add a comment explaining why.
+- When a test drives the code through a validation/parse step and the invalid-input fallback returns the same value a negative-path test asserts (e.g. a forwarded-response fixture missing a required field and a `denied` expectation both yield `{ approved: false, state: "denied" }`), a broken fixture false-greens the negative test.
+  Assert the positive (non-fallback) path against the same fixture builder first — a malformed fixture then fails loudly there — or assert a discriminating field the fallback cannot produce.
 - Prefer a concrete test asserting current (even imperfect) behavior over `test.todo`.
   A real assertion documents the limitation and lets a future fix flip the expectation.
 - When a test reveals a pre-existing bug rather than a wrong assumption, use `test.fails` to document the expected behavior and file a GitHub issue.
