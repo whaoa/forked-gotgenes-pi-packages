@@ -1,0 +1,70 @@
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  PermissionPromptDecision,
+  requestPermissionDecisionFromUi,
+} from "#src/permission-dialog";
+import type { PermissionEventBus } from "#src/permission-events";
+import { type ApprovalRequester, ParentAuthorizer } from "./approval-escalator";
+import { DenyingAuthorizer } from "./denying-authorizer";
+import { LocalUserAuthorizer } from "./local-user-authorizer";
+import type { PromptPermissionDetails } from "./permission-prompter";
+import type { SubagentDetector } from "./subagent-detection";
+
+/**
+ * The live-authority role: on `ask`, an `Authorizer` rules on a single
+ * request and is told the decision.
+ *
+ * One method, one responsibility. `DenyingAuthorizer` ignores `details`;
+ * `LocalUserAuthorizer` reads `message`/`sessionLabel` and derives the UI
+ * event from it; `ParentAuthorizer` reads `message` and derives the
+ * forwarded display from it.
+ */
+export interface Authorizer {
+  authorize(
+    details: PromptPermissionDetails,
+  ): Promise<PermissionPromptDecision>;
+}
+
+/**
+ * Construction inputs for {@link selectAuthorizer}.
+ *
+ * Transitional (Step 1, #555): `escalator` is the composition root's shared
+ * `ApprovalEscalator` instance, wrapped by `ParentAuthorizer`. Step 2 removes
+ * this field once the escalator's forwarding machinery folds directly into
+ * `ParentAuthorizer`.
+ */
+export interface AuthorizerSelectionDeps {
+  /** Single owner of subagent detection; the ParentAuthorizer-selection predicate. */
+  detection: SubagentDetector;
+  /** Event bus used by `LocalUserAuthorizer` for the `permissions:ui_prompt` broadcast. */
+  events: PermissionEventBus;
+  /** Injected for testability; production callers pass the real function. */
+  requestPermissionDecisionFromUi: typeof requestPermissionDecisionFromUi;
+  /** Shared escalator instance `ParentAuthorizer` forwards through. */
+  escalator: ApprovalRequester;
+}
+
+/**
+ * Select the `Authorizer` for the current context: the single owner of the
+ * three-way `hasUI` / `isSubagent` / deny dispatch.
+ *
+ * Evaluated once per session activation (`AuthorizerSelection.activate`),
+ * replacing the re-derivation of the same predicates across
+ * `PromptingGateway`, `PermissionPrompter`, and `ApprovalEscalator`.
+ */
+export function selectAuthorizer(
+  ctx: ExtensionContext,
+  deps: AuthorizerSelectionDeps,
+): Authorizer {
+  if (ctx.hasUI) {
+    return new LocalUserAuthorizer({
+      ui: ctx.ui,
+      events: deps.events,
+      requestPermissionDecisionFromUi: deps.requestPermissionDecisionFromUi,
+    });
+  }
+  if (deps.detection.isSubagent(ctx)) {
+    return new ParentAuthorizer(ctx, deps.escalator);
+  }
+  return new DenyingAuthorizer();
+}

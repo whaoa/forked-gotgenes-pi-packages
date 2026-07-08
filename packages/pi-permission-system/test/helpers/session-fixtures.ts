@@ -14,6 +14,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
+import type { AuthorizerSelectionLifecycle } from "#src/authority/authorizer-selection";
 import type { SessionConfigStore } from "#src/config-store";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import type { ExtensionPaths } from "#src/extension-paths";
@@ -21,7 +22,6 @@ import type { ForwardingController } from "#src/forwarding-manager";
 import type { ScopedPermissionManager } from "#src/permission-manager";
 import { PermissionResolver } from "#src/permission-resolver";
 import { PermissionSession } from "#src/permission-session";
-import type { PromptingGatewayLifecycle } from "#src/prompting-gateway";
 import type { Ruleset } from "#src/rule";
 import type { SessionLogger } from "#src/session-logger";
 import { SessionRules } from "#src/session-rules";
@@ -69,10 +69,10 @@ export function makeConfigStore(
   };
 }
 
-export function makeGateway(): PromptingGatewayLifecycle {
+export function makeAuthorizerSelection(): AuthorizerSelectionLifecycle {
   return {
-    activate: vi.fn<PromptingGatewayLifecycle["activate"]>(),
-    deactivate: vi.fn<PromptingGatewayLifecycle["deactivate"]>(),
+    activate: vi.fn<AuthorizerSelectionLifecycle["activate"]>(),
+    deactivate: vi.fn<AuthorizerSelectionLifecycle["deactivate"]>(),
   };
 }
 
@@ -132,7 +132,7 @@ export function makeRealSession(overrides?: {
   permissionManager?: ScopedPermissionManager;
   sessionRules?: SessionRules;
   configStore?: SessionConfigStore;
-  gateway?: PromptingGatewayLifecycle;
+  authorizerSelection?: AuthorizerSelectionLifecycle;
   platform?: NodeJS.Platform;
 }): {
   session: PermissionSession;
@@ -142,7 +142,7 @@ export function makeRealSession(overrides?: {
   permissionManager: ReturnType<typeof makeFakePermissionManager>;
   sessionRules: SessionRules;
   configStore: SessionConfigStore;
-  gateway: PromptingGatewayLifecycle;
+  authorizerSelection: AuthorizerSelectionLifecycle;
 } {
   const paths = makePaths(overrides?.paths);
   const logger = overrides?.logger ?? makeLogger();
@@ -153,7 +153,8 @@ export function makeRealSession(overrides?: {
       | undefined) ?? makeFakePermissionManager();
   const sessionRules = overrides?.sessionRules ?? new SessionRules();
   const configStore = overrides?.configStore ?? makeConfigStore();
-  const gateway = overrides?.gateway ?? makeGateway();
+  const authorizerSelection =
+    overrides?.authorizerSelection ?? makeAuthorizerSelection();
   const platform = overrides?.platform ?? process.platform;
   const session = new PermissionSession(
     paths,
@@ -161,7 +162,7 @@ export function makeRealSession(overrides?: {
     permissionManager,
     sessionRules,
     configStore,
-    gateway,
+    authorizerSelection,
     platform,
   );
   return {
@@ -172,7 +173,7 @@ export function makeRealSession(overrides?: {
     permissionManager,
     sessionRules,
     configStore,
-    gateway,
+    authorizerSelection,
   };
 }
 

@@ -1,12 +1,6 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { ApprovalRequester } from "./authority/approval-escalator";
-import type { PermissionPromptDecision } from "./permission-dialog";
-import {
-  emitUiPromptEvent,
-  type PermissionEventBus,
-} from "./permission-events";
-import { buildDirectUiPrompt } from "./permission-ui-prompt";
-import type { ReviewLogger } from "./session-logger";
+import type { PermissionPromptDecision } from "#src/permission-dialog";
+import type { ReviewLogger } from "#src/session-logger";
+import type { Authorizer } from "./authorizer";
 
 export type PermissionReviewSource = "tool_call" | "skill_input" | "skill_read";
 
@@ -27,72 +21,53 @@ export interface PromptPermissionDetails {
   sessionLabel?: string;
 }
 
-/** Mockable contract for permission prompting. */
+/**
+ * Narrow seam onto {@link PermissionPrompter}.
+ *
+ * Kept separate from the concrete class so consumers (e.g. `AuthorizerSelection`)
+ * can inject a plain `{ prompt: vi.fn() }` mock in tests — a private field on
+ * the concrete class would create a nominal brand that a structural mock
+ * cannot satisfy without a cast.
+ */
 export interface PermissionPrompterApi {
   prompt(
-    ctx: ExtensionContext,
+    authorizer: Authorizer,
     details: PromptPermissionDetails,
   ): Promise<PermissionPromptDecision>;
 }
 
-/**
- * Dependencies required by PermissionPrompter.
- *
- * Keeps the prompter's external surface narrow: callers provide a review
- * logger, the UI-prompt event bus, and the forwarder that owns the
- * UI/subagent-forwarding branching logic.
- */
+/** Dependencies required by {@link PermissionPrompter}. */
 export interface PermissionPrompterDeps {
   /** Write structured entries to the permission review log. */
   logger: ReviewLogger;
-  /** Event bus used for UI prompt broadcasts. */
-  events: PermissionEventBus;
-  /** Resolves the permission decision: direct UI dialog or forwarded to parent. */
-  forwarder: ApprovalRequester;
 }
 
 /**
- * Encapsulates the full permission-prompt flow:
+ * Brackets the ask-path flow with review-log entries and delegates the
+ * live decision to the selected {@link Authorizer}:
  *   1. Review-log "waiting" entry.
- *   2. UI-present vs. subagent-forwarding branching (via confirmPermission).
+ *   2. `authorizer.authorize(details)`.
  *   3. Review-log "approved" / "denied" entry.
+ *
+ * The UI/forwarding branching this class previously owned now lives on the
+ * individual `Authorizer` implementations (`LocalUserAuthorizer`,
+ * `ParentAuthorizer`, `DenyingAuthorizer`) — this class no longer threads
+ * `ExtensionContext` per call.
  *
  * Yolo-mode auto-approval happens upstream, at the composition stage
  * (`PermissionManager.check`'s `rewriteAsksToYolo`) — an `ask` never reaches
  * this class under yolo, so this class has no yolo-mode knowledge.
- *
- * Injecting a single PermissionPrompter instance means adding a new prompt
- * parameter (e.g. a future sessionLabel variant) only requires changing
- * PromptPermissionDetails and this class — not the full threading chain.
  */
 export class PermissionPrompter implements PermissionPrompterApi {
   constructor(private readonly deps: PermissionPrompterDeps) {}
 
   async prompt(
-    ctx: ExtensionContext,
+    authorizer: Authorizer,
     details: PromptPermissionDetails,
   ): Promise<PermissionPromptDecision> {
     this.writeReviewEntry("permission_request.waiting", details);
 
-    // Build the event once. When this session has UI it broadcasts directly;
-    // when it does not (a forwarding subagent), the display fields ride along
-    // to the parent so the parent emits a non-degraded event from the
-    // forwarded path instead of here.
-    const uiPrompt = buildDirectUiPrompt(details);
-    if (ctx.hasUI) {
-      emitUiPromptEvent(this.deps.events, uiPrompt);
-    }
-
-    const decision = await this.deps.forwarder.requestApproval(
-      ctx,
-      details.message,
-      details.sessionLabel ? { sessionLabel: details.sessionLabel } : undefined,
-      {
-        source: uiPrompt.source,
-        surface: uiPrompt.surface,
-        value: uiPrompt.value,
-      },
-    );
+    const decision = await authorizer.authorize(details);
 
     this.writeReviewEntry(
       decision.approved

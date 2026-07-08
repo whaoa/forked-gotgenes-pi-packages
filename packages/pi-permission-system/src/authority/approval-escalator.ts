@@ -33,9 +33,12 @@ import {
   resolvePermissionForwardingTargetSessionId,
   SUBAGENT_PARENT_SESSION_ENV_CANDIDATES,
 } from "#src/permission-forwarding";
+import { buildDirectUiPrompt } from "#src/permission-ui-prompt";
 import type { DebugReviewLogger } from "#src/session-logger";
 import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
+import type { Authorizer } from "./authorizer";
+import type { PromptPermissionDetails } from "./permission-prompter";
 
 /**
  * Constructor config for `ApprovalEscalator`.
@@ -323,5 +326,41 @@ export class ApprovalEscalator implements ApprovalRequester {
     safeDeleteFile(this.logger, requestPath, "forwarded permission request");
     cleanupPermissionForwardingLocationIfEmpty(this.logger, location);
     return { approved: false, state: "denied" };
+  }
+}
+
+// ── ParentAuthorizer ──────────────────────────────────────────
+
+/**
+ * Authorizer for a subagent session: escalate the ask up the tree to the
+ * parent's authority.
+ *
+ * Step 1 (#555) wraps an existing `ApprovalEscalator` instance, binding
+ * `ctx` once at construction instead of threading it per call. Step 2 folds
+ * the escalator's forwarding machinery directly into this class and removes
+ * this wrapper plus the now-dead `ctx.hasUI` / `!isSubagent` arms on
+ * `ApprovalEscalator` (see the #555 plan) — this constructor shape is
+ * transitional, not the final one.
+ */
+export class ParentAuthorizer implements Authorizer {
+  constructor(
+    private readonly ctx: ForwarderContext,
+    private readonly escalator: ApprovalRequester,
+  ) {}
+
+  authorize(
+    details: PromptPermissionDetails,
+  ): Promise<PermissionPromptDecision> {
+    const uiPrompt = buildDirectUiPrompt(details);
+    return this.escalator.requestApproval(
+      this.ctx,
+      details.message,
+      details.sessionLabel ? { sessionLabel: details.sessionLabel } : undefined,
+      {
+        source: uiPrompt.source,
+        surface: uiPrompt.surface,
+        value: uiPrompt.value,
+      },
+    );
   }
 }

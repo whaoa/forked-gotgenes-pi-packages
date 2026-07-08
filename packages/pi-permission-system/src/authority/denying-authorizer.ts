@@ -1,0 +1,12 @@
+import type { PermissionPromptDecision } from "#src/permission-dialog";
+import type { Authorizer } from "./authorizer";
+
+/**
+ * Least-privilege Authorizer: no authority is reachable for this session
+ * (no UI, not a subagent), so every ask is denied.
+ */
+export class DenyingAuthorizer implements Authorizer {
+  authorize(): Promise<PermissionPromptDecision> {
+    return Promise.resolve({ approved: false, state: "denied" });
+  }
+}

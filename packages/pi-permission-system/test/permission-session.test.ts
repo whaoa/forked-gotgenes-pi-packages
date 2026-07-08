@@ -74,21 +74,21 @@ describe("PermissionSession", () => {
       expect(forwarding.stop).toHaveBeenCalled();
     });
 
-    it("forwards activate to the gateway", () => {
-      const { session, gateway } = createSession();
+    it("forwards activate to the authorizer selection", () => {
+      const { session, authorizerSelection } = createSession();
       const ctx = makeCtx();
 
       session.activate(ctx);
 
-      expect(gateway.activate).toHaveBeenCalledWith(ctx);
+      expect(authorizerSelection.activate).toHaveBeenCalledWith(ctx);
     });
 
-    it("forwards deactivate to the gateway", () => {
-      const { session, gateway } = createSession();
+    it("forwards deactivate to the authorizer selection", () => {
+      const { session, authorizerSelection } = createSession();
       session.activate(makeCtx());
       session.deactivate();
 
-      expect(gateway.deactivate).toHaveBeenCalled();
+      expect(authorizerSelection.deactivate).toHaveBeenCalled();
     });
   });
 

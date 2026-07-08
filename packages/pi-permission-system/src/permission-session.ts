@@ -3,7 +3,7 @@ import {
   getActiveAgentName,
   getActiveAgentNameFromSystemPrompt,
 } from "./active-agent";
-
+import type { AuthorizerSelectionLifecycle } from "./authority/authorizer-selection";
 import type { SessionConfigStore } from "./config-store";
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ExtensionPaths } from "./extension-paths";
@@ -11,7 +11,6 @@ import type { ForwardingController } from "./forwarding-manager";
 import type { ToolCallGateInputs } from "./handlers/gates/tool-call-gate-pipeline";
 import { PathNormalizer } from "./path-normalizer";
 import type { ScopedPermissionManager } from "./permission-manager";
-import type { PromptingGatewayLifecycle } from "./prompting-gateway";
 
 import type { SessionRules } from "./session-rules";
 import type { SkillPromptEntry } from "./skill-prompt-sanitizer";
@@ -33,7 +32,7 @@ import type { PathRuleTokenMatcher } from "./types";
  * - `ExtensionPaths` — immutable path constants
  * - `ForwardingController` — polling lifecycle
  * - `SessionConfigStore` — owns extension config; provides refresh, log, read
- * - `PromptingGatewayLifecycle` — prompting lifecycle forwarded via activate/deactivate
+ * - `AuthorizerSelectionLifecycle` — authorizer-selection lifecycle forwarded via activate/deactivate
  */
 export class PermissionSession implements ToolCallGateInputs {
   private context: ExtensionContext | null = null;
@@ -47,7 +46,7 @@ export class PermissionSession implements ToolCallGateInputs {
     private readonly permissionManager: ScopedPermissionManager,
     private readonly sessionRules: SessionRules,
     private readonly configStore: SessionConfigStore,
-    private readonly gateway: PromptingGatewayLifecycle,
+    private readonly authorizerSelection: AuthorizerSelectionLifecycle,
     private readonly platform: NodeJS.Platform,
   ) {
     // Placeholder until the first activate(ctx) binds the real cwd; every gate
@@ -71,14 +70,14 @@ export class PermissionSession implements ToolCallGateInputs {
     this.context = ctx;
     this.pathNormalizer = new PathNormalizer(this.platform, ctx.cwd);
     this.forwarding.start(ctx);
-    this.gateway.activate(ctx);
+    this.authorizerSelection.activate(ctx);
   }
 
-  /** Clear the context, stop forwarding, and deactivate the gateway. */
+  /** Clear the context, stop forwarding, and deactivate the authorizer selection. */
   deactivate(): void {
     this.context = null;
     this.forwarding.stop();
-    this.gateway.deactivate();
+    this.authorizerSelection.deactivate();
   }
 
   /** Return the current runtime context, or null if not activated. */

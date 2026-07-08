@@ -1,5 +1,5 @@
+import type { PromptPermissionDetails } from "./authority/permission-prompter";
 import type { PermissionPromptDecision } from "./permission-dialog";
-import type { PromptPermissionDetails } from "./permission-prompter";
 
 /**
  * The prompting role the gate runner needs: a yes/no on whether an

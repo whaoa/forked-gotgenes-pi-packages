@@ -1,0 +1,166 @@
+import { describe, expect, it, vi } from "vitest";
+import { LocalUserAuthorizer } from "#src/authority/local-user-authorizer";
+import type { PromptPermissionDetails } from "#src/authority/permission-prompter";
+import type {
+  PermissionPromptDecision,
+  requestPermissionDecisionFromUi,
+} from "#src/permission-dialog";
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function makeDetails(
+  overrides?: Partial<PromptPermissionDetails>,
+): PromptPermissionDetails {
+  return {
+    requestId: "req-123",
+    source: "tool_call",
+    agentName: "test-agent",
+    message: "Allow read?",
+    toolName: "read",
+    ...overrides,
+  };
+}
+
+function makeDeps(
+  overrides: {
+    requestPermissionDecisionFromUi?: typeof requestPermissionDecisionFromUi;
+  } = {},
+) {
+  const events = {
+    emit: vi.fn(),
+    on: vi.fn().mockReturnValue(() => undefined),
+  };
+  const ui = { select: vi.fn(), input: vi.fn() };
+  const decisionFn =
+    overrides.requestPermissionDecisionFromUi ??
+    vi
+      .fn<typeof requestPermissionDecisionFromUi>()
+      .mockResolvedValue({ approved: true, state: "approved" });
+  return {
+    deps: { ui, events, requestPermissionDecisionFromUi: decisionFn },
+    events,
+    ui,
+    decisionFn,
+  };
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────
+
+describe("LocalUserAuthorizer", () => {
+  it("emits a UI prompt event with normalized surface and value", async () => {
+    const { deps, events } = makeDeps();
+    const authorizer = new LocalUserAuthorizer(deps);
+
+    await authorizer.authorize(
+      makeDetails({
+        toolName: "bash",
+        command: "git push",
+        toolInputPreview: "git push",
+      }),
+    );
+
+    expect(events.emit).toHaveBeenCalledWith("permissions:ui_prompt", {
+      requestId: "req-123",
+      source: "tool_call",
+      surface: "bash",
+      value: "git push",
+      agentName: "test-agent",
+      message: "Allow read?",
+      forwarding: null,
+    });
+  });
+
+  it("normalizes skill prompt events to the skill surface", async () => {
+    const { deps, events } = makeDeps();
+    const authorizer = new LocalUserAuthorizer(deps);
+
+    await authorizer.authorize(
+      makeDetails({
+        source: "skill_input",
+        toolName: undefined,
+        skillName: "deploy-helper",
+      }),
+    );
+
+    expect(events.emit).toHaveBeenCalledWith("permissions:ui_prompt", {
+      requestId: "req-123",
+      source: "skill_input",
+      surface: "skill",
+      value: "deploy-helper",
+      agentName: "test-agent",
+      message: "Allow read?",
+      forwarding: null,
+    });
+  });
+
+  it("calls requestPermissionDecisionFromUi with the dialog title and message", async () => {
+    const { deps, ui, decisionFn } = makeDeps();
+    const authorizer = new LocalUserAuthorizer(deps);
+
+    await authorizer.authorize(makeDetails());
+
+    expect(decisionFn).toHaveBeenCalledWith(
+      ui,
+      "Permission Required",
+      "Allow read?",
+      undefined,
+    );
+  });
+
+  it("passes the sessionLabel option when present", async () => {
+    const { deps, decisionFn } = makeDeps();
+    const authorizer = new LocalUserAuthorizer(deps);
+
+    await authorizer.authorize(
+      makeDetails({ sessionLabel: "Yes, for 'read' tool" }),
+    );
+
+    expect(decisionFn).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      expect.any(String),
+      { sessionLabel: "Yes, for 'read' tool" },
+    );
+  });
+
+  it("emits the UI event before calling requestPermissionDecisionFromUi", async () => {
+    const calls: string[] = [];
+    const events = {
+      emit: vi.fn(() => {
+        calls.push("emit");
+      }),
+      on: vi.fn().mockReturnValue(() => undefined),
+    };
+    const ui = { select: vi.fn(), input: vi.fn() };
+    const decisionFn = vi.fn<typeof requestPermissionDecisionFromUi>(() => {
+      calls.push("dialog");
+      return Promise.resolve({ approved: true, state: "approved" });
+    });
+    const authorizer = new LocalUserAuthorizer({
+      ui,
+      events,
+      requestPermissionDecisionFromUi: decisionFn,
+    });
+
+    await authorizer.authorize(makeDetails());
+
+    expect(calls).toEqual(["emit", "dialog"]);
+  });
+
+  it("returns the decision from requestPermissionDecisionFromUi", async () => {
+    const decision: PermissionPromptDecision = {
+      approved: false,
+      state: "denied",
+    };
+    const { deps } = makeDeps({
+      requestPermissionDecisionFromUi: vi
+        .fn<typeof requestPermissionDecisionFromUi>()
+        .mockResolvedValue(decision),
+    });
+    const authorizer = new LocalUserAuthorizer(deps);
+
+    const result = await authorizer.authorize(makeDetails());
+
+    expect(result).toEqual(decision);
+  });
+});

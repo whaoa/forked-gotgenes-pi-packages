@@ -96,11 +96,17 @@ describe("session_start handler consolidation", () => {
     // The single handler should accept event with reason="reload" without throwing
     const mockCtx = {
       cwd: baseDir,
+      hasUI: false,
       ui: { select: async () => "", input: async () => "" },
       agent: { name: "test-agent" },
       sessionManager: {
         getEntries: () => [],
         addEntry: () => {},
+        // AuthorizerSelection.activate selects an Authorizer eagerly (#555),
+        // which calls SubagentDetection.isSubagent(ctx) when hasUI is false —
+        // a real ExtensionContext always provides these two readers.
+        getSessionId: () => "session-1",
+        getSessionDir: () => baseDir,
       },
     };
 

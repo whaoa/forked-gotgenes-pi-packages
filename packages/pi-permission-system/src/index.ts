@@ -4,10 +4,12 @@ import {
   ApprovalEscalator,
   type ApprovalEscalatorDeps,
 } from "./authority/approval-escalator";
+import { AuthorizerSelection } from "./authority/authorizer-selection";
 import {
   ForwardedRequestServer,
   type ForwardedRequestServerDeps,
 } from "./authority/forwarded-request-server";
+import { PermissionPrompter } from "./authority/permission-prompter";
 import { SubagentDetection } from "./authority/subagent-detection";
 import { registerBuiltinToolInputFormatters } from "./builtin-tool-input-formatters";
 import { registerPermissionSystemCommand } from "./config-modal";
@@ -29,11 +31,9 @@ import { ToolCallGatePipeline } from "./handlers/gates/tool-call-gate-pipeline";
 import { createFailClosedToolCall } from "./handlers/tool-call-boundary";
 import { requestPermissionDecisionFromUi } from "./permission-dialog";
 import { PermissionManager } from "./permission-manager";
-import { PermissionPrompter } from "./permission-prompter";
 import { PermissionResolver } from "./permission-resolver";
 import { PermissionSession } from "./permission-session";
 import { LocalPermissionsService } from "./permissions-service";
-import { PromptingGateway } from "./prompting-gateway";
 import { PermissionServiceLifecycle } from "./service-lifecycle";
 import { PermissionSessionLogger } from "./session-logger";
 import { SessionRules } from "./session-rules";
@@ -112,14 +112,13 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   };
   const requestServer = new ForwardedRequestServer(requestServerDeps);
 
-  const prompter = new PermissionPrompter({
-    logger,
-    events: pi.events,
-    forwarder: escalator,
-  });
+  const prompter = new PermissionPrompter({ logger });
 
-  const gateway = new PromptingGateway({
+  const authorizerSelection = new AuthorizerSelection({
     detection: subagentDetection,
+    events: pi.events,
+    requestPermissionDecisionFromUi,
+    escalator,
     prompter,
   });
 
@@ -129,7 +128,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     permissionManager,
     sessionRules,
     configStore,
-    gateway,
+    authorizerSelection,
     hostPlatform,
   );
 
@@ -196,7 +195,12 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const agentPrep = new AgentPrepHandler(session, resolver, toolRegistry);
 
   const reporter = new GateDecisionReporter(logger, pi.events);
-  const gateRunner = new GateRunner(resolver, sessionRules, gateway, reporter);
+  const gateRunner = new GateRunner(
+    resolver,
+    sessionRules,
+    authorizerSelection,
+    reporter,
+  );
   const toolCallGatePipeline = new ToolCallGatePipeline(
     resolver,
     session,
