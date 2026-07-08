@@ -1,21 +1,15 @@
 # PermissionPrompter
 
-`src/permission-prompter.ts`
+`src/authority/permission-prompter.ts`
 
 ## Responsibility
 
-`PermissionPrompter` owns the full permission-prompt flow for a single agent request:
+`PermissionPrompter` brackets the ask-path flow with review-log entries and delegates the live decision to the selected `Authorizer` ([#555]):
 
-1. **Review log — waiting** — write `permission_request.waiting` before any dialog is shown.
-2. **UI prompt broadcast** — build the `PermissionUiPromptEvent` once via `buildDirectUiPrompt(details)`.
-   When `ctx.hasUI`, emit it on `permissions:ui_prompt` so observers (e.g. notification extensions) know the user must respond.
-   A non-UI session does not emit here — the parent emits from the forwarded path instead.
-3. **UI/forwarding branch** — delegate to `forwarder.requestApproval()`, which selects the correct path:
-   - `ctx.hasUI` → show the interactive dialog.
-   - subagent context → write a forwarded-permission request file (carrying the relayed display fields) and poll for the parent session's response.
-   - neither → deny immediately.
-   The prompter relays the built event's `source`/`surface`/`value` to `requestApproval` so a forwarded request persists them and the parent emits a non-degraded event.
-4. **Review log — outcome** — write `permission_request.approved` or `permission_request.denied` with the final decision state and any denial reason.
+1. **Review log — waiting** — write `permission_request.waiting` before the authorizer is consulted.
+2. **`authorizer.authorize(details)`** — the selected `Authorizer` (`LocalUserAuthorizer`, `ParentAuthorizer`, or `DenyingAuthorizer`) resolves the decision.
+   The UI-prompt broadcast and the UI/forwarding branching this class previously owned now live on the individual `Authorizer` implementations — see [architecture.md's authority model](architecture.md#target-the-authority-model).
+3. **Review log — outcome** — write `permission_request.approved` or `permission_request.denied` with the final decision state and any denial reason.
 
 Yolo-mode auto-approval is resolved upstream, at the composition stage (`PermissionManager.check`'s `rewriteAsksToYolo`) — an `ask` never reaches this class under yolo, so `PermissionPrompter` has no yolo-mode knowledge.
 
@@ -26,8 +20,8 @@ Adding a new field to `PromptPermissionDetails` (e.g. `sessionLabel` in #51) req
 
 With `PermissionPrompter`, adding a new field touches two files:
 
-- `src/handlers/types.ts` — add the field to `PromptPermissionDetails`.
-- `src/permission-prompter.ts` — read the new field inside `prompt()`.
+- `src/authority/permission-prompter.ts` — add the field to `PromptPermissionDetails`.
+- The `Authorizer` implementation(s) that read the new field — currently `local-user-authorizer.ts` and `approval-escalator.ts` (`ParentAuthorizer`).
 
 Handler code and wiring in `index.ts` are unaffected.
 
@@ -35,45 +29,48 @@ Handler code and wiring in `index.ts` are unaffected.
 
 ```typescript
 interface PermissionPrompterApi {
-  prompt(ctx: ExtensionContext, details: PromptPermissionDetails): Promise<PermissionPromptDecision>;
+  prompt(authorizer: Authorizer, details: PromptPermissionDetails): Promise<PermissionPromptDecision>;
 }
 
 interface PermissionPrompterDeps {
-  writeReviewLog(event: string, details: Record<string, unknown>): void;
-  events: PermissionEventBus;                    // permissions:ui_prompt broadcast
-  forwarder: ApprovalRequester;                  // UI dialog or subagent forwarding
+  logger: ReviewLogger; // review-log bracketing only
 }
 ```
 
-`ApprovalRequester` is the narrow seam defined in `src/authority/approval-escalator.ts`:
+`PermissionPrompterApi` is the narrow seam `AuthorizerSelection` depends on (not the concrete class) — a private field on the concrete class would create a nominal brand a structural test mock (`{ prompt: vi.fn() }`) cannot satisfy without a cast.
+
+`Authorizer` is the single live-authority role, defined in `src/authority/authorizer.ts`:
 
 ```typescript
-interface ApprovalRequester {
-  requestApproval(
-    ctx: ExtensionContext,
-    message: string,
-    options?: RequestPermissionOptions,
-    forwarded?: ForwardedPromptDisplay,
-  ): Promise<PermissionPromptDecision>;
+interface Authorizer {
+  authorize(details: PromptPermissionDetails): Promise<PermissionPromptDecision>;
 }
 ```
 
-## Relationship to the forwarder
+## Relationship to the Authorizer spine
 
-`PermissionPrompter` delegates the UI/forwarding decision to the injected `ApprovalRequester`.
-It never assembles a forwarding-dependency bag internally — the `ApprovalEscalator` instance (constructed in `index.ts` with its own `ApprovalEscalatorDeps`) is injected directly into the prompter.
-The escalation-up role (`ApprovalEscalator`, injected here) and the serving-down role (`ForwardedRequestServer`, injected into `ForwardingManager`) are separate classes as of #530 — they no longer share a single instance.
+`PermissionPrompter` no longer assembles or holds any UI/forwarding dependency — it receives the already-selected `Authorizer` as a call-time argument from `AuthorizerSelection.prompt(details)`, rather than threading `ExtensionContext` through a `forwarder.requestApproval(ctx, …)` call.
+`AuthorizerSelection` (the rewrite of the former `PromptingGateway`) owns the selection: `selectAuthorizer(ctx, deps)` runs once per session activation and returns the `Authorizer` for that context — `LocalUserAuthorizer` when `ctx.hasUI`, `ParentAuthorizer` when the context is a no-UI subagent, `DenyingAuthorizer` otherwise.
 
 ## Wiring
 
-`PermissionPrompter` is instantiated once in `piPermissionSystemExtension()` (`src/index.ts`) after the `ApprovalEscalator`, and injected into `PermissionSessionRuntimeDeps.promptPermission`:
+`PermissionPrompter` is instantiated once in `piPermissionSystemExtension()` (`src/index.ts`) and injected into `AuthorizerSelection`:
 
 ```typescript
-const escalator = new ApprovalEscalator(escalatorDeps);
-const prompter = new PermissionPrompter({ …, forwarder: escalator });
-// …
-promptPermission: (ctx, details) => prompter.prompt(ctx, details),
+const prompter = new PermissionPrompter({ logger });
+
+const authorizerSelection = new AuthorizerSelection({
+  detection: subagentDetection,
+  events: pi.events,
+  requestPermissionDecisionFromUi,
+  forwardingDir: paths.forwardingDir,
+  registry: subagentRegistry,
+  logger,
+  prompter,
+});
 ```
 
-Handler classes call `session.prompt(ctx, details)` which delegates to the injected prompter.
-Tests mock `prompt` on the `PermissionSession` mock directly.
+`authorizerSelection` implements `GatePrompter` and is passed to both `PermissionSession` (as the `activate`/`deactivate` lifecycle) and `GateRunner` (as the `canConfirm()`/`prompt(details)` role).
+`GateRunner` calls `this.prompter.prompt(details)` on the gate-prompter role exactly as before — the Authorizer spine is entirely behind that seam.
+
+[#555]: https://github.com/gotgenes/pi-packages/issues/555

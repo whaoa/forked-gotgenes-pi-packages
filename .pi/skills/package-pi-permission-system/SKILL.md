@@ -168,7 +168,7 @@ This resolver-internal boundary is a deliberate, formalized seam, not transition
 - Test system-prompt sanitization (denied tool lines narrowed out of the `Available tools:` listing, allowed tools preserved).
 - Test the external-directory guard for path-bearing file tools, including extension and MCP tools (default-on path gating, #352).
 - Test config loading, validation issues, and tolerance of deprecated keys.
-- To test the file-based permission-forwarding round-trip (a subagent's `ask` reaching the parent), do not `await` the child's `pi.fire("tool_call", …)` directly — `ApprovalEscalator.requestApproval` polls for a response with a 10-minute timeout when forwarding to the parent.
+- To test the file-based permission-forwarding round-trip (a subagent's `ask` reaching the parent), do not `await` the child's `pi.fire("tool_call", …)` directly — `ParentAuthorizer.authorize` (`src/authority/approval-escalator.ts`) polls for a response with a 10-minute timeout when forwarding to the parent.
   Instead: fire without awaiting, poll the parent's `requests/` dir (`createPermissionForwardingLocation(forwardingDir, parentSessionId)`) for the child's request file, write an approval JSON to `responses/<id>.json`, then await the fire.
   See the `subagent registry sharing` test in `test/composition-root.test.ts`.
 
