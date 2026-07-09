@@ -494,7 +494,7 @@ The `PermissionsService` interface exposes three methods:
 
 The sections above describe the current implementation.
 This section records the organizing concept the package is moving toward — the spine that the elicitation, forwarding, and yolo machinery should collapse into.
-It is a target, not current state: the `Authorizer` interface, its three implementations, and once-per-activation selection landed in Phase 9 Step 1 ([#555]), and `canConfirm()` was dissolved in Phase 9 Step 2 ([#556]) — the ask path now always escalates to the selected `Authorizer`; serving (`ForwardedRequestServer`) is not yet rebuilt onto `evaluate()` + the serving `Authorizer` (Phase 9 Step 3, [#557]).
+It is a target, not current state: the `Authorizer` interface, its three implementations, and once-per-activation selection landed in Phase 9 Step 1 ([#555]), and `canConfirm()` was dissolved in Phase 9 Step 2 ([#556]) — the ask path now always escalates to the selected `Authorizer`; and serving (`ForwardedRequestServer`) was rebuilt onto `evaluate()` + the serving `Authorizer` in Phase 9 Step 3 ([#557]) — the yolo, elicitation, and forwarding machinery now collapse onto the spine as intended.
 
 ### Why this is worth doing
 
@@ -787,7 +787,7 @@ src/
 ├── service-lifecycle.ts      `ServiceLifecycle` interface + `PermissionServiceLifecycle` class — owns the process-global service publish (#302 child-gated), ready emit, and session teardown ordering (#320)
 ├── service.ts                PermissionsService interface, Symbol.for() accessor (cross-extension API)
 ├── permission-events.ts      Event channel constants, payload types, emit helpers
-├── permission-ui-prompt.ts   Centralized construction for `permissions:ui_prompt` event payloads - single source for the emitted contract shape
+├── permission-ui-prompt.ts   Centralized construction for `permissions:ui_prompt` event payloads - `buildUiPrompt` is the single builder for direct and forwarded asks (surface/value override-or-derive, forwarding passthrough), keeping the emitted contract shape in one place (#557)
 ├── config-store.ts           `ConfigStore` class — owns `config` + `lastConfigWarning`; `ConfigReader`, `SessionConfigStore`, `CommandConfigStore` narrow interfaces (#335, #337)
 ├── config-loader.ts          File I/O, format detection, strict zod validation (fail-closed) for config files
 ├── config-schema.ts          Zod schemas - single source of truth for the config shape; derives the JSON Schema (buildPermissionsJsonSchema) and the config types (#547)
@@ -820,7 +820,7 @@ src/
 ├── active-agent.ts            Agent name detection from session/system prompt
 ├── authority/                 Subagent detection, the Authorizer spine, and forwarded-permission escalation (seeded #529; forwarding subsystem relocated here #530; Authorizer spine landed #555)
 │   ├── authorizer.ts          `Authorizer` interface (`authorize(details): Promise<PermissionPromptDecision>`) + `AuthorizerSelectionDeps` + `selectAuthorizer(ctx, deps)` - the once-per-activation hasUI/isSubagent/deny dispatch, replacing its re-derivation across the former `PromptingGateway`/`PermissionPrompter`/`ApprovalEscalator` (#555)
-│   ├── local-user-authorizer.ts `LocalUserAuthorizer` class - Authorizer for a session with UI: emits the `permissions:ui_prompt` broadcast, then shows the dialog (#555)
+│   ├── local-user-authorizer.ts `LocalUserAuthorizer` class - Authorizer for a session with UI and the single `permissions:ui_prompt` emit site: renders a forwarded ask's provenance (`details.forwarding`) as a non-degraded broadcast + `(Subagent)` title, then shows the dialog (#555, #557)
 │   ├── denying-authorizer.ts  `DenyingAuthorizer` class - least-privilege Authorizer for a session with no reachable authority; denies with the `confirmationUnavailable` marker so the ask path derives the `confirmation_unavailable` resolution (#555, #556)
 │   ├── authorizer-selection.ts `AuthorizerSelection` class - context-owning `AskEscalator` implementation (`escalate(details)`); selects the `Authorizer` once per activation and delegates to it via `PermissionPrompter`; rewrite of `PromptingGateway`; `canConfirm()` dissolved (#555, #556)
 │   ├── permission-prompter.ts `PermissionPrompter` class (`PermissionPrompterApi`) - review-log bracketing (waiting → approved/denied) around `authorizer.authorize(details)`; `PromptPermissionDetails` type; relocated from `src/permission-prompter.ts`, drops per-call `ctx` threading (#555)
@@ -828,7 +828,7 @@ src/
 │   ├── subagent-context.ts    Pure subagent execution context detection (registry + env vars + filesystem)
 │   ├── forwarder-context.ts   `ForwarderContext` read-interface + `getSessionId` - shared by the escalation and serving roles (#530)
 │   ├── approval-escalator.ts  `ParentAuthorizer` class - Authorizer for a subagent session: escalates the ask up the tree via the request-write/poll machinery, `ctx` bound at construction; folded from the former `ApprovalEscalator`, which shed its `hasUI`/not-a-subagent dispatch arms (#315, #316, #317, #530, #555)
-│   ├── forwarded-request-server.ts `ForwardedRequestServer` class (`InboxProcessor`) - serving-down role: `processInbox()` drains forwarded requests and the per-request serve flow (#530)
+│   ├── forwarded-request-server.ts `ForwardedRequestServer` class (`InboxProcessor`) - serving-down role: `processInbox()` drains forwarded requests and resolves each like a local action - `ServingPolicy` (recorded authority) then `AskEscalator` on `ask`; `ServingPolicy` seam + one-hop canary (#530, #557)
 │   └── forwarding-io.ts       Forwarding filesystem helpers - request/response read-write, location derivation, atomic JSON writes
 ├── subagent-registry.ts       SubagentSessionRegistry class + getSubagentSessionRegistry() process-global accessor - in-process subagent session tracking
 ├── subagent-lifecycle-events.ts subscribeSubagentLifecycle() - subscribes to @gotgenes/pi-subagents child lifecycle events; registers/unregisters child sessions in SubagentSessionRegistry (ADR 0002)
@@ -891,12 +891,14 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
    Impact 4 / Risk 2 / Priority 16.
    Release: independent
 
-3. **Serving is resolution: rebuild `processInbox` on `evaluate()` + the serving session's `Authorizer`.**
+3. ✅ **Serving is resolution: rebuild `processInbox` on `evaluate()` + the serving session's `Authorizer`.**
    ([#557]) Cause: the serving node answers escalations without consulting its own recorded authority ([resolved direction](#resolved-direction) 1), so parent policy cannot govern a child's escalation and yolo needs the bespoke serve-time check.
    Target: `src/authority/forwarded-request-server.ts` — inject a policy view + the `AskEscalator` seam; a request carrying `(surface, value)` resolves against the serving node's composed base ruleset (`agentName` undefined — the child applied its own per-agent overrides before forwarding; `allow`, including yolo-rewritten, auto-approves — yolo inheritance for free; `deny` auto-denies; `ask` or missing fields escalates through the seam); the escalated ask carries its forwarded provenance (requester agent/session, original `source`/`surface`/`value`) as data on `PromptPermissionDetails`, so `LocalUserAuthorizer` emits the non-degraded forwarded `permissions:ui_prompt` broadcast and the server sheds its bespoke emit + dialog path; remove `isYoloModeEnabled` + the `ConfigReader` dep; add the one-hop canary (loud warning when a request arrives from a requester whose registered parent is not the serving session).
    Smell: Category C (duplicate policy enforcement; single source of truth) / Category A (bespoke yolo arm).
    Outcome: zero yolo checks outside the composed ruleset; `processSingleForwardedRequest` < 60 lines; one `permissions:ui_prompt` emit site (`LocalUserAuthorizer`); behavior change (ships as `feat:`): parent `allow`/`deny` rules now govern children's escalations.
    Invariant (pinned by test): the forwarded `permissions:ui_prompt` broadcast stays non-degraded — original `source` and `surface`/`value` projection preserved, `forwarding` context populated — per the [#292] contract hardening documented in `docs/cross-extension-api.md`; rerouting the prompt through the `Authorizer` must not regress it.
+   Landed: `ForwardedRequestServer` resolves each request on the injected `ServingPolicy` (recorded authority) and escalates `ask`/field-less requests through the `AskEscalator` seam; `LocalUserAuthorizer` became the single `permissions:ui_prompt` emit site rendering forwarded provenance from `PromptPermissionDetails` (the `buildDirectUiPrompt`/`buildForwardedUiPrompt` split folded into `buildUiPrompt`); the bespoke yolo check + `ConfigReader` dep are gone and the one-hop canary warns on a multi-hop/misrouted requester.
+   Design recorded in `docs/decisions/0005-serving-authorizer-provenance.md`; post-ship validation in [#565].
    Impact 5 / Risk 3 / Priority 15.
    Release: independent
 
@@ -922,7 +924,7 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
 flowchart TD
     S1["✅ Step 1 (#555)<br/>Authorizer interface + selection"]
     S2["✅ Step 2 (#556)<br/>Dissolve canConfirm"]
-    S3["Step 3 (#557)<br/>Serving is resolution"]
+    S3["✅ Step 3 (#557)<br/>Serving is resolution"]
     S4["Step 4 (#558)<br/>Grant-scope selection"]
     S5["Step 5 (#559)<br/>Complete authority/ migration"]
 
@@ -1074,4 +1076,5 @@ Eight steps ([#525]–[#532]), all closed.
 [#557]: https://github.com/gotgenes/pi-packages/issues/557
 [#558]: https://github.com/gotgenes/pi-packages/issues/558
 [#559]: https://github.com/gotgenes/pi-packages/issues/559
+[#565]: https://github.com/gotgenes/pi-packages/issues/565
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
