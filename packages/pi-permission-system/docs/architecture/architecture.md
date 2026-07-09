@@ -635,6 +635,8 @@ These were the open decisions; they are now settled.
 1. **Serving is resolution.**
    Serving an escalation from below is identical to resolving an action locally: the serving node runs `evaluate()` against its recorded authority, then escalates to its own `Authorizer` on `ask`.
    `requestApproval` already encodes the three-way `Authorizer` selection; `processInbox` is refactored onto the same pipeline, so the `hasUI` guards and the bespoke serve-time yolo check (`shouldAutoApprovePermissionState`) dissolve into `evaluate()` + selection rather than being separate logic.
+   Identical in policy, not anonymous in presentation: a forwarded ask carries its provenance (requester agent/session, original `source`/`surface`/`value`) as part of the question — data on the escalated ask's details, not a separate emission path — so the `permissions:ui_prompt` broadcast observers receive stays non-degraded (`forwarding` populated, the [#292] contract hardening).
+   Provenance-as-data is the live-authority echo of the principal identity the [access-intent direction](#remaining-design-work) requires, and it rides a future multi-hop escalation chain with no per-hop special-casing.
 2. **Multi-level escalation: admitted, not shipped.**
    The model is recursive — a middle node's `Authorizer` is its own `ParentAuthorizer`, so an unanswerable `ask` re-escalates up with no special-casing.
    In practice the tree is depth-2: pi-subagents' recursion guard removes the subagent tool from children, so there are no grandchildren to escalate.
@@ -891,15 +893,16 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
 
 3. **Serving is resolution: rebuild `processInbox` on `evaluate()` + the serving session's `Authorizer`.**
    ([#557]) Cause: the serving node answers escalations without consulting its own recorded authority ([resolved direction](#resolved-direction) 1), so parent policy cannot govern a child's escalation and yolo needs the bespoke serve-time check.
-   Target: `src/authority/forwarded-request-server.ts` — inject a resolver view + the session's selected `Authorizer`; a request carrying `(surface, value)` resolves against the serving node's composed ruleset (`allow`, including yolo-rewritten, auto-approves — yolo inheritance for free; `deny` auto-denies; `ask` or missing fields escalates to the serving `Authorizer`); remove `isYoloModeEnabled` + the `ConfigReader` dep; add the one-hop canary (loud warning when a request arrives from a requester that is itself a registered non-root subagent).
+   Target: `src/authority/forwarded-request-server.ts` — inject a policy view + the `AskEscalator` seam; a request carrying `(surface, value)` resolves against the serving node's composed base ruleset (`agentName` undefined — the child applied its own per-agent overrides before forwarding; `allow`, including yolo-rewritten, auto-approves — yolo inheritance for free; `deny` auto-denies; `ask` or missing fields escalates through the seam); the escalated ask carries its forwarded provenance (requester agent/session, original `source`/`surface`/`value`) as data on `PromptPermissionDetails`, so `LocalUserAuthorizer` emits the non-degraded forwarded `permissions:ui_prompt` broadcast and the server sheds its bespoke emit + dialog path; remove `isYoloModeEnabled` + the `ConfigReader` dep; add the one-hop canary (loud warning when a request arrives from a requester whose registered parent is not the serving session).
    Smell: Category C (duplicate policy enforcement; single source of truth) / Category A (bespoke yolo arm).
-   Outcome: zero yolo checks outside the composed ruleset; `processSingleForwardedRequest` < 60 lines; behavior change (ships as `feat:`): parent `allow`/`deny` rules now govern children's escalations.
+   Outcome: zero yolo checks outside the composed ruleset; `processSingleForwardedRequest` < 60 lines; one `permissions:ui_prompt` emit site (`LocalUserAuthorizer`); behavior change (ships as `feat:`): parent `allow`/`deny` rules now govern children's escalations.
+   Invariant (pinned by test): the forwarded `permissions:ui_prompt` broadcast stays non-degraded — original `source` and `surface`/`value` projection preserved, `forwarding` context populated — per the [#292] contract hardening documented in `docs/cross-extension-api.md`; rerouting the prompt through the `Authorizer` must not regress it.
    Impact 5 / Risk 3 / Priority 15.
    Release: independent
 
 4. **Grant-scope selection on forwarded approvals.**
    ([#558]) Cause: [resolved direction](#resolved-direction) 4 — a forwarded "for this session" grant can today land only on the requesting subagent; the human cannot choose the serving scope.
-   Target: `src/permission-forwarding.ts` (request carries the child's suggested session pattern), `src/authority/approval-escalator.ts` (rides the existing `sessionApproval` suggestion along), `src/authority/forwarded-request-server.ts` + `src/permission-dialog.ts` (scope-aware dialog options — requesting subagent pre-selected as the least-privilege default); a whole-session grant records into the serving node's own `SessionRules`.
+   Target: `src/permission-forwarding.ts` (request carries the child's suggested session pattern), `src/authority/approval-escalator.ts` (rides the existing `sessionApproval` suggestion along), `src/authority/forwarded-request-server.ts` (threads the scope choice into the escalated ask's details — after Step 3 the forwarded dialog is shown by `LocalUserAuthorizer` via the threaded provenance, not server-local prompting), `src/authority/local-user-authorizer.ts` + `src/permission-dialog.ts` (scope-aware dialog options — requesting subagent pre-selected as the least-privilege default); a whole-session grant records into the serving node's own `SessionRules`.
    Smell: completes the Category C authority model (feature riding the spine).
    Outcome: the forwarded dialog offers "this subagent only" (default) vs "whole session"; a whole-session grant suppresses future prompts for the parent and all children (verified by a composition-root round-trip test).
    Impact 3 / Risk 3 / Priority 9.
@@ -1065,6 +1068,7 @@ Eight steps ([#525]–[#532]), all closed.
 [#519]: https://github.com/gotgenes/pi-packages/issues/519
 [#520]: https://github.com/gotgenes/pi-packages/issues/520
 [#521]: https://github.com/gotgenes/pi-packages/issues/521
+[#292]: https://github.com/gotgenes/pi-packages/issues/292
 [#555]: https://github.com/gotgenes/pi-packages/issues/555
 [#556]: https://github.com/gotgenes/pi-packages/issues/556
 [#557]: https://github.com/gotgenes/pi-packages/issues/557
