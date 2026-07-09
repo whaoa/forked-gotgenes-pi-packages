@@ -260,6 +260,10 @@ Tests that must stay (exercise preserved layers):
 - **[#555] `LocalUserAuthorizer` emits the event before the dialog; `Denying`/`ParentAuthorizer` never emit** — pinned by the existing authorizer suites; the rendering change keeps emit-then-dialog order.
 - **[#556] uniform escalation bracketing** (`waiting` before authorize, marker-driven `confirmation_unavailable`) — untouched code; forwarded asks now flow through it, extending rather than altering the invariant.
 - **[#398] responses-dir defensive recreation** — the `processInbox` drain loop structure is preserved; the existing test stays green.
+- **Escalation requires an activated selection** — `AskEscalator.escalate` rejects when no `Authorizer` has been selected (`selected === null`), and the server's `try`/`catch` maps a rejection to a *denied* response.
+  A poll that ran before `session.activate` would therefore silently deny an approvable forwarded request.
+  Satisfied today: `PermissionSession.activate(ctx)` calls `authorizerSelection.activate(ctx)`, and inbox polling only begins at `session_start` (via `session.activate`), so selection is always bound before the first drain.
+  Pinned by the server suite's escalation cases (which activate before polling) plus the existing `permission-session.test.ts` activate-order coverage — a reorder that broke it would fail those, not just surface at runtime.
 - **[#526]/[#527] yolo-as-ruleset** (deny-preserving rewrite, `origin: "yolo"`) — serving now *relies* on it: under yolo, a forwarded request matching an explicit `deny` is now denied where the old bespoke check approved it.
   This is the intended alignment with documented yolo semantics ("suppresses prompts but preserves hard denies"), called out in the `feat:` commit body.
 
@@ -294,6 +298,9 @@ Tests that must stay (exercise preserved layers):
   Deliberate ([#556]'s uniformity decision extended); recorded in the Design Overview and the ADR; no known consumer parses the review log programmatically.
 - **Double review-entry volume could obscure the serving lifecycle.**
   Accepted: the `forwarded_permission.*` entries keep the serving lifecycle greppable on their own; revisit only if real log reading proves noisy ([#565] check 3 will surface it).
+- **Inbox drain still serializes on the human response.**
+  Routing the `ask` through the `AskEscalator` seam does not change the drain's concurrency: an escalated forwarded request `await`s the human dialog inside the drain, exactly as the old direct `requestPermissionDecisionFromUi` call did, and `ForwardingManager`'s `processing` lock already forbids overlapping drains.
+  Not a new concurrency change — the UI surface and the one-dialog-at-a-time serialization are identical before and after; a reviewer should read the escalator swap as behavior-neutral here.
 
 ## Open Questions
 
