@@ -268,6 +268,33 @@ describe("GateRunner — descriptor path", () => {
     );
   });
 
+  it("forwards the descriptor's sessionApproval suggestion on escalate", async () => {
+    const { runner, deps } = makeGateRunner({
+      resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
+    });
+    const approval = SessionApproval.single("bash", "git *");
+    await runner.run(
+      makeDescriptor({ sessionApproval: approval }),
+      null,
+      "tc-1",
+    );
+    expect(deps.escalate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionApproval: { surface: "bash", patterns: ["git *"] },
+      }),
+    );
+  });
+
+  it("omits sessionApproval from escalate details when the descriptor has none", async () => {
+    const { runner, deps } = makeGateRunner({
+      resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),
+    });
+    await runner.run(makeDescriptor(), null, "tc-1");
+    expect(deps.escalate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ sessionApproval: expect.anything() }),
+    );
+  });
+
   it("does not call recordSessionApproval when user approves once (no sessionApproval)", async () => {
     const { runner, deps } = makeGateRunner({
       resolveResult: makeCheckResult({ state: "ask", matchedPattern: "*" }),

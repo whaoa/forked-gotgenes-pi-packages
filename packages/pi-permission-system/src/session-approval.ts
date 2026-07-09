@@ -1,3 +1,5 @@
+import type { ForwardedSessionApproval } from "./permission-forwarding";
+
 /**
  * Value object for a session-scoped approval: one surface, one-or-more patterns.
  *
@@ -39,5 +41,14 @@ export class SessionApproval {
     const pattern = this.representativePattern;
     if (pattern === undefined) return undefined;
     return { surface: this.surface, pattern };
+  }
+
+  /**
+   * Plain data shape for relaying this approval on a forwarded request, so the
+   * serving node can record the same pattern(s) as a whole-session grant.
+   * Returns a defensive copy of the patterns.
+   */
+  toForwardedData(): ForwardedSessionApproval {
+    return { surface: this.surface, patterns: [...this.patterns] };
   }
 }

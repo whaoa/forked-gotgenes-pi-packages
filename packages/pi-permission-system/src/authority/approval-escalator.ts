@@ -22,6 +22,7 @@ import type { PermissionPromptDecision } from "#src/permission-dialog";
 import {
   type ForwardedPermissionRequest,
   type ForwardedPromptDisplay,
+  type ForwardedSessionApproval,
   PERMISSION_FORWARDING_POLL_INTERVAL_MS,
   PERMISSION_FORWARDING_TIMEOUT_MS,
   type PermissionForwardingLocation,
@@ -98,11 +99,16 @@ export class ParentAuthorizer implements Authorizer {
     details: PromptPermissionDetails,
   ): Promise<PermissionPromptDecision> {
     const uiPrompt = buildUiPrompt(details);
-    return this.waitForForwardedApproval(this.ctx, details.message, {
-      source: uiPrompt.source,
-      surface: uiPrompt.surface,
-      value: uiPrompt.value,
-    });
+    return this.waitForForwardedApproval(
+      this.ctx,
+      details.message,
+      {
+        source: uiPrompt.source,
+        surface: uiPrompt.surface,
+        value: uiPrompt.value,
+      },
+      details.sessionApproval,
+    );
   }
 
   // ── Private methods ────────────────────────────────────────────────────
@@ -111,6 +117,7 @@ export class ParentAuthorizer implements Authorizer {
     ctx: ForwarderContext,
     message: string,
     forwarded?: ForwardedPromptDisplay,
+    sessionApproval?: ForwardedSessionApproval,
   ): Promise<PermissionPromptDecision> {
     const requesterSessionId = getSessionId(ctx);
     const targetSessionId = resolvePermissionForwardingTargetSessionId({
@@ -156,6 +163,7 @@ export class ParentAuthorizer implements Authorizer {
       requesterSessionId,
       targetSessionId,
       forwarded,
+      sessionApproval,
     );
     const requestPath = join(location.requestsDir, `${request.id}.json`);
     const responsePath = join(location.responsesDir, `${request.id}.json`);
@@ -194,6 +202,7 @@ export class ParentAuthorizer implements Authorizer {
     requesterSessionId: string,
     targetSessionId: string,
     forwarded?: ForwardedPromptDisplay,
+    sessionApproval?: ForwardedSessionApproval,
   ): ForwardedPermissionRequest {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${process.pid}`;
     const requesterAgentName =
@@ -214,6 +223,7 @@ export class ParentAuthorizer implements Authorizer {
             value: forwarded.value,
           }
         : {}),
+      ...(sessionApproval ? { sessionApproval } : {}),
     };
   }
 

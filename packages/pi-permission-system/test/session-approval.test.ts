@@ -72,4 +72,32 @@ describe("SessionApproval", () => {
       expect(approval.toGateApproval()).toBeUndefined();
     });
   });
+
+  describe("toForwardedData", () => {
+    it("returns surface and all patterns for a single approval", () => {
+      const approval = SessionApproval.single("bash", "git *");
+      expect(approval.toForwardedData()).toEqual({
+        surface: "bash",
+        patterns: ["git *"],
+      });
+    });
+
+    it("returns surface and all patterns for a multiple approval", () => {
+      const approval = SessionApproval.multiple("external_directory", [
+        "/outside/a/*",
+        "/outside/b/*",
+      ]);
+      expect(approval.toForwardedData()).toEqual({
+        surface: "external_directory",
+        patterns: ["/outside/a/*", "/outside/b/*"],
+      });
+    });
+
+    it("defensive copy — mutating the result patterns does not affect the approval", () => {
+      const approval = SessionApproval.single("bash", "git *");
+      const data = approval.toForwardedData();
+      (data.patterns as string[]).push("rm *");
+      expect(approval.patterns).toEqual(["git *"]);
+    });
+  });
 });

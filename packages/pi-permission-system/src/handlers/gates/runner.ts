@@ -147,6 +147,9 @@ export class GateRunner {
         const decision = await this.prompter.escalate({
           requestId: toolCallId,
           ...descriptor.promptDetails,
+          ...(descriptor.sessionApproval
+            ? { sessionApproval: descriptor.sessionApproval.toForwardedData() }
+            : {}),
         });
         autoApproved = decision.autoApproved === true;
         confirmationUnavailable = decision.confirmationUnavailable === true;

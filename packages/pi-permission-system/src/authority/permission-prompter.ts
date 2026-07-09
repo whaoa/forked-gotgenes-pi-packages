@@ -1,4 +1,5 @@
 import type { PermissionPromptDecision } from "#src/permission-dialog";
+import type { ForwardedSessionApproval } from "#src/permission-forwarding";
 import type { ReviewLogger } from "#src/session-logger";
 import type { Authorizer } from "./authorizer";
 
@@ -38,6 +39,13 @@ export interface PromptPermissionDetails {
   value?: string | null;
   /** Present iff this ask was forwarded from a subagent; drives the non-degraded broadcast + "(Subagent)" title. */
   forwarding?: ForwardedAskProvenance;
+  /**
+   * The session-approval suggestion for this ask. On the child's escalation it
+   * rides into the forwarded request; on the serving node it lets the dialog
+   * offer a whole-session grant scope. Absent when the gate computed no
+   * suggestion.
+   */
+  sessionApproval?: ForwardedSessionApproval;
 }
 
 /**

@@ -93,6 +93,93 @@ describe("ParentAuthorizer", () => {
     }
   });
 
+  test("persists the details' sessionApproval suggestion onto the forwarded request", async () => {
+    const temp = createForwardingTempDir("parent-session");
+    try {
+      const registry = makeSubagentRegistry("child-session", {
+        parentSessionId: "parent-session",
+      });
+      const authorizer = new ParentAuthorizer(
+        makeForwarderContext({ hasUI: false, sessionId: "child-session" }),
+        {
+          forwardingDir: temp.forwardingDir,
+          registry,
+          logger: { review: () => {}, debug: () => {} },
+        },
+      );
+
+      const decisionPromise = authorizer.authorize({
+        requestId: "unused-by-parent-authorizer",
+        source: "tool_call",
+        agentName: "Explore",
+        message: "Allow git push?",
+        toolName: "bash",
+        command: "git push",
+        sessionApproval: { surface: "bash", patterns: ["git *"] },
+      });
+
+      const request = await waitForRequestFile(temp.location.requestsDir);
+      expect(request.sessionApproval).toEqual({
+        surface: "bash",
+        patterns: ["git *"],
+      });
+
+      writeFileSync(
+        join(temp.location.responsesDir, `${request.id}.json`),
+        JSON.stringify({
+          approved: true,
+          state: "approved",
+          responderSessionId: "parent-session",
+        }),
+        "utf-8",
+      );
+      await decisionPromise;
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  test("omits sessionApproval from the request when the details carry none", async () => {
+    const temp = createForwardingTempDir("parent-session");
+    try {
+      const registry = makeSubagentRegistry("child-session", {
+        parentSessionId: "parent-session",
+      });
+      const authorizer = new ParentAuthorizer(
+        makeForwarderContext({ hasUI: false, sessionId: "child-session" }),
+        {
+          forwardingDir: temp.forwardingDir,
+          registry,
+          logger: { review: () => {}, debug: () => {} },
+        },
+      );
+
+      const decisionPromise = authorizer.authorize({
+        requestId: "unused-by-parent-authorizer",
+        source: "tool_call",
+        agentName: "Explore",
+        message: "Allow read?",
+        toolName: "read",
+      });
+
+      const request = await waitForRequestFile(temp.location.requestsDir);
+      expect(request.sessionApproval).toBeUndefined();
+
+      writeFileSync(
+        join(temp.location.responsesDir, `${request.id}.json`),
+        JSON.stringify({
+          approved: true,
+          state: "approved",
+          responderSessionId: "parent-session",
+        }),
+        "utf-8",
+      );
+      await decisionPromise;
+    } finally {
+      temp.cleanup();
+    }
+  });
+
   test("returns denied when the response marks the request denied", async () => {
     const temp = createForwardingTempDir("parent-session");
     try {

@@ -53,6 +53,20 @@ export interface ForwardedPromptDisplay {
   value: string | null;
 }
 
+/**
+ * The child's session-approval suggestion, relayed to the serving node so a
+ * human who grants "the whole session" records the same pattern the child
+ * would have recorded locally.
+ *
+ * A plain data shape (not the `SessionApproval` value object) so it serializes
+ * onto the forwarded request; the serving node rebuilds a `SessionApproval`
+ * from it via `SessionApproval.multiple`.
+ */
+export interface ForwardedSessionApproval {
+  surface: string;
+  patterns: readonly string[];
+}
+
 export type ForwardedPermissionRequest = {
   id: string;
   createdAt: number;
@@ -69,6 +83,13 @@ export type ForwardedPermissionRequest = {
   source?: PermissionUiPromptSource;
   surface?: string | null;
   value?: string | null;
+  /**
+   * The child's session-approval suggestion. Present when the child computed a
+   * "for this session" pattern for the ask; lets the serving node record a
+   * whole-session grant. Optional for version-skew tolerance (an older child
+   * omits it, and the serving dialog then offers no scope choice).
+   */
+  sessionApproval?: ForwardedSessionApproval;
 };
 
 export type ForwardedPermissionResponse = {
