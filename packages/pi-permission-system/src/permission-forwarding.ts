@@ -44,7 +44,8 @@ const SESSION_FORWARDING_RESPONSES_DIRECTORY_NAME = "responses";
  * can emit a non-degraded `permissions:ui_prompt` event.
  *
  * Carried separately from the prompt message because the parent reconstructs
- * the original event through `buildForwardedUiPrompt`, not from the message text.
+ * the original event from the escalated ask's details (`buildUiPrompt`), not
+ * from the message text.
  */
 export interface ForwardedPromptDisplay {
   source: PermissionUiPromptSource;

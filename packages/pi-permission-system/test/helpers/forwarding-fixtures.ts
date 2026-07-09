@@ -20,8 +20,6 @@ import { vi } from "vitest";
 
 import type { ForwardedRequestServerDeps } from "#src/authority/forwarded-request-server";
 import type { ForwarderContext } from "#src/authority/forwarder-context";
-import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
-import type { PermissionPromptDecision } from "#src/permission-dialog";
 import {
   createPermissionForwardingLocation,
   type ForwardedPermissionRequest,
@@ -31,6 +29,7 @@ import {
   type SubagentSessionInfo,
   SubagentSessionRegistry,
 } from "#src/subagent-registry";
+import { makeCheckResult } from "#test/helpers/handler-fixtures";
 
 /** Handle over a temp forwarding directory; register `cleanup` in `afterEach`. */
 export interface ForwardingTempDir {
@@ -91,9 +90,12 @@ export function createForwardingTempDir(
 }
 
 /**
- * Builds `ForwardedRequestServerDeps` with an approving UI and yolo disabled.
- * Pass `config: { current: () => ({ ...DEFAULT_EXTENSION_CONFIG, yoloMode: true }) }`
- * to exercise the auto-approve arm.
+ * Builds `ForwardedRequestServerDeps` with a policy that defers to escalation
+ * (`ask`) and an approving escalator.
+ *
+ * Override `policy` / `escalator` with captured `vi.fn()` mocks to assert the
+ * resolve-then-escalate flow (e.g. `policy: { check }` returning
+ * `makeCheckResult({ state: "allow" })`, `escalator: { escalate }`).
  */
 export function makeServerDeps(
   overrides: Partial<ForwardedRequestServerDeps> = {},
@@ -101,10 +103,12 @@ export function makeServerDeps(
   return {
     forwardingDir: "/tmp/forwarding",
     logger: { review: vi.fn(), debug: vi.fn() },
-    requestPermissionDecisionFromUi: vi
-      .fn()
-      .mockResolvedValue(makeUiDecision()),
-    config: { current: () => ({ ...DEFAULT_EXTENSION_CONFIG }) },
+    policy: { check: vi.fn(() => makeCheckResult({ state: "ask" })) },
+    escalator: {
+      escalate: vi
+        .fn()
+        .mockResolvedValue({ approved: true, state: "approved" }),
+    },
     ...overrides,
   };
 }
@@ -133,13 +137,6 @@ export function makeForwarderContext(
       ...overrides.sessionManager,
     },
   };
-}
-
-/** Builds the UI decision `requestPermissionDecisionFromUi` resolves. */
-export function makeUiDecision(
-  overrides: Partial<PermissionPromptDecision> = {},
-): PermissionPromptDecision {
-  return { approved: true, state: "approved", ...overrides };
 }
 
 /**

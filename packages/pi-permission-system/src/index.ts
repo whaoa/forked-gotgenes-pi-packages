@@ -3,7 +3,7 @@ import { getAgentDir, getPackageDir } from "@earendil-works/pi-coding-agent";
 import { AuthorizerSelection } from "./authority/authorizer-selection";
 import {
   ForwardedRequestServer,
-  type ForwardedRequestServerDeps,
+  type ServingPolicy,
 } from "./authority/forwarded-request-server";
 import { PermissionPrompter } from "./authority/permission-prompter";
 import { SubagentDetection } from "./authority/subagent-detection";
@@ -25,6 +25,7 @@ import { GateRunner } from "./handlers/gates/runner";
 import { SkillInputGatePipeline } from "./handlers/gates/skill-input-gate-pipeline";
 import { ToolCallGatePipeline } from "./handlers/gates/tool-call-gate-pipeline";
 import { createFailClosedToolCall } from "./handlers/tool-call-boundary";
+import { buildAccessIntentForSurface } from "./input-normalizer";
 import { requestPermissionDecisionFromUi } from "./permission-dialog";
 import { PermissionManager } from "./permission-manager";
 import { PermissionResolver } from "./permission-resolver";
@@ -90,15 +91,6 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     logger,
   });
 
-  const requestServerDeps: ForwardedRequestServerDeps = {
-    forwardingDir: paths.forwardingDir,
-    logger,
-    events: pi.events,
-    requestPermissionDecisionFromUi,
-    config: configStore,
-  };
-  const requestServer = new ForwardedRequestServer(requestServerDeps);
-
   const prompter = new PermissionPrompter({ logger });
 
   const authorizerSelection = new AuthorizerSelection({
@@ -109,6 +101,38 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     registry: subagentRegistry,
     logger,
     prompter,
+  });
+
+  // Resolver composes the manager + session ruleset and owns the
+  // access-path → path-values unwrap. Constructed here (before `session`) so
+  // the forwarded-request server's ServingPolicy can resolve against it; the
+  // service and gates below share this one instance.
+  const resolver = new PermissionResolver(permissionManager, sessionRules);
+
+  // Serving a forwarded request is resolution: evaluate (surface, value)
+  // against the serving node's composed base ruleset (agentName undefined —
+  // the child already applied its own per-agent overrides before forwarding).
+  // The session.getPathNormalizer() read is deferred behind the closure: inbox
+  // polling starts at session_start, after `session` is assigned — the same
+  // deferred-binding precedent as the logger notify sink below.
+  const servingPolicy: ServingPolicy = {
+    check: (surface, value) =>
+      resolver.resolve(
+        buildAccessIntentForSurface(
+          surface,
+          value ?? undefined,
+          session.getPathNormalizer(),
+          undefined,
+        ),
+      ),
+  };
+
+  const requestServer = new ForwardedRequestServer({
+    forwardingDir: paths.forwardingDir,
+    logger,
+    policy: servingPolicy,
+    escalator: authorizerSelection,
+    registry: subagentRegistry,
   });
 
   session = new PermissionSession(
@@ -135,11 +159,6 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
         session.lastKnownActiveAgentName ?? undefined,
       ),
   });
-
-  // Resolver composes the manager + session ruleset and owns the
-  // access-path → path-values unwrap; the service routes its policy
-  // queries through it, so it is constructed before it.
-  const resolver = new PermissionResolver(permissionManager, sessionRules);
 
   const permissionsService = new LocalPermissionsService(
     resolver,

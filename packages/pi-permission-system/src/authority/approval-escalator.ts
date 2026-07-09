@@ -28,7 +28,7 @@ import {
   resolvePermissionForwardingTargetSessionId,
   SUBAGENT_PARENT_SESSION_ENV_CANDIDATES,
 } from "#src/permission-forwarding";
-import { buildDirectUiPrompt } from "#src/permission-ui-prompt";
+import { buildUiPrompt } from "#src/permission-ui-prompt";
 import type { DebugReviewLogger } from "#src/session-logger";
 import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
@@ -97,7 +97,7 @@ export class ParentAuthorizer implements Authorizer {
   authorize(
     details: PromptPermissionDetails,
   ): Promise<PermissionPromptDecision> {
-    const uiPrompt = buildDirectUiPrompt(details);
+    const uiPrompt = buildUiPrompt(details);
     return this.waitForForwardedApproval(this.ctx, details.message, {
       source: uiPrompt.source,
       surface: uiPrompt.surface,

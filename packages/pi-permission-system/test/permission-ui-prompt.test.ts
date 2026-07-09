@@ -1,36 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildDirectUiPrompt,
-  buildForwardedUiPrompt,
-  buildUiPrompt,
-} from "#src/permission-ui-prompt";
+import { buildUiPrompt } from "#src/permission-ui-prompt";
 
-describe("buildDirectUiPrompt", () => {
-  it("maps a tool_call prompt to the tool surface and command value", () => {
-    expect(
-      buildDirectUiPrompt({
-        requestId: "req-1",
-        source: "tool_call",
-        agentName: "Explore",
-        message: "Allow git push?",
-        toolName: "bash",
-        command: "git push",
-      }),
-    ).toEqual({
-      requestId: "req-1",
-      source: "tool_call",
-      surface: "bash",
-      value: "git push",
-      agentName: "Explore",
-      message: "Allow git push?",
-      forwarding: null,
-    });
-  });
-
+describe("buildUiPrompt", () => {
   it("normalizes a skill prompt to the skill surface and skill-name value", () => {
     expect(
-      buildDirectUiPrompt({
+      buildUiPrompt({
         requestId: "req-2",
         source: "skill_input",
         agentName: null,
@@ -50,7 +25,7 @@ describe("buildDirectUiPrompt", () => {
 
   it("derives value with command > path > target > skillName > toolName precedence", () => {
     expect(
-      buildDirectUiPrompt({
+      buildUiPrompt({
         requestId: "req-3",
         source: "tool_call",
         agentName: null,
@@ -61,9 +36,7 @@ describe("buildDirectUiPrompt", () => {
       }).value,
     ).toBe("/etc/hosts");
   });
-});
 
-describe("buildUiPrompt", () => {
   it("derives surface and value from direct fields and defaults forwarding to null", () => {
     expect(
       buildUiPrompt({
@@ -158,44 +131,20 @@ describe("buildUiPrompt", () => {
       },
     });
   });
-});
 
-describe("buildForwardedUiPrompt", () => {
-  it("populates forwarding context and carries the original source/surface/value", () => {
+  it("passes forwarding context with null requester identity through unchanged", () => {
     expect(
-      buildForwardedUiPrompt({
-        requestId: "req-fwd",
-        message: "Subagent 'Explore' requested permission.\n\nAllow git push?",
-        requesterAgentName: "Explore",
-        requesterSessionId: "child-session",
+      buildUiPrompt({
+        requestId: "req-fwd-null",
         source: "tool_call",
-        surface: "bash",
-        value: "git push",
-      }),
-    ).toEqual({
-      requestId: "req-fwd",
-      source: "tool_call",
-      surface: "bash",
-      value: "git push",
-      agentName: "Explore",
-      message: "Subagent 'Explore' requested permission.\n\nAllow git push?",
-      forwarding: {
-        requesterAgentName: "Explore",
-        requesterSessionId: "child-session",
-      },
-    });
-  });
-
-  it("falls back to source tool_call with null surface/value when the request omits them", () => {
-    expect(
-      buildForwardedUiPrompt({
-        requestId: "req-fwd-old",
+        agentName: null,
         message: "Allow?",
-        requesterAgentName: null,
-        requesterSessionId: null,
+        surface: null,
+        value: null,
+        forwarding: { requesterAgentName: null, requesterSessionId: null },
       }),
     ).toEqual({
-      requestId: "req-fwd-old",
+      requestId: "req-fwd-null",
       source: "tool_call",
       surface: null,
       value: null,

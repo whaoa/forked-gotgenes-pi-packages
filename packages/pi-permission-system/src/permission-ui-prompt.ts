@@ -1,9 +1,10 @@
 /**
  * Centralized construction for `permissions:ui_prompt` payloads.
  *
- * Every emit site builds its event through one of these functions, so the
- * public contract's shape — including the normalized `surface`/`value`
- * projection — lives in exactly one place and cannot drift by source.
+ * The single builder `buildUiPrompt` handles both direct and forwarded asks, so
+ * the public contract's shape — including the normalized `surface`/`value`
+ * projection and the `forwarding` context — lives in exactly one place and
+ * cannot drift by source.
  *
  * This module is a leaf: it owns narrow input types that each call site's
  * domain object satisfies structurally, so it imports nothing from the
@@ -13,7 +14,6 @@
 import type {
   ForwardedPromptContext,
   PermissionUiPromptEvent,
-  PermissionUiPromptSource,
 } from "./permission-events";
 
 /** Input for a direct (non-forwarded) tool or skill prompt. */
@@ -27,20 +27,6 @@ export interface DirectPromptInput {
   path?: string;
   command?: string;
   target?: string;
-}
-
-/** Input for a file-forwarded subagent prompt shown by the parent UI. */
-export interface ForwardedPromptInput {
-  requestId: string;
-  message: string;
-  requesterAgentName: string | null;
-  requesterSessionId: string | null;
-  /** Original prompt origin, when the forwarded request carries it. */
-  source?: PermissionUiPromptSource | null;
-  /** Original normalized surface, when the forwarded request carries it. */
-  surface?: string | null;
-  /** Original normalized value, when the forwarded request carries it. */
-  value?: string | null;
 }
 
 /**
@@ -99,41 +85,4 @@ function directValue(input: DirectPromptInput): string | null {
     input.toolName ??
     null
   );
-}
-
-/**
- * Build the UI prompt event for a direct tool/skill prompt.
- *
- * Thin wrapper over {@link buildUiPrompt}; folds into it once
- * `forwarded-request-server` stops importing the two-builder split (#557 step 2).
- */
-export function buildDirectUiPrompt(
-  input: DirectPromptInput,
-): PermissionUiPromptEvent {
-  return buildUiPrompt(input);
-}
-
-/**
- * Build the UI prompt event for a file-forwarded subagent prompt.
- *
- * `source` defaults to `"tool_call"` (the dominant forwarded origin) when the
- * persisted request predates carrying it — a parent on a newer version may read
- * a request written by an older child during an upgrade. The consumer still
- * receives the notify-now signal, message, and forwarding context.
- */
-export function buildForwardedUiPrompt(
-  input: ForwardedPromptInput,
-): PermissionUiPromptEvent {
-  return {
-    requestId: input.requestId,
-    source: input.source ?? "tool_call",
-    surface: input.surface ?? null,
-    value: input.value ?? null,
-    agentName: input.requesterAgentName,
-    message: input.message,
-    forwarding: {
-      requesterAgentName: input.requesterAgentName,
-      requesterSessionId: input.requesterSessionId,
-    },
-  };
 }

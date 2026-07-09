@@ -3,26 +3,17 @@ import {
   type ForwarderContext,
   getSessionId,
 } from "#src/authority/forwarder-context";
-import type { ConfigReader } from "#src/config-store";
-import { isYoloModeEnabled } from "#src/extension-config";
-import type {
-  PermissionDecisionUi,
-  PermissionPromptDecision,
-  RequestPermissionOptions,
-} from "#src/permission-dialog";
-import {
-  emitUiPromptEvent,
-  type PermissionEventBus,
-} from "#src/permission-events";
+import type { PermissionPromptDecision } from "#src/permission-dialog";
 import {
   type ForwardedPermissionRequest,
   type ForwardedPermissionResponse,
   isForwardedPermissionRequestForSession,
   type PermissionForwardingLocation,
 } from "#src/permission-forwarding";
-import { buildForwardedUiPrompt } from "#src/permission-ui-prompt";
 import type { DebugReviewLogger } from "#src/session-logger";
-
+import type { SubagentSessionRegistry } from "#src/subagent-registry";
+import type { PermissionCheckResult } from "#src/types";
+import type { AskEscalator } from "./authorizer-selection";
 import {
   cleanupPermissionForwardingLocationIfEmpty,
   ensureDirectoryExists,
@@ -34,6 +25,7 @@ import {
   safeDeleteFile,
   writeJsonFileAtomic,
 } from "./forwarding-io";
+import type { PromptPermissionDetails } from "./permission-prompter";
 
 /**
  * Narrow seam describing what `ForwardingManager` needs from the server: a
@@ -47,20 +39,30 @@ export interface InboxProcessor {
   processInbox(ctx: ForwarderContext): Promise<void>;
 }
 
+/**
+ * Recorded-authority view the serving node resolves a forwarded request
+ * against: answer one `(surface, value)` query on the serving session's
+ * composed base ruleset (agent-neutral — the child already applied its own
+ * per-agent overrides before forwarding).
+ *
+ * Narrow by design (ISP): the server needs one decision, not the whole
+ * resolver. The composition root satisfies it with an access-intent build plus
+ * `resolver.resolve`, the same primitives `LocalPermissionsService` composes.
+ */
+export interface ServingPolicy {
+  check(surface: string, value: string | null): PermissionCheckResult;
+}
+
 /** Constructor config for `ForwardedRequestServer`. */
 export interface ForwardedRequestServerDeps {
   forwardingDir: string;
   logger: DebugReviewLogger;
-  /** Event bus used for UI prompt broadcasts. */
-  events?: PermissionEventBus;
-  requestPermissionDecisionFromUi: (
-    ui: PermissionDecisionUi,
-    title: string,
-    message: string,
-    options?: RequestPermissionOptions,
-  ) => Promise<PermissionPromptDecision>;
-  /** Read current config for the retained forwarded-inbox yolo auto-approve check. */
-  config: ConfigReader;
+  /** Recorded-authority resolution for `(surface, value)` requests. */
+  policy: ServingPolicy;
+  /** Escalation seam to the serving session's selected `Authorizer` on `ask`. */
+  escalator: AskEscalator;
+  /** In-process subagent registry, read only by the one-hop canary. */
+  registry?: SubagentSessionRegistry;
 }
 
 // ── Module-private helpers ────────────────────────────────────────────────
@@ -78,39 +80,70 @@ function formatForwardedPermissionPrompt(
   ].join("\n");
 }
 
+/**
+ * A request is resolvable against the ruleset only when it carries a concrete
+ * `(surface, value)` display projection. A legacy/version-skew request without
+ * them floors to `ask` (escalate), never a silent grant.
+ */
+function hasDisplayFields(
+  request: ForwardedPermissionRequest,
+): request is ForwardedPermissionRequest & { surface: string; value: string } {
+  return (
+    typeof request.surface === "string" &&
+    request.surface.length > 0 &&
+    typeof request.value === "string" &&
+    request.value.length > 0
+  );
+}
+
+/**
+ * Map a forwarded request onto the escalated ask's details, carrying the
+ * forwarded provenance (requester agent/session + the child's original display
+ * projection) so `LocalUserAuthorizer` emits a non-degraded broadcast (#292).
+ */
+function buildForwardedAskDetails(
+  request: ForwardedPermissionRequest,
+): PromptPermissionDetails {
+  return {
+    requestId: request.id,
+    source: request.source ?? "tool_call",
+    agentName: request.requesterAgentName || null,
+    message: formatForwardedPermissionPrompt(request),
+    surface: request.surface ?? null,
+    value: request.value ?? null,
+    forwarding: {
+      requesterAgentName: request.requesterAgentName || null,
+      requesterSessionId: request.requesterSessionId || null,
+    },
+  };
+}
+
 // ── ForwardedRequestServer ────────────────────────────────────────────────
 
 /**
  * Owner of the serving-down role of the forwarded-permission behavior:
  * draining this session's forwarded-permission inbox and answering each
- * request (auto-approve under yolo, or prompt via the injected UI).
+ * request the same way the session resolves a local action — `evaluate()`
+ * against its recorded authority (`ServingPolicy`), then escalation to its
+ * selected `Authorizer` (`AskEscalator`) on `ask`.
  */
 export class ForwardedRequestServer implements InboxProcessor {
   private readonly forwardingDir: string;
-  private readonly events: PermissionEventBus | undefined;
   private readonly logger: DebugReviewLogger;
-  private readonly requestPermissionDecisionFromUi: (
-    ui: PermissionDecisionUi,
-    title: string,
-    message: string,
-    options?: RequestPermissionOptions,
-  ) => Promise<PermissionPromptDecision>;
-  private readonly config: ConfigReader;
+  private readonly policy: ServingPolicy;
+  private readonly escalator: AskEscalator;
+  private readonly registry: SubagentSessionRegistry | undefined;
 
   constructor(deps: ForwardedRequestServerDeps) {
     this.forwardingDir = deps.forwardingDir;
-    this.events = deps.events;
     this.logger = deps.logger;
-    this.requestPermissionDecisionFromUi = deps.requestPermissionDecisionFromUi;
-    this.config = deps.config;
+    this.policy = deps.policy;
+    this.escalator = deps.escalator;
+    this.registry = deps.registry;
   }
 
   /** Drain and respond to this session's forwarded-permission inbox. */
   async processInbox(ctx: ForwarderContext): Promise<void> {
-    if (!ctx.hasUI) {
-      return;
-    }
-
     const currentSessionId = getSessionId(ctx);
     const location = getExistingPermissionForwardingLocation(
       this.forwardingDir,
@@ -152,7 +185,6 @@ export class ForwardedRequestServer implements InboxProcessor {
       }
 
       await this.processSingleForwardedRequest(
-        ctx,
         request,
         location,
         requestPath,
@@ -166,7 +198,6 @@ export class ForwardedRequestServer implements InboxProcessor {
   // ── Private methods ────────────────────────────────────────────────────
 
   private async processSingleForwardedRequest(
-    ctx: ForwarderContext,
     request: ForwardedPermissionRequest,
     location: PermissionForwardingLocation,
     requestPath: string,
@@ -185,6 +216,8 @@ export class ForwardedRequestServer implements InboxProcessor {
       return;
     }
 
+    this.warnOnMultiHop(request, currentSessionId);
+
     const forwardedPermissionLogDetails = {
       requestId: request.id,
       source: location.label,
@@ -194,54 +227,10 @@ export class ForwardedRequestServer implements InboxProcessor {
       requestPath,
     };
 
-    let decision: PermissionPromptDecision = {
-      approved: false,
-      state: "denied",
-    };
-    // Last yolo check outside the composed ruleset: dissolves when
-    // processInbox is refactored onto evaluate() + Authorizer selection in
-    // the Phase 9 spine work.
-    if (isYoloModeEnabled(this.config.current())) {
-      this.logger.review(
-        "forwarded_permission.auto_approved",
-        forwardedPermissionLogDetails,
-      );
-      decision = { approved: true, state: "approved" };
-    } else {
-      this.logger.review(
-        "forwarded_permission.prompted",
-        forwardedPermissionLogDetails,
-      );
-      try {
-        const forwardedMessage = formatForwardedPermissionPrompt(request);
-        if (this.events) {
-          emitUiPromptEvent(
-            this.events,
-            buildForwardedUiPrompt({
-              requestId: request.id,
-              message: forwardedMessage,
-              requesterAgentName: request.requesterAgentName || null,
-              requesterSessionId: request.requesterSessionId || null,
-              source: request.source ?? null,
-              surface: request.surface ?? null,
-              value: request.value ?? null,
-            }),
-          );
-        }
-        decision = await this.requestPermissionDecisionFromUi(
-          ctx.ui,
-          "Permission Required (Subagent)",
-          forwardedMessage,
-        );
-      } catch (error) {
-        logPermissionForwardingError(
-          this.logger,
-          "Failed to show forwarded permission confirmation dialog",
-          error,
-        );
-        decision = { approved: false, state: "denied" };
-      }
-    }
+    const decision = await this.resolveDecision(
+      request,
+      forwardedPermissionLogDetails,
+    );
 
     const responsePath = join(location.responsesDir, `${request.id}.json`);
     this.logger.review(
@@ -281,5 +270,69 @@ export class ForwardedRequestServer implements InboxProcessor {
       requestPath,
       `${location.label} forwarded permission request`,
     );
+  }
+
+  /**
+   * Resolve the request the same way the session resolves a local action:
+   * recorded authority first (a request carrying `(surface, value)` resolves
+   * against the serving node's composed ruleset — `allow`, including
+   * yolo-rewritten, auto-approves; `deny` auto-denies), then escalate `ask`
+   * (or a request without display fields) to the selected `Authorizer`.
+   */
+  private async resolveDecision(
+    request: ForwardedPermissionRequest,
+    logDetails: Record<string, unknown>,
+  ): Promise<PermissionPromptDecision> {
+    const state = hasDisplayFields(request)
+      ? this.policy.check(request.surface, request.value).state
+      : "ask";
+
+    if (state === "allow") {
+      this.logger.review("forwarded_permission.auto_approved", logDetails);
+      return { approved: true, state: "approved" };
+    }
+    if (state === "deny") {
+      this.logger.review("forwarded_permission.auto_denied", logDetails);
+      return { approved: false, state: "denied" };
+    }
+
+    this.logger.review("forwarded_permission.prompted", logDetails);
+    try {
+      return await this.escalator.escalate(buildForwardedAskDetails(request));
+    } catch (error) {
+      logPermissionForwardingError(
+        this.logger,
+        `Failed to escalate forwarded permission request '${request.id}'`,
+        error,
+      );
+      return { approved: false, state: "denied" };
+    }
+  }
+
+  /**
+   * One-hop canary: forwarding is depth-1 (child → root). If the requester is
+   * itself a registered subagent whose parent is not this serving session, the
+   * request came through more than one hop (or was misrouted) — resolution is
+   * still well-defined, so keep serving, but warn loudly so a future
+   * recursion-guard break is visible rather than silent. Unregistered
+   * (external file-based) requesters have no recorded parent and are silent.
+   */
+  private warnOnMultiHop(
+    request: ForwardedPermissionRequest,
+    currentSessionId: string,
+  ): void {
+    const requesterInfo = this.registry?.get(request.requesterSessionId);
+    if (
+      requesterInfo?.parentSessionId &&
+      requesterInfo.parentSessionId !== currentSessionId
+    ) {
+      logPermissionForwardingWarning(
+        this.logger,
+        `Forwarded permission request '${request.id}' violates the one-hop ` +
+          `invariant: requester '${request.requesterSessionId}' is a registered ` +
+          `subagent whose parent '${requesterInfo.parentSessionId}' is not this ` +
+          `serving session '${currentSessionId}' (multi-hop or misrouted).`,
+      );
+    }
   }
 }
