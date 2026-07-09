@@ -11,12 +11,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { AuthorizerSelectionDeps as SelectionCtorDeps } from "#src/authority/authorizer";
 import { AuthorizerSelection } from "#src/authority/authorizer-selection";
 import { LocalUserAuthorizer } from "#src/authority/local-user-authorizer";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 import type {
   PermissionPrompterApi,
   PromptPermissionDetails,
 } from "#src/authority/permission-prompter";
 import type { SubagentDetector } from "#src/authority/subagent-detection";
-import type { PermissionPromptDecision } from "#src/permission-dialog";
 
 // ── Test helpers ──────────────────────────────────────────────────────────
 

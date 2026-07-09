@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { ParentAuthorizer } from "#src/authority/approval-escalator";
-import type { ForwardedPermissionRequest } from "#src/permission-forwarding";
+import type { ForwardedPermissionRequest } from "#src/authority/permission-forwarding";
 import {
   createForwardingTempDir,
   makeForwarderContext,

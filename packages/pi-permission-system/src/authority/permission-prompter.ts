@@ -1,5 +1,5 @@
-import type { PermissionPromptDecision } from "#src/permission-dialog";
-import type { ForwardedSessionApproval } from "#src/permission-forwarding";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
+import type { ForwardedSessionApproval } from "#src/authority/permission-forwarding";
 import type { ReviewLogger } from "#src/session-logger";
 import type { Authorizer } from "./authorizer";
 

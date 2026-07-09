@@ -4,8 +4,8 @@ import {
   SUBAGENT_CHILD_DISPOSED,
   SUBAGENT_CHILD_SESSION_CREATED,
   subscribeSubagentLifecycle,
-} from "#src/subagent-lifecycle-events";
-import { SubagentSessionRegistry } from "#src/subagent-registry";
+} from "#src/authority/subagent-lifecycle-events";
+import { SubagentSessionRegistry } from "#src/authority/subagent-registry";
 
 describe("subscribeSubagentLifecycle", () => {
   let registry: SubagentSessionRegistry;

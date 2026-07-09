@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { LocalUserAuthorizer } from "#src/authority/local-user-authorizer";
-import type { PromptPermissionDetails } from "#src/authority/permission-prompter";
 import type {
   PermissionPromptDecision,
   requestPermissionDecisionFromUi,
-} from "#src/permission-dialog";
+} from "#src/authority/permission-dialog";
+import type { PromptPermissionDetails } from "#src/authority/permission-prompter";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

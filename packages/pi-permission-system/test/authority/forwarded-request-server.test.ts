@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ForwardedRequestServer } from "#src/authority/forwarded-request-server";
-import type { ForwardedPermissionResponse } from "#src/permission-forwarding";
+import type { ForwardedPermissionResponse } from "#src/authority/permission-forwarding";
 import {
   createForwardingTempDir,
   type ForwardingTempDir,

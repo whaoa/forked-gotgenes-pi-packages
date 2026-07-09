@@ -24,11 +24,11 @@ import {
   createPermissionForwardingLocation,
   type ForwardedPermissionRequest,
   type PermissionForwardingLocation,
-} from "#src/permission-forwarding";
+} from "#src/authority/permission-forwarding";
 import {
   type SubagentSessionInfo,
   SubagentSessionRegistry,
-} from "#src/subagent-registry";
+} from "#src/authority/subagent-registry";
 import { makeCheckResult } from "#test/helpers/handler-fixtures";
 
 /** Handle over a temp forwarding directory; register `cleanup` in `afterEach`. */

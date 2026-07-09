@@ -1,4 +1,4 @@
-import type { PermissionPromptDecision } from "./permission-dialog";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 
 /** Result of applying the permission gate. */
 export type PermissionGateResult =

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import type { SubagentDetectionContext } from "#src/authority/subagent-context";
 import { SubagentDetection } from "#src/authority/subagent-detection";
-import { SubagentSessionRegistry } from "#src/subagent-registry";
+import { SubagentSessionRegistry } from "#src/authority/subagent-registry";
 
 afterEach(() => {
   vi.unstubAllEnvs();

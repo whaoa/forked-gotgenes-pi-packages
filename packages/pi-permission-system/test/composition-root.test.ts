@@ -27,18 +27,17 @@ import {
   type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
+import {
+  createPermissionForwardingLocation,
+  type ForwardedPermissionRequest,
+} from "#src/authority/permission-forwarding";
+import { SUBAGENT_CHILD_SESSION_CREATED } from "#src/authority/subagent-lifecycle-events";
+import { getSubagentSessionRegistry } from "#src/authority/subagent-registry";
 import { getGlobalConfigPath } from "#src/config-paths";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import piPermissionSystemExtension from "#src/index";
 import { PERMISSIONS_READY_CHANNEL } from "#src/permission-events";
-import {
-  createPermissionForwardingLocation,
-  type ForwardedPermissionRequest,
-} from "#src/permission-forwarding";
 import { getPermissionsService } from "#src/service";
-import { SUBAGENT_CHILD_SESSION_CREATED } from "#src/subagent-lifecycle-events";
-import { getSubagentSessionRegistry } from "#src/subagent-registry";
 import { makeFakePi } from "#test/helpers/make-fake-pi";
 
 const SERVICE_KEY = Symbol.for("@gotgenes/pi-permission-system:service");

@@ -1,4 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ForwardingController } from "#src/authority/forwarding-manager";
 import {
   getActiveAgentName,
   getActiveAgentNameFromSystemPrompt,
@@ -7,7 +8,6 @@ import type { AuthorizerSelectionLifecycle } from "./authority/authorizer-select
 import type { SessionConfigStore } from "./config-store";
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ExtensionPaths } from "./extension-paths";
-import type { ForwardingController } from "./forwarding-manager";
 import type { ToolCallGateInputs } from "./handlers/gates/tool-call-gate-pipeline";
 import { PathNormalizer } from "./path-normalizer";
 import type { ScopedPermissionManager } from "./permission-manager";

@@ -3,7 +3,7 @@ import {
   getSubagentSessionRegistry,
   type SubagentSessionInfo,
   SubagentSessionRegistry,
-} from "#src/subagent-registry";
+} from "#src/authority/subagent-registry";
 
 const REGISTRY_KEY = Symbol.for(
   "@gotgenes/pi-permission-system:subagent-registry",

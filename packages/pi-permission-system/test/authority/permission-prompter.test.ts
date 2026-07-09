@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Authorizer } from "#src/authority/authorizer";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 import {
   PermissionPrompter,
   type PermissionPrompterDeps,
   type PromptPermissionDetails,
 } from "#src/authority/permission-prompter";
-import type { PermissionPromptDecision } from "#src/permission-dialog";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

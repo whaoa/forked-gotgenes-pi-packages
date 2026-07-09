@@ -1,4 +1,4 @@
-import type { PermissionPromptDecision } from "#src/permission-dialog";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 import type { Authorizer } from "./authorizer";
 
 /**

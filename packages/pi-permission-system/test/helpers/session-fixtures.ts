@@ -15,10 +15,10 @@ import { vi } from "vitest";
 
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import type { AuthorizerSelectionLifecycle } from "#src/authority/authorizer-selection";
+import type { ForwardingController } from "#src/authority/forwarding-manager";
 import type { SessionConfigStore } from "#src/config-store";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import type { ExtensionPaths } from "#src/extension-paths";
-import type { ForwardingController } from "#src/forwarding-manager";
 import type { ScopedPermissionManager } from "#src/permission-manager";
 import { PermissionResolver } from "#src/permission-resolver";
 import { PermissionSession } from "#src/permission-session";

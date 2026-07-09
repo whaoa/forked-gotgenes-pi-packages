@@ -734,7 +734,6 @@ src/
 ├── scope-merge.ts            Cross-scope permission merge + origin-map bookkeeping
 ├── permission-manager.ts     Scope loading + rule composition + `check(intent)` (single resolution entry point, #478); delegates I/O to PolicyLoader; `getPromotablePathTokenMatcher(agentName?)` builds a `PathRuleTokenMatcher` predicate from the composed config's specific (non-`*`) `path`-surface deny/ask rules, folding Windows case/separators via `rule.ts`'s `pathMatchOptions` — feeds bash bare-filename promotion (#509)
 ├── permission-gate.ts        Pure deny/ask/allow gate (injected IO)
-├── permission-dialog.ts      Dialog options (once / session / deny)
 ├── permission-resolver.ts    `ScopedPermissionResolver` interface - the single `{ resolve(intent) }` role the gate factories / runner / pipeline depend on (#478); `PermissionResolver` concrete class - holds `ScopedPermissionManager` + `SessionRules`, owns `resolve(intent)` (unwraps an `access-path` `AccessIntent` via `matchValues()` before calling `manager.check`) / raw `checkPermission` (implements `SkillPermissionChecker`, no session rules) / `getToolPermission` / `getConfigIssues`; extracted from `PermissionSession` (#340); the query methods (`getToolPermission` / `getConfigIssues`) are now consumed by `AgentPrepHandler` / `SessionLifecycleHandler` (#341)
 ├── decision-reporter.ts      `DecisionReporter` interface + `GateDecisionReporter` class - owns `SessionLogger` and event bus; writes review-log entries and emits decision events (#322)
 ├── decision-audit.ts         `DecisionRecorder` / `DecisionSummaryWriter` / `AuditLogger` interfaces + `DecisionAudit` class - per-session decision counters (`recordDecision` / `recordError`); `writeSummary` emits a `permission.session_summary` debug line on shutdown and warns on a `toolCalls != allowed + blocked + errors` invariant violation (#452)
@@ -818,22 +817,23 @@ src/
 ├── builtin-tool-input-formatters.ts   Built-in formatters registered at startup: formatMcpInputForPrompt keyed to "mcp" (#283)
 ├── tool-registry.ts           ToolRegistry interface + tool name validation
 ├── active-agent.ts            Agent name detection from session/system prompt
-├── authority/                 Subagent detection, the Authorizer spine, and forwarded-permission escalation (seeded #529; forwarding subsystem relocated here #530; Authorizer spine landed #555)
+├── authority/                 Subagent detection, the Authorizer spine, and forwarded-permission escalation (seeded #529; forwarding subsystem relocated here #530; Authorizer spine landed #555; migration completed #559)
 │   ├── authorizer.ts          `Authorizer` interface (`authorize(details): Promise<PermissionPromptDecision>`) + `AuthorizerSelectionDeps` + `selectAuthorizer(ctx, deps)` - the once-per-activation hasUI/isSubagent/deny dispatch, replacing its re-derivation across the former `PromptingGateway`/`PermissionPrompter`/`ApprovalEscalator` (#555)
 │   ├── local-user-authorizer.ts `LocalUserAuthorizer` class - Authorizer for a session with UI and the single `permissions:ui_prompt` emit site: renders a forwarded ask's provenance (`details.forwarding`) as a non-degraded broadcast + `(Subagent)` title, then shows the dialog (#555, #557)
+│   ├── permission-dialog.ts   Dialog options (once / session / deny); relocated from `src/permission-dialog.ts` (#559)
 │   ├── denying-authorizer.ts  `DenyingAuthorizer` class - least-privilege Authorizer for a session with no reachable authority; denies with the `confirmationUnavailable` marker so the ask path derives the `confirmation_unavailable` resolution (#555, #556)
 │   ├── authorizer-selection.ts `AuthorizerSelection` class - context-owning `AskEscalator` implementation (`escalate(details)`); selects the `Authorizer` once per activation and delegates to it via `PermissionPrompter`; rewrite of `PromptingGateway`; `canConfirm()` dissolved (#555, #556)
 │   ├── permission-prompter.ts `PermissionPrompter` class (`PermissionPrompterApi`) - review-log bracketing (waiting → approved/denied) around `authorizer.authorize(details)`; `PromptPermissionDetails` type; relocated from `src/permission-prompter.ts`, drops per-call `ctx` threading (#555)
 │   ├── subagent-detection.ts  SubagentDetection class - single owner of subagent detection (SubagentDetector.isSubagent + RegisteredChildDetector.isRegisteredChild); delegates to subagent-context (#529)
 │   ├── subagent-context.ts    Pure subagent execution context detection (registry + env vars + filesystem)
+│   ├── subagent-registry.ts   SubagentSessionRegistry class + getSubagentSessionRegistry() process-global accessor - in-process subagent session tracking; relocated from `src/subagent-registry.ts` (#559)
+│   ├── subagent-lifecycle-events.ts subscribeSubagentLifecycle() - subscribes to @gotgenes/pi-subagents child lifecycle events; registers/unregisters child sessions in SubagentSessionRegistry (ADR 0002); relocated from `src/subagent-lifecycle-events.ts` (#559)
 │   ├── forwarder-context.ts   `ForwarderContext` read-interface + `getSessionId` - shared by the escalation and serving roles (#530)
+│   ├── permission-forwarding.ts Constants for cross-session forwarding (registry + env var resolution); relocated from `src/permission-forwarding.ts` (#559)
 │   ├── approval-escalator.ts  `ParentAuthorizer` class - Authorizer for a subagent session: escalates the ask up the tree via the request-write/poll machinery, `ctx` bound at construction; folded from the former `ApprovalEscalator`, which shed its `hasUI`/not-a-subagent dispatch arms (#315, #316, #317, #530, #555)
 │   ├── forwarded-request-server.ts `ForwardedRequestServer` class (`InboxProcessor`) - serving-down role: `processInbox()` drains forwarded requests and resolves each like a local action - `ServingPolicy` (recorded authority) then `AskEscalator` on `ask`; `ServingPolicy` seam + one-hop canary (#530, #557)
-│   └── forwarding-io.ts       Forwarding filesystem helpers - request/response read-write, location derivation, atomic JSON writes
-├── subagent-registry.ts       SubagentSessionRegistry class + getSubagentSessionRegistry() process-global accessor - in-process subagent session tracking
-├── subagent-lifecycle-events.ts subscribeSubagentLifecycle() - subscribes to @gotgenes/pi-subagents child lifecycle events; registers/unregisters child sessions in SubagentSessionRegistry (ADR 0002)
-├── permission-forwarding.ts   Constants for cross-session forwarding (registry + env var resolution)
-├── forwarding-manager.ts      `ForwardingController` interface + `ForwardingManager` class - drives the forwarded-permission inbox polling lifecycle; tells `ForwardedRequestServer.processInbox`
+│   ├── forwarding-io.ts       Forwarding filesystem helpers - request/response read-write, location derivation, atomic JSON writes
+│   └── forwarding-manager.ts  `ForwardingController` interface + `ForwardingManager` class - drives the forwarded-permission inbox polling lifecycle; tells `ForwardedRequestServer.processInbox`; relocated from `src/forwarding-manager.ts` (#559)
 ├── session-logger.ts          `SessionLogger` interface + `PermissionSessionLogger` class; owns JSONL-writer composition, IO-failure warning dedup, and notify sink (#336, [#362])
 ├── logging.ts                 JSONL review/debug log writer
 ├── status.ts                  Footer status bar integration
@@ -912,11 +912,12 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
    Impact 3 / Risk 3 / Priority 9.
    Release: independent
 
-5. **Complete the `authority/` migration.**
+5. ✅ **Complete the `authority/` migration.**
    ([#559]) Cause: Phase 8's forward-looking directory sketch names the elicitation and subagent modules as `authority/` residents; Steps 1–4 rewrite most of them into place, and this step moves the mechanical remainder so the domain is closed and files move once.
    Target: `src/permission-dialog.ts`, `src/permission-forwarding.ts`, `src/subagent-registry.ts`, `src/subagent-lifecycle-events.ts`, `src/forwarding-manager.ts` → `src/authority/`; imports rewritten via the `#src/` aliases.
    Smell: Category E (flat directory).
    Outcome: all escalation/forwarding/subagent modules live under `src/authority/`; flat `src/` root drops ~67 → ~62 modules; no behavior change.
+   Landed: all five modules relocated via `git mv`; parent-relative imports rewritten to `#src/authority/…` aliases (mechanically verified by `tsc` + eslint's `no-parent-relative-imports` rule); five test files moved into `test/authority/` to match the established layout; no logic changes.
    Impact 2 / Risk 1 / Priority 10.
    Release: independent
 
@@ -928,7 +929,7 @@ flowchart TD
     S2["✅ Step 2 (#556)<br/>Dissolve canConfirm"]
     S3["✅ Step 3 (#557)<br/>Serving is resolution"]
     S4["✅ Step 4 (#558)<br/>Grant-scope selection"]
-    S5["Step 5 (#559)<br/>Complete authority/ migration"]
+    S5["✅ Step 5 (#559)<br/>Complete authority/ migration"]
 
     S1 --> S2
     S1 --> S3

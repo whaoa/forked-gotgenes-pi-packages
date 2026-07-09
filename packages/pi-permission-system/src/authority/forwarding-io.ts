@@ -9,15 +9,15 @@ import {
   writeFileSync,
 } from "node:fs";
 
-import { isPermissionDecisionState } from "#src/permission-dialog";
-import type { PermissionUiPromptSource } from "#src/permission-events";
+import { isPermissionDecisionState } from "#src/authority/permission-dialog";
 import {
   createPermissionForwardingLocation,
   type ForwardedPermissionRequest,
   type ForwardedPermissionResponse,
   type ForwardedSessionApproval,
   type PermissionForwardingLocation,
-} from "#src/permission-forwarding";
+} from "#src/authority/permission-forwarding";
+import type { PermissionUiPromptSource } from "#src/permission-events";
 import type { DebugReviewLogger } from "#src/session-logger";
 
 /** Valid `permissions:ui_prompt` source values, for tolerant request reads. */

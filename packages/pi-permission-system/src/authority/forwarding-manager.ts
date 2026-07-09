@@ -1,7 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { InboxProcessor } from "./authority/forwarded-request-server";
-import type { SubagentDetector } from "./authority/subagent-detection";
+import type { InboxProcessor } from "./forwarded-request-server";
 import { PERMISSION_FORWARDING_POLL_INTERVAL_MS } from "./permission-forwarding";
+import type { SubagentDetector } from "./subagent-detection";
 
 /**
  * Narrow interface for the forwarding lifecycle used by `PermissionSession`.

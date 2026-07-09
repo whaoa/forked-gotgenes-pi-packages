@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PermissionPromptDecision } from "#src/permission-dialog";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 import {
   applyPermissionGate,
   type PermissionGateParams,

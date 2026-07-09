@@ -3,17 +3,17 @@ import {
   type ForwarderContext,
   getSessionId,
 } from "#src/authority/forwarder-context";
-import type { PermissionPromptDecision } from "#src/permission-dialog";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 import {
   type ForwardedPermissionRequest,
   type ForwardedPermissionResponse,
   isForwardedPermissionRequestForSession,
   type PermissionForwardingLocation,
-} from "#src/permission-forwarding";
+} from "#src/authority/permission-forwarding";
+import type { SubagentSessionRegistry } from "#src/authority/subagent-registry";
 import { SessionApproval } from "#src/session-approval";
 import type { SessionApprovalRecorder } from "#src/session-approval-recorder";
 import type { DebugReviewLogger } from "#src/session-logger";
-import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import type { PermissionCheckResult } from "#src/types";
 import type { AskEscalator } from "./authorizer-selection";
 import {

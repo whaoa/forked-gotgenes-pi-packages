@@ -2,10 +2,10 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type {
   PermissionPromptDecision,
   requestPermissionDecisionFromUi,
-} from "#src/permission-dialog";
+} from "#src/authority/permission-dialog";
+import type { SubagentSessionRegistry } from "#src/authority/subagent-registry";
 import type { PermissionEventBus } from "#src/permission-events";
 import type { DebugReviewLogger } from "#src/session-logger";
-import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { ParentAuthorizer } from "./approval-escalator";
 import { DenyingAuthorizer } from "./denying-authorizer";
 import { LocalUserAuthorizer } from "./local-user-authorizer";

@@ -1,7 +1,6 @@
 import { join } from "node:path";
-
+import type { PermissionUiPromptSource } from "#src/permission-events";
 import type { PermissionDecisionState } from "./permission-dialog";
-import type { PermissionUiPromptSource } from "./permission-events";
 import type { SubagentSessionRegistry } from "./subagent-registry";
 
 export const PERMISSION_FORWARDING_POLL_INTERVAL_MS = 250;

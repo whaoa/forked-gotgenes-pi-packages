@@ -5,7 +5,7 @@ import {
   normalizePermissionDenialReason,
   type PermissionDecisionUi,
   requestPermissionDecisionFromUi,
-} from "#src/permission-dialog";
+} from "#src/authority/permission-dialog";
 
 describe("isPermissionDecisionState", () => {
   it("accepts approved", () => {

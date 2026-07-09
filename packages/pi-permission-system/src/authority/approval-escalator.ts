@@ -18,7 +18,7 @@ import {
   sleep,
   writeJsonFileAtomic,
 } from "#src/authority/forwarding-io";
-import type { PermissionPromptDecision } from "#src/permission-dialog";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 import {
   type ForwardedPermissionRequest,
   type ForwardedPromptDisplay,
@@ -28,10 +28,10 @@ import {
   type PermissionForwardingLocation,
   resolvePermissionForwardingTargetSessionId,
   SUBAGENT_PARENT_SESSION_ENV_CANDIDATES,
-} from "#src/permission-forwarding";
+} from "#src/authority/permission-forwarding";
+import type { SubagentSessionRegistry } from "#src/authority/subagent-registry";
 import { buildUiPrompt } from "#src/permission-ui-prompt";
 import type { DebugReviewLogger } from "#src/session-logger";
-import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import { toRecord } from "#src/value-guards";
 import type { Authorizer } from "./authorizer";
 import type { PromptPermissionDetails } from "./permission-prompter";

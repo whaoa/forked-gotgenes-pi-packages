@@ -3,7 +3,7 @@ import {
   isSubagentExecutionContext,
   type SubagentDetectionContext,
 } from "#src/authority/subagent-context";
-import type { SubagentSessionRegistry } from "#src/subagent-registry";
+import type { SubagentSessionRegistry } from "#src/authority/subagent-registry";
 
 /**
  * Narrow seam for the ask-path consumers: "is the current session a subagent?"

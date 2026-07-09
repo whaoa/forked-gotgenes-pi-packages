@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { SUBAGENT_ENV_HINT_KEYS } from "#src/authority/permission-forwarding";
 import {
   isRegisteredSubagentChild,
   isSubagentExecutionContext,
   normalizeFilesystemPath,
   type SubagentDetectionContext,
 } from "#src/authority/subagent-context";
-import { SUBAGENT_ENV_HINT_KEYS } from "#src/permission-forwarding";
-import { SubagentSessionRegistry } from "#src/subagent-registry";
+import { SubagentSessionRegistry } from "#src/authority/subagent-registry";
 
 afterEach(() => {
   vi.unstubAllEnvs();

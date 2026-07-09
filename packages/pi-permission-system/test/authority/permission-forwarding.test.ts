@@ -7,7 +7,7 @@ import {
   resolvePermissionForwardingTargetSessionId,
   SUBAGENT_PARENT_SESSION_ENV_CANDIDATES,
   SUBAGENT_PARENT_SESSION_ENV_KEY,
-} from "#src/permission-forwarding";
+} from "#src/authority/permission-forwarding";
 import { makeSubagentRegistry } from "#test/helpers/forwarding-fixtures";
 
 afterEach(() => {

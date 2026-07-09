@@ -5,8 +5,12 @@ import {
   ForwardedRequestServer,
   type ServingPolicy,
 } from "./authority/forwarded-request-server";
+import { ForwardingManager } from "./authority/forwarding-manager";
+import { requestPermissionDecisionFromUi } from "./authority/permission-dialog";
 import { PermissionPrompter } from "./authority/permission-prompter";
 import { SubagentDetection } from "./authority/subagent-detection";
+import { subscribeSubagentLifecycle } from "./authority/subagent-lifecycle-events";
+import { getSubagentSessionRegistry } from "./authority/subagent-registry";
 import { registerBuiltinToolInputFormatters } from "./builtin-tool-input-formatters";
 import { registerPermissionSystemCommand } from "./config-modal";
 import { getGlobalConfigPath } from "./config-paths";
@@ -15,7 +19,6 @@ import { DecisionAudit } from "./decision-audit";
 import { GateDecisionReporter } from "./decision-reporter";
 import { isYoloModeEnabled } from "./extension-config";
 import { computeExtensionPaths } from "./extension-paths";
-import { ForwardingManager } from "./forwarding-manager";
 import {
   AgentPrepHandler,
   PermissionGateHandler,
@@ -26,7 +29,6 @@ import { SkillInputGatePipeline } from "./handlers/gates/skill-input-gate-pipeli
 import { ToolCallGatePipeline } from "./handlers/gates/tool-call-gate-pipeline";
 import { createFailClosedToolCall } from "./handlers/tool-call-boundary";
 import { buildAccessIntentForSurface } from "./input-normalizer";
-import { requestPermissionDecisionFromUi } from "./permission-dialog";
 import { PermissionManager } from "./permission-manager";
 import { PermissionResolver } from "./permission-resolver";
 import { PermissionSession } from "./permission-session";
@@ -34,8 +36,6 @@ import { LocalPermissionsService } from "./permissions-service";
 import { PermissionServiceLifecycle } from "./service-lifecycle";
 import { PermissionSessionLogger } from "./session-logger";
 import { SessionRules } from "./session-rules";
-import { subscribeSubagentLifecycle } from "./subagent-lifecycle-events";
-import { getSubagentSessionRegistry } from "./subagent-registry";
 import { ToolAccessExtractorRegistry } from "./tool-access-extractor-registry";
 import { ToolInputFormatterRegistry } from "./tool-input-formatter-registry";
 

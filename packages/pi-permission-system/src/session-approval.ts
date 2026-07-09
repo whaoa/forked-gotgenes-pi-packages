@@ -1,4 +1,4 @@
-import type { ForwardedSessionApproval } from "./permission-forwarding";
+import type { ForwardedSessionApproval } from "#src/authority/permission-forwarding";
 
 /**
  * Value object for a session-scoped approval: one surface, one-or-more patterns.

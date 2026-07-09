@@ -1,10 +1,10 @@
-import { buildForwardedScopeLabels } from "#src/pattern-suggest";
 import type {
   PermissionDecisionUi,
   PermissionPromptDecision,
   RequestPermissionOptions,
   requestPermissionDecisionFromUi,
-} from "#src/permission-dialog";
+} from "#src/authority/permission-dialog";
+import { buildForwardedScopeLabels } from "#src/pattern-suggest";
 import {
   emitUiPromptEvent,
   type PermissionEventBus,

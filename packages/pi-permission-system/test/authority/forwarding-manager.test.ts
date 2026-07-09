@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
+import { ForwardingManager } from "#src/authority/forwarding-manager";
 import type { SubagentDetector } from "#src/authority/subagent-detection";
-import { ForwardingManager } from "#src/forwarding-manager";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
 

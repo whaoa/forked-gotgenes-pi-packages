@@ -18,7 +18,7 @@ import {
   logPermissionForwardingWarning,
   tryRemoveDirectoryIfEmpty,
 } from "#src/authority/forwarding-io";
-import { createPermissionForwardingLocation } from "#src/permission-forwarding";
+import { createPermissionForwardingLocation } from "#src/authority/permission-forwarding";
 import type { DebugReviewLogger } from "#src/session-logger";
 
 // ── helpers ────────────────────────────────────────────────────────────────
