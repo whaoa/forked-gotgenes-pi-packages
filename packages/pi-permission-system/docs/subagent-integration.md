@@ -17,6 +17,7 @@ The integration enables:
 2. **Per-agent policy enforcement** - the permission system's `before_agent_start` handler resolves the agent name from the `<active_agent>` system-prompt tag and applies per-agent `permission:` frontmatter overrides.
 3. **`ask`-state forwarding** - when a child triggers an `ask` permission, the request forwards to the parent session's UI through the existing polling mechanism.
    The parent approves or denies, and the child resumes.
+   When the parent approves "for this session," it chooses a scope: **this subagent only** (the least-privilege default) records the grant on the requesting child, while **the whole session** records it on the serving parent so the parent and all its subagents resolve it without re-prompting.
 
 No configuration is required - the integration is automatic when both extensions are installed.
 When `@gotgenes/pi-permission-system` is not installed, `@gotgenes/pi-subagents` emits its lifecycle events with no subscriber - a harmless no-op.
@@ -25,6 +26,7 @@ When `@gotgenes/pi-permission-system` is not installed, `@gotgenes/pi-subagents`
 
 When a delegated or routed subagent runs without direct UI access, `ask` permissions can still be enforced by forwarding the confirmation request through Pi session directories.
 The main interactive session polls for forwarded requests, shows the confirmation prompt, writes the response, and the subagent resumes once that decision is available.
+A parent `allow`/`deny` rule governs a child's escalation directly (the serving node resolves it as recorded authority before prompting), and a "whole session" grant recorded on the parent auto-approves later forwards of the same pattern.
 
 This keeps `ask` policies usable even when the original permission check happens inside a non-UI execution context.
 

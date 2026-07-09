@@ -902,11 +902,13 @@ Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490]
    Impact 5 / Risk 3 / Priority 15.
    Release: independent
 
-4. **Grant-scope selection on forwarded approvals.**
+4. **✅ Grant-scope selection on forwarded approvals.**
    ([#558]) Cause: [resolved direction](#resolved-direction) 4 — a forwarded "for this session" grant can today land only on the requesting subagent; the human cannot choose the serving scope.
    Target: `src/permission-forwarding.ts` (request carries the child's suggested session pattern), `src/authority/approval-escalator.ts` (rides the existing `sessionApproval` suggestion along), `src/authority/forwarded-request-server.ts` (threads the scope choice into the escalated ask's details — after Step 3 the forwarded dialog is shown by `LocalUserAuthorizer` via the threaded provenance, not server-local prompting), `src/authority/local-user-authorizer.ts` + `src/permission-dialog.ts` (scope-aware dialog options — requesting subagent pre-selected as the least-privilege default); a whole-session grant records into the serving node's own `SessionRules`.
    Smell: completes the Category C authority model (feature riding the spine).
    Outcome: the forwarded dialog offers "this subagent only" (default) vs "whole session"; a whole-session grant suppresses future prompts for the parent and all children (verified by a composition-root round-trip test).
+   Landed: the child rides its `SessionApproval` on `PromptPermissionDetails.sessionApproval` → `ForwardedPermissionRequest.sessionApproval` (tolerant read); `LocalUserAuthorizer` offers a two-step scope select (`buildForwardedScopeLabels`) for a forwarded ask carrying a suggestion; a whole-session choice returns the serving-node-internal `approved_for_serving_session` state, which `ForwardedRequestServer.applyGrantScope` records into the serving `SessionRules` and translates to a plain `approved` (child records nothing, re-forwards, auto-approves).
+   Design recorded in `docs/decisions/0006-forwarded-grant-scope-selection.md`.
    Impact 3 / Risk 3 / Priority 9.
    Release: independent
 
@@ -925,7 +927,7 @@ flowchart TD
     S1["✅ Step 1 (#555)<br/>Authorizer interface + selection"]
     S2["✅ Step 2 (#556)<br/>Dissolve canConfirm"]
     S3["✅ Step 3 (#557)<br/>Serving is resolution"]
-    S4["Step 4 (#558)<br/>Grant-scope selection"]
+    S4["✅ Step 4 (#558)<br/>Grant-scope selection"]
     S5["Step 5 (#559)<br/>Complete authority/ migration"]
 
     S1 --> S2
