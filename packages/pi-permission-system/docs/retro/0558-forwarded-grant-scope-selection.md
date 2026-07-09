@@ -50,6 +50,54 @@ Final suite 2310 tests (+20); pre-completion reviewer returned PASS.
   Whole-session proves no second prompt + parent's own action session-approved; subagent-only proves scope containment (parent still prompts).
 - **Serving-node-only recording confirmed end-to-end:** the whole-session choice returns `approved_for_serving_session`, `applyGrantScope` records + translates to plain `approved`, and the round-trip test confirms the child records nothing and re-forwards.
 
+## Stage: Final Retrospective (2026-07-09T18:15:00Z)
+
+### Session summary
+
+Shipped Phase 9 Step 4 end-to-end in one continuous context: planned it (two `ask_user` design decisions), executed four TDD cycles from a green 2290-test baseline to 2310, passed the pre-completion reviewer on the first dispatch, then pushed, closed #558, and merged release-please PR #567 (`pi-permission-system` v20.3.0).
+The run was clean — no rework commits and no user-caught errors; the only friction was one under-listed plan touch point (surfaced and fixed in-cycle by a red test) and two self-corrected lint slips the pre-commit hook caught before they landed.
+
+### Observations
+
+#### What went well
+
+- **First-dispatch pre-completion PASS.**
+  Unlike #557 (which needed a FAIL→fix→re-dispatch on an unmet LOC target), the reviewer returned PASS on the first run — the plan carried the Step 3 `< 60 lines` invariant forward explicitly and the implementation held it (`applyGrantScope` factored as a separate method, `processSingleForwardedRequest` at 43 lines), so the reviewer verified rather than caught it.
+- **Real, non-hollow round-trip tests.**
+  The composition-root tests drive two real factory instances on separate event buses with real 250ms polling; the parent's serving poll runs the actual two-step `ui.select` dialog, records into the shared `SessionRules`, and the child re-forwards — proving the whole-session grant suppresses a second prompt and the subagent-only grant stays contained, not just that the units wire up.
+- **Clean release handling on an `UNSTABLE` PR.**
+  `release_pr_merge` refused with `UNSTABLE`; `statusCheckRollup` showed a genuine `IN_PROGRESS` CI check (not the empty-rollup `GITHUB_TOKEN` case), so the flow waited on the PR's own run via `ci_watch`, then retried and merged by rebase — the ship protocol's distinction held without a force-merge.
+
+#### What caused friction (agent side)
+
+- `missing-context` (plan stage) — the plan's Module-Level Changes omitted `src/authority/forwarding-io.ts`.
+  Its tolerant reader (`readForwardedPermissionRequest`) reconstructs only an allowlist of known fields, so the new `sessionApproval` was silently stripped on read.
+  Impact: added friction, no rework — the cycle-2 server red test (`records a whole-session grant`, recorder never called) surfaced it immediately, and an `asForwardedSessionApproval` helper (mirroring the file's existing `asX` parsers) fixed it in the same cycle/commit.
+  `tsc` could not have caught it (the field is optional), only the cross-consumer round-trip.
+- `other` (TDD stage) — two self-corrected lint slips, both `@typescript-eslint/no-unnecessary-condition`, caught by the pre-commit eslint hook before landing.
+  The first (`deps.escalate.mock.calls[0]?.[0]` then a truthiness guard) is the exact `fn.mock.calls[0]` anti-pattern the `testing` skill already names — a salience miss, not a missing rule; rewrote to `expect.not.objectContaining`.
+  The second (`pattern ?? "*"` on a `string`-typed element) rewrote to guard `patterns[0]` truthiness.
+  Impact: two blocked commit attempts, each fixed in one edit; no re-planning.
+
+#### What caused friction (user side)
+
+- None material.
+  The two planning `ask_user` decisions (serving-node-only recording; two-step dialog) were answered promptly and decisively, and both shaped the design cleanly — the two-step choice in particular kept the local-ask dialog byte-identical.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatch was the `pre-completion-reviewer` on `anthropic/claude-sonnet-5` (48 tool uses, ~206s): judgment-heavy verification (invariant cross-checks, LOC measurement, acceptance-criteria tracing) well-matched to the model.
+  No mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` points; both lint slips and the plan-touch-point miss resolved in a single corrective edit each, none exceeding one tool call.
+- **Unused-tool detection** — nothing missed; the work ran in one context with full prior knowledge, so `colgrep`/`Explore` were unnecessary, and the pre-commit hook + red tests caught the two slips that a pre-emptive tool could have.
+- **Feedback-loop gap analysis** — incremental verification was strong (`pnpm run check` after each shared-type change, per-file red/green vitest, full suite + root lint before commits).
+  The one small gap: cycles 1 and 2 attempted `git commit` before running `pnpm run lint`, relying on the pre-commit eslint hook to catch the slips — low impact (the hook is exactly that net), but running lint before the commit attempt would avoid the blocked-commit round-trip.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0558-forwarded-grant-scope-selection.md`.
+2. Added a tolerant-reader touch-point heuristic to `.pi/prompts/plan-issue.md` (Module-Level Changes section): a plan step that adds a field to a serialized contract whose reader reconstructs only an allowlist of known fields must list that reader, since the field is silently dropped on read and the gap surfaces only in a cross-consumer round-trip test, not `tsc` (Refs #558).
+
 [#292]: https://github.com/gotgenes/pi-packages/issues/292
 [#557]: https://github.com/gotgenes/pi-packages/issues/557
 [#565]: https://github.com/gotgenes/pi-packages/issues/565
