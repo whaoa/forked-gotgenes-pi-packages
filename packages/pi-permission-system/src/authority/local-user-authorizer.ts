@@ -1,6 +1,8 @@
+import { buildForwardedScopeLabels } from "#src/pattern-suggest";
 import type {
   PermissionDecisionUi,
   PermissionPromptDecision,
+  RequestPermissionOptions,
   requestPermissionDecisionFromUi,
 } from "#src/permission-dialog";
 import {
@@ -45,7 +47,30 @@ export class LocalUserAuthorizer implements Authorizer {
         ? "Permission Required (Subagent)"
         : "Permission Required",
       details.message,
-      details.sessionLabel ? { sessionLabel: details.sessionLabel } : undefined,
+      buildRequestOptions(details),
     );
   }
+}
+
+/**
+ * A forwarded ask carrying a session-approval suggestion offers the scope
+ * choice (subagent vs whole session); any other ask keeps its single
+ * "for this session" option (custom label when the gate supplied one).
+ */
+function buildRequestOptions(
+  details: PromptPermissionDetails,
+): RequestPermissionOptions | undefined {
+  const pattern = details.sessionApproval?.patterns[0];
+  if (details.forwarding && details.sessionApproval && pattern) {
+    return {
+      sessionScope: buildForwardedScopeLabels(
+        details.forwarding.requesterAgentName,
+        details.sessionApproval.surface,
+        pattern,
+      ),
+    };
+  }
+  return details.sessionLabel
+    ? { sessionLabel: details.sessionLabel }
+    : undefined;
 }

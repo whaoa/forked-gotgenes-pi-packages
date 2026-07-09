@@ -15,6 +15,7 @@ import {
   createPermissionForwardingLocation,
   type ForwardedPermissionRequest,
   type ForwardedPermissionResponse,
+  type ForwardedSessionApproval,
   type PermissionForwardingLocation,
 } from "#src/permission-forwarding";
 import type { DebugReviewLogger } from "#src/session-logger";
@@ -39,6 +40,31 @@ function asNullableDisplayString(value: unknown): string | null | undefined {
     return value;
   }
   return undefined;
+}
+
+/**
+ * Narrow an unknown value to a `ForwardedSessionApproval`, or `undefined`.
+ *
+ * Tolerant read: the child's session-approval suggestion is optional (absent
+ * on an older child) and only accepted when well-formed — a non-empty surface
+ * and an all-string patterns array.
+ */
+function asForwardedSessionApproval(
+  value: unknown,
+): ForwardedSessionApproval | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const candidate = value as Partial<ForwardedSessionApproval>;
+  if (
+    typeof candidate.surface !== "string" ||
+    candidate.surface.length === 0 ||
+    !Array.isArray(candidate.patterns) ||
+    !candidate.patterns.every((pattern) => typeof pattern === "string")
+  ) {
+    return undefined;
+  }
+  return { surface: candidate.surface, patterns: [...candidate.patterns] };
 }
 
 export function formatUnknownErrorMessage(error: unknown): string {
@@ -323,6 +349,7 @@ export function readForwardedPermissionRequest(
       source: asUiPromptSource(parsed.source),
       surface: asNullableDisplayString(parsed.surface),
       value: asNullableDisplayString(parsed.value),
+      sessionApproval: asForwardedSessionApproval(parsed.sessionApproval),
     };
   } catch (error) {
     logPermissionForwardingWarning(

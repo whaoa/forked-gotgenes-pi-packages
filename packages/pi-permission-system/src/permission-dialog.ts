@@ -1,6 +1,7 @@
 export type PermissionDecisionState =
   | "approved"
   | "approved_for_session"
+  | "approved_for_serving_session"
   | "denied"
   | "denied_with_reason";
 
@@ -67,6 +68,7 @@ export function isPermissionDecisionState(
   return (
     value === "approved" ||
     value === "approved_for_session" ||
+    value === "approved_for_serving_session" ||
     value === "denied" ||
     value === "denied_with_reason"
   );
@@ -75,6 +77,15 @@ export function isPermissionDecisionState(
 export interface RequestPermissionOptions {
   /** Override the "for this session" option label (e.g. to show the suggested pattern). */
   sessionLabel?: string;
+  /**
+   * Forwarded asks only: when set, choosing the "for this session" option opens
+   * a second select asking whether the grant applies to the requesting subagent
+   * only (the least-privilege default) or the whole serving session.
+   */
+  sessionScope?: {
+    subagentLabel: string;
+    servingSessionLabel: string;
+  };
 }
 
 export async function requestPermissionDecisionFromUi(
@@ -103,6 +114,21 @@ export async function requestPermissionDecisionFromUi(
   }
 
   if (selected === sessionOption) {
+    if (options?.sessionScope) {
+      const scope = await ui.select(`${title}\nApply this session grant to:`, [
+        options.sessionScope.subagentLabel,
+        options.sessionScope.servingSessionLabel,
+      ]);
+      return {
+        approved: true,
+        // A cancelled scope select (undefined) falls back to the
+        // least-privilege subagent scope.
+        state:
+          scope === options.sessionScope.servingSessionLabel
+            ? "approved_for_serving_session"
+            : "approved_for_session",
+      };
+    }
     return {
       approved: true,
       state: "approved_for_session",

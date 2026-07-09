@@ -109,6 +109,7 @@ export function makeServerDeps(
         .fn()
         .mockResolvedValue({ approved: true, state: "approved" }),
     },
+    recorder: { recordSessionApproval: vi.fn() },
     ...overrides,
   };
 }

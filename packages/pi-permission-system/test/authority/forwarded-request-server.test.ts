@@ -219,6 +219,119 @@ describe("processInbox — recorded-authority resolution", () => {
   });
 });
 
+describe("processInbox — grant-scope selection", () => {
+  test("records a whole-session grant into the serving recorder and translates the response to a plain approve", async () => {
+    temp = createForwardingTempDir("parent-session");
+    temp.writeRequest({
+      id: "req-whole",
+      source: "tool_call",
+      surface: "bash",
+      value: "git push",
+      sessionApproval: { surface: "bash", patterns: ["git *"] },
+    });
+
+    const check = vi.fn(() => makeCheckResult({ state: "ask" }));
+    const escalate = vi.fn().mockResolvedValue({
+      approved: true,
+      state: "approved_for_serving_session",
+    });
+    const recordSessionApproval = vi.fn();
+
+    const server = new ForwardedRequestServer(
+      makeServerDeps({
+        forwardingDir: temp.forwardingDir,
+        policy: { check },
+        escalator: { escalate },
+        recorder: { recordSessionApproval },
+      }),
+    );
+
+    await server.processInbox(
+      makeForwarderContext({ hasUI: true, sessionId: "parent-session" }),
+    );
+
+    expect(recordSessionApproval).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: "bash", patterns: ["git *"] }),
+    );
+    // Translated: the child receives a plain approve and records nothing.
+    expect(readResponse(temp, "req-whole")).toMatchObject({
+      approved: true,
+      state: "approved",
+    });
+  });
+
+  test("offers the request's sessionApproval to the escalated dialog details", async () => {
+    temp = createForwardingTempDir("parent-session");
+    temp.writeRequest({
+      id: "req-scope-details",
+      source: "tool_call",
+      surface: "bash",
+      value: "git push",
+      sessionApproval: { surface: "bash", patterns: ["git *"] },
+    });
+
+    const check = vi.fn(() => makeCheckResult({ state: "ask" }));
+    const escalate = vi
+      .fn()
+      .mockResolvedValue({ approved: true, state: "approved" });
+
+    const server = new ForwardedRequestServer(
+      makeServerDeps({
+        forwardingDir: temp.forwardingDir,
+        policy: { check },
+        escalator: { escalate },
+      }),
+    );
+
+    await server.processInbox(
+      makeForwarderContext({ hasUI: true, sessionId: "parent-session" }),
+    );
+
+    expect(escalate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionApproval: { surface: "bash", patterns: ["git *"] },
+      }),
+    );
+  });
+
+  test("passes a subagent-only grant through untouched without recording on the serving node", async () => {
+    temp = createForwardingTempDir("parent-session");
+    temp.writeRequest({
+      id: "req-subagent",
+      source: "tool_call",
+      surface: "bash",
+      value: "git push",
+      sessionApproval: { surface: "bash", patterns: ["git *"] },
+    });
+
+    const check = vi.fn(() => makeCheckResult({ state: "ask" }));
+    const escalate = vi
+      .fn()
+      .mockResolvedValue({ approved: true, state: "approved_for_session" });
+    const recordSessionApproval = vi.fn();
+
+    const server = new ForwardedRequestServer(
+      makeServerDeps({
+        forwardingDir: temp.forwardingDir,
+        policy: { check },
+        escalator: { escalate },
+        recorder: { recordSessionApproval },
+      }),
+    );
+
+    await server.processInbox(
+      makeForwarderContext({ hasUI: true, sessionId: "parent-session" }),
+    );
+
+    expect(recordSessionApproval).not.toHaveBeenCalled();
+    // Passed through: the child records its own pattern (today's behavior).
+    expect(readResponse(temp, "req-subagent")).toMatchObject({
+      approved: true,
+      state: "approved_for_session",
+    });
+  });
+});
+
 describe("processInbox — one-hop canary", () => {
   test("warns when the requester is a registered subagent whose parent is not this serving session", async () => {
     temp = createForwardingTempDir("parent-session");

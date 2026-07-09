@@ -201,6 +201,57 @@ describe("LocalUserAuthorizer", () => {
         undefined,
       );
     });
+
+    it("offers a sessionScope when the forwarded ask carries a suggestion", async () => {
+      const { deps, decisionFn } = makeDeps();
+      const authorizer = new LocalUserAuthorizer(deps);
+
+      await authorizer.authorize(
+        makeDetails({
+          toolName: "bash",
+          command: "git push",
+          forwarding: {
+            requesterAgentName: "Explore",
+            requesterSessionId: "child-session",
+          },
+          sessionApproval: { surface: "bash", patterns: ["git *"] },
+        }),
+      );
+
+      expect(decisionFn).toHaveBeenCalledWith(
+        expect.anything(),
+        "Permission Required (Subagent)",
+        expect.any(String),
+        {
+          sessionScope: {
+            subagentLabel: "This subagent ('Explore') only",
+            servingSessionLabel:
+              'The whole session — allow bash "git *" for parent and all subagents',
+          },
+        },
+      );
+    });
+
+    it("offers no sessionScope for a forwarded ask without a suggestion", async () => {
+      const { deps, decisionFn } = makeDeps();
+      const authorizer = new LocalUserAuthorizer(deps);
+
+      await authorizer.authorize(
+        makeDetails({
+          forwarding: {
+            requesterAgentName: "Explore",
+            requesterSessionId: "child-session",
+          },
+        }),
+      );
+
+      expect(decisionFn).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        expect.any(String),
+        undefined,
+      );
+    });
   });
 
   it("returns the decision from requestPermissionDecisionFromUi", async () => {

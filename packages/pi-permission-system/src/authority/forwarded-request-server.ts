@@ -10,6 +10,8 @@ import {
   isForwardedPermissionRequestForSession,
   type PermissionForwardingLocation,
 } from "#src/permission-forwarding";
+import { SessionApproval } from "#src/session-approval";
+import type { SessionApprovalRecorder } from "#src/session-approval-recorder";
 import type { DebugReviewLogger } from "#src/session-logger";
 import type { SubagentSessionRegistry } from "#src/subagent-registry";
 import type { PermissionCheckResult } from "#src/types";
@@ -61,6 +63,11 @@ export interface ForwardedRequestServerDeps {
   policy: ServingPolicy;
   /** Escalation seam to the serving session's selected `Authorizer` on `ask`. */
   escalator: AskEscalator;
+  /**
+   * The serving session's `SessionRules`. Records a whole-session grant when a
+   * human approves a forwarded request for the entire serving session.
+   */
+  recorder: SessionApprovalRecorder;
   /** In-process subagent registry, read only by the one-hop canary. */
   registry?: SubagentSessionRegistry;
 }
@@ -115,6 +122,11 @@ function buildForwardedAskDetails(
       requesterAgentName: request.requesterAgentName || null,
       requesterSessionId: request.requesterSessionId || null,
     },
+    // Carries the child's suggestion so LocalUserAuthorizer can offer the
+    // whole-session grant scope; absent for a legacy/version-skew request.
+    ...(request.sessionApproval
+      ? { sessionApproval: request.sessionApproval }
+      : {}),
   };
 }
 
@@ -132,6 +144,7 @@ export class ForwardedRequestServer implements InboxProcessor {
   private readonly logger: DebugReviewLogger;
   private readonly policy: ServingPolicy;
   private readonly escalator: AskEscalator;
+  private readonly recorder: SessionApprovalRecorder;
   private readonly registry: SubagentSessionRegistry | undefined;
 
   constructor(deps: ForwardedRequestServerDeps) {
@@ -139,6 +152,7 @@ export class ForwardedRequestServer implements InboxProcessor {
     this.logger = deps.logger;
     this.policy = deps.policy;
     this.escalator = deps.escalator;
+    this.recorder = deps.recorder;
     this.registry = deps.registry;
   }
 
@@ -237,8 +251,42 @@ export class ForwardedRequestServer implements InboxProcessor {
       location,
       requestPath,
       currentSessionId,
-      decision,
+      this.applyGrantScope(request, decision, forwardedPermissionLogDetails),
     );
+  }
+
+  /**
+   * Apply the human's grant-scope choice on a forwarded approval.
+   *
+   * A whole-session grant (`approved_for_serving_session`) records the child's
+   * suggested pattern into this serving node's `SessionRules` — the single
+   * source of truth for the scope — and is then translated to a plain
+   * `approved` so the child records nothing (its next identical action
+   * re-forwards and resolves as recorded authority). Every other decision
+   * passes through unchanged (`approved_for_session` → the child records).
+   */
+  private applyGrantScope(
+    request: ForwardedPermissionRequest,
+    decision: PermissionPromptDecision,
+    logDetails: Record<string, unknown>,
+  ): PermissionPromptDecision {
+    if (decision.state !== "approved_for_serving_session") {
+      return decision;
+    }
+    if (request.sessionApproval) {
+      this.recorder.recordSessionApproval(
+        SessionApproval.multiple(
+          request.sessionApproval.surface,
+          request.sessionApproval.patterns,
+        ),
+      );
+      this.logger.review("forwarded_permission.session_recorded", {
+        ...logDetails,
+        surface: request.sessionApproval.surface,
+        patterns: request.sessionApproval.patterns,
+      });
+    }
+    return { approved: true, state: "approved" };
   }
 
   /**

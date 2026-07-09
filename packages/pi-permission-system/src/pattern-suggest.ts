@@ -62,6 +62,35 @@ export function suggestMcpPattern(target: string): string {
   return "*";
 }
 
+/** Scope labels for the forwarded-approval two-step scope select. */
+export interface ForwardedScopeLabels {
+  /** Least-privilege default: record on the requesting subagent only. */
+  subagentLabel: string;
+  /** Record on the serving node — covers the parent and all subagents. */
+  servingSessionLabel: string;
+}
+
+/**
+ * Build the two scope labels shown when a human grants a forwarded request
+ * "for this session."
+ *
+ * The subagent option names the requester (least privilege); the whole-session
+ * option restates the surface + pattern being granted session-wide.
+ */
+export function buildForwardedScopeLabels(
+  agentName: string | null,
+  surface: string,
+  pattern: string,
+): ForwardedScopeLabels {
+  const subagentLabel = agentName
+    ? `This subagent ('${agentName}') only`
+    : "This subagent only";
+  return {
+    subagentLabel,
+    servingSessionLabel: `The whole session — allow ${surface} "${pattern}" for parent and all subagents`,
+  };
+}
+
 /** Surface-aware human-readable labels for the session-approval option. */
 function buildLabel(pattern: string, surface: string): string {
   switch (surface) {

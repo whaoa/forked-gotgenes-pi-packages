@@ -132,6 +132,10 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     logger,
     policy: servingPolicy,
     escalator: authorizerSelection,
+    // Records a whole-session grant into the same SessionRules the resolver and
+    // gate runner read, so a serving-scope grant governs the parent and future
+    // forwarded resolutions.
+    recorder: sessionRules,
     registry: subagentRegistry,
   });
 
