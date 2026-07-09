@@ -671,3 +671,173 @@ describe("session approvals do not leak across same-cwd session switches", () =>
     rmSync(cwd, { recursive: true, force: true });
   });
 });
+
+describe("forwarded grant-scope selection round-trip", () => {
+  // A UI-present serving ctx whose `select` drives the two-step forwarded
+  // dialog: the main prompt picks "for this session" (options[1]); the scope
+  // prompt (options include a "The whole session …" label) returns the chosen
+  // scope. Every `select` options array is recorded so a test can prove the
+  // human was (or was not) re-prompted.
+  function makeServingCtx(
+    cwd: string,
+    sessionId: string,
+    selectLog: string[][],
+    scope: "whole" | "subagent",
+  ): unknown {
+    return {
+      cwd,
+      hasUI: true,
+      sessionManager: {
+        getEntries: (): unknown[] => [],
+        getSessionId: (): string => sessionId,
+        getSessionDir: (): string => cwd,
+      },
+      ui: {
+        notify: (): void => {},
+        setStatus: (): void => {},
+        select: async (
+          _title: string,
+          options: string[],
+        ): Promise<string | undefined> => {
+          selectLog.push(options);
+          const wholeOption = options.find((o) =>
+            o.startsWith("The whole session"),
+          );
+          if (wholeOption) {
+            return scope === "whole" ? wholeOption : options[0];
+          }
+          return options[1];
+        },
+        input: async (): Promise<string | undefined> => undefined,
+      },
+    };
+  }
+
+  it("records a whole-session grant on the serving node so later forwards and the parent's own action resolve without a second prompt", async () => {
+    writeGlobalConfig({ permission: { "*": "allow", demo: "ask" } });
+
+    const parentCwd = mkdtempSync(join(tmpdir(), "pi-perm-parent-"));
+    const childCwd = mkdtempSync(join(tmpdir(), "pi-perm-child-"));
+    const parentSessionId = "parent-whole-1";
+    const childSessionId = "child-whole-1";
+    const selectLog: string[][] = [];
+
+    const parentBus = createEventBus();
+    const parentPi = makeFakePi({ events: parentBus, toolNames: ["demo"] });
+    piPermissionSystemExtension(parentPi as unknown as ExtensionAPI);
+    const childPi = makeFakePi({
+      events: createEventBus(),
+      toolNames: ["demo"],
+    });
+    piPermissionSystemExtension(childPi as unknown as ExtensionAPI);
+
+    // The parent starts serving (its poll drains the inbox using the UI ctx).
+    const parentCtx = makeServingCtx(
+      parentCwd,
+      parentSessionId,
+      selectLog,
+      "whole",
+    );
+    await fireSessionStart(parentPi, parentCtx);
+    parentBus.emit(SUBAGENT_CHILD_SESSION_CREATED, {
+      sessionId: childSessionId,
+      parentSessionId,
+    });
+
+    // 1. First child `demo` forwards; the human grants the whole session.
+    const firstResult = (await childPi.fire(
+      "tool_call",
+      { toolName: "demo", toolCallId: "demo-1", input: {} },
+      makeChildCtx(childCwd, childSessionId),
+    )) as { block?: true };
+    expect(firstResult.block).toBeUndefined();
+    // One serve = main dialog + scope dialog.
+    expect(selectLog).toHaveLength(2);
+
+    // 2. A second child `demo` re-forwards and the serving node auto-approves
+    // from its recorded whole-session grant — no new human prompt.
+    const secondResult = (await childPi.fire(
+      "tool_call",
+      { toolName: "demo", toolCallId: "demo-2", input: {} },
+      makeChildCtx(childCwd, childSessionId),
+    )) as { block?: true };
+    expect(secondResult.block).toBeUndefined();
+    expect(selectLog).toHaveLength(2);
+
+    // 3. The parent's own `demo` is session-approved by the same grant.
+    const parentResult = (await parentPi.fire(
+      "tool_call",
+      { toolName: "demo", toolCallId: "demo-parent", input: {} },
+      parentCtx,
+    )) as { block?: true };
+    expect(parentResult.block).toBeUndefined();
+    expect(selectLog).toHaveLength(2);
+
+    await parentPi.fire("session_shutdown");
+    rmSync(parentCwd, { recursive: true, force: true });
+    rmSync(childCwd, { recursive: true, force: true });
+  });
+
+  it("contains a subagent-only grant to the requesting child so the parent's own action still prompts", async () => {
+    writeGlobalConfig({ permission: { "*": "allow", demo: "ask" } });
+
+    const parentCwd = mkdtempSync(join(tmpdir(), "pi-perm-parent-"));
+    const childCwd = mkdtempSync(join(tmpdir(), "pi-perm-child-"));
+    const parentSessionId = "parent-sub-1";
+    const childSessionId = "child-sub-1";
+    const selectLog: string[][] = [];
+
+    const parentBus = createEventBus();
+    const parentPi = makeFakePi({ events: parentBus, toolNames: ["demo"] });
+    piPermissionSystemExtension(parentPi as unknown as ExtensionAPI);
+    const childPi = makeFakePi({
+      events: createEventBus(),
+      toolNames: ["demo"],
+    });
+    piPermissionSystemExtension(childPi as unknown as ExtensionAPI);
+
+    const parentCtx = makeServingCtx(
+      parentCwd,
+      parentSessionId,
+      selectLog,
+      "subagent",
+    );
+    await fireSessionStart(parentPi, parentCtx);
+    parentBus.emit(SUBAGENT_CHILD_SESSION_CREATED, {
+      sessionId: childSessionId,
+      parentSessionId,
+    });
+
+    // 1. First child `demo` forwards; the human grants this subagent only.
+    const firstResult = (await childPi.fire(
+      "tool_call",
+      { toolName: "demo", toolCallId: "demo-1", input: {} },
+      makeChildCtx(childCwd, childSessionId),
+    )) as { block?: true };
+    expect(firstResult.block).toBeUndefined();
+    expect(selectLog).toHaveLength(2);
+
+    // 2. The child recorded the grant locally: its next `demo` resolves as a
+    // session approval with no forward, so the serving node is not consulted.
+    const secondResult = (await childPi.fire(
+      "tool_call",
+      { toolName: "demo", toolCallId: "demo-2", input: {} },
+      makeChildCtx(childCwd, childSessionId),
+    )) as { block?: true };
+    expect(secondResult.block).toBeUndefined();
+    expect(selectLog).toHaveLength(2);
+
+    // 3. The parent holds no grant, so its own `demo` prompts again.
+    const parentResult = (await parentPi.fire(
+      "tool_call",
+      { toolName: "demo", toolCallId: "demo-parent", input: {} },
+      parentCtx,
+    )) as { block?: true };
+    expect(parentResult.block).toBeUndefined();
+    expect(selectLog.length).toBeGreaterThan(2);
+
+    await parentPi.fire("session_shutdown");
+    rmSync(parentCwd, { recursive: true, force: true });
+    rmSync(childCwd, { recursive: true, force: true });
+  });
+});
