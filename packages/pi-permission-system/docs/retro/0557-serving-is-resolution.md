@@ -46,3 +46,57 @@ Test count went 2280 → 2290 (+10, net of removed `buildDirectUiPrompt`/`buildF
 - **Provenance types identical by design**: `ForwardedAskProvenance` (declared in `permission-prompter.ts` to keep that layer free of an events import) is structurally identical to the event's `ForwardedPromptContext`, so `PromptPermissionDetails` flows straight into `buildUiPrompt` with no copying — as the plan intended.
 - **Behavior shifts shipped as documented**: parent `allow`/`deny` now govern children's escalations; explicit `deny` wins under yolo on the serving path; field-less legacy requests escalate instead of yolo-auto-approving; policy-decided requests emit no `permissions:ui_prompt` (one sentence added to `cross-extension-api.md`, the "not degraded" guarantee preserved verbatim).
 - All cross-step invariants held (reviewer-confirmed), notably the #292 non-degraded broadcast (re-pinned by composing `LocalUserAuthorizer` + server-details tests) and the escalate-requires-activated-selection timing invariant added to the plan this session.
+
+## Stage: Final Retrospective (2026-07-09T16:59:56Z)
+
+### Session summary
+
+Shipped Phase 9 Step 3 end-to-end: folded two plan tightenings (escalate-timing invariant, drain serialization) into the plan, executed all four TDD cycles plus a pre-completion FAIL→fix, then pushed, closed #557, and merged release-please PR #566 (`pi-permission-system` v20.2.0).
+The run was clean apart from one substantive rework (a plan LOC target missed until the reviewer measured it) and three trivial self-corrected tool slips.
+
+### Observations
+
+#### What went well
+
+- **The pre-completion reviewer earned its keep on a target the deterministic gates cannot see.**
+  Every green check passed (`check`, `lint`, `test` 2290, `fallow dead-code`), yet the plan's `processSingleForwardedRequest < 60 lines` commitment was unmet at 74 lines.
+  Only the reviewer (on `anthropic/claude-sonnet-5`) measured it and returned FAIL — a genuine value-add, since `fallow dead-code` does not measure LOC/complexity.
+- **The planning-stage foresight paid off at implementation.**
+  Because the prior session amended the Phase 9 roadmap to record the #292 non-degraded-broadcast invariant as a documented Step 3 outcome, the reviewer could verify it and the threaded-provenance design preserved it with a green suite — the presentation invariant did not silently regress.
+- **Clean release-please UNSTABLE handling.**
+  The `release_pr_merge` refusal was a genuinely `IN_PROGRESS` CI check (not the empty-rollup `GITHUB_TOKEN` case), so the ship flow waited for CI (`ci_watch` on the PR head SHA) and retried, rather than force-merging — the protocol's distinction held.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the plan committed to `processSingleForwardedRequest < 60 lines`, but no TDD-loop step measured it; `fallow health` never ran during implementation (only `fallow dead-code`, which does not measure LOC).
+  The miss surfaced only as a pre-completion FAIL.
+  Impact: one extra `refactor:` commit (`4b103618`, extracting `recordForwardedDecision`) and a full FAIL→fix→re-dispatch reviewer cycle (~350s of reviewer time across two dispatches).
+  The fix itself was a genuine decide/respond SRP split, not number-forcing.
+- `instruction-violation` (self-identified) — a defensive `cd /Users/chris/.../pi-permission-system 2>/dev/null; cd ...` prefix on a vitest command hit the `external_directory` permission gate (the first path does not exist at that level) and was denied; AGENTS.md bans prefixing a command with `cd` into the working directory.
+  Impact: one wasted tool call, immediately re-run without the `cd`.
+- `instruction-violation` (self-identified) — during the ship UNSTABLE-wait, passed the literal string `HEAD` to `ci_find`'s `expected_sha` instead of a resolved 40-char SHA; the ship prompt says pass the exact SHA, never a value from memory.
+  Impact: one ~125s non-blocking `ci_find` timeout, recovered via `gh pr view --json headRefOid` + `ci_watch`.
+- `other` (self-identified) — an `Edit` batch on `index.ts` carried a stray `newText_unused` key and was rejected wholesale; re-issued correctly.
+  Impact: one wasted tool call.
+
+#### What caused friction (user side)
+
+- None material.
+  The operator's one substantive decision (fix vs. skip the 74-line FAIL) was answered promptly and correctly; the earlier "are we ready?"
+  check surfaced two real plan tightenings before implementation, which is the intended pre-flight.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the only subagent dispatches were the two `pre-completion-reviewer` runs on `anthropic/claude-sonnet-5`; judgment-heavy review (acceptance-criteria verification, precise LOC measurement, invariant cross-checking) is well-matched to that model, and it caught the quantitative miss the deterministic gates missed.
+  No mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` points; no error ran longer than one corrective tool call.
+  The 74-line FAIL resolved in a single extraction.
+- **Unused-tool detection** — `pnpm fallow health` was the available-but-unused tool: running it on the touched file before the reviewer dispatch would have caught the LOC miss locally.
+- **Feedback-loop gap analysis** — incremental verification was otherwise strong (`pnpm run check` after each shared-type change, per-file red/green vitest, full suite before commits).
+  The single gap was the `fallow health` LOC/complexity check, which never ran in the TDD loop — the direct cause of the FAIL→fix cycle.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0557-serving-is-resolution.md`.
+2. Proposed adding a `pnpm fallow health` quantitative-target check to `.pi/prompts/tdd-plan.md` ("After the last TDD step"); operator declined — no prompt change made.
+   The observation stays recorded here as the session's primary friction finding.
