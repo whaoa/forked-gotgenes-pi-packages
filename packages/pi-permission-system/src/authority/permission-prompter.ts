@@ -4,6 +4,19 @@ import type { Authorizer } from "./authorizer";
 
 export type PermissionReviewSource = "tool_call" | "skill_input" | "skill_read";
 
+/**
+ * Provenance of a forwarded ask: who is really asking, one hop below.
+ *
+ * Present on {@link PromptPermissionDetails} only when the ask was forwarded
+ * from a subagent. Structurally identical to the event's `ForwardedPromptContext`
+ * so the details flow straight into `buildUiPrompt`, but declared here to keep
+ * the prompter layer free of an events-module import.
+ */
+export interface ForwardedAskProvenance {
+  requesterAgentName: string | null;
+  requesterSessionId: string | null;
+}
+
 /** Details passed when prompting the user for a permission decision. */
 export interface PromptPermissionDetails {
   requestId: string;
@@ -19,6 +32,12 @@ export interface PromptPermissionDetails {
   toolInputPreview?: string;
   /** Override label for the "for this session" dialog option. */
   sessionLabel?: string;
+  /** Explicit display-surface override (a forwarded ask carries the child's original). */
+  surface?: string | null;
+  /** Explicit display-value override (a forwarded ask carries the child's original). */
+  value?: string | null;
+  /** Present iff this ask was forwarded from a subagent; drives the non-degraded broadcast + "(Subagent)" title. */
+  forwarding?: ForwardedAskProvenance;
 }
 
 /**

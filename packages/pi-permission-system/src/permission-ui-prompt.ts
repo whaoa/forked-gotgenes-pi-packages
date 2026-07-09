@@ -11,6 +11,7 @@
  */
 
 import type {
+  ForwardedPromptContext,
   PermissionUiPromptEvent,
   PermissionUiPromptSource,
 } from "./permission-events";
@@ -42,6 +43,44 @@ export interface ForwardedPromptInput {
   value?: string | null;
 }
 
+/**
+ * Input for any UI prompt — direct or forwarded.
+ *
+ * A direct prompt supplies only the `DirectPromptInput` fields and lets
+ * `surface`/`value` derive and `forwarding` default to `null`; a forwarded ask
+ * supplies the child's original `surface`/`value` projection explicitly and a
+ * populated `forwarding` context, so the parent's broadcast stays non-degraded
+ * (the #292 contract hardening).
+ */
+export interface UiPromptInput extends DirectPromptInput {
+  /** Explicit display surface; falls back to the derived projection when omitted. */
+  surface?: string | null;
+  /** Explicit display value; falls back to the derived projection when omitted. */
+  value?: string | null;
+  /** Forwarding context for a forwarded subagent ask; `null`/omitted for a direct prompt. */
+  forwarding?: ForwardedPromptContext | null;
+}
+
+/**
+ * Build a `permissions:ui_prompt` event from either a direct or a forwarded ask.
+ *
+ * `surface`/`value` use the explicit override when the caller sets them (an
+ * explicit `null` is honored, not treated as "derive"); otherwise they fall
+ * back to the direct-prompt projection. `forwarding` passes through, defaulting
+ * to `null`.
+ */
+export function buildUiPrompt(input: UiPromptInput): PermissionUiPromptEvent {
+  return {
+    requestId: input.requestId,
+    source: input.source,
+    surface: input.surface !== undefined ? input.surface : directSurface(input),
+    value: input.value !== undefined ? input.value : directValue(input),
+    agentName: input.agentName,
+    message: input.message,
+    forwarding: input.forwarding ?? null,
+  };
+}
+
 /** Normalized display surface for a direct prompt. */
 function directSurface(input: DirectPromptInput): string | null {
   if (input.source === "skill_input" || input.source === "skill_read") {
@@ -62,19 +101,16 @@ function directValue(input: DirectPromptInput): string | null {
   );
 }
 
-/** Build the UI prompt event for a direct tool/skill prompt. */
+/**
+ * Build the UI prompt event for a direct tool/skill prompt.
+ *
+ * Thin wrapper over {@link buildUiPrompt}; folds into it once
+ * `forwarded-request-server` stops importing the two-builder split (#557 step 2).
+ */
 export function buildDirectUiPrompt(
   input: DirectPromptInput,
 ): PermissionUiPromptEvent {
-  return {
-    requestId: input.requestId,
-    source: input.source,
-    surface: directSurface(input),
-    value: directValue(input),
-    agentName: input.agentName,
-    message: input.message,
-    forwarding: null,
-  };
+  return buildUiPrompt(input);
 }
 
 /**

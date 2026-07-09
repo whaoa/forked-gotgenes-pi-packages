@@ -147,6 +147,62 @@ describe("LocalUserAuthorizer", () => {
     expect(calls).toEqual(["emit", "dialog"]);
   });
 
+  describe("forwarded provenance", () => {
+    it("emits a non-degraded forwarded event with populated forwarding and the child's display projection", async () => {
+      const { deps, events } = makeDeps();
+      const authorizer = new LocalUserAuthorizer(deps);
+
+      await authorizer.authorize(
+        makeDetails({
+          source: "tool_call",
+          agentName: "Explore",
+          message:
+            "Subagent 'Explore' requested permission.\n\nAllow git push?",
+          surface: "bash",
+          value: "git push",
+          forwarding: {
+            requesterAgentName: "Explore",
+            requesterSessionId: "child-session",
+          },
+        }),
+      );
+
+      expect(events.emit).toHaveBeenCalledWith("permissions:ui_prompt", {
+        requestId: "req-123",
+        source: "tool_call",
+        surface: "bash",
+        value: "git push",
+        agentName: "Explore",
+        message: "Subagent 'Explore' requested permission.\n\nAllow git push?",
+        forwarding: {
+          requesterAgentName: "Explore",
+          requesterSessionId: "child-session",
+        },
+      });
+    });
+
+    it("uses the '(Subagent)' dialog title when the ask is forwarded", async () => {
+      const { deps, ui, decisionFn } = makeDeps();
+      const authorizer = new LocalUserAuthorizer(deps);
+
+      await authorizer.authorize(
+        makeDetails({
+          forwarding: {
+            requesterAgentName: "Explore",
+            requesterSessionId: "child-session",
+          },
+        }),
+      );
+
+      expect(decisionFn).toHaveBeenCalledWith(
+        ui,
+        "Permission Required (Subagent)",
+        "Allow read?",
+        undefined,
+      );
+    });
+  });
+
   it("returns the decision from requestPermissionDecisionFromUi", async () => {
     const decision: PermissionPromptDecision = {
       approved: false,

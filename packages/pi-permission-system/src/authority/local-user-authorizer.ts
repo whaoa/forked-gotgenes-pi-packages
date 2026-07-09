@@ -7,7 +7,7 @@ import {
   emitUiPromptEvent,
   type PermissionEventBus,
 } from "#src/permission-events";
-import { buildDirectUiPrompt } from "#src/permission-ui-prompt";
+import { buildUiPrompt } from "#src/permission-ui-prompt";
 import type { Authorizer } from "./authorizer";
 import type { PromptPermissionDetails } from "./permission-prompter";
 
@@ -26,7 +26,10 @@ export interface LocalUserAuthorizerDeps {
  *
  * Emits the `permissions:ui_prompt` broadcast (moved here from
  * `PermissionPrompter`'s `ctx.hasUI` arm) before showing the dialog, so
- * observers know a decision is imminent.
+ * observers know a decision is imminent. This is the single emit site: a
+ * forwarded ask carries its provenance on `details.forwarding`, which this
+ * class renders (populated `forwarding` context + "(Subagent)" title) so the
+ * broadcast stays non-degraded (#292) without a second emission path.
  */
 export class LocalUserAuthorizer implements Authorizer {
   constructor(private readonly deps: LocalUserAuthorizerDeps) {}
@@ -34,11 +37,13 @@ export class LocalUserAuthorizer implements Authorizer {
   authorize(
     details: PromptPermissionDetails,
   ): Promise<PermissionPromptDecision> {
-    const uiPrompt = buildDirectUiPrompt(details);
+    const uiPrompt = buildUiPrompt(details);
     emitUiPromptEvent(this.deps.events, uiPrompt);
     return this.deps.requestPermissionDecisionFromUi(
       this.deps.ui,
-      "Permission Required",
+      details.forwarding
+        ? "Permission Required (Subagent)"
+        : "Permission Required",
       details.message,
       details.sessionLabel ? { sessionLabel: details.sessionLabel } : undefined,
     );
