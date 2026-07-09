@@ -232,6 +232,27 @@ export class ForwardedRequestServer implements InboxProcessor {
       forwardedPermissionLogDetails,
     );
 
+    this.recordForwardedDecision(
+      request,
+      location,
+      requestPath,
+      currentSessionId,
+      decision,
+    );
+  }
+
+  /**
+   * Persist the served decision: write the response file the child polls for,
+   * log the outcome, and delete the drained request. The symmetric "respond"
+   * half to {@link resolveDecision}'s "decide" half.
+   */
+  private recordForwardedDecision(
+    request: ForwardedPermissionRequest,
+    location: PermissionForwardingLocation,
+    requestPath: string,
+    currentSessionId: string,
+    decision: PermissionPromptDecision,
+  ): void {
     const responsePath = join(location.responsesDir, `${request.id}.json`);
     this.logger.review(
       decision.approved
