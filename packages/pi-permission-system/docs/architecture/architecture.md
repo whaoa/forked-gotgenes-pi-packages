@@ -887,7 +887,7 @@ Recompute commands (run from the repo root):
 
 ### Steps
 
-#### Step 1: Introduce a tool-kind classification decided once at the normalize boundary
+#### Step 1: Introduce a tool-kind classification decided once at the normalize boundary ([#568])
 
 **Cause:** the extraction question — "what does this invocation access: a bash command, an MCP target, or a path?"
 — is a domain decision re-derived by silent string comparison at every consumer instead of decided once where the invocation enters the system ([#561]).
@@ -901,7 +901,7 @@ The 21 grep sites are the symptom; the cause is the missing dispatch point.
 
 Release: batch "tool-kind-dispatch"
 
-#### Step 2: Move the presentation family onto the tool-kind product
+#### Step 2: Move the presentation family onto the tool-kind product ([#569])
 
 **Cause:** the same discriminator on the presentation side — prompt, preview, denial-message, and decision-value projections each re-decide the kind per formatter, including a private `isMcpCheck()` helper that two sibling call sites re-derive instead of sharing.
 
@@ -963,7 +963,7 @@ Release: independent
 
 ```mermaid
 flowchart TD
-    S1["Step 1 - Tool-kind classification decided once"] --> S2["Step 2 - Presentation family onto the tool-kind product"]
+    S1["Step 1 - Tool-kind classification decided once (#568)"] --> S2["Step 2 - Presentation family onto the tool-kind product (#569)"]
     S1 -.->|"soft ordering — shared input-normalizer.ts churn"| S4["Step 4 - Advisory bash decomposition parity (#309)"]
     S3["Step 3 - PathFlavor + src/path/ domain (#562)"]
     S5["Step 5 - Indirection-wrapper re-target/floor (#490)"]
@@ -1136,4 +1136,6 @@ Five steps ([#555]–[#559]), all closed.
 [#562]: https://github.com/gotgenes/pi-packages/issues/562
 [#564]: https://github.com/gotgenes/pi-packages/issues/564
 [#481]: https://github.com/gotgenes/pi-packages/issues/481
+[#568]: https://github.com/gotgenes/pi-packages/issues/568
+[#569]: https://github.com/gotgenes/pi-packages/issues/569
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
