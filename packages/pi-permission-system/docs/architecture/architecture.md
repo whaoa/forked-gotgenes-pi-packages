@@ -746,7 +746,7 @@ src/
 │   ├── path-normalization.ts `AccessPath`'s representation backing (relocated from `path-utils.ts`, [#505]): `normalizePathForComparison` (lexical absolute), `canonicalNormalizePathForComparison` (symlink-resolved + win32-lowercased, [#382]), `normalizePathPolicyLiteral` (literal cleanup), `getPathPolicyValues` (lexical ∪ relative match set) + `PathPolicyValueOptions`; pure derivation, injected `platform`, calls `isPathWithinDirectory` (from `path-containment.ts`) downward for the cwd-relative alias
 │   ├── access-intent.ts     `AccessIntent` discriminated union each gate emits: `tool` (raw input the manager normalizes) and `access-path` (an `AccessPath` for every path gate — `path`, `external_directory`, and the per-tool path-bearing surfaces `read`/`write`/`edit`/`grep`/`find`/`ls`, #486, #502); `ResolvedAccessIntent` (`tool | path-values`) is what the manager consumes after the resolver unwraps `access-path` via `matchValues()`, keeping the manager string-based — `path-values` is resolver-internal, not gate-emitted, since #486 (#478, #486)
 │   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form), `resolvedAlias(): string | undefined` (the canonical form only when distinct from the lexical form, for disclosing a symlink target in a prompt/denial message, #507); the surface-neutral `forPath(pathValue, { cwd, resolveBase?, platform })` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison` (all from `path-normalization.ts`, [#505]) (resolveBase defaults to cwd; `platform` injected, not read ambiently, #510; serves every path surface, #486), and `forLiteral(literal, matchAliases?)` builds a literal-only path with no canonical for the unknown-base bash case ([#393]); `forDevice(devicePath)` preserves an MSYS device path verbatim across all three representations, and `forLiteral`'s optional `matchAliases` carries a win32 backslash match alias for a Git Bash POSIX absolute so a `/tmp/*` rule matches under separator folding (#533); type-distinct accessors make the lexical/canonical conflation a compile error (#476)
-│   ├── tool-kind.ts        `ToolKind` string-union classification + `classifyToolKind(toolName)` — the single dispatch point deciding what an invocation accesses (bash command / MCP target / skill / path-bearing tool / extension) once at the normalize boundary; imports only `PATH_BEARING_TOOLS` (AccessPath-free, so `permission-manager.ts` may consume it without breaching the ADR-0002 string boundary); the extraction consumers (`input-normalizer`, `tool-input-path`, the tool-call gate pipeline, `permission-manager`'s `deriveSource`) dispatch on it instead of re-deriving `toolName === "bash"`/`"mcp"` (Phase 10 Step 1, #568)
+│   ├── tool-kind.ts        `ToolKind` string-union classification + `classifyToolKind(toolName)` — the single dispatch point deciding what an invocation accesses (bash command / MCP target / skill / path-bearing tool / extension) once at the normalize boundary; imports only `PATH_BEARING_TOOLS` (AccessPath-free, so `permission-manager.ts` may consume it without breaching the ADR-0002 string boundary); the extraction consumers (`input-normalizer`, `tool-input-path`, the tool-call gate pipeline, `permission-manager`'s `deriveSource`) dispatch on it instead of re-deriving `toolName === "bash"`/`"mcp"` (Phase 10 Step 1, #568); also owns `isMcpCheck({ toolName, source })` — the shared MCP-ness predicate (keeps the `source === "mcp"` disjunct) the presentation consumers (`denial-messages`, `permission-prompts`, `tool-preview-formatter`, `deriveDecisionValue`) dispatch on alongside `classifyToolKind`, replacing their re-derived `(source === "mcp" || toolName === "mcp")` checks (Phase 10 Step 2, #569)
 │   └── bash/
 │       ├── parser.ts           Lazy tree-sitter-bash parser: `TSNode` interface (exported), `TSParser` interface (private), `initParser` (private), `getParser = memoizeAsyncWithRetry(initParser)` (exported); dropped from `bash-program.ts` (#473)
 │       ├── node-text.ts        Quote-aware AST node-text resolver: `resolveNodeText` (pure; handles `word`, `raw_string`, `string`, `concatenation`, expansions, default fallback), `SKIP_SUBTREE_TYPES` (heredoc/comment sentinel set), `ARG_NODE_TYPES` (argument-value node-type set; peer of `SKIP_SUBTREE_TYPES`); dropped from `bash-program.ts` (#473, #474)
@@ -859,7 +859,7 @@ Both discriminator families are cause-level Category C coupling flaws traced to 
 
 | Metric                                                               | Baseline (2026-07-10)               | Phase 10 target                                           |
 | -------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------------- |
-| Tool-kind discriminator sites (`src/`)                               | 21                                  | ≤ 4, all in `access-intent/tool-kind.ts`                  |
+| Tool-kind discriminator sites (`src/`)                               | 21                                  | ≤ 4, all in `access-intent/tool-kind.ts` (met: 2, Step 2) |
 | `platform === "win32"` sites (`src/`)                                | 13                                  | 1 (the `PathFlavor` construction)                         |
 | win32 match-fold derivations (`caseInsensitive` occurrences, `src/`) | 6                                   | ≤ 2                                                       |
 | Advisory bash fidelity                                               | whole-string match                  | decomposed parity with the gate (test-gated)              |
@@ -903,13 +903,15 @@ The 21 grep sites are the symptom; the cause is the missing dispatch point.
 
 Release: batch "tool-kind-dispatch"
 
-#### Step 2: Move the presentation family onto the tool-kind product ([#569])
+#### ✅ Step 2: Move the presentation family onto the tool-kind product ([#569])
 
 **Cause:** the same discriminator on the presentation side — prompt, preview, denial-message, and decision-value projections each re-decide the kind per formatter, including a private `isMcpCheck()` helper that two sibling call sites re-derive instead of sharing.
 
 - **Smell:** Category C (repeated discriminator / OCP).
 - **Target:** `tool-preview-formatter.ts`, `permission-prompts.ts`, `denial-messages.ts` (delete `isMcpCheck`), `handlers/gates/helpers.ts` (`deriveDecisionValue`).
 - **Outcome:** total family sites 21 → ≤ 4, all inside `access-intent/tool-kind.ts` (the recompute command above hits the target).
+- **Landed:** `isMcpCheck` promoted from a private `denial-messages.ts` helper to a shared export in `access-intent/tool-kind.ts` (keeps the `source === "mcp"` disjunct that `classifyToolKind` cannot express); the four presentation consumers (`denial-messages`, `permission-prompts`, `tool-preview-formatter`, `deriveDecisionValue`) migrated onto `classifyToolKind`/`isMcpCheck`, with the `&& target` guard hoisted to the call sites that display it.
+  Recompute 12 → 2 (both inside `tool-kind.ts`: the docstring and the `isMcpCheck` disjunct); `deriveDecisionValue` became an exhaustive `switch`; suite +4 (`isMcpCheck` unit tests).
 - **Impact 3 / Risk 1 / Priority 15.**
 
 Release: batch "tool-kind-dispatch"
@@ -965,7 +967,7 @@ Release: independent
 
 ```mermaid
 flowchart TD
-    S1["✅ Step 1 - Tool-kind classification decided once (#568)"] --> S2["Step 2 - Presentation family onto the tool-kind product (#569)"]
+    S1["✅ Step 1 - Tool-kind classification decided once (#568)"] --> S2["✅ Step 2 - Presentation family onto the tool-kind product (#569)"]
     S1 -.->|"soft ordering — shared input-normalizer.ts churn"| S4["Step 4 - Advisory bash decomposition parity (#309)"]
     S3["Step 3 - PathFlavor + src/path/ domain (#562)"]
     S5["Step 5 - Indirection-wrapper re-target/floor (#490)"]
