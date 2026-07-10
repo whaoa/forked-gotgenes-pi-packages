@@ -1,3 +1,4 @@
+import { classifyToolKind, isMcpCheck } from "./access-intent/tool-kind";
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ToolInputFormatterLookup } from "./tool-input-formatter-registry";
 import {
@@ -158,11 +159,7 @@ export class ToolPreviewFormatter {
     input: unknown,
     pathBearingTools: ReadonlySet<string>,
   ): string | undefined {
-    if (
-      result.toolName === "bash" ||
-      result.toolName === "mcp" ||
-      result.source === "mcp"
-    ) {
+    if (classifyToolKind(result.toolName) === "bash" || isMcpCheck(result)) {
       return undefined;
     }
 
