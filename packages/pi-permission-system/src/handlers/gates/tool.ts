@@ -1,4 +1,5 @@
 import type { AccessPath } from "#src/access-intent/access-path";
+import { classifyToolKind } from "#src/access-intent/tool-kind";
 import { PATH_BEARING_TOOLS } from "#src/path-surfaces";
 import { suggestSessionPattern } from "#src/pattern-suggest";
 import { formatAskPrompt } from "#src/permission-prompts";
@@ -23,10 +24,14 @@ function deriveSuggestionValue(
   check: PermissionCheckResult,
   accessPath?: AccessPath,
 ): string {
-  if (tcc.toolName === "bash") return check.command ?? "";
-  if (tcc.toolName === "mcp") return check.target ?? "mcp";
-  if (accessPath) return accessPath.value();
-  return "*";
+  switch (classifyToolKind(tcc.toolName)) {
+    case "bash":
+      return check.command ?? "";
+    case "mcp":
+      return check.target ?? "mcp";
+    default:
+      return accessPath ? accessPath.value() : "*";
+  }
 }
 
 /**

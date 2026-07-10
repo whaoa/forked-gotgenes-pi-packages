@@ -1,5 +1,6 @@
 import type { AccessPath } from "#src/access-intent/access-path";
 import { BashProgram } from "#src/access-intent/bash/program";
+import { classifyToolKind } from "#src/access-intent/tool-kind";
 import type { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
@@ -77,7 +78,7 @@ export class ToolCallGatePipeline {
     const command = getNonEmptyString(toRecord(tcc.input).command);
     const normalizer = this.inputs.getPathNormalizer();
     const bashProgram =
-      tcc.toolName === "bash" && command
+      classifyToolKind(tcc.toolName) === "bash" && command
         ? await BashProgram.parse(
             command,
             normalizer,
@@ -159,7 +160,7 @@ export class ToolCallGatePipeline {
     command: string | null,
     normalizer: PathNormalizer,
   ): { toolCheck: PermissionCheckResult; accessPath?: AccessPath } {
-    if (tcc.toolName === "bash" && bashProgram) {
+    if (classifyToolKind(tcc.toolName) === "bash" && bashProgram) {
       return {
         toolCheck: resolveBashCommandCheck(
           command ?? "",
