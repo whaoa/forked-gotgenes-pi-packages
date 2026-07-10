@@ -1,3 +1,4 @@
+import { classifyToolKind, isMcpCheck } from "./access-intent/tool-kind";
 import { matchQualifier } from "./denial-messages";
 import type { SkillPromptEntry } from "./skill-prompt-sanitizer";
 import type { ToolPreviewFormatter } from "./tool-preview-formatter";
@@ -22,7 +23,7 @@ export function formatUnknownToolReason(
     preview.length > 0 ? `${preview.join(", ")}${suffix}` : "none";
 
   const mcpHint =
-    toolName === "mcp"
+    classifyToolKind(toolName) === "mcp"
       ? ""
       : ' If this was intended as an MCP server tool, call the registered \'mcp\' tool when available (for example: {"tool":"server:tool"}).';
 
@@ -37,7 +38,7 @@ export function formatAskPrompt(
 ): string {
   const subject = agentName ? `Agent '${agentName}'` : "Current agent";
 
-  if (result.toolName === "bash") {
+  if (classifyToolKind(result.toolName) === "bash") {
     const subCommand = result.command ?? "";
     const qualifier = matchQualifier(
       result.matchedPattern,
@@ -52,7 +53,7 @@ export function formatAskPrompt(
     return `${subject} requested bash command '${subCommand}'${qualifierInfo}${fullCommandInfo}. Allow this command?`;
   }
 
-  if ((result.source === "mcp" || result.toolName === "mcp") && result.target) {
+  if (isMcpCheck(result) && result.target) {
     const patternInfo = result.matchedPattern
       ? ` (matched '${result.matchedPattern}')`
       : "";
