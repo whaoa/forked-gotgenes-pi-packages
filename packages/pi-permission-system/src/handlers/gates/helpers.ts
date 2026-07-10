@@ -1,3 +1,4 @@
+import { classifyToolKind } from "#src/access-intent/tool-kind";
 import type {
   PermissionDecisionEvent,
   PermissionDecisionResolution,
@@ -14,10 +15,17 @@ export function deriveDecisionValue(
   check: Pick<PermissionCheckResult, "command" | "target">,
   path?: string,
 ): string {
-  if (toolName === "bash") return check.command ?? toolName;
-  if (toolName === "mcp") return check.target ?? toolName;
-  if (path) return path;
-  return toolName;
+  switch (classifyToolKind(toolName)) {
+    case "bash":
+      return check.command ?? toolName;
+    case "mcp":
+      return check.target ?? toolName;
+    case "path":
+    case "skill":
+    case "extension":
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- || intentional: an empty path falls through to toolName (the original `if (path)` truthiness)
+      return path || toolName;
+  }
 }
 
 /**
