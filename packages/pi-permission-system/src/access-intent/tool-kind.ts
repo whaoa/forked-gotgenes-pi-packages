@@ -7,9 +7,12 @@ import { PATH_BEARING_TOOLS } from "#src/path-surfaces";
  * This is the single dispatch point that replaces the scattered
  * `toolName === "bash"`/`"mcp"` re-derivation across the extraction consumers
  * (`input-normalizer`, `tool-input-path`, the tool-call gate pipeline, and
- * `permission-manager`'s source derivation). Adding a tool kind means editing
- * {@link classifyToolKind} plus the exhaustive switches the compiler flags —
- * an OCP win over silent `===` comparisons a new variant sails past (#561).
+ * `permission-manager`'s source derivation) and the presentation consumers
+ * (`tool-preview-formatter`, `permission-prompts`, `denial-messages`, and
+ * `deriveDecisionValue`), which dispatch on {@link classifyToolKind} or
+ * {@link isMcpCheck}. Adding a tool kind means editing {@link classifyToolKind}
+ * plus the exhaustive switches the compiler flags — an OCP win over silent
+ * `===` comparisons a new variant sails past (#561).
  *
  * The value is plain data (a string union): `tool-kind.ts` imports no
  * `AccessPath`, so `permission-manager.ts` may consume it without breaching the
@@ -34,4 +37,21 @@ export function classifyToolKind(toolName: string): ToolKind {
   if (name === "skill") return "skill";
   if (PATH_BEARING_TOOLS.has(name)) return "path";
   return "extension";
+}
+
+/** The resolved-check fields that decide MCP-ness. */
+interface McpKindFields {
+  toolName: string;
+  source: string;
+}
+
+/**
+ * True when a resolved check concerns an MCP call — either the invoked tool is
+ * `mcp`, or the winning rule matched on the `mcp` surface (`source`). The
+ * `source` disjunct is why this cannot reduce to `classifyToolKind(toolName)`:
+ * `deriveSource` can set `source` to `mcp` on a result whose `toolName` is a
+ * server-qualified string.
+ */
+export function isMcpCheck(check: McpKindFields): boolean {
+  return check.source === "mcp" || classifyToolKind(check.toolName) === "mcp";
 }

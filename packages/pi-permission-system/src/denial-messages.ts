@@ -1,3 +1,4 @@
+import { classifyToolKind, isMcpCheck } from "./access-intent/tool-kind";
 import { EXTENSION_ID } from "./extension-config";
 import type { BashCommandContext, PermissionCheckResult } from "./types";
 
@@ -127,7 +128,7 @@ function buildToolDenyBody(
     parts.push(`Agent '${agentName}'`);
   }
 
-  if (isMcpCheck(check)) {
+  if (isMcpCheck(check) && check.target) {
     parts.push(`is not permitted to run MCP target '${check.target}'`);
   } else {
     parts.push(`is not permitted to run '${check.toolName}'`);
@@ -190,10 +191,10 @@ function buildUnavailableBody(ctx: DenialContext): string {
   switch (ctx.kind) {
     case "tool": {
       const { check } = ctx;
-      if (check.toolName === "bash" && check.command) {
+      if (classifyToolKind(check.toolName) === "bash" && check.command) {
         return `Running bash command '${check.command}' requires approval, but no interactive UI is available.`;
       }
-      if (isMcpCheck(check)) {
+      if (isMcpCheck(check) && check.target) {
         return "Using tool 'mcp' requires approval, but no interactive UI is available.";
       }
       return `Using tool '${check.toolName}' requires approval, but no interactive UI is available.`;
@@ -220,10 +221,10 @@ function buildUserDeniedBody(
   switch (ctx.kind) {
     case "tool": {
       const { check } = ctx;
-      if (isMcpCheck(check)) {
+      if (isMcpCheck(check) && check.target) {
         return `User denied MCP target '${check.target}'.${reasonSuffix(denialReason)}`;
       }
-      if (check.toolName === "bash" && check.command) {
+      if (classifyToolKind(check.toolName) === "bash" && check.command) {
         return `User denied bash command '${check.command}'.${reasonSuffix(denialReason)}`;
       }
       return `User denied tool '${check.toolName}'.${reasonSuffix(denialReason)}`;
@@ -241,10 +242,6 @@ function buildUserDeniedBody(
     case "skill_input":
       return `User denied access to skill '${ctx.skillName}'.${reasonSuffix(denialReason)}`;
   }
-}
-
-function isMcpCheck(check: PermissionCheckResult): boolean {
-  return (check.source === "mcp" || check.toolName === "mcp") && !!check.target;
 }
 
 /** Render an external-path disclosure list for the bash deny body's path clause. */

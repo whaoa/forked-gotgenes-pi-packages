@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { classifyToolKind } from "#src/access-intent/tool-kind";
+import { classifyToolKind, isMcpCheck } from "#src/access-intent/tool-kind";
 import { PATH_BEARING_TOOLS } from "#src/path-surfaces";
 
 describe("classifyToolKind", () => {
@@ -38,5 +38,29 @@ describe("classifyToolKind", () => {
     expect(classifyToolKind(" bash ")).toBe("bash");
     expect(classifyToolKind("\tmcp\n")).toBe("mcp");
     expect(classifyToolKind("  read  ")).toBe("path");
+  });
+});
+
+describe("isMcpCheck", () => {
+  test("is true when the tool itself is mcp", () => {
+    expect(isMcpCheck({ toolName: "mcp", source: "tool" })).toBe(true);
+  });
+
+  test("is true when the winning rule matched on the mcp surface", () => {
+    // The `source` disjunct: a server-qualified toolName still classifies as an
+    // MCP call because `deriveSource` set source to `mcp`.
+    expect(
+      isMcpCheck({ toolName: "some-server:some-tool", source: "mcp" }),
+    ).toBe(true);
+    expect(isMcpCheck({ toolName: "read", source: "mcp" })).toBe(true);
+  });
+
+  test("is false for a bash check", () => {
+    expect(isMcpCheck({ toolName: "bash", source: "bash" })).toBe(false);
+  });
+
+  test("is false for a plain tool check", () => {
+    expect(isMcpCheck({ toolName: "read", source: "tool" })).toBe(false);
+    expect(isMcpCheck({ toolName: "task", source: "default" })).toBe(false);
   });
 });
