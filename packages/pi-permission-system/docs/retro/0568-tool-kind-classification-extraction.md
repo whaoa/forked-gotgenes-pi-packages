@@ -49,3 +49,50 @@ The extraction-family production discriminator sites dropped to 0 and the total 
 - **Metric nuance:** the recompute grep now returns 12, one of which is a docstring inside `tool-kind.ts` (the outcome permits sites inside that module); all 11 others are the presentation family.
 - **Pre-completion reviewer: PASS** — all deterministic checks green (`check`, root `lint`, 2317 tests, `fallow dead-code`), Mermaid re-rendered clean (4 charts), ADR-0002 boundary verified intact.
   No warnings.
+
+## Stage: Final Retrospective (2026-07-10T19:07:04Z)
+
+### Session summary
+
+One continuous session carried #568 through all four stages — plan, TDD, ship, retro — for Phase 10 Step 1 of the pi-permission-system roadmap.
+The implementation landed cleanly: five red→green→commit cycles, four `refactor:` + two `docs:` commits, suite 2310 → 2317 (+7), pre-completion PASS, CI green, issue closed, release deferred (batch tail is Step 2 / #569).
+Zero rework, zero user corrections, zero CI or reviewer failures across the whole session.
+
+### Observations
+
+#### What went well
+
+- **Plan mitigations validated at execution.**
+  The plan's "fold the first consumer into the introduction commit to avoid a `fallow dead-code` failure on the unwired export" mitigation worked exactly as written — the reviewer explicitly confirmed it.
+  The plan's Test Impact Analysis prediction ("`permission-manager-unified.test.ts` already pins every `deriveSource` arm") held, so the manager migration was a pure refactor under green with no new characterization tests.
+- **Reviewer scope corrected for a batched-release repo.**
+  The pre-completion skill's Step 1 diff (`git diff $BASE..HEAD` with `BASE` = last tag) over-scoped badly: the last `pi-permission-system` tag (`v20.3.0`) predates the entire already-landed Phase 9 batch, so the tag-based file list dragged in ~40 unrelated `authority/` files.
+  Scoping the reviewer to the issue's own commit range (`04f3e5c1^..HEAD`) gave it the 10 files that actually changed.
+  This recurs structurally: refactor issues ship mid-batch, so the last tag is routinely many commits behind.
+- **Exhaustive-switch discipline paid off.**
+  Migrating `normalizeInput`/`getToolInputPath`/`deriveSource` to `switch (classifyToolKind(...))` turned a future tool-kind addition into a compile error — the OCP win the issue set out to buy, now structurally enforced rather than convention.
+
+#### What caused friction (agent side)
+
+- `other` (over-verification) — during the ship close-comment step I re-checked the 40-char SHA length three times with three different one-liners (`wc -c`, `head -c 40`, `tr -d '\n' | wc -c`).
+  `git rev-parse <short>` already returns the full expanded SHA, so the length checks were redundant.
+  Impact: ~3 extra tool calls, no rework.
+
+#### What caused friction (user side)
+
+- **`mid-batch — defer` ask was moot in hindsight.**
+  The ship flow asked the operator up front whether to defer the release; the answer was defer.
+  Only later (step 4b) did the range-check confirm every unreleased commit is a non-releasing type (`docs:`/`refactor:`), so nothing would release regardless.
+  The early ask is deliberate design (a decision from the plan resists reversal), and cost one near-zero question — flagged as an observation, not a problem to fix.
+
+### Diagnostic details
+
+- **Model-performance correlation** — one subagent dispatch: the `pre-completion-reviewer` (its configured model) on judgment-heavy review work — an appropriate match; it ran the deterministic gates and returned a scoped PASS.
+- **Escalation-delay tracking** — no `rabbit-hole` friction points; no error sequence exceeded one tool call.
+- **Unused-tool detection** — nothing missed; `colgrep`/`grep`/`read` covered planning exploration, and no lens indicated an un-dispatched subagent was warranted.
+- **Feedback-loop gap analysis** — verification ran incrementally: `pnpm run check` after every shared-type step, the affected test file per red→green cycle, then the full suite + root `lint` + `fallow dead-code` before the reviewer.
+  No end-of-session-only verification.
+
+### Changes made
+
+1. `.pi/skills/pre-completion/SKILL.md` (Step 1) — added a note that under batched releases the last-tag `$BASE..HEAD` diff over-scopes to sibling issues' shipped files, and to scope the reviewer to the issue's own commits (`git diff --name-only <plan-commit>^..HEAD`) instead.

@@ -21,6 +21,9 @@ BASE=$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=
 git diff --name-only $BASE..HEAD
 ```
 
+When the last tag predates unrelated already-landed work (this repo batches releases — `refactor:`/`test:`/`build:` commits don't tag), `$BASE..HEAD` over-scopes to sibling issues' shipped files.
+Scope to the issue's own commits instead — anchor on the plan commit (`docs: plan … (#N)`): `git diff --name-only <plan-commit>^..HEAD`.
+
 Note:
 
 - The list of modified files.
