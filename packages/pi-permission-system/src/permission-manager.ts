@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { ResolvedAccessIntent } from "./access-intent/access-intent";
+import { classifyToolKind } from "./access-intent/tool-kind";
 import {
   getGlobalConfigPath,
   getProjectAgentsDir,
@@ -37,15 +38,6 @@ import type {
 import { isPermissionState } from "./types";
 import { wildcardMatch } from "./wildcard-matcher";
 
-const BUILT_IN_TOOL_PERMISSION_NAMES = new Set([
-  "bash",
-  "read",
-  "write",
-  "edit",
-  "grep",
-  "find",
-  "ls",
-]);
 const SPECIAL_PERMISSION_KEYS = new Set(["external_directory", "path"]);
 
 /** Universal fallback when permission["*"] is absent from all scopes. */
@@ -281,29 +273,10 @@ export class PermissionManager implements ScopedPermissionManager {
    */
   getToolPermission(toolName: string, agentName?: string): PermissionState {
     const { composedRules } = this.resolvePermissions(agentName);
-    const normalizedToolName = toolName.trim();
-
-    // Special surfaces (external_directory): evaluate directly by surface name.
-    if (SPECIAL_PERMISSION_KEYS.has(normalizedToolName)) {
-      return evaluate(normalizedToolName, "*", composedRules, this.platform)
-        .action;
-    }
-
-    // Bash, MCP, skill: evaluate with "*" value — the per-surface catch-all
-    // (or universal default) handles this correctly.
-    if (normalizedToolName === "bash") {
-      return evaluate("bash", "*", composedRules, this.platform).action;
-    }
-    if (normalizedToolName === "mcp") {
-      return evaluate("mcp", "*", composedRules, this.platform).action;
-    }
-    if (normalizedToolName === "skill") {
-      return evaluate("skill", "*", composedRules, this.platform).action;
-    }
-
-    // Tool-name surfaces (read, write, etc. and extension tools).
-    return evaluate(normalizedToolName, "*", composedRules, this.platform)
-      .action;
+    // Every surface (special, bash, mcp, skill, path-bearing, and extension
+    // tools) resolves its tool-level state identically: evaluate the surface
+    // name against the "*" catch-all value. There is no per-kind branch.
+    return evaluate(toolName.trim(), "*", composedRules, this.platform).action;
   }
 
   /**
@@ -391,7 +364,9 @@ function buildCheckResult(
   // For MCP, replace the normalizer's fallback target with the actual
   // matched candidate value so PermissionCheckResult.target is accurate.
   const extras =
-    surface === "mcp" ? { ...resultExtras, target: value } : resultExtras;
+    classifyToolKind(surface) === "mcp"
+      ? { ...resultExtras, target: value }
+      : resultExtras;
 
   return {
     toolName,
@@ -444,19 +419,22 @@ function deriveSource(
   toolName: string,
 ): PermissionCheckResult["source"] {
   if (rule.layer === "session") return "session";
-
-  if (toolName === "mcp") {
-    if (rule.layer === "default") return "default";
-    return "mcp";
-  }
-
   if (SPECIAL_PERMISSION_KEYS.has(toolName)) return "special";
-  if (toolName === "skill") return "skill";
-  if (toolName === "bash") return "bash";
 
-  // Built-in tools always report "tool"; extension tools distinguish default.
-  if (BUILT_IN_TOOL_PERMISSION_NAMES.has(toolName)) return "tool";
-  return rule.layer === "default" ? "default" : "tool";
+  switch (classifyToolKind(toolName)) {
+    case "mcp":
+      return rule.layer === "default" ? "default" : "mcp";
+    case "skill":
+      return "skill";
+    case "bash":
+      return "bash";
+    case "path":
+      // Built-in path-bearing tools (read/write/edit/grep/find/ls).
+      return "tool";
+    case "extension":
+      // Extension tools distinguish a synthesized-default match from a rule.
+      return rule.layer === "default" ? "default" : "tool";
+  }
 }
 
 // Re-export types that external modules import from this file.
