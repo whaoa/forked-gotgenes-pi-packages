@@ -423,7 +423,7 @@ This requires two detections:
 1. **Is the current process a subagent?**
    - `isSubagentExecutionContext()` in `src/authority/subagent-context.ts`.
 2. **What is the parent session ID?**
-   - `resolvePermissionForwardingTargetSessionId()` in `src/permission-forwarding.ts`.
+   - `resolvePermissionForwardingTargetSessionId()` in `src/authority/permission-forwarding.ts`.
 
 ### Known extension env var inventory
 
@@ -461,9 +461,9 @@ Adding a new env var candidate when an extension adopts the convention is a one-
 ### In-process case (resolved)
 
 In-process subagent extensions (e.g. `@gotgenes/pi-subagents`) call `createAgentSession()` directly - no child process is spawned and no env vars are ever set.
-`@gotgenes/pi-subagents` publishes `subagents:child:session-created` (before `bindExtensions()`) and `subagents:child:disposed` (in the run's `finally`); `src/subagent-lifecycle-events.ts` subscribes and writes/removes the entry in `SubagentSessionRegistry` synchronously.
-The registry is process-global (see `getSubagentSessionRegistry()` in `src/subagent-registry.ts`) so the child's separate jiti instance reads the same store as the parent.
-See `src/subagent-registry.ts` and [Subagent Integration](../subagent-integration.md) for details.
+`@gotgenes/pi-subagents` publishes `subagents:child:session-created` (before `bindExtensions()`) and `subagents:child:disposed` (in the run's `finally`); `src/authority/subagent-lifecycle-events.ts` subscribes and writes/removes the entry in `SubagentSessionRegistry` synchronously.
+The registry is process-global (see `getSubagentSessionRegistry()` in `src/authority/subagent-registry.ts`) so the child's separate jiti instance reads the same store as the parent.
+See `src/authority/subagent-registry.ts` and [Subagent Integration](../subagent-integration.md) for details.
 
 ### External convention guide
 
@@ -493,8 +493,9 @@ The `PermissionsService` interface exposes three methods:
 ## Target: the authority model
 
 The sections above describe the current implementation.
-This section records the organizing concept the package is moving toward — the spine that the elicitation, forwarding, and yolo machinery should collapse into.
-It is a target, not current state: the `Authorizer` interface, its three implementations, and once-per-activation selection landed in Phase 9 Step 1 ([#555]), and `canConfirm()` was dissolved in Phase 9 Step 2 ([#556]) — the ask path now always escalates to the selected `Authorizer`; and serving (`ForwardedRequestServer`) was rebuilt onto `evaluate()` + the serving `Authorizer` in Phase 9 Step 3 ([#557]) — the yolo, elicitation, and forwarding machinery now collapse onto the spine as intended.
+This section records the organizing concept the package is built around — the spine the elicitation, forwarding, and yolo machinery collapse into.
+It is now current state, not merely a target: the `Authorizer` interface, its three implementations, and once-per-activation selection landed in Phase 9 Step 1 ([#555]); `canConfirm()` was dissolved in Phase 9 Step 2 ([#556]) — the ask path now always escalates to the selected `Authorizer`; serving (`ForwardedRequestServer`) was rebuilt onto `evaluate()` + the serving `Authorizer` in Phase 9 Step 3 ([#557]); human-selectable grant-scope landed in Phase 9 Step 4 ([#558]); and the mechanical `authority/` directory migration completed in Phase 9 Step 5 ([#559]) — the yolo, elicitation, and forwarding machinery now collapse onto the spine as built.
+Only the ["beyond the target"](#beyond-the-target-a-non-deterministic-access-intent-classifier) extension points below (the model-triage `Authorizer`, a non-deterministic access-intent classifier, a pluggable escalation seam) remain aspirational.
 
 ### Why this is worth doing
 
@@ -842,112 +843,16 @@ src/
 └── types.ts                   Core type definitions; the config-shape types (PermissionState, FlatPermissionConfig, etc.) are re-exported from config-schema.ts (#547); domain type guards `isPermissionState`, `isDenyWithReason` (#532)
 ```
 
-## Improvement roadmap — Phase 9: The Authorizer spine
+## Improvement roadmap — Phase 9: The Authorizer spine (complete)
 
-### Findings summary
+Phase 9 built the [authority model](#target-the-authority-model) spine that Phase 8 tidied for: the `Authorizer` interface and its three implementations (`LocalUserAuthorizer`, `ParentAuthorizer`, `DenyingAuthorizer`) selected once per session, `canConfirm()` dissolved so the ask path always escalates, `ForwardedRequestServer` rebuilt onto `evaluate()` plus the serving session's own `Authorizer` so parent `allow`/`deny` rules now govern a child's escalation, human-selectable grant-scope on forwarded approvals, and the mechanical completion of the `authority/` directory migration (flat `src/` root: ~67 → 62 modules).
 
-Phase 9 builds the [authority model](#target-the-authority-model) spine that Phase 8 tidied for.
-The cause is first-principles, not tool-sourced: the live-authority path — what happens on `ask` — has no single owner.
-The deontic question "who may decide, and how do we reach them" is answered by an accretion of collaborators: `GateRunner` asks `GatePrompter.canConfirm()`, `PromptingGateway` computes it from `hasUI || isSubagent`, `ApprovalEscalator.requestApproval` re-branches on the same predicates per prompt, and `PermissionPrompter.prompt` reads `ctx.hasUI` a third time for event emission.
-"No authority reachable" is represented twice with different logging (`applyPermissionGate`'s `ask` + `!canConfirm` arm and `requestApproval`'s not-a-subagent arm).
-The serving side (`ForwardedRequestServer.processSingleForwardedRequest`) answers escalations with bespoke logic — its own yolo check (the last one outside the composed ruleset) and no `evaluate()` — so a parent `allow`/`deny` rule does not govern a child's escalation.
-Fallow corroborates the symptoms: the three largest non-test functions after the composition root are exactly the ask-path modules (`runDescriptor` 130 lines, `processSingleForwardedRequest` 117, `waitForForwardedApproval` 77); dead code is 0 and duplication is 0.4%.
+All 5 steps are closed: [#555], [#556], [#557], [#558], [#559].
+Open issues swept and confirmed out of scope during planning: [#309], [#490], [#520], [#521], [#519], [#23].
+The `ModelTriageAuthorizer` ([#472]) remains deferred to a later phase with its own decision record.
+Follow-on issue [#565] (validate serving-is-resolution decisions post-ship) remains open, tracking live observation of the new parent-governs-child-escalation behavior; it is non-gating.
 
-| Metric                                                                                  | Phase 8 exit                 | Phase 9 target   |
-| --------------------------------------------------------------------------------------- | ---------------------------- | ---------------- |
-| Health score                                                                            | 78 B                         | ≥ 78             |
-| Dead exports / files                                                                    | 0                            | 0                |
-| Ask-path role interfaces (`GatePrompter`, `PermissionPrompterApi`, `ApprovalRequester`) | 3                            | 1 (`Authorizer`) |
-| `canConfirm` occurrences in `src/`                                                      | 15 across 5 modules          | 0                |
-| `hasUI` / `isSubagent` evaluations per ask                                              | 3+ per prompt                | once per session |
-| Yolo checks outside the composed ruleset                                                | 1 (`ForwardedRequestServer`) | 0                |
-| `processSingleForwardedRequest`                                                         | 117 lines                    | < 60 lines       |
-| Flat `src/` root modules                                                                | ~67                          | ~62              |
-
-Scope decisions from planning: grant-scope selection ([resolved direction](#resolved-direction) 4) is included as the tail step; the `ModelTriageAuthorizer` ([#472]) is deferred to a later phase with its own decision record — the Step 1 seam is its extension point.
-The two production clone groups (58 lines total, unrelated to the spine) score polish-tier (Priority ≤ 10) and are deferred.
-Open issues swept and out of scope: [#309] (advisory bash-path fidelity), [#490] (indirection-wrapper flooring), [#520] (win32 backslash-relative bug), [#521] (read-only command allowlisting), [#519] (SDK UIContext clarification), [#23] (upstream-fork per-agent override evaluation).
-
-### Steps
-
-1. **✅ Introduce the `Authorizer` spine: interface, three implementations, once-per-session selection.**
-   ([#555]) Cause: the three-way "who decides" dispatch is buried inside `ApprovalEscalator.requestApproval` and re-derived per prompt; the fallow signal (`waitForForwardedApproval` at 77 lines inside a class that also owns dispatch) is a symptom.
-   Target: new `src/authority/authorizer.ts` (`Authorizer` interface — `authorize(details): Promise<PermissionPromptDecision>` — plus `selectAuthorizer(ctx, detection)`), new `src/authority/local-user-authorizer.ts` (owns `ctx.ui` + `requestPermissionDecisionFromUi` + direct UI-prompt event emission), new `src/authority/denying-authorizer.ts` (least-privilege deny), `src/authority/approval-escalator.ts` (sheds its `hasUI` and not-a-subagent arms; its forwarding machinery becomes the `ParentAuthorizer`), `src/prompting-gateway.ts` rewritten as the selection owner at `src/authority/authorizer-selection.ts` (context stored at `activate`, authorizer selected once per session), `src/permission-prompter.ts` → `src/authority/permission-prompter.ts` (keeps review-log bracketing, delegates to the selected `Authorizer`, drops per-call `ctx` threading).
-   Smell: Category C (missing domain concept; relay chain of 4 role interfaces to reach one dialog).
-   Outcome: the `hasUI`/`isSubagent`/deny dispatch exists in exactly one place (`selectAuthorizer`); predicates evaluated once per session activation; behavior-neutral — existing review-log and decision-event tests pass unchanged.
-   Landed: `src/authority/authorizer.ts` (`Authorizer` interface, `AuthorizerSelectionDeps`, `selectAuthorizer`), `local-user-authorizer.ts`, `denying-authorizer.ts`, and `authorizer-selection.ts` (`AuthorizerSelection`, the `PromptingGateway` rewrite) landed in one commit alongside the moved `authority/permission-prompter.ts` and the wired `index.ts`; a second commit folded `ApprovalEscalator` directly into `ParentAuthorizer` (`approval-escalator.ts`), removing the transitional wrapper, the dead `hasUI`/`!isSubagent` arms, and the now-unused `ApprovalRequester` interface and `detection` dependency.
-   `GatePrompter.canConfirm()` survives unchanged, as planned — dissolved next in Step 2.
-   Impact 5 / Risk 3 / Priority 15.
-   Release: independent
-
-2. ✅ **Dissolve `canConfirm()`: the ask path always escalates.**
-   ([#556]) Cause: "can anyone answer" is a pre-check duplicating the selection knowledge; with `DenyingAuthorizer`, absent authority is an authorizer that answers, not a boolean smeared across the gateway, gate, and runner.
-   Target: delete `src/gate-prompter.ts`; `src/permission-gate.ts` drops the `canConfirm` param (`ask` always awaits `promptForApproval`); `src/handlers/gates/runner.ts` drops the pre-check; `src/handlers/gates/helpers.ts` derives `confirmation_unavailable` from a marker on the `DenyingAuthorizer`'s decision (mirroring the existing `autoApproved` marker).
-   Landed: `GatePrompter` deleted and replaced by the single-method `AskEscalator` seam (`escalate(details)`, `authorizer-selection.ts`); `permission-gate.ts`/`runner.ts`/`helpers.ts` shed the `canConfirm` plumbing; `DenyingAuthorizer` denies with a `confirmationUnavailable` marker and `PermissionPrompter` surfaces it as the denied entry's `resolution`.
-   Smell: Category C (scattered boolean policy) / Category A (parameter dead after Step 1).
-   Outcome: `canConfirm` occurrences in `src/` drop 15 → 0; `runDescriptor` sheds the pre-check plumbing.
-   The ask path now escalates uniformly — the `DenyingAuthorizer` is bracketed like any authorizer — so the unavailable path is recorded as the prompter's `waiting`/`denied` entries (`resolution: confirmation_unavailable`, preserved via the marker) rather than a standalone gate-written `blocked` entry; the `confirmation_unavailable` decision event is unchanged.
-   This is a deliberate design decision (uniform escalation over byte-identical review-log shape), so the review log differs from Step 1's target wording.
-   Impact 4 / Risk 2 / Priority 16.
-   Release: independent
-
-3. ✅ **Serving is resolution: rebuild `processInbox` on `evaluate()` + the serving session's `Authorizer`.**
-   ([#557]) Cause: the serving node answers escalations without consulting its own recorded authority ([resolved direction](#resolved-direction) 1), so parent policy cannot govern a child's escalation and yolo needs the bespoke serve-time check.
-   Target: `src/authority/forwarded-request-server.ts` — inject a policy view + the `AskEscalator` seam; a request carrying `(surface, value)` resolves against the serving node's composed base ruleset (`agentName` undefined — the child applied its own per-agent overrides before forwarding; `allow`, including yolo-rewritten, auto-approves — yolo inheritance for free; `deny` auto-denies; `ask` or missing fields escalates through the seam); the escalated ask carries its forwarded provenance (requester agent/session, original `source`/`surface`/`value`) as data on `PromptPermissionDetails`, so `LocalUserAuthorizer` emits the non-degraded forwarded `permissions:ui_prompt` broadcast and the server sheds its bespoke emit + dialog path; remove `isYoloModeEnabled` + the `ConfigReader` dep; add the one-hop canary (loud warning when a request arrives from a requester whose registered parent is not the serving session).
-   Smell: Category C (duplicate policy enforcement; single source of truth) / Category A (bespoke yolo arm).
-   Outcome: zero yolo checks outside the composed ruleset; `processSingleForwardedRequest` < 60 lines; one `permissions:ui_prompt` emit site (`LocalUserAuthorizer`); behavior change (ships as `feat:`): parent `allow`/`deny` rules now govern children's escalations.
-   Invariant (pinned by test): the forwarded `permissions:ui_prompt` broadcast stays non-degraded — original `source` and `surface`/`value` projection preserved, `forwarding` context populated — per the [#292] contract hardening documented in `docs/cross-extension-api.md`; rerouting the prompt through the `Authorizer` must not regress it.
-   Landed: `ForwardedRequestServer` resolves each request on the injected `ServingPolicy` (recorded authority) and escalates `ask`/field-less requests through the `AskEscalator` seam; `LocalUserAuthorizer` became the single `permissions:ui_prompt` emit site rendering forwarded provenance from `PromptPermissionDetails` (the `buildDirectUiPrompt`/`buildForwardedUiPrompt` split folded into `buildUiPrompt`); the bespoke yolo check + `ConfigReader` dep are gone and the one-hop canary warns on a multi-hop/misrouted requester.
-   Design recorded in `docs/decisions/0005-serving-authorizer-provenance.md`; post-ship validation in [#565].
-   Impact 5 / Risk 3 / Priority 15.
-   Release: independent
-
-4. **✅ Grant-scope selection on forwarded approvals.**
-   ([#558]) Cause: [resolved direction](#resolved-direction) 4 — a forwarded "for this session" grant can today land only on the requesting subagent; the human cannot choose the serving scope.
-   Target: `src/permission-forwarding.ts` (request carries the child's suggested session pattern), `src/authority/approval-escalator.ts` (rides the existing `sessionApproval` suggestion along), `src/authority/forwarded-request-server.ts` (threads the scope choice into the escalated ask's details — after Step 3 the forwarded dialog is shown by `LocalUserAuthorizer` via the threaded provenance, not server-local prompting), `src/authority/local-user-authorizer.ts` + `src/permission-dialog.ts` (scope-aware dialog options — requesting subagent pre-selected as the least-privilege default); a whole-session grant records into the serving node's own `SessionRules`.
-   Smell: completes the Category C authority model (feature riding the spine).
-   Outcome: the forwarded dialog offers "this subagent only" (default) vs "whole session"; a whole-session grant suppresses future prompts for the parent and all children (verified by a composition-root round-trip test).
-   Landed: the child rides its `SessionApproval` on `PromptPermissionDetails.sessionApproval` → `ForwardedPermissionRequest.sessionApproval` (tolerant read); `LocalUserAuthorizer` offers a two-step scope select (`buildForwardedScopeLabels`) for a forwarded ask carrying a suggestion; a whole-session choice returns the serving-node-internal `approved_for_serving_session` state, which `ForwardedRequestServer.applyGrantScope` records into the serving `SessionRules` and translates to a plain `approved` (child records nothing, re-forwards, auto-approves).
-   Design recorded in `docs/decisions/0006-forwarded-grant-scope-selection.md`.
-   Impact 3 / Risk 3 / Priority 9.
-   Release: independent
-
-5. ✅ **Complete the `authority/` migration.**
-   ([#559]) Cause: Phase 8's forward-looking directory sketch names the elicitation and subagent modules as `authority/` residents; Steps 1–4 rewrite most of them into place, and this step moves the mechanical remainder so the domain is closed and files move once.
-   Target: `src/permission-dialog.ts`, `src/permission-forwarding.ts`, `src/subagent-registry.ts`, `src/subagent-lifecycle-events.ts`, `src/forwarding-manager.ts` → `src/authority/`; imports rewritten via the `#src/` aliases.
-   Smell: Category E (flat directory).
-   Outcome: all escalation/forwarding/subagent modules live under `src/authority/`; flat `src/` root drops ~67 → ~62 modules; no behavior change.
-   Landed: all five modules relocated via `git mv`; parent-relative imports rewritten to `#src/authority/…` aliases (mechanically verified by `tsc` + eslint's `no-parent-relative-imports` rule); five test files moved into `test/authority/` to match the established layout; no logic changes.
-   Impact 2 / Risk 1 / Priority 10.
-   Release: independent
-
-### Step dependency diagram
-
-```mermaid
-flowchart TD
-    S1["✅ Step 1 (#555)<br/>Authorizer interface + selection"]
-    S2["✅ Step 2 (#556)<br/>Dissolve canConfirm"]
-    S3["✅ Step 3 (#557)<br/>Serving is resolution"]
-    S4["✅ Step 4 (#558)<br/>Grant-scope selection"]
-    S5["✅ Step 5 (#559)<br/>Complete authority/ migration"]
-
-    S1 --> S2
-    S1 --> S3
-    S3 --> S4
-    S2 --> S5
-    S4 --> S5
-```
-
-### Parallel tracks
-
-- **Track A — spine:** Step 1 → Step 2.
-- **Track B — serving:** Step 1 → Step 3 → Step 4 (parallel to Track A after Step 1; disjoint files).
-- **Track C — organization:** Step 5, after both tracks land.
-
-### Release batches
-
-- No multi-step batch: every step leaves the package consistent on its own.
-- Independently releasable: Steps 1, 2, 5 (refactors; hidden changelog type, auto-batch into the next release), Steps 3, 4 (`feat:` — each cuts a release on landing).
+Full findings, step details, dependency diagram, and release batches: [history/phase-9-authorizer-spine.md](history/phase-9-authorizer-spine.md).
 
 ## Improvement roadmap — Phase 8: Tidy first for the authority spine (complete)
 
@@ -969,7 +874,7 @@ Full findings, step details, dependency diagram, and release batches: [history/p
 
 ## Refactoring history
 
-The architecture above is the product of eight completed improvement phases.
+The architecture above is the product of nine completed improvement phases.
 Each phase's findings, numbered plan, dependency graph, and health metrics are preserved in a per-phase history file under [`history/`](history/).
 
 | Phase | Theme                                           | History                                                                                                  |
@@ -982,6 +887,7 @@ Each phase's findings, numbered plan, dependency graph, and health metrics are p
 | 6     | Access-intent extraction                        | [phase-6-access-intent-extraction.md](history/phase-6-access-intent-extraction.md)                       |
 | 7     | AccessPath as the universal path representation | [phase-7-accesspath-universal-representation.md](history/phase-7-accesspath-universal-representation.md) |
 | 8     | Tidy first for the authority spine              | [phase-8-tidy-first-authority-spine.md](history/phase-8-tidy-first-authority-spine.md)                   |
+| 9     | The Authorizer spine                            | [phase-9-authorizer-spine.md](history/phase-9-authorizer-spine.md)                                       |
 
 ### Phase 1 — Preview formatter extension seam (complete)
 
@@ -1022,6 +928,11 @@ Five steps ([#502]–[#506]), all closed, plus the `PathNormalizer` platform-sea
 
 Prepared the [authority model](#target-the-authority-model) spine for Phase 9 without building it: moved yolo out of the prompt path into a composition-stage ruleset rewrite, split the dual-role `PermissionForwarder` into `ApprovalEscalator` and `ForwardedRequestServer` under a new `src/authority/` domain, extracted a single `SubagentDetection` collaborator, removed the deprecated event-bus RPC channel (breaking), and cut test-tree duplication from 6.7% to 0.2%.
 Eight steps ([#525]–[#532]), all closed.
+
+### Phase 9 — The Authorizer spine (complete)
+
+Built the [authority model](#target-the-authority-model) spine: the `Authorizer` interface and its three implementations (`LocalUserAuthorizer`, `ParentAuthorizer`, `DenyingAuthorizer`) selected once per session, `canConfirm()` dissolved so the ask path always escalates, `ForwardedRequestServer` rebuilt onto `evaluate()` plus the serving session's own `Authorizer` so parent `allow`/`deny` rules now govern a child's escalation, human-selectable grant-scope on forwarded approvals, and the mechanical completion of the `authority/` directory migration.
+Five steps ([#555]–[#559]), all closed.
 
 [#261]: https://github.com/gotgenes/pi-packages/issues/261
 [#266]: https://github.com/gotgenes/pi-packages/issues/266
