@@ -746,6 +746,7 @@ src/
 │   ├── path-normalization.ts `AccessPath`'s representation backing (relocated from `path-utils.ts`, [#505]): `normalizePathForComparison` (lexical absolute), `canonicalNormalizePathForComparison` (symlink-resolved + win32-lowercased, [#382]), `normalizePathPolicyLiteral` (literal cleanup), `getPathPolicyValues` (lexical ∪ relative match set) + `PathPolicyValueOptions`; pure derivation, injected `platform`, calls `isPathWithinDirectory` (from `path-containment.ts`) downward for the cwd-relative alias
 │   ├── access-intent.ts     `AccessIntent` discriminated union each gate emits: `tool` (raw input the manager normalizes) and `access-path` (an `AccessPath` for every path gate — `path`, `external_directory`, and the per-tool path-bearing surfaces `read`/`write`/`edit`/`grep`/`find`/`ls`, #486, #502); `ResolvedAccessIntent` (`tool | path-values`) is what the manager consumes after the resolver unwraps `access-path` via `matchValues()`, keeping the manager string-based — `path-values` is resolver-internal, not gate-emitted, since #486 (#478, #486)
 │   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form), `resolvedAlias(): string | undefined` (the canonical form only when distinct from the lexical form, for disclosing a symlink target in a prompt/denial message, #507); the surface-neutral `forPath(pathValue, { cwd, resolveBase?, platform })` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison` (all from `path-normalization.ts`, [#505]) (resolveBase defaults to cwd; `platform` injected, not read ambiently, #510; serves every path surface, #486), and `forLiteral(literal, matchAliases?)` builds a literal-only path with no canonical for the unknown-base bash case ([#393]); `forDevice(devicePath)` preserves an MSYS device path verbatim across all three representations, and `forLiteral`'s optional `matchAliases` carries a win32 backslash match alias for a Git Bash POSIX absolute so a `/tmp/*` rule matches under separator folding (#533); type-distinct accessors make the lexical/canonical conflation a compile error (#476)
+│   ├── tool-kind.ts        `ToolKind` string-union classification + `classifyToolKind(toolName)` — the single dispatch point deciding what an invocation accesses (bash command / MCP target / skill / path-bearing tool / extension) once at the normalize boundary; imports only `PATH_BEARING_TOOLS` (AccessPath-free, so `permission-manager.ts` may consume it without breaching the ADR-0002 string boundary); the extraction consumers (`input-normalizer`, `tool-input-path`, the tool-call gate pipeline, `permission-manager`'s `deriveSource`) dispatch on it instead of re-deriving `toolName === "bash"`/`"mcp"` (Phase 10 Step 1, #568)
 │   └── bash/
 │       ├── parser.ts           Lazy tree-sitter-bash parser: `TSNode` interface (exported), `TSParser` interface (private), `initParser` (private), `getParser = memoizeAsyncWithRetry(initParser)` (exported); dropped from `bash-program.ts` (#473)
 │       ├── node-text.ts        Quote-aware AST node-text resolver: `resolveNodeText` (pure; handles `word`, `raw_string`, `string`, `concatenation`, expansions, default fallback), `SKIP_SUBTREE_TYPES` (heredoc/comment sentinel set), `ARG_NODE_TYPES` (argument-value node-type set; peer of `SKIP_SUBTREE_TYPES`); dropped from `bash-program.ts` (#473, #474)
@@ -887,7 +888,7 @@ Recompute commands (run from the repo root):
 
 ### Steps
 
-#### Step 1: Introduce a tool-kind classification decided once at the normalize boundary ([#568])
+#### ✅ Step 1: Introduce a tool-kind classification decided once at the normalize boundary ([#568])
 
 **Cause:** the extraction question — "what does this invocation access: a bash command, an MCP target, or a path?"
 — is a domain decision re-derived by silent string comparison at every consumer instead of decided once where the invocation enters the system ([#561]).
@@ -897,6 +898,7 @@ The 21 grep sites are the symptom; the cause is the missing dispatch point.
 - **Target:** new `src/access-intent/tool-kind.ts` (the classification and its per-kind extraction product); migrate the extraction consumers: `input-normalizer.ts`, `tool-input-path.ts`, `handlers/gates/tool.ts`, `handlers/gates/tool-call-gate-pipeline.ts`, `permission-manager.ts`.
   Constraint: `permission-manager.ts` stays string-based per `docs/decisions/0002-path-values-string-boundary.md`; the classification value is plain data, safe to consume there.
 - **Outcome:** extraction-family `toolName === "bash"`/`"mcp"` sites drop to 0 outside `access-intent/tool-kind.ts`; total family sites 21 → ≤ 12 (presentation family remains until Step 2).
+- **Landed:** `access-intent/tool-kind.ts` (`ToolKind` + `classifyToolKind`) added; the five extraction consumers migrated onto it; total family 21 → 12 (all remaining sites are the presentation family Step 2 clears, plus one docstring inside `tool-kind.ts`). `getToolPermission`'s dead per-kind branches collapsed to a single `evaluate(…, "*", …)` in the same pass.
 - **Impact 4 / Risk 2 / Priority 16.**
 
 Release: batch "tool-kind-dispatch"
@@ -963,7 +965,7 @@ Release: independent
 
 ```mermaid
 flowchart TD
-    S1["Step 1 - Tool-kind classification decided once (#568)"] --> S2["Step 2 - Presentation family onto the tool-kind product (#569)"]
+    S1["✅ Step 1 - Tool-kind classification decided once (#568)"] --> S2["Step 2 - Presentation family onto the tool-kind product (#569)"]
     S1 -.->|"soft ordering — shared input-normalizer.ts churn"| S4["Step 4 - Advisory bash decomposition parity (#309)"]
     S3["Step 3 - PathFlavor + src/path/ domain (#562)"]
     S5["Step 5 - Indirection-wrapper re-target/floor (#490)"]
