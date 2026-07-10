@@ -1,4 +1,4 @@
-import { PATH_BEARING_TOOLS } from "./path-surfaces";
+import { classifyToolKind } from "./access-intent/tool-kind";
 import type { ToolAccessExtractorLookup } from "./tool-access-extractor-registry";
 import { getNonEmptyString, toRecord } from "./value-guards";
 
@@ -6,7 +6,7 @@ export function getPathBearingToolPath(
   toolName: string,
   input: unknown,
 ): string | null {
-  if (!PATH_BEARING_TOOLS.has(toolName)) {
+  if (classifyToolKind(toolName) !== "path") {
     return null;
   }
 
@@ -31,24 +31,22 @@ export function getToolInputPath(
   input: unknown,
   extractors?: ToolAccessExtractorLookup,
 ): string | null {
-  if (toolName === "bash") {
-    return null;
-  }
-
   const record = toRecord(input);
 
-  if (PATH_BEARING_TOOLS.has(toolName)) {
-    return getNonEmptyString(record.path);
+  switch (classifyToolKind(toolName)) {
+    case "bash":
+      return null;
+    case "path":
+      return getNonEmptyString(record.path);
+    case "mcp":
+      return getNonEmptyString(toRecord(record.arguments).path);
+    case "skill":
+    case "extension": {
+      const custom = extractors?.get(toolName);
+      if (custom) {
+        return getNonEmptyString(custom(record));
+      }
+      return getNonEmptyString(record.path);
+    }
   }
-
-  if (toolName === "mcp") {
-    return getNonEmptyString(toRecord(record.arguments).path);
-  }
-
-  const custom = extractors?.get(toolName);
-  if (custom) {
-    return getNonEmptyString(custom(record));
-  }
-
-  return getNonEmptyString(record.path);
 }
