@@ -90,6 +90,7 @@ A missing export throws `is not a function` at runtime but surfaces as `TS2305` 
 
 - When `prefer-nullish-coalescing` flags `||`, check whether the left side could be a falsy non-null value (`""`, `0`, `false`) that the code intentionally converts to the fallback.
   If so, keep `||` and add `// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- || intentional: converts falsy values to fallback`.
+  The rule also flags the equivalent `x ? x : y` ternary, so do not reach for a ternary to dodge it — use `x || y` with the disable.
   Do not mechanically replace `||` with `??` without verifying test expectations.
 
 ## TDD planning rules

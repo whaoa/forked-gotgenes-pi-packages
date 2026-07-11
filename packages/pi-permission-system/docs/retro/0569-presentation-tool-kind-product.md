@@ -54,3 +54,50 @@ The recompute grep dropped from 12 to 2 (both inside `tool-kind.ts`: the docstri
   Real tool names never carry surrounding whitespace, so this is not an observable change.
 - **Plan held exactly.**
   All touched files matched the Module-Level Changes list; the metric prediction (12 → 2) and the SRP design (single no-target `isMcpCheck` with `&& target` hoisted to call sites) landed as written.
+
+## Stage: Final Retrospective (2026-07-11T03:00:54Z)
+
+### Session summary
+
+One continuous session carried #569 through all four stages — plan, TDD, ship, retro — for Phase 10 Step 2 of the pi-permission-system roadmap, completing the "tool-kind-dispatch" batch.
+The implementation landed cleanly: five red→green→commit cycles (four `refactor:` + one `docs:`), suite 2317 → 2321 (+4 `isMcpCheck` unit tests), pre-completion PASS, CI green, issue closed, no release cut (all commits are `refactor:`/excluded-`docs:`, so the batch auto-defers to the next releasing change).
+One minor self-caught lint fixup; zero rework, zero user corrections, zero CI or reviewer failures.
+
+### Observations
+
+#### What went well
+
+- **Plan-to-execution fidelity, second consecutive batch step.**
+  Like #568, the plan's predictions held exactly: the SRP design (one no-target `isMcpCheck`, `&& target` hoisted to call sites), the metric (recompute 12 → 2, both inside `tool-kind.ts`), and the Test Impact Analysis (existing suites already pin every branch, no new characterization tests) all landed as written.
+  The two `source === "mcp"`-disjunct characterization tests the plan called out (`denial-messages.test.ts` "MCP source with target on non-mcp toolName", `tool-preview-formatter.test.ts` "returns undefined for mcp source") were the exact safety net that made each migration a pure refactor under green.
+- **Fold-first-consumer mitigation worked again.**
+  Introducing `isMcpCheck` and migrating `denial-messages.ts` in the same commit kept the export from ever landing unwired — `fallow dead-code` stayed green, as the plan's mitigation anticipated.
+
+#### What caused friction (agent side)
+
+- `other` (plan mispredicted the lint-safe form) — the plan's `deriveDecisionValue` sketch used a truthy ternary (`path ? path : toolName`) to preserve the empty-path fall-through, but `@typescript-eslint/prefer-nullish-coalescing` also flags the `x ? x : y` ternary, not just `||`.
+  The commit hook rejected it; I switched to `path || toolName` + an `eslint-disable-next-line` (the testing skill's documented idiom).
+  Self-identified (caught by the pre-commit gate).
+  Impact: one extra edit + one eslint re-run within Step 4, no rework, no reorder.
+- `missing-context` (malformed read path) — an early planning read used `/Users/chris/development/pi/pi-permission-system/src/permission-manager.ts` (missing the `pi-packages/packages/` segment), which the permission system correctly denied as an external-directory access.
+  Re-read with the correct `packages/pi-permission-system/...` path immediately.
+  Impact: one denied tool call, no rework.
+
+#### What caused friction (user side)
+
+- None.
+  User involvement was mechanical flow-approval only; no strategic redirection was needed and none was missing.
+  The one permission denial was the extension doing its job on an agent-side path typo, not a user intervention.
+
+### Diagnostic details
+
+- **Model-performance correlation** — one subagent dispatch: the `pre-completion-reviewer` on judgment-heavy review work (deterministic gates + behavior-preservation verification).
+  Appropriate match; it ran the gates and returned a scoped PASS with accurate recompute numbers.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the lint error resolved in a single edit, no error sequence exceeded one tool call.
+- **Unused-tool detection** — nothing missed; `grep`/`read` covered the small exploration surface (this was a well-specified refactor with the plan already in hand).
+- **Feedback-loop gap analysis** — verification ran incrementally: `pnpm run check` after the shared-type step and again after Step 4, the affected test file per red→green cycle, then the full suite + root `lint` + `fallow dead-code` before the reviewer.
+  No end-of-session-only verification.
+
+### Changes made
+
+1. `.pi/skills/testing/SKILL.md` (Operator semantics) — noted that `@typescript-eslint/prefer-nullish-coalescing` also flags the `x ? x : y` ternary, not only `||`, so a ternary cannot be used to dodge the rule; use `x || y` with the disable.
