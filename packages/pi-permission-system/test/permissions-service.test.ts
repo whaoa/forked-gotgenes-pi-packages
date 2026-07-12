@@ -21,6 +21,19 @@ vi.mock("node:fs", () => ({
   default: { realpathSync },
 }));
 
+// Mock the advisory bash resolver so the service test asserts delegation; the
+// decomposition behavior itself is covered in bash-advisory-check.test.ts.
+const resolveBashAdvisoryCheck = vi.hoisted(() =>
+  vi.fn<
+    (
+      command: string,
+      agentName: string | undefined,
+      resolver: unknown,
+    ) => PermissionCheckResult
+  >(),
+);
+vi.mock("#src/bash-advisory-check", () => ({ resolveBashAdvisoryCheck }));
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
 interface FakeResolver {
@@ -85,18 +98,49 @@ const normalizer = new PathNormalizer(posixPathFlavor, "/test/project");
 beforeEach(() => {
   realpathSync.mockReset();
   realpathSync.mockImplementation((p: string) => p);
+  resolveBashAdvisoryCheck.mockReset();
+  resolveBashAdvisoryCheck.mockReturnValue(
+    makeCheckResult({ toolName: "bash" }),
+  );
 });
 
 describe("checkPermission", () => {
   it("resolves a non-path surface through a tool intent", () => {
     const { service, resolver } = makeService();
-    service.checkPermission("bash", "echo hi", "my-agent");
+    service.checkPermission("skill", "my-skill", "my-agent");
     expect(resolver.resolve).toHaveBeenCalledWith({
       kind: "tool",
-      surface: "bash",
-      input: { command: "echo hi" },
+      surface: "skill",
+      input: { name: "my-skill" },
       agentName: "my-agent",
     });
+  });
+
+  it("routes a bash query through the advisory decomposition resolver", () => {
+    const { service, resolver } = makeService();
+    const expected = makeCheckResult({ state: "deny", toolName: "bash" });
+    resolveBashAdvisoryCheck.mockReturnValue(expected);
+    const result = service.checkPermission(
+      "bash",
+      "cd /repo && npm install x",
+      "my-agent",
+    );
+    expect(resolveBashAdvisoryCheck).toHaveBeenCalledWith(
+      "cd /repo && npm install x",
+      "my-agent",
+      resolver,
+    );
+    expect(result).toBe(expected);
+  });
+
+  it("passes an empty string to the advisory resolver for a value-less bash query", () => {
+    const { service, resolver } = makeService();
+    service.checkPermission("bash");
+    expect(resolveBashAdvisoryCheck).toHaveBeenCalledWith(
+      "",
+      undefined,
+      resolver,
+    );
   });
 
   it("resolves an external_directory path query through an access-path intent matching the canonical alias", () => {
@@ -133,11 +177,11 @@ describe("checkPermission", () => {
   });
 
   it("returns the result from resolver.resolve", () => {
-    const expected = makeCheckResult({ state: "deny", toolName: "bash" });
+    const expected = makeCheckResult({ state: "deny", toolName: "skill" });
     const resolver = makeResolver();
     resolver.resolve.mockReturnValue(expected);
     const { service } = makeService({ resolver });
-    const result = service.checkPermission("bash", "rm -rf /");
+    const result = service.checkPermission("skill", "my-skill");
     expect(result).toBe(expected);
   });
 });

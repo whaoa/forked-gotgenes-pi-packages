@@ -1,4 +1,5 @@
 import type { AccessIntent } from "./access-intent/access-intent";
+import { resolveBashAdvisoryCheck } from "./bash-advisory-check";
 import { buildAccessIntentForSurface } from "./input-normalizer";
 import type { PathNormalizer } from "./path-normalizer";
 import type { PermissionsService } from "./service";
@@ -50,6 +51,13 @@ export class LocalPermissionsService implements PermissionsService {
     value?: string,
     agentName?: string,
   ): ReturnType<PermissionsService["checkPermission"]> {
+    // Bash decomposes at gate parity: a chained/nested command is split into
+    // its command-pattern units and resolved most-restrictive, matching what
+    // the enforcement gate enforces (#309). A cold parser falls back to the
+    // whole-string match inside resolveBashAdvisoryCheck.
+    if (surface === "bash") {
+      return resolveBashAdvisoryCheck(value ?? "", agentName, this.resolver);
+    }
     const intent = buildAccessIntentForSurface(
       surface,
       value,
