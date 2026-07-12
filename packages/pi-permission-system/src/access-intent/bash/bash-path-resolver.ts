@@ -440,11 +440,10 @@ export class BashPathResolver {
   ): BashPathRuleCandidate[] {
     const seen = new Set<string>();
     const result: BashPathRuleCandidate[] = [];
-    const windowsSeparators = this.normalizer.usesWindowsSeparators();
 
     for (const { token, base } of candidates) {
       const candidate =
-        classifyTokenAsRuleCandidate(token, { windowsSeparators }) ??
+        classifyTokenAsRuleCandidate(token, this.normalizer.flavor) ??
         classifyPromotedRuleCandidate(token, this.isPromotablePathToken);
       if (!candidate) continue;
 

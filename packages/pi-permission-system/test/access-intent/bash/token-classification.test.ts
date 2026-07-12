@@ -5,6 +5,7 @@ import {
   classifyTokenAsPathCandidate,
   classifyTokenAsRuleCandidate,
 } from "#src/access-intent/bash/token-classification";
+import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
 
 // ── Shared rejection behaviour ─────────────────────────────────────────────
 //
@@ -154,88 +155,127 @@ describe("classifyTokenAsPathCandidate", () => {
 describe("classifyTokenAsRuleCandidate", () => {
   describe("shared rejection: rejectNonPathToken", () => {
     test("empty string → null", () => {
-      expect(classifyTokenAsRuleCandidate("")).toBeNull();
+      expect(classifyTokenAsRuleCandidate("", posixPathFlavor)).toBeNull();
     });
 
     test("flag (leading dash) → null", () => {
-      expect(classifyTokenAsRuleCandidate("-r")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("--recursive")).toBeNull();
+      expect(classifyTokenAsRuleCandidate("-r", posixPathFlavor)).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("--recursive", posixPathFlavor),
+      ).toBeNull();
     });
 
     test("env assignment (= before any /) → null", () => {
-      expect(classifyTokenAsRuleCandidate("FOO=/bar")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("HOME=/home/user")).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("FOO=/bar", posixPathFlavor),
+      ).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("HOME=/home/user", posixPathFlavor),
+      ).toBeNull();
     });
 
     test("env-like token where = comes after / is NOT rejected as assignment", () => {
       // /foo=bar: slashIndex (0) < eqIndex (4) → not an assignment → continues.
       // Contains /, so rule candidate accepts it.
-      expect(classifyTokenAsRuleCandidate("/foo=bar")).toBe("/foo=bar");
+      expect(classifyTokenAsRuleCandidate("/foo=bar", posixPathFlavor)).toBe(
+        "/foo=bar",
+      );
     });
 
     test("URL → null", () => {
-      expect(classifyTokenAsRuleCandidate("https://example.com")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("http://localhost:3000")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("file:///tmp/foo")).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("https://example.com", posixPathFlavor),
+      ).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("http://localhost:3000", posixPathFlavor),
+      ).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("file:///tmp/foo", posixPathFlavor),
+      ).toBeNull();
     });
 
     test("@scope/package → null", () => {
-      expect(classifyTokenAsRuleCandidate("@foo/bar")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("@scope/pkg")).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("@foo/bar", posixPathFlavor),
+      ).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("@scope/pkg", posixPathFlavor),
+      ).toBeNull();
     });
 
     test("bare-slash token → null", () => {
-      expect(classifyTokenAsRuleCandidate("/")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("//")).toBeNull();
+      expect(classifyTokenAsRuleCandidate("/", posixPathFlavor)).toBeNull();
+      expect(classifyTokenAsRuleCandidate("//", posixPathFlavor)).toBeNull();
     });
 
     test("regex metacharacters → null", () => {
-      expect(classifyTokenAsRuleCandidate("foo.*")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("bar.+")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("a\\|b")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("[abc]")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("^/start")).toBeNull();
+      expect(classifyTokenAsRuleCandidate("foo.*", posixPathFlavor)).toBeNull();
+      expect(classifyTokenAsRuleCandidate("bar.+", posixPathFlavor)).toBeNull();
+      expect(classifyTokenAsRuleCandidate("a\\|b", posixPathFlavor)).toBeNull();
+      expect(classifyTokenAsRuleCandidate("[abc]", posixPathFlavor)).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("^/start", posixPathFlavor),
+      ).toBeNull();
     });
   });
 
   describe("rule-candidate acceptance gate (broader than path)", () => {
     test("absolute path (starts with /) → returned as-is", () => {
-      expect(classifyTokenAsRuleCandidate("/etc/hosts")).toBe("/etc/hosts");
+      expect(classifyTokenAsRuleCandidate("/etc/hosts", posixPathFlavor)).toBe(
+        "/etc/hosts",
+      );
     });
 
     test("home-relative path (starts with ~/) → returned as-is", () => {
-      expect(classifyTokenAsRuleCandidate("~/Documents")).toBe("~/Documents");
+      expect(classifyTokenAsRuleCandidate("~/Documents", posixPathFlavor)).toBe(
+        "~/Documents",
+      );
     });
 
     test("parent-traversal (contains ..) → returned as-is", () => {
-      expect(classifyTokenAsRuleCandidate("../foo")).toBe("../foo");
-      expect(classifyTokenAsRuleCandidate("..")).toBe("..");
+      expect(classifyTokenAsRuleCandidate("../foo", posixPathFlavor)).toBe(
+        "../foo",
+      );
+      expect(classifyTokenAsRuleCandidate("..", posixPathFlavor)).toBe("..");
     });
 
     test("dot-file (starts with .) → returned as-is", () => {
       // Rule candidate accepts dot-files; path candidate does not.
-      expect(classifyTokenAsRuleCandidate(".env")).toBe(".env");
-      expect(classifyTokenAsRuleCandidate(".gitignore")).toBe(".gitignore");
+      expect(classifyTokenAsRuleCandidate(".env", posixPathFlavor)).toBe(
+        ".env",
+      );
+      expect(classifyTokenAsRuleCandidate(".gitignore", posixPathFlavor)).toBe(
+        ".gitignore",
+      );
     });
 
     test("current-dir relative (starts with ./) → returned as-is", () => {
-      expect(classifyTokenAsRuleCandidate("./src")).toBe("./src");
-      expect(classifyTokenAsRuleCandidate("./build/output.js")).toBe(
-        "./build/output.js",
+      expect(classifyTokenAsRuleCandidate("./src", posixPathFlavor)).toBe(
+        "./src",
       );
+      expect(
+        classifyTokenAsRuleCandidate("./build/output.js", posixPathFlavor),
+      ).toBe("./build/output.js");
     });
 
     test("relative path containing / → returned as-is", () => {
       // Rule candidate accepts any token with / (not already rejected).
-      expect(classifyTokenAsRuleCandidate("src/foo.ts")).toBe("src/foo.ts");
-      expect(classifyTokenAsRuleCandidate("packages/pi-foo/index.ts")).toBe(
-        "packages/pi-foo/index.ts",
+      expect(classifyTokenAsRuleCandidate("src/foo.ts", posixPathFlavor)).toBe(
+        "src/foo.ts",
       );
+      expect(
+        classifyTokenAsRuleCandidate(
+          "packages/pi-foo/index.ts",
+          posixPathFlavor,
+        ),
+      ).toBe("packages/pi-foo/index.ts");
     });
 
     test("plain word with no path shape → null", () => {
-      expect(classifyTokenAsRuleCandidate("hello")).toBeNull();
-      expect(classifyTokenAsRuleCandidate("myfile.txt")).toBeNull();
+      expect(classifyTokenAsRuleCandidate("hello", posixPathFlavor)).toBeNull();
+      expect(
+        classifyTokenAsRuleCandidate("myfile.txt", posixPathFlavor),
+      ).toBeNull();
     });
   });
 
@@ -243,70 +283,65 @@ describe("classifyTokenAsRuleCandidate", () => {
     test("forward-slash drive path → returned as-is", () => {
       // Forward-slash form was already accepted via token.includes("/").
       // The explicit branch makes it first-class and order-independent.
-      expect(classifyTokenAsRuleCandidate("C:/Windows/win.ini")).toBe(
-        "C:/Windows/win.ini",
-      );
+      expect(
+        classifyTokenAsRuleCandidate("C:/Windows/win.ini", posixPathFlavor),
+      ).toBe("C:/Windows/win.ini");
     });
 
     test("backslash drive path → returned as-is (new: no forward slash)", () => {
       // Previously dropped by both classifiers; the backslash form has no /
       // so the includes("/") branch could not catch it.
-      expect(classifyTokenAsRuleCandidate("D:\\secrets\\password.txt")).toBe(
-        "D:\\secrets\\password.txt",
-      );
-      expect(classifyTokenAsRuleCandidate("C:\\Windows\\win.ini")).toBe(
-        "C:\\Windows\\win.ini",
-      );
+      expect(
+        classifyTokenAsRuleCandidate(
+          "D:\\secrets\\password.txt",
+          posixPathFlavor,
+        ),
+      ).toBe("D:\\secrets\\password.txt");
+      expect(
+        classifyTokenAsRuleCandidate("C:\\Windows\\win.ini", posixPathFlavor),
+      ).toBe("C:\\Windows\\win.ini");
     });
 
     test("lowercase drive letter (backslash) → returned as-is", () => {
-      expect(classifyTokenAsRuleCandidate("c:\\foo")).toBe("c:\\foo");
+      expect(classifyTokenAsRuleCandidate("c:\\foo", posixPathFlavor)).toBe(
+        "c:\\foo",
+      );
     });
 
     test("drive-relative path without separator (C:foo) → null", () => {
-      expect(classifyTokenAsRuleCandidate("C:foo")).toBeNull();
+      expect(classifyTokenAsRuleCandidate("C:foo", posixPathFlavor)).toBeNull();
     });
   });
 
-  describe("Windows backslash-relative acceptance gate (windowsSeparators option, #520)", () => {
-    test("backslash-relative token accepted with windowsSeparators: true", () => {
-      expect(
-        classifyTokenAsRuleCandidate("dir\\file", { windowsSeparators: true }),
-      ).toBe("dir\\file");
+  describe("Windows backslash-relative acceptance gate (win32 flavor, #520)", () => {
+    test("backslash-relative token accepted under the win32 flavor", () => {
+      expect(classifyTokenAsRuleCandidate("dir\\file", win32PathFlavor)).toBe(
+        "dir\\file",
+      );
     });
 
-    test("backslash-relative token rejected with no options (default unchanged)", () => {
-      expect(classifyTokenAsRuleCandidate("dir\\file")).toBeNull();
-    });
-
-    test("backslash-relative token rejected with windowsSeparators: false", () => {
+    test("backslash-relative token rejected under the posix flavor", () => {
       expect(
-        classifyTokenAsRuleCandidate("dir\\file", {
-          windowsSeparators: false,
-        }),
+        classifyTokenAsRuleCandidate("dir\\file", posixPathFlavor),
       ).toBeNull();
     });
 
-    test("backslash regex-metacharacter token still rejected under the flag", () => {
-      // rejectNonPathToken's REGEX_METACHAR_PATTERN fires before the new
-      // branch is reached, regardless of windowsSeparators.
+    test("backslash regex-metacharacter token still rejected under the win32 flavor", () => {
+      // rejectNonPathToken's REGEX_METACHAR_PATTERN fires before the separator
+      // branch is reached, regardless of flavor.
+      expect(classifyTokenAsRuleCandidate("a\\|b", win32PathFlavor)).toBeNull();
       expect(
-        classifyTokenAsRuleCandidate("a\\|b", { windowsSeparators: true }),
-      ).toBeNull();
-      expect(
-        classifyTokenAsRuleCandidate("\\(group\\)", {
-          windowsSeparators: true,
-        }),
+        classifyTokenAsRuleCandidate("\\(group\\)", win32PathFlavor),
       ).toBeNull();
     });
 
-    test("backslash traversal accepted regardless of the flag (already via ..)", () => {
-      expect(classifyTokenAsRuleCandidate("..\\secret")).toBe("..\\secret");
-      expect(
-        classifyTokenAsRuleCandidate("..\\secret", {
-          windowsSeparators: false,
-        }),
-      ).toBe("..\\secret");
+    test("backslash traversal accepted regardless of flavor (already via ..)", () => {
+      expect(classifyTokenAsRuleCandidate("..\\secret", posixPathFlavor)).toBe(
+        "..\\secret",
+      );
+      expect(classifyTokenAsRuleCandidate("..\\secret", win32PathFlavor)).toBe(
+        "..\\secret",
+      );
     });
   });
 
@@ -316,14 +351,14 @@ describe("classifyTokenAsRuleCandidate", () => {
 
     for (const tok of dotFiles) {
       test(`dot-file "${tok}": rule accepts, path rejects`, () => {
-        expect(classifyTokenAsRuleCandidate(tok)).toBe(tok);
+        expect(classifyTokenAsRuleCandidate(tok, posixPathFlavor)).toBe(tok);
         expect(classifyTokenAsPathCandidate(tok)).toBeNull();
       });
     }
 
     for (const tok of relPaths) {
       test(`relative path "${tok}": rule accepts, path rejects`, () => {
-        expect(classifyTokenAsRuleCandidate(tok)).toBe(tok);
+        expect(classifyTokenAsRuleCandidate(tok, posixPathFlavor)).toBe(tok);
         expect(classifyTokenAsPathCandidate(tok)).toBeNull();
       });
     }
@@ -331,7 +366,7 @@ describe("classifyTokenAsRuleCandidate", () => {
     const sharedAccepted = ["/etc/hosts", "~/docs", "../sibling"];
     for (const tok of sharedAccepted) {
       test(`"${tok}": both classifiers accept`, () => {
-        expect(classifyTokenAsRuleCandidate(tok)).toBe(tok);
+        expect(classifyTokenAsRuleCandidate(tok, posixPathFlavor)).toBe(tok);
         expect(classifyTokenAsPathCandidate(tok)).toBe(tok);
       });
     }
@@ -343,7 +378,7 @@ describe("classifyTokenAsRuleCandidate", () => {
     ];
     for (const tok of winDrivePaths) {
       test(`Windows drive path "${tok}": both classifiers accept`, () => {
-        expect(classifyTokenAsRuleCandidate(tok)).toBe(tok);
+        expect(classifyTokenAsRuleCandidate(tok, posixPathFlavor)).toBe(tok);
         expect(classifyTokenAsPathCandidate(tok)).toBe(tok);
       });
     }
@@ -351,7 +386,7 @@ describe("classifyTokenAsRuleCandidate", () => {
     const sharedRejected = ["hello", "--flag", "FOO=/bar", "https://x.com"];
     for (const tok of sharedRejected) {
       test(`"${tok}": both classifiers reject`, () => {
-        expect(classifyTokenAsRuleCandidate(tok)).toBeNull();
+        expect(classifyTokenAsRuleCandidate(tok, posixPathFlavor)).toBeNull();
         expect(classifyTokenAsPathCandidate(tok)).toBeNull();
       });
     }
