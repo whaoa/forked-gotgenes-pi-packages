@@ -751,6 +751,43 @@ describe("BashProgram", () => {
         expect(program.commands()).toEqual([{ text: command }]);
       });
     });
+
+    describe("indirection wrappers", () => {
+      it.each([
+        ["sudo aws s3 ls", "sudo aws s3 ls"],
+        ["env FOO=bar aws s3 ls", "env FOO=bar aws s3 ls"],
+        ["xargs rm -rf", "xargs rm -rf"],
+        ["time aws s3 ls", "time aws s3 ls"],
+        ["nohup aws s3 ls", "nohup aws s3 ls"],
+        ["timeout 10 aws s3 ls", "timeout 10 aws s3 ls"],
+        ["nice -n 10 aws s3 ls", "nice -n 10 aws s3 ls"],
+        ["/usr/bin/sudo aws s3 ls", "/usr/bin/sudo aws s3 ls"],
+      ])("flags %s as an indirection wrapper", async (command, text) => {
+        const program = await BashProgram.parse(command, normalizer);
+        expect(program.commands()).toEqual([
+          { text, wrapperKind: "indirection" },
+        ]);
+      });
+
+      it("flags an env-prefixed indirection wrapper after stripping the prefix", async () => {
+        const program = await BashProgram.parse(
+          "AWS_PROFILE=prod sudo aws s3 ls",
+          normalizer,
+        );
+        expect(program.commands()).toEqual([
+          { text: "sudo aws s3 ls", wrapperKind: "indirection" },
+        ]);
+      });
+
+      it.each([
+        "aws s3 ls",
+        "ls -la",
+        "grep -n foo file",
+      ])("does not flag %s as an indirection wrapper", async (command) => {
+        const program = await BashProgram.parse(command, normalizer);
+        expect(program.commands()).toEqual([{ text: command }]);
+      });
+    });
   });
 
   it("derives both slices from a single parse", async () => {

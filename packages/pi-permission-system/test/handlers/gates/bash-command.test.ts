@@ -254,4 +254,53 @@ describe("resolveBashCommandCheck", () => {
       expect(result.matchedPattern).toBe("ls *");
     });
   });
+
+  describe("indirection wrapper floor", () => {
+    it("floors an indirection wrapper from allow to ask with a sentinel pattern", () => {
+      const resolver = makeResolver(
+        bashResult("allow", "sudo aws s3 rm s3://bucket", "*"),
+      );
+
+      const result = resolveBashCommandCheck(
+        "sudo aws s3 rm s3://bucket",
+        [{ text: "sudo aws s3 rm s3://bucket", wrapperKind: "indirection" }],
+        undefined,
+        resolver,
+      );
+
+      expect(result.state).toBe("ask");
+      expect(result.matchedPattern).toBe("<indirection-bash-wrapper>");
+      expect(result.command).toBe("sudo aws s3 rm s3://bucket");
+    });
+
+    it("keeps an explicit deny on an indirection wrapper", () => {
+      const resolver = makeResolver(
+        bashResult("deny", "sudo rm -rf /", "sudo *"),
+      );
+
+      const result = resolveBashCommandCheck(
+        "sudo rm -rf /",
+        [{ text: "sudo rm -rf /", wrapperKind: "indirection" }],
+        undefined,
+        resolver,
+      );
+
+      expect(result.state).toBe("deny");
+      expect(result.matchedPattern).toBe("sudo *");
+    });
+
+    it("leaves an explicit ask on an indirection wrapper unchanged", () => {
+      const resolver = makeResolver(bashResult("ask", "sudo aws", "sudo *"));
+
+      const result = resolveBashCommandCheck(
+        "sudo aws",
+        [{ text: "sudo aws", wrapperKind: "indirection" }],
+        undefined,
+        resolver,
+      );
+
+      expect(result.state).toBe("ask");
+      expect(result.matchedPattern).toBe("sudo *");
+    });
+  });
 });

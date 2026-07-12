@@ -154,6 +154,21 @@ function makeUnit(
 const SHELL_WRAPPER_NAMES = new Set(["bash", "sh", "dash", "zsh", "ksh"]);
 
 /**
+ * Indirection wrappers that always invoke a following command, so the wrapper
+ * (not the inner command) is what a bash rule matches. Floored by command-name
+ * basename alone. Extend this set to cover another always-invoking wrapper.
+ */
+const INDIRECTION_WRAPPER_NAMES = new Set([
+  "sudo",
+  "env",
+  "xargs",
+  "time",
+  "nohup",
+  "timeout",
+  "nice",
+]);
+
+/**
  * Classify a `command` node as a floored wrapper, or `undefined` for an
  * ordinary command. Reads only the node's own named children (a shallow walk),
  * skipping any leading `variable_assignment` prefix, and matches the command
@@ -162,6 +177,10 @@ const SHELL_WRAPPER_NAMES = new Set(["bash", "sh", "dash", "zsh", "ksh"]);
  * `"opaque-payload"`: `eval`, or a shell (`bash`/`sh`/`dash`/`zsh`/`ksh`) with a
  * `-c` short-flag cluster (`-c`, `-ec`, `-xc`) — the inner program is a quoted
  * argument the enumerator does not re-parse (#481).
+ *
+ * `"indirection"`: an always-invoking prefix/exec wrapper
+ * (`INDIRECTION_WRAPPER_NAMES`) — the inner command is a visible argument that a
+ * `<cmd> *` rule would otherwise never match (#490).
  */
 function classifyWrapperCommand(node: TSNode): WrapperKind | undefined {
   const { commandName, args } = readWrapperCommand(node);
@@ -170,6 +189,7 @@ function classifyWrapperCommand(node: TSNode): WrapperKind | undefined {
   if (SHELL_WRAPPER_NAMES.has(commandName) && hasShortFlagC(args)) {
     return "opaque-payload";
   }
+  if (INDIRECTION_WRAPPER_NAMES.has(commandName)) return "indirection";
   return undefined;
 }
 
