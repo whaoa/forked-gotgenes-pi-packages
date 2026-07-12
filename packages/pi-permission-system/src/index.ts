@@ -76,7 +76,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // assigned below. yolo becomes a composition-stage ask→allow rewrite (#526).
   const permissionManager = new PermissionManager({
     agentDir,
-    platform: hostPlatform,
+    flavor: pathFlavorForPlatform(hostPlatform),
     isYoloEnabled: () => isYoloModeEnabled(configStore.current()),
   });
 

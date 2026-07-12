@@ -12,7 +12,7 @@ import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import { BashProgram } from "#src/access-intent/bash/program";
 import { getPathPolicyValues } from "#src/access-intent/path-normalization";
 import { getGlobalConfigPath, getProjectAgentsDir } from "#src/config-paths";
-import { posixPathFlavor } from "#src/path/path-flavor";
+import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import {
   PermissionManager,
@@ -44,7 +44,7 @@ describe("PermissionManager — injected platform (#510)", () => {
     const manager = new PermissionManager({
       globalConfigPath: "/nonexistent/config.json",
       agentsDir: "/nonexistent/agents",
-      platform: "win32",
+      flavor: win32PathFlavor,
     });
     const result = manager.check(
       {
@@ -61,7 +61,7 @@ describe("PermissionManager — injected platform (#510)", () => {
     const manager = new PermissionManager({
       globalConfigPath: "/nonexistent/config.json",
       agentsDir: "/nonexistent/agents",
-      platform: "linux",
+      flavor: posixPathFlavor,
     });
     const result = manager.check(
       {
@@ -87,7 +87,7 @@ describe("PermissionManager — injected platform (#510)", () => {
     const manager = new PermissionManager({
       globalConfigPath: "/nonexistent/config.json",
       agentsDir: "/nonexistent/agents",
-      platform: "win32",
+      flavor: win32PathFlavor,
     });
 
     const allowed = manager.check(
@@ -1048,7 +1048,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
         policyLoader: createInMemoryPolicyLoader({
           global: { permission: { path: { id_rsa: "deny" } } },
         }),
-        platform: "win32",
+        flavor: win32PathFlavor,
       });
       const isPromotable = manager.getPromotablePathTokenMatcher();
       expect(isPromotable("ID_RSA")).toBe(true);
@@ -1059,7 +1059,7 @@ describe("PermissionManager with in-memory PolicyLoader", () => {
         policyLoader: createInMemoryPolicyLoader({
           global: { permission: { path: { id_rsa: "deny" } } },
         }),
-        platform: "linux",
+        flavor: posixPathFlavor,
       });
       const isPromotable = manager.getPromotablePathTokenMatcher();
       expect(isPromotable("ID_RSA")).toBe(false);

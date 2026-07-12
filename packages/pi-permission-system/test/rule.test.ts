@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
 import type { Rule, RuleOrigin, Ruleset } from "#src/rule";
 import {
   evaluate,
@@ -48,12 +49,17 @@ describe("evaluate", () => {
 
   test("returns matching rule when a rule matches", () => {
     const ruleset: Ruleset = [allowBashGit];
-    const result = evaluate("bash", "git status", ruleset, "linux");
+    const result = evaluate("bash", "git status", ruleset, posixPathFlavor);
     expect(result).toEqual(allowBashGit);
   });
 
   test("returns synthetic rule with 'ask' when no rules match and no defaultAction", () => {
-    const result = evaluate("bash", "npm install", [allowBashGit], "linux");
+    const result = evaluate(
+      "bash",
+      "npm install",
+      [allowBashGit],
+      posixPathFlavor,
+    );
     expect(result.surface).toBe("bash");
     expect(result.pattern).toBe("npm install");
     expect(result.action).toBe("ask");
@@ -64,7 +70,7 @@ describe("evaluate", () => {
       "bash",
       "npm install",
       [allowBashGit],
-      "linux",
+      posixPathFlavor,
       "deny",
     );
     expect(result.surface).toBe("bash");
@@ -77,36 +83,48 @@ describe("evaluate", () => {
       "bash",
       "git status",
       [allowBashGit],
-      "linux",
+      posixPathFlavor,
       "deny",
     );
     expect(result).toEqual(allowBashGit);
   });
 
   test("returns synthetic rule for empty ruleset", () => {
-    const result = evaluate("mcp", "exa_search", [], "linux");
+    const result = evaluate("mcp", "exa_search", [], posixPathFlavor);
     expect(result.surface).toBe("mcp");
     expect(result.pattern).toBe("exa_search");
     expect(result.action).toBe("ask");
   });
 
   test("matches rules for all permission surfaces", () => {
-    expect(evaluate("read", "src/foo.ts", [allowRead], "linux").action).toBe(
-      "allow",
-    );
-    expect(evaluate("mcp", "exa_search", [askMcp], "linux").action).toBe("ask");
     expect(
-      evaluate("skill", "librarian", [allowSkillLibrarian], "linux").action,
+      evaluate("read", "src/foo.ts", [allowRead], posixPathFlavor).action,
     ).toBe("allow");
     expect(
-      evaluate("special", "external_directory", [askSpecialExtDir], "linux")
+      evaluate("mcp", "exa_search", [askMcp], posixPathFlavor).action,
+    ).toBe("ask");
+    expect(
+      evaluate("skill", "librarian", [allowSkillLibrarian], posixPathFlavor)
         .action,
+    ).toBe("allow");
+    expect(
+      evaluate(
+        "special",
+        "external_directory",
+        [askSpecialExtDir],
+        posixPathFlavor,
+      ).action,
     ).toBe("ask");
   });
 
   test("last-match-wins: later conflicting rule overrides earlier", () => {
     const ruleset: Ruleset = [allowBashGit, denyBashGitPush];
-    const result = evaluate("bash", "git push origin main", ruleset, "linux");
+    const result = evaluate(
+      "bash",
+      "git push origin main",
+      ruleset,
+      posixPathFlavor,
+    );
     expect(result).toEqual(denyBashGitPush);
   });
 
@@ -127,7 +145,7 @@ describe("evaluate", () => {
       "bash",
       "git status",
       [denyAll, allowStatus],
-      "linux",
+      posixPathFlavor,
     );
     expect(result).toEqual(allowStatus);
   });
@@ -139,21 +157,21 @@ describe("evaluate", () => {
       action: "allow",
       origin: "global",
     };
-    expect(evaluate("bash", "anything", [universalAllow], "linux").action).toBe(
-      "allow",
-    );
-    expect(evaluate("mcp", "something", [universalAllow], "linux").action).toBe(
-      "allow",
-    );
     expect(
-      evaluate("skill", "librarian", [universalAllow], "linux").action,
+      evaluate("bash", "anything", [universalAllow], posixPathFlavor).action,
+    ).toBe("allow");
+    expect(
+      evaluate("mcp", "something", [universalAllow], posixPathFlavor).action,
+    ).toBe("allow");
+    expect(
+      evaluate("skill", "librarian", [universalAllow], posixPathFlavor).action,
     ).toBe("allow");
   });
 
   test("specific surface rule does not match a different surface", () => {
     const ruleset: Ruleset = [allowBashGit];
     // bash rule should not match mcp surface
-    const result = evaluate("mcp", "git status", ruleset, "linux");
+    const result = evaluate("mcp", "git status", ruleset, posixPathFlavor);
     expect(result.action).toBe("ask"); // falls back to default
   });
 
@@ -165,7 +183,7 @@ describe("evaluate", () => {
       { surface: "bash", pattern: "git *", action: "allow", origin: "agent" },
     ];
     const merged = [...globalRules, ...agentRules];
-    const result = evaluate("bash", "git status", merged, "linux");
+    const result = evaluate("bash", "git status", merged, posixPathFlavor);
     expect(result.action).toBe("allow"); // agent rule wins
   });
 
@@ -178,12 +196,12 @@ describe("evaluate", () => {
     ];
     // git status matches global but not agent rule
     const merged = [...globalRules, ...agentRules];
-    const result = evaluate("bash", "git status", merged, "linux");
+    const result = evaluate("bash", "git status", merged, posixPathFlavor);
     expect(result.action).toBe("allow"); // global rule is the last match for this pattern
   });
 
   test("empty ruleset returns synthetic default", () => {
-    const result = evaluate("bash", "git status", [], "linux");
+    const result = evaluate("bash", "git status", [], posixPathFlavor);
     expect(result.surface).toBe("bash");
     expect(result.pattern).toBe("git status");
     expect(result.action).toBe("ask");
@@ -211,20 +229,22 @@ describe("evaluate", () => {
       origin: "builtin",
     };
     // Both rules with and without layer field produce the same match.
-    expect(evaluate("bash", "git status", [withLayer], "linux").action).toBe(
-      "allow",
-    );
-    expect(evaluate("bash", "git status", [withoutLayer], "linux").action).toBe(
-      "allow",
-    );
+    expect(
+      evaluate("bash", "git status", [withLayer], posixPathFlavor).action,
+    ).toBe("allow");
+    expect(
+      evaluate("bash", "git status", [withoutLayer], posixPathFlavor).action,
+    ).toBe("allow");
     // Layer metadata does not affect last-match-wins ordering.
     const ruleset: Rule[] = [withDefault, withLayer];
-    expect(evaluate("bash", "git status", ruleset, "linux")).toEqual(withLayer);
+    expect(evaluate("bash", "git status", ruleset, posixPathFlavor)).toEqual(
+      withLayer,
+    );
     // A rule with layer: "default" still wins if it is last in the array.
     const reversedRuleset: Rule[] = [withLayer, withDefault];
-    expect(evaluate("bash", "git status", reversedRuleset, "linux")).toEqual(
-      withDefault,
-    );
+    expect(
+      evaluate("bash", "git status", reversedRuleset, posixPathFlavor),
+    ).toEqual(withDefault);
   });
 
   test("evaluate() preserves origin on a matched rule", () => {
@@ -236,12 +256,12 @@ describe("evaluate", () => {
       layer: "config",
       origin,
     };
-    const result = evaluate("bash", "git status", [rule], "linux");
+    const result = evaluate("bash", "git status", [rule], posixPathFlavor);
     expect(result.origin).toBe("project");
   });
 
   test("evaluate() synthetic fallback rule has origin 'builtin'", () => {
-    const result = evaluate("bash", "npm install", [], "linux");
+    const result = evaluate("bash", "npm install", [], posixPathFlavor);
     expect(result.origin).toBe("builtin");
   });
 
@@ -254,7 +274,7 @@ describe("evaluate", () => {
       layer: "config",
       origin: "global",
     };
-    const result = evaluate("bash", "npm install", [rule], "linux");
+    const result = evaluate("bash", "npm install", [rule], posixPathFlavor);
     expect(result.action).toBe("deny");
     expect(result.reason).toBe("Use pnpm instead");
   });
@@ -279,7 +299,7 @@ describe("evaluate", () => {
       "bash",
       "npm install",
       [allowAll, denyNpm],
-      "linux",
+      posixPathFlavor,
     );
     expect(result.action).toBe("deny");
     expect(result.reason).toBe("Use pnpm");
@@ -305,14 +325,14 @@ describe("evaluate", () => {
       "bash",
       "npm install",
       [denyNpm, allowInstall],
-      "linux",
+      posixPathFlavor,
     );
     expect(result.action).toBe("allow");
     expect(result.reason).toBeUndefined();
   });
 
   test("evaluate() synthetic fallback rule has no reason", () => {
-    const result = evaluate("bash", "npm install", [], "linux");
+    const result = evaluate("bash", "npm install", [], posixPathFlavor);
     expect(result.reason).toBeUndefined();
   });
 
@@ -334,7 +354,9 @@ describe("evaluate", () => {
         layer: "config",
         origin,
       };
-      expect(evaluate("read", "*", [rule], "linux").origin).toBe(origin);
+      expect(evaluate("read", "*", [rule], posixPathFlavor).origin).toBe(
+        origin,
+      );
     }
   });
 
@@ -360,7 +382,7 @@ describe("evaluate", () => {
       "external_directory",
       "c:\\users\\foo\\pi\\docs\\readme.md",
       [denyExternalAll, allowExternalPi],
-      "win32",
+      win32PathFlavor,
     );
     expect(result.action).toBe("allow");
   });
@@ -370,7 +392,7 @@ describe("evaluate", () => {
       "external_directory",
       "c:\\users\\foo\\pi\\docs\\readme.md",
       [denyExternalAll, allowExternalPi],
-      "linux",
+      posixPathFlavor,
     );
     expect(result.action).toBe("deny");
   });
@@ -387,7 +409,7 @@ describe("evaluate", () => {
       "external_directory",
       "c:\\users\\foo\\pi\\docs\\readme.md",
       [denyExternalAll, allowForwardSlash],
-      "win32",
+      win32PathFlavor,
     );
     expect(result.action).toBe("allow");
   });
@@ -404,7 +426,7 @@ describe("evaluate", () => {
           origin: "global",
         },
       ],
-      "win32",
+      win32PathFlavor,
     );
     expect(result.action).toBe("ask");
   });
@@ -435,7 +457,12 @@ describe("evaluateFirst", () => {
 
   test("returns the first candidate that matches a non-default rule", () => {
     const rules: Ruleset = [defaultRule, allowBash];
-    const result = evaluateFirst("bash", ["git status", "*"], rules, "linux");
+    const result = evaluateFirst(
+      "bash",
+      ["git status", "*"],
+      rules,
+      posixPathFlavor,
+    );
     expect(result.rule).toEqual(allowBash);
     expect(result.value).toBe("git status");
   });
@@ -444,14 +471,24 @@ describe("evaluateFirst", () => {
     // "npm install" matches only the default; "*" also matches only the
     // default — falls back to first candidate.
     const rules: Ruleset = [defaultRule];
-    const result = evaluateFirst("bash", ["npm install", "*"], rules, "linux");
+    const result = evaluateFirst(
+      "bash",
+      ["npm install", "*"],
+      rules,
+      posixPathFlavor,
+    );
     expect(result.rule.layer).toBe("default");
     expect(result.value).toBe("npm install");
   });
 
   test("falls back to first candidate when all candidates match only the default", () => {
     const rules: Ruleset = [defaultRule];
-    const result = evaluateFirst("bash", ["a", "b", "c"], rules, "linux");
+    const result = evaluateFirst(
+      "bash",
+      ["a", "b", "c"],
+      rules,
+      posixPathFlavor,
+    );
     expect(result.value).toBe("a");
   });
 
@@ -466,7 +503,12 @@ describe("evaluateFirst", () => {
       origin: "global",
     };
     const rules: Ruleset = [defaultRule, denyMcp, allowMcpCatchAll];
-    const result = evaluateFirst("mcp", ["exa_search", "mcp"], rules, "linux");
+    const result = evaluateFirst(
+      "mcp",
+      ["exa_search", "mcp"],
+      rules,
+      posixPathFlavor,
+    );
     expect(result.rule).toEqual(denyMcp);
     expect(result.value).toBe("exa_search");
   });
@@ -479,7 +521,7 @@ describe("evaluateFirst", () => {
       "mcp",
       ["unknown_tool", "exa_search"],
       rules,
-      "linux",
+      posixPathFlavor,
     );
     expect(result.rule).toEqual(denyMcp);
     expect(result.value).toBe("exa_search");
@@ -487,14 +529,19 @@ describe("evaluateFirst", () => {
 
   test("single-candidate array behaves like evaluate()", () => {
     const rules: Ruleset = [defaultRule, allowBash];
-    const result = evaluateFirst("bash", ["git status"], rules, "linux");
+    const result = evaluateFirst(
+      "bash",
+      ["git status"],
+      rules,
+      posixPathFlavor,
+    );
     expect(result.rule).toEqual(allowBash);
     expect(result.value).toBe("git status");
   });
 
   test("uses '*' as fallback value when values array is empty", () => {
     const rules: Ruleset = [defaultRule];
-    const result = evaluateFirst("bash", [], rules, "linux");
+    const result = evaluateFirst("bash", [], rules, posixPathFlavor);
     expect(result.value).toBe("*");
   });
 });
@@ -535,7 +582,7 @@ describe("evaluateAnyValue", () => {
       "path",
       ["/proj/src/foo.ts", "src/foo.ts"],
       rules,
-      "linux",
+      posixPathFlavor,
     );
     expect(result.rule).toEqual(relativeDeny);
     expect(result.value).toBe("src/foo.ts");
@@ -547,7 +594,7 @@ describe("evaluateAnyValue", () => {
       "path",
       ["/proj/src/foo.ts", "src/foo.ts"],
       rules,
-      "linux",
+      posixPathFlavor,
     );
     expect(result.rule).toEqual(absoluteAllow);
     expect(result.value).toBe("/proj/src/foo.ts");
@@ -558,14 +605,14 @@ describe("evaluateAnyValue", () => {
       "path",
       ["/proj/src/foo.ts", "src/foo.ts"],
       [],
-      "linux",
+      posixPathFlavor,
     );
     expect(result.rule.action).toBe("ask");
     expect(result.value).toBe("/proj/src/foo.ts");
   });
 
   test("uses '*' as fallback value when values array is empty", () => {
-    const result = evaluateAnyValue("path", [], [], "linux");
+    const result = evaluateAnyValue("path", [], [], posixPathFlavor);
     expect(result.value).toBe("*");
   });
 });
@@ -599,7 +646,7 @@ describe("evaluateMostRestrictive", () => {
       "path",
       [".env", "README.md"],
       rules,
-      "linux",
+      posixPathFlavor,
     );
     expect(result).not.toBeNull();
     expect(result!.rule.action).toBe("deny");
@@ -612,7 +659,7 @@ describe("evaluateMostRestrictive", () => {
       "path",
       ["/home/user/.ssh/id_rsa", "README.md"],
       rules,
-      "linux",
+      posixPathFlavor,
     );
     expect(result).not.toBeNull();
     expect(result!.rule.action).toBe("ask");
@@ -625,14 +672,14 @@ describe("evaluateMostRestrictive", () => {
       "path",
       ["README.md", "src/index.ts"],
       rules,
-      "linux",
+      posixPathFlavor,
     );
     expect(result).toBeNull();
   });
 
   test("empty values: returns null", () => {
     const rules: Ruleset = [allowAll, denyEnv];
-    const result = evaluateMostRestrictive("path", [], rules, "linux");
+    const result = evaluateMostRestrictive("path", [], rules, posixPathFlavor);
     expect(result).toBeNull();
   });
 
@@ -642,7 +689,7 @@ describe("evaluateMostRestrictive", () => {
       "path",
       ["/home/user/.ssh/id_rsa", ".env"],
       rules,
-      "linux",
+      posixPathFlavor,
     );
     expect(result).not.toBeNull();
     expect(result!.rule.action).toBe("deny");

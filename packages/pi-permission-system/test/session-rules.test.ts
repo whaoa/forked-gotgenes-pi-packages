@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { evaluate } from "#src/rule";
 import { SessionApproval } from "#src/session-approval";
 import type { SessionApprovalRecorder } from "#src/session-approval-recorder";
@@ -131,7 +131,7 @@ describe("SessionRules", () => {
         "external_directory",
         "/other/project/src/foo.ts",
         session.getRuleset(),
-        "linux",
+        posixPathFlavor,
       );
       expect(result.action).toBe("allow");
     });
@@ -143,7 +143,7 @@ describe("SessionRules", () => {
         "external_directory",
         "/other/unrelated/file.ts",
         session.getRuleset(),
-        "linux",
+        posixPathFlavor,
       );
       // No rule matches — evaluate returns synthetic rule with default action "ask"
       expect(result.action).toBe("ask");
@@ -156,7 +156,7 @@ describe("SessionRules", () => {
         "external_directory",
         "/other/project-b/foo.ts",
         session.getRuleset(),
-        "linux",
+        posixPathFlavor,
       );
       expect(result.action).toBe("ask");
     });
@@ -169,7 +169,7 @@ describe("SessionRules", () => {
         "external_directory",
         "/other/project/src/",
         session.getRuleset(),
-        "linux",
+        posixPathFlavor,
       );
       expect(result.action).toBe("allow");
     });
@@ -183,7 +183,7 @@ describe("SessionRules", () => {
           "external_directory",
           "/project-a/foo.ts",
           session.getRuleset(),
-          "linux",
+          posixPathFlavor,
         ).action,
       ).toBe("allow");
       expect(
@@ -191,7 +191,7 @@ describe("SessionRules", () => {
           "external_directory",
           "/project-b/bar.ts",
           session.getRuleset(),
-          "linux",
+          posixPathFlavor,
         ).action,
       ).toBe("allow");
       expect(
@@ -199,7 +199,7 @@ describe("SessionRules", () => {
           "external_directory",
           "/project-c/baz.ts",
           session.getRuleset(),
-          "linux",
+          posixPathFlavor,
         ).action,
       ).toBe("ask");
     });
@@ -211,7 +211,7 @@ describe("SessionRules", () => {
         "bash",
         "/other/project/foo.ts",
         session.getRuleset(),
-        "linux",
+        posixPathFlavor,
       );
       expect(result.action).toBe("ask");
     });
@@ -226,7 +226,7 @@ describe("SessionRules", () => {
           "external_directory",
           "/old/project/file.ts",
           session.getRuleset(),
-          "linux",
+          posixPathFlavor,
         ).action,
       ).toBe("ask");
       expect(
@@ -234,7 +234,7 @@ describe("SessionRules", () => {
           "external_directory",
           "/new/project/file.ts",
           session.getRuleset(),
-          "linux",
+          posixPathFlavor,
         ).action,
       ).toBe("allow");
     });
@@ -280,7 +280,7 @@ describe("deriveApprovalPattern", () => {
         "external_directory",
         "/other/project/src/bar.ts",
         session.getRuleset(),
-        "linux",
+        posixPathFlavor,
       ).action,
     ).toBe("allow");
   });
@@ -294,7 +294,7 @@ describe("deriveApprovalPattern", () => {
         "external_directory",
         "/other/project/lib/bar.ts",
         session.getRuleset(),
-        "linux",
+        posixPathFlavor,
       ).action,
     ).toBe("ask");
   });
@@ -311,11 +311,12 @@ describe("deriveApprovalPattern", () => {
         "edit",
         "/test/project/index.html",
         session.getRuleset(),
-        "linux",
+        posixPathFlavor,
       ).action,
     ).toBe("allow");
     expect(
-      evaluate("edit", "/etc/passwd", session.getRuleset(), "linux").action,
+      evaluate("edit", "/etc/passwd", session.getRuleset(), posixPathFlavor)
+        .action,
     ).toBe("ask");
   });
 });

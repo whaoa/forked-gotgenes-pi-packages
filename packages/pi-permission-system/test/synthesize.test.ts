@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import type { RuleOrigin } from "#src/rule";
 import { evaluate } from "#src/rule";
 import {
@@ -30,17 +31,21 @@ describe("synthesizeDefaults", () => {
 
   test("universal rule catches any surface via wildcardMatch", () => {
     const rules = synthesizeDefaults("ask");
-    expect(evaluate("read", "*", rules, "linux").action).toBe("ask");
-    expect(evaluate("bash", "git status", rules, "linux").action).toBe("ask");
-    expect(evaluate("external_directory", "*", rules, "linux").action).toBe(
+    expect(evaluate("read", "*", rules, posixPathFlavor).action).toBe("ask");
+    expect(evaluate("bash", "git status", rules, posixPathFlavor).action).toBe(
       "ask",
     );
-    expect(evaluate("future_surface", "*", rules, "linux").action).toBe("ask");
+    expect(
+      evaluate("external_directory", "*", rules, posixPathFlavor).action,
+    ).toBe("ask");
+    expect(evaluate("future_surface", "*", rules, posixPathFlavor).action).toBe(
+      "ask",
+    );
   });
 
   test("universal rule has layer 'default'", () => {
     const rules = synthesizeDefaults("allow");
-    expect(evaluate("read", "*", rules, "linux").layer).toBe("default");
+    expect(evaluate("read", "*", rules, posixPathFlavor).layer).toBe("default");
   });
 
   test("defaults to origin 'builtin' when no origin supplied", () => {
@@ -56,7 +61,7 @@ describe("synthesizeDefaults", () => {
 
   test("origin is preserved through evaluate()", () => {
     const rules = synthesizeDefaults("allow", "project");
-    const result = evaluate("read", "*", rules, "linux");
+    const result = evaluate("read", "*", rules, posixPathFlavor);
     expect(result.origin).toBe("project");
   });
 
@@ -173,7 +178,7 @@ describe("synthesizeBaseline", () => {
       },
     ];
     const rules = synthesizeBaseline(configRules);
-    const result = evaluate("mcp", "mcp_status", rules, "linux");
+    const result = evaluate("mcp", "mcp_status", rules, posixPathFlavor);
     expect(result.action).toBe("allow");
     expect(result.layer).toBe("baseline");
     expect(result.origin).toBe("baseline");
@@ -220,7 +225,7 @@ describe("composeRuleset", () => {
       },
     ];
     const composed = composeRuleset(defaults, [], config);
-    const result = evaluate("bash", "echo hello", composed, "linux");
+    const result = evaluate("bash", "echo hello", composed, posixPathFlavor);
     expect(result.action).toBe("deny");
     expect(result.layer).toBe("config");
   });
@@ -237,7 +242,7 @@ describe("composeRuleset", () => {
       },
     ];
     const composed = composeRuleset(defaults, [], config);
-    const result = evaluate("read", "*", composed, "linux");
+    const result = evaluate("read", "*", composed, posixPathFlavor);
     expect(result.action).toBe("allow");
     expect(result.layer).toBe("config");
   });
@@ -263,7 +268,7 @@ describe("composeRuleset", () => {
       },
     ];
     const composed = composeRuleset(defaults, baseline, config);
-    const result = evaluate("mcp", "mcp_status", composed, "linux");
+    const result = evaluate("mcp", "mcp_status", composed, posixPathFlavor);
     expect(result.action).toBe("deny");
     expect(result.layer).toBe("config");
   });
@@ -289,7 +294,7 @@ describe("composeRuleset", () => {
       },
     ];
     const composed = composeRuleset(defaults, baseline, config);
-    const result = evaluate("mcp", "exa_web_search", composed, "linux");
+    const result = evaluate("mcp", "exa_web_search", composed, posixPathFlavor);
     expect(result.action).toBe("allow");
     expect(result.layer).toBe("config");
   });

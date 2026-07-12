@@ -1,6 +1,8 @@
+import type { PathFlavor } from "#src/path/path-flavor";
+
 import { PATH_SURFACES } from "./path-surfaces";
 import type { PermissionState } from "./types";
-import { wildcardMatch } from "./wildcard-matcher";
+import { type WildcardMatchOptions, wildcardMatch } from "./wildcard-matcher";
 
 /**
  * Provenance of a rule — which source contributed it.
@@ -74,12 +76,10 @@ export function evaluate(
   surface: string,
   pattern: string,
   rules: Ruleset,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
   defaultAction?: PermissionState,
 ): Rule {
-  const rule = rules.findLast((r) =>
-    ruleMatches(r, surface, pattern, platform),
-  );
+  const rule = rules.findLast((r) => ruleMatches(r, surface, pattern, flavor));
   if (rule !== undefined) return rule;
   return {
     surface,
@@ -96,20 +96,18 @@ export function evaluate(
  */
 export function pathMatchOptions(
   surface: string,
-  platform: NodeJS.Platform,
-): { caseInsensitive: true; windowsSeparators: true } | undefined {
-  return platform === "win32" && PATH_SURFACES.has(surface)
-    ? { caseInsensitive: true, windowsSeparators: true }
-    : undefined;
+  flavor: PathFlavor,
+): WildcardMatchOptions | undefined {
+  return PATH_SURFACES.has(surface) ? flavor.matchOptions : undefined;
 }
 
 function ruleMatches(
   rule: Rule,
   surface: string,
   value: string,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): boolean {
-  const matchOptions = pathMatchOptions(surface, platform);
+  const matchOptions = pathMatchOptions(surface, flavor);
   return (
     wildcardMatch(rule.surface, surface) &&
     wildcardMatch(rule.pattern, value, matchOptions)
@@ -144,11 +142,11 @@ export function evaluateMostRestrictive(
   surface: string,
   values: string[],
   rules: Ruleset,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): { rule: Rule; value: string } | null {
   let worst: { rule: Rule; value: string } | null = null;
   for (const value of values) {
-    const rule = evaluate(surface, value, rules, platform);
+    const rule = evaluate(surface, value, rules, flavor);
     if (rule.action === "deny") return { rule, value };
     if (rule.action === "ask" && worst?.rule.action !== "ask") {
       worst = { rule, value };
@@ -161,10 +159,10 @@ export function evaluateFirst(
   surface: string,
   values: string[],
   rules: Ruleset,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): { rule: Rule; value: string } {
   for (const value of values) {
-    const rule = evaluate(surface, value, rules, platform);
+    const rule = evaluate(surface, value, rules, flavor);
     if (rule.layer !== "default") {
       return { rule, value };
     }
@@ -172,7 +170,7 @@ export function evaluateFirst(
   // All candidates matched only the synthesized default — use the first.
   const fallbackValue = values[0] ?? "*";
   return {
-    rule: evaluate(surface, fallbackValue, rules, platform),
+    rule: evaluate(surface, fallbackValue, rules, flavor),
     value: fallbackValue,
   };
 }
@@ -189,22 +187,22 @@ export function evaluateAnyValue(
   surface: string,
   values: string[],
   rules: Ruleset,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): { rule: Rule; value: string } {
   const fallbackValue = values[0] ?? "*";
   const rule = rules.findLast((r) =>
-    values.some((value) => ruleMatches(r, surface, value, platform)),
+    values.some((value) => ruleMatches(r, surface, value, flavor)),
   );
   if (rule !== undefined) {
     return {
       rule,
       value:
-        values.find((value) => ruleMatches(rule, surface, value, platform)) ??
+        values.find((value) => ruleMatches(rule, surface, value, flavor)) ??
         fallbackValue,
     };
   }
   return {
-    rule: evaluate(surface, fallbackValue, rules, platform),
+    rule: evaluate(surface, fallbackValue, rules, flavor),
     value: fallbackValue,
   };
 }

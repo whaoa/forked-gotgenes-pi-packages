@@ -8,6 +8,7 @@ import {
 } from "./config-paths";
 import { normalizeInput } from "./input-normalizer";
 import { normalizeFlatConfig } from "./normalize";
+import { type PathFlavor, posixPathFlavor } from "./path/path-flavor";
 import { PATH_SURFACES } from "./path-surfaces";
 import {
   FilePolicyLoader,
@@ -101,11 +102,12 @@ export interface PermissionManagerOptions extends PolicyLoaderOptions {
    */
   agentDir?: string;
   /**
-   * Host platform, injected from the composition root, that decides whether
-   * path-surface rule matching folds case (and separators) on Windows.
-   * Defaults to a POSIX flavor; production always supplies the real platform.
+   * Resolved path-language flavor, injected from the composition root, that
+   * decides whether path-surface rule matching folds case (and separators) on
+   * Windows. Defaults to the POSIX flavor; production always supplies the real
+   * platform's flavor.
    */
-  platform?: NodeJS.Platform;
+  flavor?: PathFlavor;
   /**
    * yolo-mode reader, injected from the composition root. When it reports
    * true, {@link PermissionManager.check} rewrites every matched `ask` to a
@@ -118,7 +120,7 @@ export interface PermissionManagerOptions extends PolicyLoaderOptions {
 
 export class PermissionManager implements ScopedPermissionManager {
   private readonly agentDir: string | undefined;
-  private readonly platform: NodeJS.Platform;
+  private readonly flavor: PathFlavor;
   private readonly isYoloEnabled: () => boolean;
   private loader: PolicyLoader;
   private readonly resolvedPermissionsCache = new Map<
@@ -128,7 +130,7 @@ export class PermissionManager implements ScopedPermissionManager {
 
   constructor(options: PermissionManagerOptions = {}) {
     this.agentDir = options.agentDir;
-    this.platform = options.platform ?? "linux";
+    this.flavor = options.flavor ?? posixPathFlavor;
     this.isYoloEnabled = options.isYoloEnabled ?? YOLO_DISABLED;
     this.loader =
       options.policyLoader ??
@@ -262,7 +264,7 @@ export class PermissionManager implements ScopedPermissionManager {
       .map((r) => r.pattern);
     if (patterns.length === 0) return NO_PROMOTION;
 
-    const matchOptions = pathMatchOptions("path", this.platform);
+    const matchOptions = pathMatchOptions("path", this.flavor);
     return (token) =>
       patterns.some((pattern) => wildcardMatch(pattern, token, matchOptions));
   }
@@ -276,7 +278,7 @@ export class PermissionManager implements ScopedPermissionManager {
     // Every surface (special, bash, mcp, skill, path-bearing, and extension
     // tools) resolves its tool-level state identically: evaluate the surface
     // name against the "*" catch-all value. There is no per-kind branch.
-    return evaluate(toolName.trim(), "*", composedRules, this.platform).action;
+    return evaluate(toolName.trim(), "*", composedRules, this.flavor).action;
   }
 
   /**
@@ -318,7 +320,7 @@ export class PermissionManager implements ScopedPermissionManager {
         intent.surface,
         intent.surface,
         fullRules,
-        this.platform,
+        this.flavor,
       );
     }
 
@@ -336,7 +338,7 @@ export class PermissionManager implements ScopedPermissionManager {
       toolName,
       intent.surface,
       fullRules,
-      this.platform,
+      this.flavor,
     );
   }
 }
@@ -355,11 +357,11 @@ function buildCheckResult(
   normalizedToolName: string,
   toolName: string,
   fullRules: Ruleset,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): PermissionCheckResult {
   const { rule, value } = PATH_SURFACES.has(surface)
-    ? evaluateAnyValue(surface, values, fullRules, platform)
-    : evaluateFirst(surface, values, fullRules, platform);
+    ? evaluateAnyValue(surface, values, fullRules, flavor)
+    : evaluateFirst(surface, values, fullRules, flavor);
 
   // For MCP, replace the normalizer's fallback target with the actual
   // matched candidate value so PermissionCheckResult.target is accurate.
