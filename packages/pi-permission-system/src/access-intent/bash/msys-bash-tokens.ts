@@ -22,7 +22,7 @@ import { isSafeSystemPath } from "#src/safe-system-paths";
  * - `plain` — everything else (relative tokens, `~/…`, native Windows drive
  *   paths); handled by ordinary win32 resolution.
  */
-export type Win32BashTokenKind =
+export type BashTokenShape =
   | { kind: "device" }
   | { kind: "drive-mount"; windowsPath: string }
   | { kind: "posix-absolute" }
@@ -36,7 +36,7 @@ export type Win32BashTokenKind =
  */
 const MSYS_DRIVE_MOUNT_PATTERN = /^\/([a-zA-Z])(\/.*)?$/;
 
-export function classifyWin32BashToken(token: string): Win32BashTokenKind {
+export function classifyWin32BashToken(token: string): BashTokenShape {
   if (isSafeSystemPath(token)) return { kind: "device" };
 
   const driveMatch = MSYS_DRIVE_MOUNT_PATTERN.exec(token);
