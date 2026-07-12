@@ -788,6 +788,33 @@ describe("BashProgram", () => {
         expect(program.commands()).toEqual([{ text: command }]);
       });
     });
+
+    describe("exec-conditional wrappers (find/fd)", () => {
+      it.each([
+        "find . -exec rm {} \\;",
+        "find . -execdir rm {} \\;",
+        "find . -ok rm {} \\;",
+        "find . -okdir rm {} \\;",
+        "fd -x rm",
+        "fd --exec rm",
+        "fd -X rm",
+        "fd --exec-batch rm",
+      ])("flags %s as an indirection wrapper", async (command) => {
+        const program = await BashProgram.parse(command, normalizer);
+        expect(program.commands()).toEqual([
+          { text: command, wrapperKind: "indirection" },
+        ]);
+      });
+
+      it.each([
+        "find . -name foo",
+        "fd pattern",
+        "fd -H -t f pattern",
+      ])("does not flag a bare %s search", async (command) => {
+        const program = await BashProgram.parse(command, normalizer);
+        expect(program.commands()).toEqual([{ text: command }]);
+      });
+    });
   });
 
   it("derives both slices from a single parse", async () => {

@@ -169,6 +169,17 @@ const INDIRECTION_WRAPPER_NAMES = new Set([
 ]);
 
 /**
+ * Search tools that invoke a command per result only when an exec flag is
+ * present; a bare search runs no subcommand. Floored only when an argument
+ * exactly matches one of the tool's exec flags. Extend by adding a tool with
+ * its exec-flag set.
+ */
+const EXEC_CONDITIONAL_WRAPPERS = new Map<string, ReadonlySet<string>>([
+  ["find", new Set(["-exec", "-execdir", "-ok", "-okdir"])],
+  ["fd", new Set(["-x", "--exec", "-X", "--exec-batch"])],
+]);
+
+/**
  * Classify a `command` node as a floored wrapper, or `undefined` for an
  * ordinary command. Reads only the node's own named children (a shallow walk),
  * skipping any leading `variable_assignment` prefix, and matches the command
@@ -179,8 +190,10 @@ const INDIRECTION_WRAPPER_NAMES = new Set([
  * argument the enumerator does not re-parse (#481).
  *
  * `"indirection"`: an always-invoking prefix/exec wrapper
- * (`INDIRECTION_WRAPPER_NAMES`) — the inner command is a visible argument that a
- * `<cmd> *` rule would otherwise never match (#490).
+ * (`INDIRECTION_WRAPPER_NAMES`), or a search tool (`EXEC_CONDITIONAL_WRAPPERS`,
+ * `find`/`fd`) carrying a per-result exec flag — the inner command is a visible
+ * argument that a `<cmd> *` rule would otherwise never match (#490). A bare
+ * `find`/`fd` search runs no subcommand and is not flagged.
  */
 function classifyWrapperCommand(node: TSNode): WrapperKind | undefined {
   const { commandName, args } = readWrapperCommand(node);
@@ -190,6 +203,8 @@ function classifyWrapperCommand(node: TSNode): WrapperKind | undefined {
     return "opaque-payload";
   }
   if (INDIRECTION_WRAPPER_NAMES.has(commandName)) return "indirection";
+  const execFlags = EXEC_CONDITIONAL_WRAPPERS.get(commandName);
+  if (execFlags && args.some((arg) => execFlags.has(arg))) return "indirection";
   return undefined;
 }
 
