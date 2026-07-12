@@ -8,7 +8,7 @@ import {
 import type { WildcardMatchOptions } from "#src/wildcard-matcher";
 
 /**
- * The resolved product of the single `platform === "win32"` decision: the
+ * The resolved product of the single win32-vs-POSIX platform decision: the
  * platform's path *language* as one immutable collaborator.
  *
  * The win32-vs-POSIX difference is not variant growth (the set is closed) but
@@ -33,7 +33,7 @@ export interface PathFlavor {
   readonly impl: PlatformPath;
   /**
    * Wildcard match options for path-surface rule matching: the win32
-   * `{ caseInsensitive, windowsSeparators }` fold, or `undefined` on POSIX.
+   * case-and-separator fold, or `undefined` on POSIX.
    */
   readonly matchOptions: WildcardMatchOptions | undefined;
   /** Comparison case fold: win32 lowercases, POSIX returns the value unchanged. */
@@ -108,7 +108,7 @@ export const win32PathFlavor: PathFlavor = new PlatformPathFlavor(
   true,
 );
 
-/** The one `platform === "win32"` decision in the package. */
+/** The one win32-vs-POSIX platform decision in the package. */
 export function pathFlavorForPlatform(platform: NodeJS.Platform): PathFlavor {
   return platform === "win32" ? win32PathFlavor : posixPathFlavor;
 }
