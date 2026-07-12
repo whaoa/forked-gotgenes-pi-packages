@@ -90,6 +90,10 @@ Returns `PermissionCheckResult` with fields `state`, `matchedPattern`, `source`,
 
 For a path-shaped surface (`path`, `external_directory`, or a path-bearing tool — `read`/`write`/`edit`/`grep`/`find`/`ls`), the supplied `value` is matched against both the path as given and its canonical (symlink-resolved) form, at parity with the gates — so a query for a symlinked path matches a rule on its real target.
 
+For the `bash` surface, a `value` containing a chained or nested command (joined by `&&`, `||`, `;`, `|`, `&`, or newlines, or nested in a command substitution/subshell) is decomposed into its command-pattern units and resolved most-restrictive (`deny` > `ask` > `allow`), at parity with the enforcement gate — so `cd /repo && npm install x` returns the decision of the `npm install x` unit, not the leading `cd`.
+A previously chained command that returned `allow` (riding an allowed leading command) may therefore now return `deny`/`ask`.
+Decomposition needs the tree-sitter parser, which is warmed at `before_agent_start` (before any tool call); a bash query in the brief pre-warm window falls back to a whole-string match, so the answer is never weaker than the gate — only strengthened once warm.
+
 #### `getToolPermission`
 
 Returns `"allow"` | `"deny"` | `"ask"` for a tool name without considering command-level rules.
