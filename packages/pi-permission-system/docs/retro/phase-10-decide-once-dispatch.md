@@ -28,6 +28,8 @@ The owner deferred that spine to a later phase (recorded as the leading Phase 11
     Provenance settled: `#309` is our own self-filed limitation note on the `Symbol.for()` service (the RPC-over-event-bus successor, `#531`), not upstream-fork debris.
     No in-monorepo consumer imports `getPermissionsService()`; scheduled anyway by owner decision despite the low Priority score (6).
   - `#490` (indirection-wrapper flooring) — **scheduled** as Step 5; direction confirmed (re-target prefix wrappers, floor `xargs`/`find -exec`).
+    *(Superseded 2026-07-12 during `#490` planning: floor **all** listed wrappers to `ask` uniformly — re-targeting needs per-wrapper option-arity tables whose errors silently under-match.*
+    *See `docs/plans/0490-floor-indirection-wrappers.md`.)*
   - `#521` (read-only allowlist) — **scheduled** as a docs step (Step 6), owner preferred a recipe over closing with a comment.
   - `#519` (SDK UIContext) — **explicit deferral** recorded in the roadmap (blocked on SDK evolution), not a silent sweep.
 - **Feasibility probes that reshaped steps:**
