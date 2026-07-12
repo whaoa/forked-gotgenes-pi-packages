@@ -52,7 +52,13 @@ function makeSetup(opts?: {
   // Default check returns allow (for skill-prompt sanitizer via resolver.checkPermission)
   vi.mocked(permissionManager.check).mockReturnValue(makeCheckResult());
   const toolRegistry = makeToolRegistry(opts?.toolRegistry);
-  const handler = new AgentPrepHandler(session, resolver, toolRegistry);
+  const warmParser = vi.fn();
+  const handler = new AgentPrepHandler(
+    session,
+    resolver,
+    toolRegistry,
+    warmParser,
+  );
   return {
     handler,
     session,
@@ -61,6 +67,7 @@ function makeSetup(opts?: {
     configStore,
     forwarding,
     toolRegistry,
+    warmParser,
   };
 }
 
@@ -104,6 +111,12 @@ describe("AgentPrepHandler.handle", () => {
     await handler.handle(makeEvent(), ctx);
     // Real session.activate calls forwarding.start
     expect(forwarding.start).toHaveBeenCalledWith(ctx);
+  });
+
+  it("triggers the bash-parser warm-up", async () => {
+    const { handler, warmParser } = makeSetup();
+    await handler.handle(makeEvent(), makeCtx());
+    expect(warmParser).toHaveBeenCalledTimes(1);
   });
 
   it("refreshes config with ctx", async () => {

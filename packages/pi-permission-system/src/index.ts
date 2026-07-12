@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, getPackageDir } from "@earendil-works/pi-coding-agent";
+import { warmBashParser } from "./access-intent/bash/parser";
 import { AuthorizerSelection } from "./authority/authorizer-selection";
 import {
   ForwardedRequestServer,
@@ -207,7 +208,14 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     logger,
     audit,
   );
-  const agentPrep = new AgentPrepHandler(session, resolver, toolRegistry);
+  const agentPrep = new AgentPrepHandler(
+    session,
+    resolver,
+    toolRegistry,
+    () => {
+      void warmBashParser();
+    },
+  );
 
   const reporter = new GateDecisionReporter(logger, pi.events);
   const gateRunner = new GateRunner(

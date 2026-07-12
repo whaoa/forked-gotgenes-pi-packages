@@ -40,12 +40,16 @@ export function shouldExposeTool(
  * - `session` — encapsulates all mutable session state and lifecycle operations
  * - `resolver` — owns permission-query surface: `getToolPermission`, skill check
  * - `toolRegistry` — Pi tool API subset (getActive + setActive)
+ * - `warmParser` — warms the tree-sitter parser so the synchronous advisory
+ *   bash path can decompose at gate parity; `before_agent_start` precedes any
+ *   tool call, so triggering it here closes the pre-warm window (#309)
  */
 export class AgentPrepHandler {
   constructor(
     private readonly session: PermissionSession,
     private readonly resolver: PermissionResolver,
     private readonly toolRegistry: ToolRegistry,
+    private readonly warmParser: () => void,
   ) {}
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -53,6 +57,10 @@ export class AgentPrepHandler {
     event: BeforeAgentStartPayload,
     ctx: ExtensionContext,
   ): Promise<BeforeAgentStartEventResult> {
+    // Fire-and-forget: warming is idempotent and best-effort, so it never
+    // delays agent start. A bash advisory query before it completes falls back
+    // to whole-string matching.
+    this.warmParser();
     this.session.activate(ctx);
     this.session.refreshConfig(ctx);
 
