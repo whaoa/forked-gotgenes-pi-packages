@@ -101,6 +101,15 @@ describe("resolveBashAdvisoryCheck", () => {
       expect(result.matchedPattern).toBe("<opaque-bash-wrapper>");
     });
 
+    it("fails closed for a non-empty command that parses to zero units", () => {
+      const resolver = makeBashResolver();
+      const result = resolveBashAdvisoryCheck("> out.txt", undefined, resolver);
+      expect(result.state).toBe("ask");
+      expect(result.matchedPattern).toBe("<unparseable-bash-command>");
+      // The synthetic fail-closed decision does not consult the resolver.
+      expect(resolver.resolve).not.toHaveBeenCalled();
+    });
+
     it("evaluates a nested command inside a substitution", () => {
       const resolver = makeBashResolver({
         "echo $(rm -rf /)": makeCheckResult({
