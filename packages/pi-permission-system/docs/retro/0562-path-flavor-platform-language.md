@@ -45,5 +45,53 @@ Pre-completion reviewer: PASS — ready for `/ship-issue`.
   Reinforces the AGENTS.md warning against scripted multi-line substitution across similar blocks.
 - ADR-0002 needed no edit: the manager now consumes `PathFlavor` but still never imports `AccessPath`, so the string boundary holds — the `no-restricted-imports` guard bans only `access-intent/access-path`.
 
+## Stage: Final Retrospective (2026-07-11T22:10:00Z)
+
+### Session summary
+
+Executed and shipped the `PathFlavor` refactor across TDD (11 commits, all `refactor:` + docs) and ship (auto-batched, no release cut) stages.
+Execution was notably clean — every step ran `check` + the affected test file + the full suite before committing, all stayed green, the pre-completion reviewer returned PASS, and nothing required post-commit rework.
+The only friction was scripting/path hygiene on the ~30-site test migration, all caught before commit; the sole user intervention was a mis-guessed skill path.
+
+### Observations
+
+#### What went well
+
+- Model-task correlation was well-matched across the arc: the deep design work (the polymorphism / behavioral-collaborator zoom-out) ran on `claude-fable-5` during planning, mechanical TDD execution on `claude-opus-4-8`, deterministic ship steps on `deepseek-v4-flash`, and the judgment-heavy pre-completion review on `claude-sonnet-5`.
+  No reasoning-weak-on-judgment or high-cost-on-mechanical mismatch.
+- The lift-and-shift cached-singleton bridge held exactly as planned: every one of the 9 refactor steps compiled and passed the full suite before commit, so the 13-site discriminator removal never had a red intermediate state.
+- Verification cadence was incremental, not end-loaded: `pnpm run check` after each shared-type change and the full 2329-test suite before each commit — the feedback-loop-gap lens found nothing.
+
+#### What caused friction (agent side)
+
+- `other` (scripted-edit delimiter trap) — a single-line `perl -pi -e 's/classifyTokenAsRuleCandidate\(([^,)]+)\)/...($1, posixPathFlavor)/g'` to inject a second call argument corrupted the string literal `"\\(group\\)"`: the `[^,)]+` capture truncated at the `)` *inside* the string, injecting the new arg mid-literal.
+  `pnpm run check` did not catch it (esbuild accepts the wrong-but-valid string); caught only by re-reading the block (turn 229) and rewriting it by hand (turn 230).
+  Impact: ~3 tool calls, one describe-block rewrite, no committed rework.
+  This is a distinct failure mode from the existing #525 multi-line `.*?` boundary-spanning trap — a capture-and-re-emit regex whose captured span can contain the delimiter.
+- `other` (scripted-edit silent no-op) — a `FILES=$(grep -rl ...); for f in $FILES; do perl ...; done` loop applied nothing (turn 188); re-running with explicit file arguments in one `perl` invocation worked (turn 190).
+  Impact: 2 tool calls; caught immediately by the post-substitution `grep` verification, no rework.
+- `other` (edit path hygiene) — two `Edit` calls used a doubled absolute prefix (`/Users/.../pi-packages/packages/pi-permission-system/packages/...`) and were rejected by the permission gate as an external directory (turns 151, 153); retried with the repo-relative path.
+  Impact: 2 rejected calls, minor.
+- `missing-context` (skill path) — reached for a filesystem-wide `find` to locate the `ask-user` skill after guessing a wrong path, when the `<available_skills>` index in the system context already listed its exact location.
+  Impact: one aborted `find`; user-caught.
+
+#### What caused friction (user side)
+
+- The `ask-user` skill mis-guess (above) was the only user touchpoint in the session — mechanical redirection, not strategic.
+  Opportunity: the retro/plan prompts say “Load the `ask-user` skill” by name; consulting the `<available_skills>` index (which carries the resolved path) is the reliable lookup, and I should default to it rather than guessing a conventional path.
+
+### Diagnostic details
+
+- **Model-performance correlation** — four distinct models across the arc, each matched to task weight (design → `claude-fable-5`; execution → `claude-opus-4-8`; ship → `deepseek-v4-flash`; review → `claude-sonnet-5`).
+  No mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole`; the longest same-error streak was 2–3 tool calls (the perl re-runs), each resolved by the next action.
+- **Unused-tool detection** — none material; the one misstep (a broad `find` for a skill) should have been an `<available_skills>`-index lookup, not a subagent dispatch.
+- **Feedback-loop gap analysis** — no gap; `check` ran after every shared-type change and the full suite before every commit, so the corrupted-string-literal trap would also have surfaced in the suite even if the manual re-read had missed it.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0562-path-flavor-platform-language.md`.
+2. Proposed sharpening the AGENTS.md scripted-substitution rule (line 55) with the single-line capture-and-re-emit delimiter trap; operator declined — kept as a retro observation only, no `AGENTS.md` change.
+
 [#479]: https://github.com/gotgenes/pi-packages/issues/479
 [#571]: https://github.com/gotgenes/pi-packages/issues/571
