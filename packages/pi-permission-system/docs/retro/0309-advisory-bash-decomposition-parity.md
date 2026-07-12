@@ -30,3 +30,26 @@ The plan preserves the synchronous public contract and ships as `feat:` (non-bre
   Plan adds a `resetWarmBashParser()` test hook and has the service test mock `bash-advisory-check` entirely to avoid cross-test leakage.
 - **Cold-start fallback is the fail-closed floor.**
   The pre-warm window falls back to the exact pre-#309 whole-string match (never weaker); when warm, the advisory path inherits `resolveBashCommandCheck`'s #452 fail-closed and #306 nested-command handling for free.
+
+## Stage: Implementation — TDD (2026-07-11T22:30:00Z)
+
+### Session summary
+
+Executed all five planned TDD steps plus one reviewer-prompted fixup, landing the advisory bash decomposition parity across six commits (`66470f08`, `e0637f15`, `d8d7ef01`, `509c597f`, `aeb86330`, `bb299ee9`).
+The synchronous `LocalPermissionsService.checkPermission("bash", …)` now decomposes chained/nested commands at gate parity via a warm-then-sync tree-sitter parse, with a cold-start whole-string fallback.
+Test count went 2329 → 2348 (+19); `check`, root `lint`, and `fallow dead-code` all green.
+
+### Observations
+
+- **The plan held up with no design deviations.**
+  All module-level changes landed as specified; `input-normalizer.ts` was correctly left untouched (Non-Goal — the decompose-or-fallback decision returns a full `PermissionCheckResult`, not an intent, so it cannot live in the intent builder).
+- **Cold-path tests stayed green without mocking.**
+  Because the parser is cold in most test files, the real `resolveBashAdvisoryCheck` falls back to the identical whole-string `tool` intent, so pre-existing bash advisory tests were unaffected; only `permissions-service.test.ts` needed a `vi.mock("#src/bash-advisory-check")` to assert delegation (and its former bash "tool intent" assertion was re-pointed to `skill`).
+- **`resetWarmBashParser()` was essential.**
+  Module-scoped `warmedParser` persists across tests (and same-cwd sessions); the parser/sync-commands/advisory tests reset it in `beforeEach`.
+  No cross-test contamination surfaced in the full suite even though a composition-root `before_agent_start` fire now warms the global parser.
+- **Found a real zero-unit command for the fail-closed case.**
+  A redirect-only line (`> out.txt`) is non-empty, non-comment, and parses to zero command units — used to assert the advisory path inherits `<unparseable-bash-command>` fail-closed end-to-end (the plan promised this case; the first pass omitted it).
+- **Pre-completion reviewer: WARN** — two non-blocking findings, both addressed before finishing: (1) the promised unparseable-warm test case was missing → added in `bb299ee9`; (2) the package skill didn't forward-reference the new bash decomposition → added a sentence to `SKILL.md`'s Cross-Extension Integration section (amended into the docs commit).
+  No FAILs.
+- **Release:** ship independently (roadmap Step 4, `feat:` non-breaking strengthening) — ready for `/ship-issue`.
