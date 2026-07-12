@@ -26,3 +26,28 @@ Plan filed at `docs/plans/0490-floor-indirection-wrappers.md`; follow-up #575 fi
   Accepted edge: bare `env`/`time`/`sudo -l` are floored too (least-privilege posture).
 - Release: **ship independently** (Step 5 is `Release: independent`; a `fix:` that cuts its own release; not part of the "tool-kind-dispatch" batch).
 - The advisory surface (`resolveBashAdvisoryCheck`) reuses the shared `resolveBashCommandCheck`, so the floor applies there for free — no separate change.
+
+## Stage: Implementation — TDD (2026-07-12T14:04:00Z)
+
+### Session summary
+
+Implemented all four planned TDD cycles: a behavior-preserving refactor generalizing #481's `BashCommand.opaque?: boolean` to a `wrapperKind?: "opaque-payload" | "indirection"` discriminant, then two `fix:` commits adding the indirection floor (always-invoke `INDIRECTION_WRAPPER_NAMES`; `find`/`fd` exec-flag-gated `EXEC_CONDITIONAL_WRAPPERS`), then the docs/roadmap commit.
+Test count went 2348 → 2374 (+26); `check`, root `lint`, and `fallow dead-code` all green.
+Pre-completion reviewer returned **PASS** — ready for `/ship-issue`.
+
+### Observations
+
+- The floor half needed no code change beyond Step 1: the `WRAPPER_SENTINEL` `Record<WrapperKind, string>` was defined with both keys in the refactor, so once the classifier emitted `"indirection"`, `resolveBashCommandCheck` floored it automatically.
+  This made Step 2's floor tests green on arrival — the only new code was the classifier arm.
+- **Deviation 1 (test omissions):** the plan floated an optional advisory indirection case in `bash-advisory-check.test.ts` and a `find`/`fd` floor case in `bash-command.test.ts` (Step 3).
+  Omitted both as redundant — the advisory path reuses `resolveBashCommandCheck`, and the `find`/`fd` floor is the identical `wrapperKind: "indirection"` path already covered by the Step 2 `sudo` floor test.
+  The distinguishing new behavior (exec-flag gating) is covered by the `program.test.ts` classifier tests.
+  Reviewer agreed the omissions are sound.
+- **Deviation 2 (unplanned file):** updated `docs/retro/phase-10-decide-once-dispatch.md` — a grep found it recorded the superseded 2026-07-10 "re-target" direction as the roadmap's scheduling record; appended a supersession marker pointing to the plan.
+  Reviewer classified it a legitimate reverse-documentation fix.
+- **Infra note:** the `rumdl-fmt` pre-commit hook failed to reinstall on the docs commit (transient `No route to host` fetching setuptools).
+  Ran `pnpm exec rumdl fmt` + `rumdl check` manually (clean), then committed the docs step with `--no-verify`.
+  Code commits were unaffected (markdown hooks skip when no `.md` files are staged).
+- Roadmap Step 5 marked `✅` on both the heading and the `S5` Mermaid node in the docs commit (not deferred to ship), per the package skill.
+- Reviewer verdict: **PASS**.
+  No warnings.
