@@ -16,7 +16,8 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { discoverGlobalNodeModulesRoot } from "#src/node-modules-discovery";
-import { isPiInfrastructureRead } from "#src/pi-infrastructure-read";
+import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
+import { isPiInfrastructureRead } from "#src/path/pi-infrastructure-read";
 
 // ── discoverGlobalNodeModulesRoot ──────────────────────────────────────────
 
@@ -117,7 +118,7 @@ describe("isPiInfrastructureRead", () => {
         "/home/user/.pi/agent/extensions/pi-permission-system/config.json",
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -129,7 +130,7 @@ describe("isPiInfrastructureRead", () => {
         "/opt/homebrew/lib/node_modules/pi-ask-user/skills",
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -141,7 +142,7 @@ describe("isPiInfrastructureRead", () => {
         "/home/user/.pi/agent/git/some-package/README.md",
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -153,7 +154,7 @@ describe("isPiInfrastructureRead", () => {
         "/opt/homebrew/lib/node_modules/pi-permission-system",
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -167,7 +168,7 @@ describe("isPiInfrastructureRead", () => {
         "/home/user/.pi/agent/extensions/pi-permission-system/config.json",
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(false);
   });
@@ -179,7 +180,7 @@ describe("isPiInfrastructureRead", () => {
         "/opt/homebrew/lib/node_modules/pi-ask-user/skills/ask-user/SKILL.md",
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(false);
   });
@@ -191,7 +192,7 @@ describe("isPiInfrastructureRead", () => {
         "/opt/homebrew/lib/node_modules/pi-ask-user/SKILL.md",
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(false);
   });
@@ -200,7 +201,13 @@ describe("isPiInfrastructureRead", () => {
 
   test("does not allow 'read' for a path outside all infra dirs", () => {
     expect(
-      isPiInfrastructureRead("read", "/etc/passwd", INFRA_DIRS, CWD, "linux"),
+      isPiInfrastructureRead(
+        "read",
+        "/etc/passwd",
+        INFRA_DIRS,
+        CWD,
+        posixPathFlavor,
+      ),
     ).toBe(false);
   });
 
@@ -212,7 +219,7 @@ describe("isPiInfrastructureRead", () => {
         "/home/user/.pi/agent-other/config.json",
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(false);
   });
@@ -226,7 +233,7 @@ describe("isPiInfrastructureRead", () => {
         `${CWD}/.pi/npm/node_modules/some-skill/SKILL.md`,
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -238,7 +245,7 @@ describe("isPiInfrastructureRead", () => {
         `${CWD}/.pi/git/github.com/org/skill-repo/SKILL.md`,
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -250,7 +257,7 @@ describe("isPiInfrastructureRead", () => {
         `${CWD}/.pi/npm/node_modules/some-skill/SKILL.md`,
         INFRA_DIRS,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(false);
   });
@@ -259,7 +266,7 @@ describe("isPiInfrastructureRead", () => {
 
   test("returns false when infrastructureDirs is empty and path is not project-local", () => {
     expect(
-      isPiInfrastructureRead("read", "/etc/passwd", [], CWD, "linux"),
+      isPiInfrastructureRead("read", "/etc/passwd", [], CWD, posixPathFlavor),
     ).toBe(false);
   });
 
@@ -271,7 +278,7 @@ describe("isPiInfrastructureRead", () => {
         `${CWD}/.pi/npm/node_modules/x/SKILL.md`,
         [],
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -287,7 +294,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         "/opt/homebrew/Cellar/pi-coding-agent/0.74.0/libexec/lib/node_modules/@earendil-works/pi-coding-agent/SKILL.md",
         ["/opt/homebrew/*/@earendil-works/pi-coding-agent/*"],
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -299,7 +306,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         "/opt/homebrew/Cellar/pi-coding-agent/0.74.0/libexec/lib/node_modules/@earendil-works/pi-coding-agent/SKILL.md",
         ["/opt/homebrew/**/@earendil-works/pi-coding-agent/**"],
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -311,7 +318,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         "/etc/passwd",
         ["/opt/homebrew/*/@earendil-works/pi-coding-agent/*"],
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(false);
   });
@@ -323,7 +330,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         "/opt/homebrew/X/file.md",
         ["/opt/homebrew/?/file.md"],
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -335,7 +342,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         "/opt/homebrew/abc/file.md",
         ["/opt/homebrew/?/file.md"],
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(false);
   });
@@ -351,7 +358,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         "/home/user/.pi/agent/config.json",
         dirs,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
     expect(
@@ -360,7 +367,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         "/opt/homebrew/Cellar/pi-coding-agent/0.74.0/libexec/lib/node_modules/@earendil-works/pi-coding-agent/SKILL.md",
         dirs,
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -373,7 +380,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         `${home}/.pi/agent/config.json`,
         ["~/.pi/agent"],
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(true);
   });
@@ -385,7 +392,7 @@ describe("isPiInfrastructureRead with glob patterns", () => {
         "/opt/homebrew/Cellar/pi-coding-agent/0.74.0/libexec/lib/node_modules/@earendil-works/pi-coding-agent/SKILL.md",
         ["/opt/homebrew/**/@earendil-works/pi-coding-agent/**"],
         CWD,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe(false);
   });
@@ -401,7 +408,7 @@ describe("isPiInfrastructureRead on win32", () => {
         "c:\\users\\foo\\.pi\\agent\\config.json",
         ["C:\\Users\\Foo\\.pi\\agent"],
         "C:\\proj",
-        "win32",
+        win32PathFlavor,
       ),
     ).toBe(true);
   });
@@ -413,7 +420,7 @@ describe("isPiInfrastructureRead on win32", () => {
         "c:\\users\\foo\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\skill.md",
         ["C:\\Users\\Foo\\**\\pi-coding-agent\\**"],
         "C:\\proj",
-        "win32",
+        win32PathFlavor,
       ),
     ).toBe(true);
   });
@@ -425,7 +432,7 @@ describe("isPiInfrastructureRead on win32", () => {
         "c:\\windows\\system32\\drivers\\etc\\hosts",
         ["C:\\Users\\Foo\\.pi\\agent"],
         "C:\\proj",
-        "win32",
+        win32PathFlavor,
       ),
     ).toBe(false);
   });

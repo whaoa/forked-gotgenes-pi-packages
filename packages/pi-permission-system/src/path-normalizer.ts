@@ -9,7 +9,7 @@ import {
 } from "./access-intent/path-normalization";
 
 import { isPathOutsideWorkingDirectory } from "./path/path-containment";
-import { isPiInfrastructureRead } from "./pi-infrastructure-read";
+import { isPiInfrastructureRead } from "./path/pi-infrastructure-read";
 
 /**
  * The interpreted effect of a literal `cd` target on the effective base, under
@@ -230,7 +230,7 @@ export class PathNormalizer {
       accessPath.boundaryValue(),
       infraDirs,
       this.cwd,
-      this.platform,
+      pathFlavorForPlatform(this.platform),
     );
   }
 }

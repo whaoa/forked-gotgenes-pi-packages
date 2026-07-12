@@ -1,8 +1,9 @@
 import { join } from "node:path";
-import { pathFlavorForPlatform } from "#src/path/path-flavor";
-import { expandHomePath } from "./expand-home";
-import { READ_ONLY_PATH_BEARING_TOOLS } from "./path-surfaces";
-import { wildcardMatch } from "./wildcard-matcher";
+
+import { expandHomePath } from "#src/expand-home";
+import type { PathFlavor } from "#src/path/path-flavor";
+import { READ_ONLY_PATH_BEARING_TOOLS } from "#src/path-surfaces";
+import { wildcardMatch } from "#src/wildcard-matcher";
 
 function containsGlobChars(value: string): boolean {
   return value.includes("*") || value.includes("?");
@@ -28,24 +29,18 @@ export function isPiInfrastructureRead(
   normalizedPath: string,
   infrastructureDirs: readonly string[],
   cwd: string,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): boolean {
   if (!READ_ONLY_PATH_BEARING_TOOLS.has(toolName)) {
     return false;
   }
 
-  const flavor = pathFlavorForPlatform(platform);
-
-  // On Windows the path value is canonicalized + lowercased; fold case (and
-  // separators) so mixed-case infra dirs and glob patterns still match.
-  const matchOptions =
-    platform === "win32"
-      ? { caseInsensitive: true, windowsSeparators: true }
-      : undefined;
-
+  // On Windows the path value is canonicalized + lowercased; the flavor's match
+  // options fold case (and separators) so mixed-case infra dirs and glob
+  // patterns still match.
   for (const dir of infrastructureDirs) {
     if (containsGlobChars(dir)) {
-      if (wildcardMatch(dir, normalizedPath, matchOptions)) return true;
+      if (wildcardMatch(dir, normalizedPath, flavor.matchOptions)) return true;
     } else {
       if (flavor.isWithin(normalizedPath, expandHomePath(dir))) return true;
     }
