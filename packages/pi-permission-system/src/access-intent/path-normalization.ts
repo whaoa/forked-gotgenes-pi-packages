@@ -2,7 +2,6 @@ import { posix as posixPath, win32 as winPath } from "node:path";
 import { expandHomePath } from "#src/expand-home";
 import { canonicalizePath } from "#src/path/canonicalize-path";
 import { pathFlavorForPlatform } from "#src/path/path-flavor";
-import { isPathWithinDirectory } from "#src/path-containment";
 
 /**
  * Representation derivation backing {@link AccessPath}: turn an accessed path
@@ -112,7 +111,7 @@ function getCwdRelativePathPolicyValues(
   if (!normalizedCwd) return [];
   if (
     absolute !== normalizedCwd &&
-    !isPathWithinDirectory(absolute, normalizedCwd, platform)
+    !pathFlavorForPlatform(platform).isWithin(absolute, normalizedCwd)
   ) {
     return [];
   }

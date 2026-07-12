@@ -36,6 +36,30 @@ describe("win32PathFlavor", () => {
     expect(win32PathFlavor.isWithin("C:\\other", "C:\\base")).toBe(false);
   });
 
+  it("folds case for a case-different descendant", () => {
+    expect(
+      win32PathFlavor.isWithin(
+        "c:\\users\\foo\\dir\\sub\\x.md",
+        "C:\\Users\\Foo\\dir",
+      ),
+    ).toBe(true);
+  });
+
+  it("folds case when path equals directory in a different case", () => {
+    expect(
+      win32PathFlavor.isWithin(
+        "c:\\users\\foo\\dir\\sub",
+        "C:\\USERS\\foo\\DIR",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a win32 sibling directory", () => {
+    expect(
+      win32PathFlavor.isWithin("C:\\Users\\Foo\\other", "C:\\Users\\Foo\\dir"),
+    ).toBe(false);
+  });
+
   it("recognizes either separator as a path separator", () => {
     expect(win32PathFlavor.hasPathSeparator("dir/file")).toBe(true);
     expect(win32PathFlavor.hasPathSeparator("dir\\file")).toBe(true);
@@ -81,7 +105,21 @@ describe("posixPathFlavor", () => {
   it("decides containment with posix geometry", () => {
     expect(posixPathFlavor.isWithin("/base/sub", "/base")).toBe(true);
     expect(posixPathFlavor.isWithin("/base", "/base")).toBe(true);
+    expect(posixPathFlavor.isWithin("/a/b/c/d/e", "/a/b")).toBe(true);
     expect(posixPathFlavor.isWithin("/other", "/base")).toBe(false);
+  });
+
+  it("rejects a sibling directory sharing a name prefix", () => {
+    expect(posixPathFlavor.isWithin("/a/bc", "/a/b")).toBe(false);
+  });
+
+  it("stays case-sensitive", () => {
+    expect(posixPathFlavor.isWithin("/a/B/c", "/a/b")).toBe(false);
+  });
+
+  it("returns false for empty operands", () => {
+    expect(posixPathFlavor.isWithin("", "/a/b")).toBe(false);
+    expect(posixPathFlavor.isWithin("/a/b", "")).toBe(false);
   });
 
   it("recognizes only the forward slash as a path separator", () => {

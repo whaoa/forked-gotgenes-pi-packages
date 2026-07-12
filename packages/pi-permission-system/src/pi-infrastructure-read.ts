@@ -1,7 +1,6 @@
 import { join } from "node:path";
-
+import { pathFlavorForPlatform } from "#src/path/path-flavor";
 import { expandHomePath } from "./expand-home";
-import { isPathWithinDirectory } from "./path-containment";
 import { READ_ONLY_PATH_BEARING_TOOLS } from "./path-surfaces";
 import { wildcardMatch } from "./wildcard-matcher";
 
@@ -35,6 +34,8 @@ export function isPiInfrastructureRead(
     return false;
   }
 
+  const flavor = pathFlavorForPlatform(platform);
+
   // On Windows the path value is canonicalized + lowercased; fold case (and
   // separators) so mixed-case infra dirs and glob patterns still match.
   const matchOptions =
@@ -46,18 +47,17 @@ export function isPiInfrastructureRead(
     if (containsGlobChars(dir)) {
       if (wildcardMatch(dir, normalizedPath, matchOptions)) return true;
     } else {
-      if (isPathWithinDirectory(normalizedPath, expandHomePath(dir), platform))
-        return true;
+      if (flavor.isWithin(normalizedPath, expandHomePath(dir))) return true;
     }
   }
 
   // Project-local Pi packages — checked fresh every call so CWD changes work.
   const projectNpmDir = join(cwd, ".pi", "npm");
   const projectGitDir = join(cwd, ".pi", "git");
-  if (isPathWithinDirectory(normalizedPath, projectNpmDir, platform)) {
+  if (flavor.isWithin(normalizedPath, projectNpmDir)) {
     return true;
   }
-  if (isPathWithinDirectory(normalizedPath, projectGitDir, platform)) {
+  if (flavor.isWithin(normalizedPath, projectGitDir)) {
     return true;
   }
 

@@ -1,5 +1,5 @@
 import { posix as posixPath, win32 as winPath } from "node:path";
-
+import { pathFlavorForPlatform } from "#src/path/path-flavor";
 import { AccessPath } from "./access-intent/access-path";
 import { classifyWin32BashToken } from "./access-intent/bash/msys-bash-tokens";
 import {
@@ -7,10 +7,8 @@ import {
   normalizePathForComparison,
   normalizePathPolicyLiteral,
 } from "./access-intent/path-normalization";
-import {
-  isPathOutsideWorkingDirectory,
-  isPathWithinDirectory,
-} from "./path-containment";
+
+import { isPathOutsideWorkingDirectory } from "./path/path-containment";
 import { isPiInfrastructureRead } from "./pi-infrastructure-read";
 
 /**
@@ -166,7 +164,7 @@ export class PathNormalizer {
 
   /** Containment of `pathValue` within `directory` (platform-aware). */
   isWithinDirectory(pathValue: string, directory: string): boolean {
-    return isPathWithinDirectory(pathValue, directory, this.platform);
+    return pathFlavorForPlatform(this.platform).isWithin(pathValue, directory);
   }
 
   /** Canonical (symlink-resolved) outside-cwd test against the baked cwd. */
@@ -179,7 +177,7 @@ export class PathNormalizer {
     return isPathOutsideWorkingDirectory(
       canonicalPath,
       this.canonicalCwd,
-      this.platform,
+      pathFlavorForPlatform(this.platform),
     );
   }
 
@@ -196,7 +194,7 @@ export class PathNormalizer {
     return isPathOutsideWorkingDirectory(
       canonicalPath,
       this.canonicalCwd,
-      this.platform,
+      pathFlavorForPlatform(this.platform),
     );
   }
 
