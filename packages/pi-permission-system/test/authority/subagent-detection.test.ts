@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SubagentDetectionContext } from "#src/authority/subagent-context";
 import { SubagentDetection } from "#src/authority/subagent-detection";
 import { SubagentSessionRegistry } from "#src/authority/subagent-registry";
+import { posixPathFlavor } from "#src/path/path-flavor";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -30,7 +31,7 @@ describe("SubagentDetection", () => {
       registry.register("child-1", {});
       const detection = new SubagentDetection({
         subagentSessionsDir,
-        platform: "linux",
+        flavor: posixPathFlavor,
         registry,
       });
       expect(detection.isSubagent(makeCtx(null, "child-1"))).toBe(true);
@@ -40,7 +41,7 @@ describe("SubagentDetection", () => {
       vi.stubEnv("PI_IS_SUBAGENT", "1");
       const detection = new SubagentDetection({
         subagentSessionsDir,
-        platform: "linux",
+        flavor: posixPathFlavor,
         registry: new SubagentSessionRegistry(),
       });
       expect(detection.isSubagent(makeCtx("/somewhere/else"))).toBe(true);
@@ -49,7 +50,7 @@ describe("SubagentDetection", () => {
     test("returns true when the session dir is nested under subagentSessionsDir (filesystem source)", () => {
       const detection = new SubagentDetection({
         subagentSessionsDir,
-        platform: "linux",
+        flavor: posixPathFlavor,
         registry: new SubagentSessionRegistry(),
       });
       expect(
@@ -60,7 +61,7 @@ describe("SubagentDetection", () => {
     test("returns false when no source matches", () => {
       const detection = new SubagentDetection({
         subagentSessionsDir,
-        platform: "linux",
+        flavor: posixPathFlavor,
         registry: new SubagentSessionRegistry(),
       });
       expect(detection.isSubagent(makeCtx("/projects/my-app"))).toBe(false);
@@ -73,7 +74,7 @@ describe("SubagentDetection", () => {
       registry.register("child-1", {});
       const detection = new SubagentDetection({
         subagentSessionsDir,
-        platform: "linux",
+        flavor: posixPathFlavor,
         registry,
       });
       expect(detection.isRegisteredChild(makeCtx(null, "child-1"))).toBe(true);
@@ -82,7 +83,7 @@ describe("SubagentDetection", () => {
     test("returns false when the session id is not registered", () => {
       const detection = new SubagentDetection({
         subagentSessionsDir,
-        platform: "linux",
+        flavor: posixPathFlavor,
         registry: new SubagentSessionRegistry(),
       });
       expect(detection.isRegisteredChild(makeCtx(null, "child-1"))).toBe(false);
@@ -91,7 +92,7 @@ describe("SubagentDetection", () => {
     test("returns false when constructed without a registry", () => {
       const detection = new SubagentDetection({
         subagentSessionsDir,
-        platform: "linux",
+        flavor: posixPathFlavor,
       });
       expect(detection.isRegisteredChild(makeCtx(null, "child-1"))).toBe(false);
     });

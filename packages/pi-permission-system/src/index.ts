@@ -29,6 +29,7 @@ import { SkillInputGatePipeline } from "./handlers/gates/skill-input-gate-pipeli
 import { ToolCallGatePipeline } from "./handlers/gates/tool-call-gate-pipeline";
 import { createFailClosedToolCall } from "./handlers/tool-call-boundary";
 import { buildAccessIntentForSurface } from "./input-normalizer";
+import { pathFlavorForPlatform } from "./path/path-flavor";
 import { PermissionManager } from "./permission-manager";
 import { PermissionResolver } from "./permission-resolver";
 import { PermissionSession } from "./permission-session";
@@ -54,7 +55,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // threading the (subagentSessionsDir, platform, registry) triple into each.
   const subagentDetection = new SubagentDetection({
     subagentSessionsDir: paths.subagentSessionsDir,
-    platform: hostPlatform,
+    flavor: pathFlavorForPlatform(hostPlatform),
     registry: subagentRegistry,
   });
   const formatterRegistry = new ToolInputFormatterRegistry();

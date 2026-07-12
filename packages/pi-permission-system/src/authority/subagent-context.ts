@@ -1,7 +1,6 @@
-import { posix as posixPath, win32 as winPath } from "node:path";
-
 import { SUBAGENT_ENV_HINT_KEYS } from "#src/authority/permission-forwarding";
 import type { SubagentSessionRegistry } from "#src/authority/subagent-registry";
+import type { PathFlavor } from "#src/path/path-flavor";
 
 /**
  * Narrow context for subagent detection — the only session-manager readers
@@ -17,17 +16,15 @@ export interface SubagentDetectionContext {
 
 export function normalizeFilesystemPath(
   pathValue: string,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): string {
-  const impl = platform === "win32" ? winPath : posixPath;
-  const normalizedPath = impl.normalize(pathValue);
-  return platform === "win32" ? normalizedPath.toLowerCase() : normalizedPath;
+  return flavor.fold(flavor.impl.normalize(pathValue));
 }
 
 function isPathWithinDirectoryForSubagent(
   pathValue: string,
   directory: string,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): boolean {
   if (!pathValue || !directory) {
     return false;
@@ -37,7 +34,7 @@ function isPathWithinDirectoryForSubagent(
     return true;
   }
 
-  const sep = platform === "win32" ? "\\" : "/";
+  const sep = flavor.impl.sep;
   const prefix = directory.endsWith(sep) ? directory : `${directory}${sep}`;
   return pathValue.startsWith(prefix);
 }
@@ -71,7 +68,7 @@ export function isRegisteredSubagentChild(
 export function isSubagentExecutionContext(
   ctx: SubagentDetectionContext,
   subagentSessionsDir: string,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
   registry?: SubagentSessionRegistry,
 ): boolean {
   // 1. Explicit registry — in-process subagent extensions register by child
@@ -99,14 +96,14 @@ export function isSubagentExecutionContext(
     return false;
   }
 
-  const normalizedSessionDir = normalizeFilesystemPath(sessionDir, platform);
+  const normalizedSessionDir = normalizeFilesystemPath(sessionDir, flavor);
   const normalizedSubagentRoot = normalizeFilesystemPath(
     subagentSessionsDir,
-    platform,
+    flavor,
   );
   return isPathWithinDirectoryForSubagent(
     normalizedSessionDir,
     normalizedSubagentRoot,
-    platform,
+    flavor,
   );
 }

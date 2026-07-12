@@ -4,6 +4,7 @@ import {
   type SubagentDetectionContext,
 } from "#src/authority/subagent-context";
 import type { SubagentSessionRegistry } from "#src/authority/subagent-registry";
+import type { PathFlavor } from "#src/path/path-flavor";
 
 /**
  * Narrow seam for the ask-path consumers: "is the current session a subagent?"
@@ -30,7 +31,7 @@ export interface RegisteredChildDetector {
 /** Composition-root inputs for {@link SubagentDetection}. */
 export interface SubagentDetectionDeps {
   subagentSessionsDir: string;
-  platform: NodeJS.Platform;
+  flavor: PathFlavor;
   registry?: SubagentSessionRegistry;
 }
 
@@ -38,7 +39,7 @@ export interface SubagentDetectionDeps {
  * Single owner of subagent detection.
  *
  * Constructed once in the composition root with the detection inputs
- * (`subagentSessionsDir`, `platform`, `registry`) and shared across every
+ * (`subagentSessionsDir`, `flavor`, `registry`) and shared across every
  * consumer, replacing the dep triple those consumers previously threaded
  * individually. Delegates to the pure detection functions in
  * {@link ./subagent-context}, holding only the deps.
@@ -52,7 +53,7 @@ export class SubagentDetection
     return isSubagentExecutionContext(
       ctx,
       this.deps.subagentSessionsDir,
-      this.deps.platform,
+      this.deps.flavor,
       this.deps.registry,
     );
   }
