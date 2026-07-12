@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
-import { posix as posixPath, win32 as winPath } from "node:path";
+
+import type { PathFlavor } from "#src/path/path-flavor";
 
 /**
  * Resolve symlinks in an absolute path, best-effort.
@@ -13,11 +14,11 @@ import { posix as posixPath, win32 as winPath } from "node:path";
  */
 export function canonicalizePath(
   absolutePath: string,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): string {
   if (!absolutePath) return absolutePath;
 
-  const impl = platform === "win32" ? winPath : posixPath;
+  const { impl } = flavor;
   const root = impl.parse(absolutePath).root;
   const rest = absolutePath.slice(root.length);
   const parts = rest.split(impl.sep).filter(Boolean);

@@ -1,7 +1,7 @@
 import { posix as posixPath, win32 as winPath } from "node:path";
-
-import { canonicalizePath } from "#src/canonicalize-path";
 import { expandHomePath } from "#src/expand-home";
+import { canonicalizePath } from "#src/path/canonicalize-path";
+import { pathFlavorForPlatform } from "#src/path/path-flavor";
 import { isPathWithinDirectory } from "#src/path-containment";
 
 /**
@@ -134,6 +134,6 @@ export function canonicalNormalizePathForComparison(
 ): string {
   const lexical = normalizePathForComparison(pathValue, cwd, platform);
   if (!lexical) return "";
-  const canonical = canonicalizePath(lexical, platform);
+  const canonical = canonicalizePath(lexical, pathFlavorForPlatform(platform));
   return platform === "win32" ? canonical.toLowerCase() : canonical;
 }

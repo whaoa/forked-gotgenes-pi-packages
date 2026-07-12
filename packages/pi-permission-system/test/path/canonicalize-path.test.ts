@@ -7,7 +7,8 @@ vi.mock("node:fs", () => ({
   default: { realpathSync },
 }));
 
-import { canonicalizePath } from "#src/canonicalize-path";
+import { canonicalizePath } from "#src/path/canonicalize-path";
+import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
 
 function enoent(p: string): NodeJS.ErrnoException {
   return Object.assign(new Error(`ENOENT: no such file or directory '${p}'`), {
@@ -21,12 +22,12 @@ describe("canonicalizePath", () => {
   });
 
   test("returns empty string for empty input", () => {
-    expect(canonicalizePath("", "linux")).toBe("");
+    expect(canonicalizePath("", posixPathFlavor)).toBe("");
   });
 
   test("returns realpathSync result when path exists", () => {
     realpathSync.mockReturnValueOnce("/real/projects/app");
-    expect(canonicalizePath("/projects/link", "linux")).toBe(
+    expect(canonicalizePath("/projects/link", posixPathFlavor)).toBe(
       "/real/projects/app",
     );
   });
@@ -37,7 +38,7 @@ describe("canonicalizePath", () => {
         throw enoent("/projects/app/new-file.ts");
       })
       .mockReturnValueOnce("/canonical/app");
-    expect(canonicalizePath("/projects/app/new-file.ts", "linux")).toBe(
+    expect(canonicalizePath("/projects/app/new-file.ts", posixPathFlavor)).toBe(
       "/canonical/app/new-file.ts",
     );
   });
@@ -54,16 +55,16 @@ describe("canonicalizePath", () => {
         throw enoent("/projects/app");
       })
       .mockReturnValueOnce("/canonical/projects");
-    expect(canonicalizePath("/projects/app/src/new-file.ts", "linux")).toBe(
-      "/canonical/projects/app/src/new-file.ts",
-    );
+    expect(
+      canonicalizePath("/projects/app/src/new-file.ts", posixPathFlavor),
+    ).toBe("/canonical/projects/app/src/new-file.ts");
   });
 
   test("returns input unchanged when walk reaches filesystem root (all ENOENT)", () => {
     realpathSync.mockImplementation(() => {
       throw enoent("");
     });
-    expect(canonicalizePath("/nonexistent/path/file.ts", "linux")).toBe(
+    expect(canonicalizePath("/nonexistent/path/file.ts", posixPathFlavor)).toBe(
       "/nonexistent/path/file.ts",
     );
   });
@@ -72,7 +73,7 @@ describe("canonicalizePath", () => {
     realpathSync.mockImplementation(() => {
       throw Object.assign(new Error("ELOOP"), { code: "ELOOP" });
     });
-    expect(canonicalizePath("/some/looping/path", "linux")).toBe(
+    expect(canonicalizePath("/some/looping/path", posixPathFlavor)).toBe(
       "/some/looping/path",
     );
   });
@@ -81,7 +82,7 @@ describe("canonicalizePath", () => {
     realpathSync.mockImplementation(() => {
       throw Object.assign(new Error("EACCES"), { code: "EACCES" });
     });
-    expect(canonicalizePath("/restricted/path", "linux")).toBe(
+    expect(canonicalizePath("/restricted/path", posixPathFlavor)).toBe(
       "/restricted/path",
     );
   });
@@ -92,7 +93,7 @@ describe("canonicalizePath", () => {
         throw Object.assign(new Error("ENOTDIR"), { code: "ENOTDIR" });
       })
       .mockReturnValueOnce("/real/parent");
-    expect(canonicalizePath("/real/parent/not-a-dir", "linux")).toBe(
+    expect(canonicalizePath("/real/parent/not-a-dir", posixPathFlavor)).toBe(
       "/real/parent/not-a-dir",
     );
   });
@@ -105,14 +106,14 @@ describe("canonicalizePath", () => {
         throw enoent("C:\\projects\\link\\file.ts");
       })
       .mockReturnValueOnce("C:\\real\\app");
-    expect(canonicalizePath("C:\\projects\\link\\file.ts", "win32")).toBe(
-      "C:\\real\\app\\file.ts",
-    );
+    expect(
+      canonicalizePath("C:\\projects\\link\\file.ts", win32PathFlavor),
+    ).toBe("C:\\real\\app\\file.ts");
   });
 
   test("win32: resolves an existing path via realpathSync", () => {
     realpathSync.mockReturnValueOnce("C:\\real\\app");
-    expect(canonicalizePath("C:\\projects\\link", "win32")).toBe(
+    expect(canonicalizePath("C:\\projects\\link", win32PathFlavor)).toBe(
       "C:\\real\\app",
     );
   });
