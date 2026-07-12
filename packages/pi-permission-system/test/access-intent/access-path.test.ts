@@ -20,6 +20,7 @@ vi.mock("node:fs", () => ({
 }));
 
 import { AccessPath } from "#src/access-intent/access-path";
+import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
 
 describe("AccessPath.forPath", () => {
   const cwd = "/projects/my-app";
@@ -36,7 +37,10 @@ describe("AccessPath.forPath", () => {
         p.startsWith("/tmp") ? `/private${p}` : p,
       );
       expect(
-        AccessPath.forPath("/tmp/x", { cwd, platform: "linux" }).matchValues(),
+        AccessPath.forPath("/tmp/x", {
+          cwd,
+          flavor: posixPathFlavor,
+        }).matchValues(),
       ).toEqual(["/tmp/x", "/private/tmp/x"]);
     });
 
@@ -44,7 +48,7 @@ describe("AccessPath.forPath", () => {
       expect(
         AccessPath.forPath("/etc/hosts", {
           cwd,
-          platform: "linux",
+          flavor: posixPathFlavor,
         }).matchValues(),
       ).toEqual(["/etc/hosts"]);
     });
@@ -53,7 +57,7 @@ describe("AccessPath.forPath", () => {
       expect(
         AccessPath.forPath("src/foo.ts", {
           cwd,
-          platform: "linux",
+          flavor: posixPathFlavor,
         }).matchValues(),
       ).toEqual(["/projects/my-app/src/foo.ts", "src/foo.ts"]);
     });
@@ -64,7 +68,7 @@ describe("AccessPath.forPath", () => {
       expect(
         AccessPath.forPath("/etc/hosts", {
           cwd,
-          platform: "linux",
+          flavor: posixPathFlavor,
         }).matchValues(),
       ).not.toHaveLength(0);
     });
@@ -75,7 +79,7 @@ describe("AccessPath.forPath", () => {
         AccessPath.forPath("foo.ts", {
           cwd,
           resolveBase: "/projects/my-app/sub",
-          platform: "linux",
+          flavor: posixPathFlavor,
         }).matchValues(),
       ).toEqual(["/projects/my-app/sub/foo.ts", "sub/foo.ts", "foo.ts"]);
     });
@@ -88,7 +92,7 @@ describe("AccessPath.forPath", () => {
         AccessPath.forPath("foo.ts", {
           cwd,
           resolveBase: "/projects/my-app/sub",
-          platform: "linux",
+          flavor: posixPathFlavor,
         }).matchValues(),
       ).toEqual([
         "/projects/my-app/sub/foo.ts",
@@ -103,7 +107,7 @@ describe("AccessPath.forPath", () => {
     test("win32: builds lexical/match/boundary values with win32 rules", () => {
       const ap = AccessPath.forPath("src\\foo.ts", {
         cwd: "C:\\Projects\\App",
-        platform: "win32",
+        flavor: win32PathFlavor,
       });
       expect(ap.value()).toBe("c:\\projects\\app\\src\\foo.ts");
       expect(ap.boundaryValue()).toBe("c:\\projects\\app\\src\\foo.ts");
@@ -120,7 +124,7 @@ describe("AccessPath.forPath", () => {
       expect(
         AccessPath.forPath("link", {
           cwd: "C:\\Projects\\App",
-          platform: "win32",
+          flavor: win32PathFlavor,
         }).boundaryValue(),
       ).toBe("c:\\real\\app");
     });
@@ -134,7 +138,7 @@ describe("AccessPath.forPath", () => {
       expect(
         AccessPath.forPath("/tmp/x", {
           cwd,
-          platform: "linux",
+          flavor: posixPathFlavor,
         }).boundaryValue(),
       ).toBe("/private/tmp/x");
     });
@@ -143,14 +147,17 @@ describe("AccessPath.forPath", () => {
       expect(
         AccessPath.forPath("/etc/hosts", {
           cwd,
-          platform: "linux",
+          flavor: posixPathFlavor,
         }).boundaryValue(),
       ).toBe("/etc/hosts");
     });
 
     test("returns empty string for empty input", () => {
       expect(
-        AccessPath.forPath("", { cwd, platform: "linux" }).boundaryValue(),
+        AccessPath.forPath("", {
+          cwd,
+          flavor: posixPathFlavor,
+        }).boundaryValue(),
       ).toBe("");
     });
   });
@@ -162,14 +169,17 @@ describe("AccessPath.forPath", () => {
       );
       // Even when the path resolves to a different canonical, value() stays lexical.
       expect(
-        AccessPath.forPath("/tmp/x", { cwd, platform: "linux" }).value(),
+        AccessPath.forPath("/tmp/x", { cwd, flavor: posixPathFlavor }).value(),
       ).toBe("/tmp/x");
     });
 
     test("normalizes the path against cwd", () => {
       // A relative path becomes an absolute lexical value.
       expect(
-        AccessPath.forPath("src/foo.ts", { cwd, platform: "linux" }).value(),
+        AccessPath.forPath("src/foo.ts", {
+          cwd,
+          flavor: posixPathFlavor,
+        }).value(),
       ).toBe("/projects/my-app/src/foo.ts");
     });
 
@@ -178,15 +188,15 @@ describe("AccessPath.forPath", () => {
         AccessPath.forPath("foo.ts", {
           cwd,
           resolveBase: "/projects/my-app/sub",
-          platform: "linux",
+          flavor: posixPathFlavor,
         }).value(),
       ).toBe("/projects/my-app/sub/foo.ts");
     });
 
     test("returns empty string for empty input", () => {
-      expect(AccessPath.forPath("", { cwd, platform: "linux" }).value()).toBe(
-        "",
-      );
+      expect(
+        AccessPath.forPath("", { cwd, flavor: posixPathFlavor }).value(),
+      ).toBe("");
     });
   });
 });
@@ -206,7 +216,7 @@ describe("resolvedAlias()", () => {
     expect(
       AccessPath.forPath("demo-symlink-passwd", {
         cwd,
-        platform: "linux",
+        flavor: posixPathFlavor,
       }).resolvedAlias(),
     ).toBe("/etc/passwd");
   });
@@ -215,7 +225,7 @@ describe("resolvedAlias()", () => {
     expect(
       AccessPath.forPath("/etc/hosts", {
         cwd,
-        platform: "linux",
+        flavor: posixPathFlavor,
       }).resolvedAlias(),
     ).toBeUndefined();
   });
@@ -226,7 +236,7 @@ describe("resolvedAlias()", () => {
 
   test("returns undefined for empty input", () => {
     expect(
-      AccessPath.forPath("", { cwd, platform: "linux" }).resolvedAlias(),
+      AccessPath.forPath("", { cwd, flavor: posixPathFlavor }).resolvedAlias(),
     ).toBeUndefined();
   });
 
@@ -237,7 +247,7 @@ describe("resolvedAlias()", () => {
     expect(
       AccessPath.forPath("link", {
         cwd: "C:\\Projects\\App",
-        platform: "win32",
+        flavor: win32PathFlavor,
       }).resolvedAlias(),
     ).toBe("c:\\real\\app");
   });
@@ -246,7 +256,7 @@ describe("resolvedAlias()", () => {
     expect(
       AccessPath.forPath("src\\foo.ts", {
         cwd: "C:\\Projects\\App",
-        platform: "win32",
+        flavor: win32PathFlavor,
       }).resolvedAlias(),
     ).toBeUndefined();
   });

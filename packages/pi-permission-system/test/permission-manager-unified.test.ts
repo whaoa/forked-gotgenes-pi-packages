@@ -12,6 +12,7 @@ import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import { BashProgram } from "#src/access-intent/bash/program";
 import { getPathPolicyValues } from "#src/access-intent/path-normalization";
 import { getGlobalConfigPath, getProjectAgentsDir } from "#src/config-paths";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import {
   PermissionManager,
@@ -142,7 +143,11 @@ function checkPath(
 ): PermissionCheckResult {
   return checkPathValues(
     manager,
-    getPathPolicyValues(path, opts.cwd ? { cwd: opts.cwd } : {}, "linux"),
+    getPathPolicyValues(
+      path,
+      opts.cwd ? { cwd: opts.cwd } : {},
+      posixPathFlavor,
+    ),
     agentName,
     sessionRules,
     surface,

@@ -19,6 +19,7 @@ import type {
 } from "#src/handlers/gates/descriptor";
 import { isGateBypass, isGateDescriptor } from "#src/handlers/gates/descriptor";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { getNonEmptyString, toRecord } from "#src/value-guards";
@@ -249,7 +250,7 @@ describe("describeBashPathGate", () => {
       path: AccessPath.forPath("src/file.txt", {
         cwd: "/test/project",
         resolveBase: "/test/project/nested",
-        platform: "linux",
+        flavor: posixPathFlavor,
       }),
       agentName: undefined,
     });

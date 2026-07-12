@@ -1,3 +1,5 @@
+import type { PathFlavor } from "#src/path/path-flavor";
+
 import {
   canonicalNormalizePathForComparison,
   getPathPolicyValues,
@@ -103,13 +105,13 @@ export class AccessPath {
    */
   static forPath(
     pathValue: string,
-    options: { cwd: string; resolveBase?: string; platform: NodeJS.Platform },
+    options: { cwd: string; resolveBase?: string; flavor: PathFlavor },
   ): AccessPath {
-    const { cwd, resolveBase = cwd, platform } = options;
+    const { cwd, resolveBase = cwd, flavor } = options;
     return new AccessPath(
-      normalizePathForComparison(pathValue, resolveBase, platform),
-      getPathPolicyValues(pathValue, { cwd, resolveBase }, platform),
-      canonicalNormalizePathForComparison(pathValue, resolveBase, platform),
+      normalizePathForComparison(pathValue, resolveBase, flavor),
+      getPathPolicyValues(pathValue, { cwd, resolveBase }, flavor),
+      canonicalNormalizePathForComparison(pathValue, resolveBase, flavor),
     );
   }
 

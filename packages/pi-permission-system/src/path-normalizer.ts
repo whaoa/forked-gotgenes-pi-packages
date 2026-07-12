@@ -50,7 +50,11 @@ export class PathNormalizer {
     private readonly cwd: string,
   ) {
     this.impl = platform === "win32" ? winPath : posixPath;
-    this.canonicalCwd = canonicalNormalizePathForComparison(cwd, cwd, platform);
+    this.canonicalCwd = canonicalNormalizePathForComparison(
+      cwd,
+      cwd,
+      pathFlavorForPlatform(platform),
+    );
   }
 
   /** Build an AccessPath for a token, resolved against `resolveBase` (default cwd). */
@@ -58,7 +62,7 @@ export class PathNormalizer {
     return AccessPath.forPath(pathValue, {
       cwd: this.cwd,
       resolveBase: options?.resolveBase,
-      platform: this.platform,
+      flavor: pathFlavorForPlatform(this.platform),
     });
   }
 
@@ -172,7 +176,7 @@ export class PathNormalizer {
     const canonicalPath = canonicalNormalizePathForComparison(
       pathValue,
       this.cwd,
-      this.platform,
+      pathFlavorForPlatform(this.platform),
     );
     return isPathOutsideWorkingDirectory(
       canonicalPath,
@@ -204,7 +208,11 @@ export class PathNormalizer {
    * touches no filesystem, unlike {@link forPath}'s canonical alias.
    */
   comparableValue(pathValue: string): string {
-    return normalizePathForComparison(pathValue, this.cwd, this.platform);
+    return normalizePathForComparison(
+      pathValue,
+      this.cwd,
+      pathFlavorForPlatform(this.platform),
+    );
   }
 
   /**

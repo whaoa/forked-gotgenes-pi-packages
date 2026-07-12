@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import { AccessPath } from "#src/access-intent/access-path";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import type { ScopedPermissionManager } from "#src/permission-manager";
 import { PermissionResolver } from "#src/permission-resolver";
 import type { Ruleset } from "#src/rule";
@@ -141,7 +142,7 @@ describe("PermissionResolver", () => {
         surface: "path",
         path: AccessPath.forPath("src/a.ts", {
           cwd: "/proj",
-          platform: "linux",
+          flavor: posixPathFlavor,
         }),
       });
 
@@ -160,7 +161,7 @@ describe("PermissionResolver", () => {
       const { resolver, permissionManager } = makeResolver();
       const accessPath = AccessPath.forPath("/tmp/x", {
         cwd: "/workspace",
-        platform: "linux",
+        flavor: posixPathFlavor,
       });
 
       resolver.resolve({
@@ -193,7 +194,7 @@ describe("PermissionResolver", () => {
       const { resolver } = makeResolver(pm);
       const accessPath = AccessPath.forPath("/tmp/x", {
         cwd: "/workspace",
-        platform: "linux",
+        flavor: posixPathFlavor,
       });
 
       const result = resolver.resolve({

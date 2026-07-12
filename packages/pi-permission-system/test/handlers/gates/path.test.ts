@@ -15,6 +15,7 @@ import type { GateDescriptor } from "#src/handlers/gates/descriptor";
 import { isGateDescriptor } from "#src/handlers/gates/descriptor";
 import { describePathGate } from "#src/handlers/gates/path";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 
 import {
@@ -193,7 +194,7 @@ describe("describePathGate", () => {
       surface: "path",
       path: AccessPath.forPath(".env", {
         cwd: "/test/project",
-        platform: "linux",
+        flavor: posixPathFlavor,
       }),
       agentName: "my-agent",
     });
@@ -245,7 +246,7 @@ describe("describePathGate — home-relative paths", () => {
       surface: "path",
       path: AccessPath.forPath("~/.ssh/config", {
         cwd: "/test/project",
-        platform: "linux",
+        flavor: posixPathFlavor,
       }),
       agentName: undefined,
     });
@@ -308,7 +309,7 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
       surface: "path",
       path: AccessPath.forPath(".env", {
         cwd: "/test/project",
-        platform: "linux",
+        flavor: posixPathFlavor,
       }),
       agentName: undefined,
     });
@@ -329,7 +330,7 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
       surface: "path",
       path: AccessPath.forPath(".env", {
         cwd: "/test/project",
-        platform: "linux",
+        flavor: posixPathFlavor,
       }),
       agentName: undefined,
     });
@@ -350,7 +351,7 @@ describe("describePathGate — extension and MCP tools (#352)", () => {
       surface: "path",
       path: AccessPath.forPath("/etc/passwd", {
         cwd: "/test/project",
-        platform: "linux",
+        flavor: posixPathFlavor,
       }),
       agentName: undefined,
     });

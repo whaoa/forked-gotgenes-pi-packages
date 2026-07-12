@@ -1,34 +1,21 @@
-import { posix as posixPath, win32 as winPath } from "node:path";
 import { expandHomePath } from "#src/expand-home";
 import { canonicalizePath } from "#src/path/canonicalize-path";
-import { pathFlavorForPlatform } from "#src/path/path-flavor";
+import type { PathFlavor } from "#src/path/path-flavor";
 
 /**
  * Representation derivation backing {@link AccessPath}: turn an accessed path
  * into the lexical / canonical / policy-value forms the resolver matches
  * against rules. Pure (no filesystem access except `canonicalizePath`'s
- * best-effort symlink resolution); the `platform` is injected, never read
- * ambiently.
+ * best-effort symlink resolution); the platform's path semantics arrive as an
+ * injected {@link PathFlavor}, never read ambiently.
  */
 export function normalizePathForComparison(
   pathValue: string,
-  cwd: string,
-  platform: NodeJS.Platform,
+  base: string,
+  flavor: PathFlavor,
 ): string {
-  const trimmed = pathValue.trim().replace(/^['"]|['"]$/g, "");
-  if (!trimmed) {
-    return "";
-  }
-
-  let normalizedPath = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
-  normalizedPath = expandHomePath(normalizedPath);
-
-  const impl = platform === "win32" ? winPath : posixPath;
-  const absolutePath = impl.resolve(cwd, normalizedPath);
-  const normalizedAbsolutePath = impl.normalize(absolutePath);
-  return platform === "win32"
-    ? normalizedAbsolutePath.toLowerCase()
-    : normalizedAbsolutePath;
+  const cleaned = normalizePathPolicyLiteral(pathValue);
+  return cleaned ? flavor.comparable(cleaned, base) : "";
 }
 
 export interface PathPolicyValueOptions {
@@ -48,9 +35,9 @@ export interface PathPolicyValueOptions {
  * Normalize a single path-like lookup value without resolving it against CWD.
  *
  * Preserves compatibility with existing relative path rules (`src/*`, `*.env`)
- * while applying the same lexical cleanup as
- * {@link normalizePathForComparison}: trim, strip simple wrapping quotes,
- * strip the OpenCode-style leading `@`, and expand `~` / `$HOME`.
+ * while applying the lexical cleanup {@link normalizePathForComparison} shares:
+ * trim, strip simple wrapping quotes, strip the OpenCode-style leading `@`, and
+ * expand `~` / `$HOME`.
  */
 export function normalizePathPolicyLiteral(pathValue: string): string {
   const trimmed = pathValue.trim().replace(/^['"]|['"]$/g, "");
@@ -69,7 +56,7 @@ export function normalizePathPolicyLiteral(pathValue: string): string {
 export function getPathPolicyValues(
   pathValue: string,
   options: PathPolicyValueOptions,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): string[] {
   const literal = normalizePathPolicyLiteral(pathValue);
   if (!literal) return [];
@@ -77,7 +64,7 @@ export function getPathPolicyValues(
 
   return [
     ...new Set([
-      ...getAbsolutePathPolicyValues(pathValue, options, platform),
+      ...getAbsolutePathPolicyValues(pathValue, options, flavor),
       literal,
     ]),
   ];
@@ -86,38 +73,34 @@ export function getPathPolicyValues(
 function getAbsolutePathPolicyValues(
   pathValue: string,
   options: PathPolicyValueOptions,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): string[] {
   const resolveBase = options.resolveBase ?? options.cwd;
   if (!resolveBase) return [];
 
-  const absolute = normalizePathForComparison(pathValue, resolveBase, platform);
+  const absolute = normalizePathForComparison(pathValue, resolveBase, flavor);
   if (!absolute) return [];
 
   return [
     absolute,
-    ...getCwdRelativePathPolicyValues(absolute, options.cwd, platform),
+    ...getCwdRelativePathPolicyValues(absolute, options.cwd, flavor),
   ];
 }
 
 function getCwdRelativePathPolicyValues(
   absolute: string,
   cwd: string | undefined,
-  platform: NodeJS.Platform,
+  flavor: PathFlavor,
 ): string[] {
   if (!cwd) return [];
 
-  const normalizedCwd = normalizePathForComparison(cwd, cwd, platform);
+  const normalizedCwd = normalizePathForComparison(cwd, cwd, flavor);
   if (!normalizedCwd) return [];
-  if (
-    absolute !== normalizedCwd &&
-    !pathFlavorForPlatform(platform).isWithin(absolute, normalizedCwd)
-  ) {
+  if (absolute !== normalizedCwd && !flavor.isWithin(absolute, normalizedCwd)) {
     return [];
   }
 
-  const impl = platform === "win32" ? winPath : posixPath;
-  const relativeValue = impl.relative(normalizedCwd, absolute);
+  const relativeValue = flavor.impl.relative(normalizedCwd, absolute);
   return relativeValue ? [relativeValue] : [];
 }
 
@@ -128,11 +111,10 @@ function getCwdRelativePathPolicyValues(
  */
 export function canonicalNormalizePathForComparison(
   pathValue: string,
-  cwd: string,
-  platform: NodeJS.Platform,
+  base: string,
+  flavor: PathFlavor,
 ): string {
-  const lexical = normalizePathForComparison(pathValue, cwd, platform);
+  const lexical = normalizePathForComparison(pathValue, base, flavor);
   if (!lexical) return "";
-  const canonical = canonicalizePath(lexical, pathFlavorForPlatform(platform));
-  return platform === "win32" ? canonical.toLowerCase() : canonical;
+  return flavor.fold(canonicalizePath(lexical, flavor));
 }

@@ -26,62 +26,65 @@ import {
   normalizePathForComparison,
   normalizePathPolicyLiteral,
 } from "#src/access-intent/path-normalization";
+import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
 
 describe("normalizePathForComparison", () => {
   const cwd = "/projects/my-app";
 
   test("resolves absolute path unchanged", () => {
-    expect(normalizePathForComparison("/usr/local/bin", cwd, "linux")).toBe(
-      "/usr/local/bin",
-    );
+    expect(
+      normalizePathForComparison("/usr/local/bin", cwd, posixPathFlavor),
+    ).toBe("/usr/local/bin");
   });
 
   test("resolves relative path against cwd", () => {
-    expect(normalizePathForComparison("src/foo.ts", cwd, "linux")).toBe(
+    expect(normalizePathForComparison("src/foo.ts", cwd, posixPathFlavor)).toBe(
       "/projects/my-app/src/foo.ts",
     );
   });
 
   test("expands bare ~ to homedir", () => {
-    expect(normalizePathForComparison("~", cwd, "linux")).toBe("/mock/home");
-  });
-
-  test("expands ~/... to homedir-relative path", () => {
-    expect(normalizePathForComparison("~/docs/readme.md", cwd, "linux")).toBe(
-      join("/mock/home", "docs/readme.md"),
+    expect(normalizePathForComparison("~", cwd, posixPathFlavor)).toBe(
+      "/mock/home",
     );
   });
 
+  test("expands ~/... to homedir-relative path", () => {
+    expect(
+      normalizePathForComparison("~/docs/readme.md", cwd, posixPathFlavor),
+    ).toBe(join("/mock/home", "docs/readme.md"));
+  });
+
   test("expands bare $HOME to homedir", () => {
-    expect(normalizePathForComparison("$HOME", cwd, "linux")).toBe(
+    expect(normalizePathForComparison("$HOME", cwd, posixPathFlavor)).toBe(
       "/mock/home",
     );
   });
 
   test("expands $HOME/... to homedir-relative path", () => {
-    expect(normalizePathForComparison("$HOME/.ssh/config", cwd, "linux")).toBe(
-      join("/mock/home", ".ssh/config"),
-    );
+    expect(
+      normalizePathForComparison("$HOME/.ssh/config", cwd, posixPathFlavor),
+    ).toBe(join("/mock/home", ".ssh/config"));
   });
 
   test("strips leading @ before resolving", () => {
-    expect(normalizePathForComparison("@/usr/local/bin", cwd, "linux")).toBe(
-      "/usr/local/bin",
-    );
+    expect(
+      normalizePathForComparison("@/usr/local/bin", cwd, posixPathFlavor),
+    ).toBe("/usr/local/bin");
   });
 
   test("strips surrounding quotes", () => {
-    expect(normalizePathForComparison("'/usr/local/bin'", cwd, "linux")).toBe(
-      "/usr/local/bin",
-    );
-    expect(normalizePathForComparison('"/usr/local/bin"', cwd, "linux")).toBe(
-      "/usr/local/bin",
-    );
+    expect(
+      normalizePathForComparison("'/usr/local/bin'", cwd, posixPathFlavor),
+    ).toBe("/usr/local/bin");
+    expect(
+      normalizePathForComparison('"/usr/local/bin"', cwd, posixPathFlavor),
+    ).toBe("/usr/local/bin");
   });
 
   test("returns empty string for blank/whitespace-only path", () => {
-    expect(normalizePathForComparison("", cwd, "linux")).toBe("");
-    expect(normalizePathForComparison("   ", cwd, "linux")).toBe("");
+    expect(normalizePathForComparison("", cwd, posixPathFlavor)).toBe("");
+    expect(normalizePathForComparison("   ", cwd, posixPathFlavor)).toBe("");
   });
 
   // ── injected platform flavor (Windows is case-folded, win32-resolved) ────
@@ -91,20 +94,24 @@ describe("normalizePathForComparison", () => {
       normalizePathForComparison(
         "C:\\Users\\Foo\\Bar.txt",
         "C:\\Projects",
-        "win32",
+        win32PathFlavor,
       ),
     ).toBe("c:\\users\\foo\\bar.txt");
   });
 
   test("win32: resolves a relative path against cwd with win32 rules", () => {
     expect(
-      normalizePathForComparison("src\\foo.ts", "C:\\Projects\\App", "win32"),
+      normalizePathForComparison(
+        "src\\foo.ts",
+        "C:\\Projects\\App",
+        win32PathFlavor,
+      ),
     ).toBe("c:\\projects\\app\\src\\foo.ts");
   });
 
   test("posix platform leaves case untouched", () => {
     expect(
-      normalizePathForComparison("/Projects/App/Src.ts", cwd, "linux"),
+      normalizePathForComparison("/Projects/App/Src.ts", cwd, posixPathFlavor),
     ).toBe("/Projects/App/Src.ts");
   });
 });
@@ -123,12 +130,18 @@ describe("canonicalNormalizePathForComparison", () => {
       return p;
     });
     expect(
-      canonicalNormalizePathForComparison("/projects/link", cwd, "linux"),
+      canonicalNormalizePathForComparison(
+        "/projects/link",
+        cwd,
+        posixPathFlavor,
+      ),
     ).toBe("/real/projects/app");
   });
 
   test("returns empty string for empty input", () => {
-    expect(canonicalNormalizePathForComparison("", cwd, "linux")).toBe("");
+    expect(canonicalNormalizePathForComparison("", cwd, posixPathFlavor)).toBe(
+      "",
+    );
   });
 
   test("returns lexical form when no symlinks (identity realpathSync)", () => {
@@ -136,7 +149,7 @@ describe("canonicalNormalizePathForComparison", () => {
       canonicalNormalizePathForComparison(
         "/projects/my-app/src/index.ts",
         cwd,
-        "linux",
+        posixPathFlavor,
       ),
     ).toBe("/projects/my-app/src/index.ts");
   });
@@ -146,7 +159,7 @@ describe("canonicalNormalizePathForComparison", () => {
       canonicalNormalizePathForComparison(
         "C:\\Projects\\App\\Src",
         "C:\\Projects\\App",
-        "win32",
+        win32PathFlavor,
       ),
     ).toBe("c:\\projects\\app\\src");
   });
@@ -189,25 +202,24 @@ describe("getPathPolicyValues", () => {
   const cwd = "/projects/my-app";
 
   test("returns only the literal when no base is available", () => {
-    expect(getPathPolicyValues("src/foo.ts", {}, "linux")).toEqual([
+    expect(getPathPolicyValues("src/foo.ts", {}, posixPathFlavor)).toEqual([
       "src/foo.ts",
     ]);
-    expect(getPathPolicyValues("src/foo.ts", {}, "linux")).toEqual([
+    expect(getPathPolicyValues("src/foo.ts", {}, posixPathFlavor)).toEqual([
       "src/foo.ts",
     ]);
   });
 
   test("adds absolute and project-relative aliases for a relative token", () => {
-    expect(getPathPolicyValues("src/foo.ts", { cwd }, "linux")).toEqual([
-      "/projects/my-app/src/foo.ts",
-      "src/foo.ts",
-    ]);
+    expect(getPathPolicyValues("src/foo.ts", { cwd }, posixPathFlavor)).toEqual(
+      ["/projects/my-app/src/foo.ts", "src/foo.ts"],
+    );
   });
 
   test("omits the relative alias for a token outside cwd", () => {
-    expect(getPathPolicyValues("/etc/hosts", { cwd }, "linux")).toEqual([
-      "/etc/hosts",
-    ]);
+    expect(getPathPolicyValues("/etc/hosts", { cwd }, posixPathFlavor)).toEqual(
+      ["/etc/hosts"],
+    );
   });
 
   test("resolves against resolveBase while aliasing relative to cwd", () => {
@@ -218,16 +230,16 @@ describe("getPathPolicyValues", () => {
           cwd,
           resolveBase: "/projects/my-app/nested",
         },
-        "linux",
+        posixPathFlavor,
       ),
     ).toEqual(["/projects/my-app/nested/foo.txt", "nested/foo.txt", "foo.txt"]);
   });
 
   test("preserves the surface catch-all", () => {
-    expect(getPathPolicyValues("*", { cwd }, "linux")).toEqual(["*"]);
+    expect(getPathPolicyValues("*", { cwd }, posixPathFlavor)).toEqual(["*"]);
   });
 
   test("returns empty for blank input", () => {
-    expect(getPathPolicyValues("   ", { cwd }, "linux")).toEqual([]);
+    expect(getPathPolicyValues("   ", { cwd }, posixPathFlavor)).toEqual([]);
   });
 });
