@@ -726,7 +726,9 @@ describe("BashProgram", () => {
         ['bash -ec "rm -rf /"', 'bash -ec "rm -rf /"'],
       ])("flags %s as opaque", async (command, text) => {
         const program = await BashProgram.parse(command, normalizer);
-        expect(program.commands()).toEqual([{ text, opaque: true }]);
+        expect(program.commands()).toEqual([
+          { text, wrapperKind: "opaque-payload" },
+        ]);
       });
 
       it("flags an env-prefixed wrapper as opaque after stripping the prefix", async () => {
@@ -735,7 +737,7 @@ describe("BashProgram", () => {
           normalizer,
         );
         expect(program.commands()).toEqual([
-          { text: 'bash -c "rm -rf /"', opaque: true },
+          { text: 'bash -c "rm -rf /"', wrapperKind: "opaque-payload" },
         ]);
       });
 

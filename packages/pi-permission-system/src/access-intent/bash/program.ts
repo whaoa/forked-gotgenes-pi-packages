@@ -75,9 +75,9 @@ export class BashProgram {
    * Splits on the shell chain operators (`&&`, `||`, `;`, `|`, `&`, newlines);
    * quotes, command substitution, and subshells are respected by the parser and
    * are NOT split — a subshell or other compound statement is emitted whole.
-   * Each unit has any leading `variable_assignment` prefix stripped, and an
-   * opaque-payload wrapper (`bash -c`/`eval`) is flagged `opaque` so its decision
-   * is floored to `ask`.
+   * Each unit has any leading `variable_assignment` prefix stripped, and a
+   * wrapper unit (`bash -c`/`eval`, or an indirection wrapper such as `sudo`) is
+   * tagged with a `wrapperKind` so its decision is floored to `ask`.
    * May be empty (e.g. an empty command or a comment-only line); callers fall
    * back to the whole command so the surface is never evaluated weaker than
    * before.

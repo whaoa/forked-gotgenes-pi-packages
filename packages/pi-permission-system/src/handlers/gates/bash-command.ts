@@ -1,4 +1,7 @@
-import type { BashCommand } from "#src/access-intent/bash/command-enumeration";
+import type {
+  BashCommand,
+  WrapperKind,
+} from "#src/access-intent/bash/command-enumeration";
 import { pickMostRestrictive } from "#src/handlers/gates/candidate-check";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { PermissionCheckResult } from "#src/types";
@@ -19,11 +22,13 @@ import type { PermissionCheckResult } from "#src/types";
  * `commandContext` (set only for a nested command), so the prompt,
  * session-approval suggestion, and decision event scope to that command.
  *
- * An opaque-payload wrapper unit (`bash -c`/`eval`, flagged `opaque` by the
- * enumerator) has its inner program hidden behind a quoted argument, so an
- * `allow` is floored up to a synthetic `ask` (the `<opaque-bash-wrapper>`
- * pattern) to keep it from riding a permissive rule; an explicit `deny`/`ask`
- * on the wrapper is left untouched (`deny > ask > allow`).
+ * A wrapper unit (flagged with a `wrapperKind` by the enumerator) hides or
+ * indirects the command that should be gated, so an `allow` is floored up to a
+ * synthetic `ask` — the `<opaque-bash-wrapper>` pattern for an inline-shell
+ * payload (`bash -c`/`eval`, #481) or `<indirection-bash-wrapper>` for a
+ * prefix/exec wrapper (`sudo`/`env`/`xargs`/`find -exec`/…, #490) — to keep it
+ * from riding a permissive rule; an explicit `deny`/`ask` on the wrapper is left
+ * untouched (`deny > ask > allow`).
  *
  * When `commands` is empty there are two cases. A trivially-empty command (an
  * empty, whitespace-only, or comment-only line) has genuinely nothing to gate,
@@ -36,6 +41,15 @@ import type { PermissionCheckResult } from "#src/types";
  * Pure and synchronous: the (async, tree-sitter) parse happens once in the
  * handler, which passes the decomposed `commands` here.
  */
+/**
+ * The synthetic `matchedPattern` recorded when a wrapper unit's `allow` is
+ * floored to `ask`, keyed by the wrapper kind that caused the floor.
+ */
+const WRAPPER_SENTINEL: Record<WrapperKind, string> = {
+  "opaque-payload": "<opaque-bash-wrapper>",
+  indirection: "<indirection-bash-wrapper>",
+};
+
 export function resolveBashCommandCheck(
   command: string,
   commands: BashCommand[],
@@ -69,11 +83,11 @@ export function resolveBashCommandCheck(
       agentName,
     });
     const result =
-      cmd.opaque && base.state === "allow"
+      cmd.wrapperKind && base.state === "allow"
         ? {
             ...base,
             state: "ask" as const,
-            matchedPattern: "<opaque-bash-wrapper>",
+            matchedPattern: WRAPPER_SENTINEL[cmd.wrapperKind],
           }
         : base;
     return cmd.context ? { ...result, commandContext: cmd.context } : result;

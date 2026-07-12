@@ -11,6 +11,16 @@ import type { BashCommandContext } from "#src/types";
  * The type is the stable extension point: #306 adds an execution `context`,
  * #307 adds per-command path candidates and an effective working directory.
  */
+/**
+ * Why a command unit's decision is floored to at least `ask`.
+ * `"opaque-payload"` — an inline-shell payload (`bash -c`/`eval`) whose inner
+ * program is not re-parsed (#481).
+ * `"indirection"` — a prefix/exec wrapper (`sudo`/`env`/`xargs`/`find -exec`/…)
+ * whose inner command is a visible argument but is not gated on its own (#490).
+ * The kind selects the audit sentinel; both floor identically.
+ */
+export type WrapperKind = "opaque-payload" | "indirection";
+
 export interface BashCommand {
   readonly text: string;
   /**
@@ -19,11 +29,11 @@ export interface BashCommand {
    */
   readonly context?: BashCommandContext;
   /**
-   * True when this is an opaque-payload wrapper (`bash -c`/`eval`) whose inner
-   * program is not re-parsed; its decision is floored to at least `ask` so it
-   * cannot ride a permissive `allow`.
+   * Set when this unit is a floored indirection wrapper; its decision is floored
+   * to at least `ask` so the wrapped command cannot ride a permissive `allow`.
+   * Absent for an ordinary command.
    */
-  readonly opaque?: boolean;
+  readonly wrapperKind?: WrapperKind;
 }
 
 // ── Command enumeration ──────────────────────────────────────────────────────
@@ -83,7 +93,9 @@ const NESTED_EXECUTION_CONTEXTS = new Map<string, BashCommandContext>([
  * nested units can only ever produce a more-restrictive decision, never weaker.
  *
  * Each emitted command unit has any leading `variable_assignment` prefix
- * stripped (so an env-var prefix cannot defeat a command-pattern rule).
+ * stripped (so an env-var prefix cannot defeat a command-pattern rule), and a
+ * wrapper unit (`bash -c`/`eval`, or an indirection wrapper such as `sudo`) is
+ * tagged with a {@link WrapperKind} so its decision is later floored to `ask`.
  */
 export function collectCommands(node: TSNode): BashCommand[] {
   const out: BashCommand[] = [];
@@ -103,7 +115,7 @@ function collectCommandsInto(
 
   if (node.type === "command") {
     out.push(
-      makeUnit(commandUnitText(node), context, isOpaqueWrapperCommand(node)),
+      makeUnit(commandUnitText(node), context, classifyWrapperCommand(node)),
     );
     // A command's text already contains any substitution; descend its subtree
     // to ALSO emit the inner commands of command/process substitutions.
@@ -130,10 +142,10 @@ function collectCommandsInto(
 function makeUnit(
   text: string,
   context: BashCommandContext | undefined,
-  opaque = false,
+  wrapperKind?: WrapperKind,
 ): BashCommand {
   const unit: BashCommand = context ? { text, context } : { text };
-  return opaque ? { ...unit, opaque } : unit;
+  return wrapperKind ? { ...unit, wrapperKind } : unit;
 }
 
 /**
@@ -142,18 +154,36 @@ function makeUnit(
 const SHELL_WRAPPER_NAMES = new Set(["bash", "sh", "dash", "zsh", "ksh"]);
 
 /**
- * True when a `command` node is an opaque-payload wrapper: a shell
- * (`bash`/`sh`/`dash`/`zsh`/`ksh`) invoked with a `-c` flag, or `eval`. Its
- * inner program is a quoted argument the enumerator does not re-parse, so the
- * wrapper's decision is later floored to at least `ask`.
+ * Classify a `command` node as a floored wrapper, or `undefined` for an
+ * ordinary command. Reads only the node's own named children (a shallow walk),
+ * skipping any leading `variable_assignment` prefix, and matches the command
+ * name on its basename (so `/bin/bash -c …` counts).
  *
- * The command name is matched on its basename (so `/bin/bash -c …` counts), and
- * a `-c` flag is recognized within a short-flag cluster (`-c`, `-ec`, `-xc`).
- * A leading `variable_assignment` prefix is skipped, matching `commandUnitText`.
+ * `"opaque-payload"`: `eval`, or a shell (`bash`/`sh`/`dash`/`zsh`/`ksh`) with a
+ * `-c` short-flag cluster (`-c`, `-ec`, `-xc`) — the inner program is a quoted
+ * argument the enumerator does not re-parse (#481).
  */
-function isOpaqueWrapperCommand(node: TSNode): boolean {
+function classifyWrapperCommand(node: TSNode): WrapperKind | undefined {
+  const { commandName, args } = readWrapperCommand(node);
+  if (commandName === undefined) return undefined;
+  if (commandName === "eval") return "opaque-payload";
+  if (SHELL_WRAPPER_NAMES.has(commandName) && hasShortFlagC(args)) {
+    return "opaque-payload";
+  }
+  return undefined;
+}
+
+/**
+ * A `command` node's name basename and its argument texts, skipping any leading
+ * `variable_assignment` prefix (matching `commandUnitText`). `commandName` is
+ * `undefined` for a pure assignment with no `command_name`.
+ */
+function readWrapperCommand(node: TSNode): {
+  commandName: string | undefined;
+  args: string[];
+} {
   let commandName: string | undefined;
-  let sawShortFlagC = false;
+  const args: string[] = [];
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i);
     if (!child?.isNamed) continue;
@@ -162,15 +192,24 @@ function isOpaqueWrapperCommand(node: TSNode): boolean {
       commandName = basename(child.text);
       continue;
     }
-    const text = child.text;
-    if (text === "--") break;
-    if (text.startsWith("-") && !text.startsWith("--") && text.includes("c")) {
-      sawShortFlagC = true;
+    args.push(child.text);
+  }
+  return { commandName, args };
+}
+
+/**
+ * True when an argument list has a short-flag cluster containing `c` before any
+ * `--` end-of-options marker (`-c`, `-ec`, `-xc`) — the inline-shell payload
+ * flag for `bash`/`sh`/`dash`/`zsh`/`ksh`.
+ */
+function hasShortFlagC(args: string[]): boolean {
+  for (const arg of args) {
+    if (arg === "--") return false;
+    if (arg.startsWith("-") && !arg.startsWith("--") && arg.includes("c")) {
+      return true;
     }
   }
-  if (commandName === undefined) return false;
-  if (commandName === "eval") return true;
-  return SHELL_WRAPPER_NAMES.has(commandName) && sawShortFlagC;
+  return false;
 }
 
 /** The final path segment of a command name (`/bin/bash` → `bash`). */
