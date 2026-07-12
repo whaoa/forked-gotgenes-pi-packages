@@ -20,6 +20,7 @@ vi.mock("node:fs", () => ({
 import { formatDenyReason } from "#src/denial-messages";
 import { extractExternalPathsFromBashCommand as extractWithNormalizer } from "#src/handlers/gates/bash-path-extractor";
 import { formatBashExternalDirectoryAskPrompt } from "#src/handlers/gates/external-directory-messages";
+import { pathFlavorForPlatform, win32PathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 
 afterEach(() => {
@@ -35,7 +36,7 @@ function extractExternalPathsFromBashCommand(
 ): Promise<string[]> {
   return extractWithNormalizer(
     command,
-    new PathNormalizer(process.platform, cwd),
+    new PathNormalizer(pathFlavorForPlatform(process.platform), cwd),
   );
 }
 
@@ -973,7 +974,7 @@ describe("Windows drive-letter paths (win32 semantics)", () => {
   async function extractWin32(command: string): Promise<string[]> {
     return extractWithNormalizer(
       command,
-      new PathNormalizer("win32", windowsCwd),
+      new PathNormalizer(win32PathFlavor, windowsCwd),
     );
   }
 
@@ -1011,7 +1012,7 @@ describe("Git Bash POSIX device paths (win32 semantics)", () => {
   async function extractWin32(command: string): Promise<string[]> {
     return extractWithNormalizer(
       command,
-      new PathNormalizer("win32", windowsCwd),
+      new PathNormalizer(win32PathFlavor, windowsCwd),
     );
   }
 
@@ -1034,7 +1035,7 @@ describe("Git Bash MSYS drive mounts (win32 semantics)", () => {
   async function extractWin32(command: string): Promise<string[]> {
     return extractWithNormalizer(
       command,
-      new PathNormalizer("win32", windowsCwd),
+      new PathNormalizer(win32PathFlavor, windowsCwd),
     );
   }
 
@@ -1060,7 +1061,7 @@ describe("Git Bash POSIX absolute paths (win32 semantics)", () => {
   async function extractWin32(command: string): Promise<string[]> {
     return extractWithNormalizer(
       command,
-      new PathNormalizer("win32", windowsCwd),
+      new PathNormalizer(win32PathFlavor, windowsCwd),
     );
   }
 

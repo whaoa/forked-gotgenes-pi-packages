@@ -9,6 +9,7 @@ import type { SessionConfigStore } from "./config-store";
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ExtensionPaths } from "./extension-paths";
 import type { ToolCallGateInputs } from "./handlers/gates/tool-call-gate-pipeline";
+import type { PathFlavor } from "./path/path-flavor";
 import { PathNormalizer } from "./path-normalizer";
 import type { ScopedPermissionManager } from "./permission-manager";
 
@@ -47,12 +48,12 @@ export class PermissionSession implements ToolCallGateInputs {
     private readonly sessionRules: SessionRules,
     private readonly configStore: SessionConfigStore,
     private readonly authorizerSelection: AuthorizerSelectionLifecycle,
-    private readonly platform: NodeJS.Platform,
+    private readonly flavor: PathFlavor,
   ) {
     // Placeholder until the first activate(ctx) binds the real cwd; every gate
     // evaluate runs after activate (handleToolCall activates first), so this
     // empty-cwd value is never read.
-    this.pathNormalizer = new PathNormalizer(platform, "");
+    this.pathNormalizer = new PathNormalizer(flavor, "");
   }
 
   // ── Context lifecycle ──────────────────────────────────────────────────
@@ -68,7 +69,7 @@ export class PermissionSession implements ToolCallGateInputs {
    */
   activate(ctx: ExtensionContext): void {
     this.context = ctx;
-    this.pathNormalizer = new PathNormalizer(this.platform, ctx.cwd);
+    this.pathNormalizer = new PathNormalizer(this.flavor, ctx.cwd);
     this.forwarding.start(ctx);
     this.authorizerSelection.activate(ctx);
   }
@@ -207,7 +208,7 @@ export class PermissionSession implements ToolCallGateInputs {
   // ── Path normalization ────────────────────────────────────────────────
 
   /**
-   * The session's {@link PathNormalizer}, carrying the host platform and the
+   * The session's {@link PathNormalizer}, carrying the host path flavor and the
    * session cwd. Rebuilt on every `resetForNewSession` so a session switch
    * rebinds the cwd.
    */

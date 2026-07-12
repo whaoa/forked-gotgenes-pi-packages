@@ -22,6 +22,7 @@ import {
 } from "#src/handlers/gates/descriptor";
 import { describeExternalDirectoryGate } from "#src/handlers/gates/external-directory";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { pathFlavorForPlatform } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import { PermissionResolver } from "#src/permission-resolver";
 import { SessionRules } from "#src/session-rules";
@@ -88,7 +89,7 @@ describe("external_directory symlink acceptance (#418)", () => {
         readTcc(),
         [],
         resolver,
-        new PathNormalizer(process.platform, cwd),
+        new PathNormalizer(pathFlavorForPlatform(process.platform), cwd),
       );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("allow");
@@ -111,7 +112,7 @@ describe("external_directory symlink acceptance (#418)", () => {
         readTcc(),
         [],
         resolver,
-        new PathNormalizer(process.platform, cwd),
+        new PathNormalizer(pathFlavorForPlatform(process.platform), cwd),
       );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("allow");
@@ -129,7 +130,7 @@ describe("external_directory symlink acceptance (#418)", () => {
         readTcc(),
         [],
         resolver,
-        new PathNormalizer(process.platform, cwd),
+        new PathNormalizer(pathFlavorForPlatform(process.platform), cwd),
       );
       expect(isGateDescriptor(result)).toBe(true);
       expect((result as GateDescriptor).preCheck?.state).toBe("ask");
@@ -155,7 +156,7 @@ describe("external_directory symlink acceptance (#418)", () => {
       };
       const program = await BashProgram.parse(
         command,
-        new PathNormalizer(process.platform, cwd),
+        new PathNormalizer(pathFlavorForPlatform(process.platform), cwd),
       );
       const result = describeBashExternalDirectoryGate(tcc, program, resolver);
       // All external paths are covered by the allow → bypass, no prompt.

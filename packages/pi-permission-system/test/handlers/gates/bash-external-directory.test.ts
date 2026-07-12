@@ -9,6 +9,7 @@ import type {
 } from "#src/handlers/gates/descriptor";
 import { isGateBypass, isGateDescriptor } from "#src/handlers/gates/descriptor";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { pathFlavorForPlatform, win32PathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { PermissionCheckResult } from "#src/types";
@@ -62,7 +63,7 @@ async function describeGate(
     tcc.toolName === "bash" && command
       ? await BashProgram.parse(
           command,
-          new PathNormalizer(process.platform, tcc.cwd),
+          new PathNormalizer(pathFlavorForPlatform(process.platform), tcc.cwd),
         )
       : null;
   return describeBashExternalDirectoryGate(tcc, bashProgram, resolver);
@@ -275,7 +276,10 @@ describe("describeBashExternalDirectoryGate — Git Bash semantics (win32)", () 
     const command = getNonEmptyString(toRecord(tcc.input).command);
     const bashProgram =
       tcc.toolName === "bash" && command
-        ? await BashProgram.parse(command, new PathNormalizer("win32", tcc.cwd))
+        ? await BashProgram.parse(
+            command,
+            new PathNormalizer(win32PathFlavor, tcc.cwd),
+          )
         : null;
     return describeBashExternalDirectoryGate(tcc, bashProgram, resolver);
   }

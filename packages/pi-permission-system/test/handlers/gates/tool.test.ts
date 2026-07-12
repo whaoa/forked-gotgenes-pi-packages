@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { describeToolGate } from "#src/handlers/gates/tool";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import {
   TOOL_INPUT_LOG_PREVIEW_MAX_LENGTH,
@@ -48,7 +49,7 @@ function makeCheckResult(
 
 // The per-tool gate now receives the AccessPath the pipeline builds, bound to
 // the makeTcc default cwd; approval values derive from `accessPath.value()`.
-const normalizer = new PathNormalizer("linux", "/test/project");
+const normalizer = new PathNormalizer(posixPathFlavor, "/test/project");
 
 // ── tests ──────────────────────────────────────────────────────────────────
 

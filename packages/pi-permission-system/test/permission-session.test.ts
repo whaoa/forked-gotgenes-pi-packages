@@ -18,6 +18,7 @@ vi.mock("../src/active-agent", () => ({
 // ── Test helpers ───────────────────────────────────────────────────────────
 
 import type { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
+import { win32PathFlavor } from "#src/path/path-flavor";
 import { SessionApproval } from "#src/session-approval";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
 import { makeCtx } from "#test/helpers/handler-fixtures";
@@ -166,8 +167,8 @@ describe("PermissionSession", () => {
       );
     });
 
-    it("builds a win32 normalizer when constructed with the win32 platform", () => {
-      const { session } = createSession({ platform: "win32" });
+    it("builds a win32 normalizer when constructed with the win32 flavor", () => {
+      const { session } = createSession({ flavor: win32PathFlavor });
       session.resetForNewSession(makeCtx({ cwd: "C:\\Projects\\App" }));
 
       expect(session.getPathNormalizer().forPath("src\\foo.ts").value()).toBe(

@@ -19,6 +19,7 @@ import type { ForwardingController } from "#src/authority/forwarding-manager";
 import type { SessionConfigStore } from "#src/config-store";
 import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import type { ExtensionPaths } from "#src/extension-paths";
+import { type PathFlavor, pathFlavorForPlatform } from "#src/path/path-flavor";
 import type { ScopedPermissionManager } from "#src/permission-manager";
 import { PermissionResolver } from "#src/permission-resolver";
 import { PermissionSession } from "#src/permission-session";
@@ -133,7 +134,7 @@ export function makeRealSession(overrides?: {
   sessionRules?: SessionRules;
   configStore?: SessionConfigStore;
   authorizerSelection?: AuthorizerSelectionLifecycle;
-  platform?: NodeJS.Platform;
+  flavor?: PathFlavor;
 }): {
   session: PermissionSession;
   paths: ExtensionPaths;
@@ -155,7 +156,7 @@ export function makeRealSession(overrides?: {
   const configStore = overrides?.configStore ?? makeConfigStore();
   const authorizerSelection =
     overrides?.authorizerSelection ?? makeAuthorizerSelection();
-  const platform = overrides?.platform ?? process.platform;
+  const flavor = overrides?.flavor ?? pathFlavorForPlatform(process.platform);
   const session = new PermissionSession(
     paths,
     forwarding,
@@ -163,7 +164,7 @@ export function makeRealSession(overrides?: {
     sessionRules,
     configStore,
     authorizerSelection,
-    platform,
+    flavor,
   );
   return {
     session,

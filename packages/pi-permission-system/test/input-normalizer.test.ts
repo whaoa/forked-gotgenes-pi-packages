@@ -22,6 +22,7 @@ import {
   normalizeInput,
 } from "#src/input-normalizer";
 import { createMcpPermissionTargets } from "#src/mcp-targets";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 
 afterEach(() => {
@@ -227,7 +228,7 @@ describe("normalizeInput — MCP surface", () => {
 });
 
 describe("buildAccessIntentForSurface", () => {
-  const normalizer = new PathNormalizer("linux", "/test/project");
+  const normalizer = new PathNormalizer(posixPathFlavor, "/test/project");
 
   it("emits an access-path intent carrying the canonical alias for the path surface", () => {
     realpathSync.mockImplementation((p: string) =>

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionManager } from "#src/permission-manager";
 import {
@@ -34,7 +35,7 @@ const CWD = "/projects/my-app";
 // `findSkillPathMatch` only uses the normalizer's platform (it compares two
 // already-absolute paths via `isWithinDirectory`), so this CWD-baked instance
 // serves every call regardless of the entries' cwd.
-const normalizer = new PathNormalizer("linux", CWD);
+const normalizer = new PathNormalizer(posixPathFlavor, CWD);
 
 function makeManager(
   defaultState: "allow" | "deny" | "ask" = "allow",
@@ -348,7 +349,7 @@ test("REGRESSION: resolveSkillPromptEntries sanitizes every available_skills blo
       prompt,
       asChecker(manager),
       null,
-      new PathNormalizer("linux", "/cwd"),
+      new PathNormalizer(posixPathFlavor, "/cwd"),
     );
 
     expect(result.prompt).not.toContain("denied-skill");
@@ -395,7 +396,7 @@ test("REGRESSION: resolveSkillPromptEntries keeps only visible skills available 
       prompt,
       asChecker(manager),
       null,
-      new PathNormalizer("linux", "/cwd"),
+      new PathNormalizer(posixPathFlavor, "/cwd"),
     );
     const visiblePath = resolve("/cwd", "./skills/visible/file.ts");
     const blockedPath = resolve("/cwd", "./skills/blocked/file.ts");

@@ -1,13 +1,11 @@
-import { posix as posixPath, win32 as winPath } from "node:path";
-import { pathFlavorForPlatform } from "#src/path/path-flavor";
+import type { PathFlavor } from "#src/path/path-flavor";
+
 import { AccessPath } from "./access-intent/access-path";
-import { classifyWin32BashToken } from "./access-intent/bash/msys-bash-tokens";
 import {
   canonicalNormalizePathForComparison,
   normalizePathForComparison,
   normalizePathPolicyLiteral,
 } from "./access-intent/path-normalization";
-
 import { isPathOutsideWorkingDirectory } from "./path/path-containment";
 import { isPiInfrastructureRead } from "./path/pi-infrastructure-read";
 
@@ -29,32 +27,27 @@ export type BashCdTarget =
 
 /**
  * Path-interpretation collaborator, constructed once at the session edge with
- * the two ambient inputs — the host `platform` and the session `cwd` — baked
- * in, and handed raw path tokens thereafter.
+ * the two ambient inputs — the resolved {@link PathFlavor} and the session
+ * `cwd` — baked in, and handed raw path tokens thereafter.
  *
  * The bash path pipeline and the per-tool/external-directory gates ask this
  * object the platform-dependent questions ("is this path absolute *under our
- * platform*?", "resolve this `cd` offset *against our cwd*") and receive
- * prepared {@link AccessPath} values, instead of reading `process.platform`
- * ambiently or threading `cwd` through every call. Internally it selects the
- * `win32`/`posix` path flavor once and delegates to the platform-parameterized
+ * flavor*?", "resolve this `cd` offset *against our cwd*") and receive prepared
+ * {@link AccessPath} values, instead of reading `process.platform` ambiently or
+ * threading `cwd` through every call. All platform semantics live on the
+ * injected `flavor`; this class holds no platform discriminator and no
+ * `win32`/`posix` branch — it delegates to `flavor` and the flavor-parameterized
  * `path-containment` / `path-normalization` / `AccessPath` primitives.
  */
 export class PathNormalizer {
-  private readonly impl: typeof posixPath;
   /** Canonical form of the baked cwd, resolved once (the symlink target is stable per session). */
   private readonly canonicalCwd: string;
 
   constructor(
-    private readonly platform: NodeJS.Platform,
+    readonly flavor: PathFlavor,
     private readonly cwd: string,
   ) {
-    this.impl = platform === "win32" ? winPath : posixPath;
-    this.canonicalCwd = canonicalNormalizePathForComparison(
-      cwd,
-      cwd,
-      pathFlavorForPlatform(platform),
-    );
+    this.canonicalCwd = canonicalNormalizePathForComparison(cwd, cwd, flavor);
   }
 
   /** Build an AccessPath for a token, resolved against `resolveBase` (default cwd). */
@@ -62,7 +55,7 @@ export class PathNormalizer {
     return AccessPath.forPath(pathValue, {
       cwd: this.cwd,
       resolveBase: options?.resolveBase,
-      flavor: pathFlavorForPlatform(this.platform),
+      flavor: this.flavor,
     });
   }
 
@@ -76,18 +69,16 @@ export class PathNormalizer {
    * semantics on a win32 host.
    *
    * Pi core always executes bash through Git Bash on Windows, so a POSIX-shaped
-   * absolute token carries MSYS semantics, not `node:path.win32` semantics. On
-   * win32 the recognized safe device paths (`/dev/null`, `/dev/std{in,out,err}`)
-   * are preserved verbatim as devices instead of being resolved into
-   * `c:\dev\null`, and MSYS drive mounts (`/c/…`) are translated to their
-   * Windows equivalent (`C:\…`) before resolution; every other token delegates
-   * to {@link forPath}. On POSIX this is a straight delegation to
-   * {@link forPath}.
+   * absolute token carries MSYS semantics, not `node:path.win32` semantics. The
+   * flavor classifies the token's shape: on win32 the recognized safe device
+   * paths (`/dev/null`, `/dev/std{in,out,err}`) are preserved verbatim as
+   * devices instead of being resolved into `c:\dev\null`, and MSYS drive mounts
+   * (`/c/…`) are translated to their Windows equivalent (`C:\…`) before
+   * resolution; every other token delegates to {@link forPath}. On POSIX every
+   * token is `plain`, so this is a straight delegation to {@link forPath}.
    */
   forBashToken(token: string, options?: { resolveBase?: string }): AccessPath {
-    if (this.platform !== "win32") return this.forPath(token, options);
-
-    const shape = classifyWin32BashToken(token);
+    const shape = this.flavor.bashTokenShape(token);
     switch (shape.kind) {
       case "device":
         return AccessPath.forDevice(token);
@@ -111,7 +102,7 @@ export class PathNormalizer {
 
   /** Platform-aware absoluteness (`win32` vs `posix` rules). */
   isAbsolute(pathValue: string): boolean {
-    return this.impl.isAbsolute(pathValue);
+    return this.flavor.impl.isAbsolute(pathValue);
   }
 
   /**
@@ -120,10 +111,10 @@ export class PathNormalizer {
    * The bash rule-candidate classifier reads this to decide whether a
    * backslash-relative token (`dir\file`) is path-shaped: on win32 `\` is a
    * separator, but on POSIX it is a legal filename character (#520). Keeping the
-   * decision here means no bash-layer module re-reads `process.platform`.
+   * decision on the flavor means no bash-layer module re-reads `process.platform`.
    */
   usesWindowsSeparators(): boolean {
-    return this.platform === "win32";
+    return this.flavor.hasPathSeparator("\\");
   }
 
   /**
@@ -133,16 +124,11 @@ export class PathNormalizer {
    * (`cd /c/x`) resolves to a translated Windows base (`C:\x`), a non-mount
    * POSIX absolute (`cd /tmp`) is not deterministically resolvable and yields an
    * `unknown` base, and a native/relative target is handled as usual. On POSIX
-   * an absolute target is absolute and everything else is relative.
+   * every token is `plain`, so an absolute target is absolute and everything
+   * else is relative.
    */
   interpretBashCdTarget(target: string): BashCdTarget {
-    if (this.platform !== "win32") {
-      return this.impl.isAbsolute(target)
-        ? { kind: "absolute", value: target }
-        : { kind: "relative" };
-    }
-
-    const shape = classifyWin32BashToken(target);
+    const shape = this.flavor.bashTokenShape(target);
     switch (shape.kind) {
       case "drive-mount":
         return { kind: "absolute", value: shape.windowsPath };
@@ -150,7 +136,7 @@ export class PathNormalizer {
       case "posix-absolute":
         return { kind: "unknown" };
       case "plain":
-        return this.impl.isAbsolute(target)
+        return this.flavor.impl.isAbsolute(target)
           ? { kind: "absolute", value: target }
           : { kind: "relative" };
     }
@@ -158,17 +144,17 @@ export class PathNormalizer {
 
   /** Resolve a `cd`-folded offset against the baked cwd (platform-aware). */
   resolveBase(offset: string): string {
-    return this.impl.resolve(this.cwd, offset);
+    return this.flavor.impl.resolve(this.cwd, offset);
   }
 
   /** Join a `cd` offset with a relative target (platform-aware), for cd-folding. */
   joinBase(offset: string, target: string): string {
-    return this.impl.join(offset, target);
+    return this.flavor.impl.join(offset, target);
   }
 
   /** Containment of `pathValue` within `directory` (platform-aware). */
   isWithinDirectory(pathValue: string, directory: string): boolean {
-    return pathFlavorForPlatform(this.platform).isWithin(pathValue, directory);
+    return this.flavor.isWithin(pathValue, directory);
   }
 
   /** Canonical (symlink-resolved) outside-cwd test against the baked cwd. */
@@ -176,12 +162,12 @@ export class PathNormalizer {
     const canonicalPath = canonicalNormalizePathForComparison(
       pathValue,
       this.cwd,
-      pathFlavorForPlatform(this.platform),
+      this.flavor,
     );
     return isPathOutsideWorkingDirectory(
       canonicalPath,
       this.canonicalCwd,
-      pathFlavorForPlatform(this.platform),
+      this.flavor,
     );
   }
 
@@ -198,7 +184,7 @@ export class PathNormalizer {
     return isPathOutsideWorkingDirectory(
       canonicalPath,
       this.canonicalCwd,
-      pathFlavorForPlatform(this.platform),
+      this.flavor,
     );
   }
 
@@ -208,16 +194,12 @@ export class PathNormalizer {
    * touches no filesystem, unlike {@link forPath}'s canonical alias.
    */
   comparableValue(pathValue: string): string {
-    return normalizePathForComparison(
-      pathValue,
-      this.cwd,
-      pathFlavorForPlatform(this.platform),
-    );
+    return normalizePathForComparison(pathValue, this.cwd, this.flavor);
   }
 
   /**
    * Pi infrastructure-read containment for a read-only tool, decided against
-   * the canonical (symlink-resolved) path and the baked cwd/platform. Takes the
+   * the canonical (symlink-resolved) path and the baked cwd/flavor. Takes the
    * already-built {@link AccessPath} so the caller does not re-resolve it.
    */
   isInfrastructureRead(
@@ -230,7 +212,7 @@ export class PathNormalizer {
       accessPath.boundaryValue(),
       infraDirs,
       this.cwd,
-      pathFlavorForPlatform(this.platform),
+      this.flavor,
     );
   }
 }

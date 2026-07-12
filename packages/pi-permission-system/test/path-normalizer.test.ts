@@ -19,6 +19,7 @@ vi.mock("node:fs", () => ({
   default: { realpathSync },
 }));
 
+import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 
 describe("PathNormalizer", () => {
@@ -28,7 +29,7 @@ describe("PathNormalizer", () => {
   });
 
   describe("posix flavor", () => {
-    const normalizer = new PathNormalizer("linux", "/projects/my-app");
+    const normalizer = new PathNormalizer(posixPathFlavor, "/projects/my-app");
 
     test("forPath builds an AccessPath resolved against the baked cwd", () => {
       const ap = normalizer.forPath("src/foo.ts");
@@ -106,7 +107,10 @@ describe("PathNormalizer", () => {
         if (p === "/tmp") return "/private/tmp";
         return p;
       });
-      const symlinkNormalizer = new PathNormalizer("linux", "/private/tmp");
+      const symlinkNormalizer = new PathNormalizer(
+        posixPathFlavor,
+        "/private/tmp",
+      );
       expect(
         symlinkNormalizer.isOutsideWorkingDirectory("/tmp/workspace/file.ts"),
       ).toBe(false);
@@ -154,7 +158,7 @@ describe("PathNormalizer", () => {
   });
 
   describe("win32 flavor", () => {
-    const normalizer = new PathNormalizer("win32", "C:\\Projects\\App");
+    const normalizer = new PathNormalizer(win32PathFlavor, "C:\\Projects\\App");
 
     test("forPath builds a case-folded AccessPath with win32 rules", () => {
       const ap = normalizer.forPath("src\\foo.ts");
@@ -286,7 +290,7 @@ describe("PathNormalizer", () => {
   });
 
   describe("isInfrastructureRead", () => {
-    const normalizer = new PathNormalizer("linux", "/projects/my-app");
+    const normalizer = new PathNormalizer(posixPathFlavor, "/projects/my-app");
 
     test("allows a read-only tool targeting a configured infra dir", () => {
       const ap = normalizer.forPath("/infra/git/pkg/SKILL.md");

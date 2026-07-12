@@ -81,7 +81,7 @@ describe("PermissionManager — injected platform (#510)", () => {
     // carries a backslash match alias for this to resolve.
     const program = await BashProgram.parse(
       "ls /tmp",
-      new PathNormalizer("win32", "C:/projects/app"),
+      new PathNormalizer(win32PathFlavor, "C:/projects/app"),
     );
     const values = program.externalPaths()[0].matchValues();
     const manager = new PermissionManager({

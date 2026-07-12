@@ -10,6 +10,7 @@ import { GateRunner } from "#src/handlers/gates/runner";
 import type { SkillInputGateInputs } from "#src/handlers/gates/skill-input-gate-pipeline";
 import type { ToolCallGateInputs } from "#src/handlers/gates/tool-call-gate-pipeline";
 import type { ToolCallContext } from "#src/handlers/gates/types";
+import { pathFlavorForPlatform } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { SessionApprovalRecorder } from "#src/session-approval-recorder";
@@ -271,7 +272,11 @@ export function makeGateInputs(
     getPathNormalizer:
       overrides.getPathNormalizer ??
       vi.fn<() => PathNormalizer>(
-        () => new PathNormalizer(process.platform, "/test/cwd"),
+        () =>
+          new PathNormalizer(
+            pathFlavorForPlatform(process.platform),
+            "/test/cwd",
+          ),
       ),
     getPromotablePathTokenMatcher:
       overrides.getPromotablePathTokenMatcher ??

@@ -45,17 +45,19 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // getPackageDir() is Pi's own install dir; auto-allow it for read-only tools
   // so the agent can read Pi's bundled docs/examples regardless of layout.
   const paths = computeExtensionPaths(agentDir, getPackageDir());
-  // The single process.platform read for the whole extension; injected into the
-  // session (PathNormalizer) and, later, rule evaluation. Interior modules must
-  // not read process.platform (enforced by the eslint guard scoped to src/).
-  const hostPlatform = process.platform;
+  // The single process.platform read for the whole extension, resolved once
+  // into the path-language flavor that every consumer shares (the session's
+  // PathNormalizer, rule evaluation, and subagent detection). Interior modules
+  // must not read process.platform (enforced by the eslint guard scoped to
+  // src/) and never re-derive the win32 flavor — they receive this product.
+  const hostFlavor = pathFlavorForPlatform(process.platform);
   const sessionRules = new SessionRules();
   const subagentRegistry = getSubagentSessionRegistry();
   // Single owner of subagent detection, shared across every consumer instead of
   // threading the (subagentSessionsDir, platform, registry) triple into each.
   const subagentDetection = new SubagentDetection({
     subagentSessionsDir: paths.subagentSessionsDir,
-    flavor: pathFlavorForPlatform(hostPlatform),
+    flavor: hostFlavor,
     registry: subagentRegistry,
   });
   const formatterRegistry = new ToolInputFormatterRegistry();
@@ -76,7 +78,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // assigned below. yolo becomes a composition-stage ask→allow rewrite (#526).
   const permissionManager = new PermissionManager({
     agentDir,
-    flavor: pathFlavorForPlatform(hostPlatform),
+    flavor: hostFlavor,
     isYoloEnabled: () => isYoloModeEnabled(configStore.current()),
   });
 
@@ -147,7 +149,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     sessionRules,
     configStore,
     authorizerSelection,
-    hostPlatform,
+    hostFlavor,
   );
 
   // refresh() must run after `session` is assigned: a debug-write IO failure

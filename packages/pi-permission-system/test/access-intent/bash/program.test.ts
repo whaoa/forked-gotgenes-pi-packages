@@ -11,12 +11,16 @@ vi.mock("node:fs", () => ({
 }));
 
 import { BashProgram } from "#src/access-intent/bash/program";
+import { pathFlavorForPlatform, win32PathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 
 describe("BashProgram", () => {
   describe("pathRuleCandidates", () => {
     const cwd = "/projects/my-app";
-    const normalizer = new PathNormalizer(process.platform, cwd);
+    const normalizer = new PathNormalizer(
+      pathFlavorForPlatform(process.platform),
+      cwd,
+    );
 
     beforeEach(() => {
       realpathSync.mockReset();
@@ -152,7 +156,10 @@ describe("BashProgram", () => {
 
   describe("externalPaths", () => {
     const cwd = "/projects/my-app";
-    const normalizer = new PathNormalizer(process.platform, cwd);
+    const normalizer = new PathNormalizer(
+      pathFlavorForPlatform(process.platform),
+      cwd,
+    );
 
     beforeEach(() => {
       realpathSync.mockReset();
@@ -173,7 +180,10 @@ describe("BashProgram", () => {
     });
 
     describe("win32 projection (injected platform, no vi.mock node:path)", () => {
-      const winNormalizer = new PathNormalizer("win32", "C:\\Projects\\App");
+      const winNormalizer = new PathNormalizer(
+        win32PathFlavor,
+        "C:\\Projects\\App",
+      );
 
       it("keeps a non-mount POSIX absolute literal (Git Bash semantics)", async () => {
         // On win32, Pi core runs Git Bash: /etc is an MSYS install-root path,
@@ -517,7 +527,7 @@ describe("BashProgram", () => {
       });
       const program = await BashProgram.parse(
         "cat /tmp/workspace/file.ts",
-        new PathNormalizer(process.platform, symlinkCwd),
+        new PathNormalizer(pathFlavorForPlatform(process.platform), symlinkCwd),
       );
       expect(program.externalPaths()).toHaveLength(0);
     });
@@ -525,7 +535,10 @@ describe("BashProgram", () => {
 
   describe("commands", () => {
     const cwd = "/projects/my-app";
-    const normalizer = new PathNormalizer(process.platform, cwd);
+    const normalizer = new PathNormalizer(
+      pathFlavorForPlatform(process.platform),
+      cwd,
+    );
 
     it("returns a single-element list for a lone command", async () => {
       const program = await BashProgram.parse("npm install pkg", normalizer);
@@ -740,7 +753,10 @@ describe("BashProgram", () => {
 
   it("derives both slices from a single parse", async () => {
     const cwd = "/projects/my-app";
-    const normalizer = new PathNormalizer(process.platform, cwd);
+    const normalizer = new PathNormalizer(
+      pathFlavorForPlatform(process.platform),
+      cwd,
+    );
     const program = await BashProgram.parse("cat .env /etc/hosts", normalizer);
     expect(program.pathRuleCandidates().map(({ token }) => token)).toEqual([
       ".env",

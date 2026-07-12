@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { AccessIntent } from "#src/access-intent/access-intent";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import { LocalPermissionsService } from "#src/permissions-service";
 import type { ToolAccessExtractorRegistrar } from "#src/tool-access-extractor-registry";
@@ -77,7 +78,7 @@ function makeService(overrides?: {
   return { service, resolver, formatterRegistry, accessExtractorRegistry };
 }
 
-const normalizer = new PathNormalizer("linux", "/test/project");
+const normalizer = new PathNormalizer(posixPathFlavor, "/test/project");
 
 // ── tests ──────────────────────────────────────────────────────────────────
 

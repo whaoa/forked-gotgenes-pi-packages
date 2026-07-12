@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccessIntent } from "#src/access-intent/access-intent";
+import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import { LocalPermissionsService } from "#src/permissions-service";
 import type { PermissionsService } from "#src/service";
@@ -111,7 +112,8 @@ describe("service round-trip through the global slot", () => {
       new LocalPermissionsService(
         resolver,
         {
-          getPathNormalizer: () => new PathNormalizer("linux", "/test/project"),
+          getPathNormalizer: () =>
+            new PathNormalizer(posixPathFlavor, "/test/project"),
         },
         new ToolInputFormatterRegistry(),
         new ToolAccessExtractorRegistry(),

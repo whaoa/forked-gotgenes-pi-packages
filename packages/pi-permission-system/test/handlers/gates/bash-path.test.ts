@@ -19,7 +19,7 @@ import type {
 } from "#src/handlers/gates/descriptor";
 import { isGateBypass, isGateDescriptor } from "#src/handlers/gates/descriptor";
 import type { ToolCallContext } from "#src/handlers/gates/types";
-import { posixPathFlavor } from "#src/path/path-flavor";
+import { pathFlavorForPlatform, posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { getNonEmptyString, toRecord } from "#src/value-guards";
@@ -60,7 +60,10 @@ async function describeGateOnPlatform(
   const command = getNonEmptyString(toRecord(tcc.input).command);
   const bashProgram =
     tcc.toolName === "bash" && command
-      ? await BashProgram.parse(command, new PathNormalizer(platform, tcc.cwd))
+      ? await BashProgram.parse(
+          command,
+          new PathNormalizer(pathFlavorForPlatform(platform), tcc.cwd),
+        )
       : null;
   return describeBashPathGate(tcc, bashProgram, resolver);
 }
