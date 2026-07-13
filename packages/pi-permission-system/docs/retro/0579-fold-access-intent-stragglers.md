@@ -38,4 +38,43 @@ All deterministic checks passed: `tsc` clean, `pnpm run lint` clean, full suite 
 - All three at-risk invariants held: ADR-0002 string boundary (`permission-manager.ts` `AccessPath`-free), `tool-kind.ts` `AccessPath`-free (sole import `PATH_BEARING_TOOLS` now a `./path-surfaces` sibling), and the interior `process.platform` ban — each still lint- and test-pinned.
 - Pre-completion reviewer: PASS (ready for `/ship-issue`); no WARN findings.
 
+## Stage: Final Retrospective (2026-07-13T16:17:19Z)
+
+### Session summary
+
+Shipped Phase 11 Step 1 across three clean stages (plan → build → ship) with zero rework: the plan's exhaustive importer enumeration matched reality exactly, both implementation commits landed as specified, CI passed first try, and issue #579 closed.
+No release cut — every commit touching the package is a `refactor:`/`docs:` hidden type, so the work auto-batches into the next release.
+
+### Observations
+
+#### What went well
+
+- **First live use of the `tidy-first-assessor` held its scope boundary cleanly.**
+  On a pure `git mv` + import-rewrite change it recommended nothing and explicitly rejected four internal-cleanup candidates (stepdown reordering, `input-normalizer.test.ts` splitting, shared-helper extraction, a barrel) as scope creep — exactly the discipline the `tidy-first` skill's first-live-use checkpoint watches for.
+  One clean data point toward retiring that checkpoint (not yet "a handful").
+- **Plan-time enumeration eliminated build-time discovery.**
+  The planning stage's bare-name grep across `src/` and `test/` (catching both `#src/` alias and `./`-relative importers, per the [#559] lesson) produced an importer list that matched the implementation exactly — eleven source importers, five test files, zero missed sites, no `tsc` surprise.
+- **`git mv` preserved history on all eight file moves** (tracked as renames), and the atomic single-commit move (plan Edge Cases) avoided any broken intermediate `tsc` state.
+
+#### What caused friction (agent side)
+
+- None warranting a rule change.
+  The session was a textbook mechanical relocation: verification ran incrementally (green baseline → full suite after Step 1 → lint after Step 2), no error retries, no rabbit holes, no scope drift.
+  The one plan deviation (extending the `access-intent/` directory-header line for move provenance) was intentional and disclosed in the commit body.
+
+#### What caused friction (user side)
+
+- None.
+  The single planning `ask_user` (move the test files too?) was the only decision point, and it resolved the one genuine organizational ambiguity up front — mechanical oversight, not strategic intervention.
+
+### Changes made
+
+1. `packages/pi-permission-system/docs/retro/0579-fold-access-intent-stragglers.md` — appended this Final Retrospective stage entry.
+   No `AGENTS.md` or prompt changes: the session was frictionless and the operator confirmed landing the retro only.
+
+### Considered but not made
+
+1. Tightening the `tidy-first` skill's applicability gate to skip pure relocations/renames (nothing to prepare) — rejected as premature while the `tidy-first-assessor` is inside its first-live-use validation window, where even a trivial run adds a boundary-held data point.
+2. Removing the `tidy-first` first-live-use checkpoint callout — its own text requires the boundary to hold "across a handful of issues"; this is one clean run, not yet a handful.
+
 [#559]: https://github.com/gotgenes/pi-packages/issues/559
