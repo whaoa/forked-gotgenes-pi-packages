@@ -38,3 +38,49 @@ Test count unchanged at 2387 (net-zero: 2 unit tests inverted in place, 7 integr
 - Pre-completion reviewer: WARN (single non-blocking finding) → resolved.
   It caught a stale "seven shared rejection cases" comment in the test file header (line 13) that mirrored the source-module comment I had already corrected to "six"; fixed and amended into the fix commit before it was pushed.
 - Deliberately left the historical plan `0533-win32-git-bash-posix-paths.md` parenthetical unchanged, as the plan specified.
+
+## Stage: Final Retrospective (2026-07-13T20:05:00Z)
+
+### Session summary
+
+A single session carried #583 end-to-end: live-repro bug confirmation, issue authoring, planning, one-cycle TDD, and shipping `pi-permission-system` v20.5.0.
+The root cause (the `/^\/+$/` branch in `rejectNonPathToken`) was diagnosed on the first trace, the plan predicted the `["/"]` resolution exactly, and TDD landed with zero deviations.
+Friction was minimal — one absolute-path typo (caught by the very gate under repair) and one mirror-comment miss (caught by the pre-completion reviewer before push).
+
+### Observations
+
+#### What went well
+
+- Clean diagnosis-to-fix arc: the bug was traced to a single predicate branch on first read, and every downstream prediction held — `//`/`///` normalizing to lexical `/`, the `["/"]` external set, and the net-zero test count were all correct in the plan before implementation.
+- The pre-completion reviewer earned its keep: it caught a stale "seven shared rejection cases" comment in `token-classification.test.ts:13` that mirrored the source-module header I *had* corrected ("seven" → "six") but whose test-file twin I missed.
+  Caught before push, fixed via amend — no `style:` follow-up commit needed.
+- Correct handling of the release-please merge edge case: `release_pr_merge` refused with `UNSTABLE`, but `statusCheckRollup` showed a real `check` job `IN_PROGRESS` (not the empty-rollup `GITHUB_TOKEN` case), so I waited two poll cycles for it to finish and retried `release_pr_merge` rather than falling back to a manual `gh pr merge` while a check was running — exactly the step-6.4 protocol.
+
+#### What caused friction (agent side)
+
+- `other` (absolute-path typo) — during planning a `Read` used `/Users/chris/development/pi/pi-permission-system/packages/pi-permission-system/test/bash-external-directory.test.ts`, collapsing `pi-packages` into `pi-permission-system`.
+  The permission system denied it as an `external_directory` access.
+  Impact: one retry with the corrected path, no rework.
+  Notable irony — the gate under repair caught my own mistake; a reminder that relative paths avoid this entirely.
+- `other` (mirror-comment miss) — fixed the rejection-case count in the source module header but not the identical comment in the sibling test file; relied on the reviewer to catch it.
+  Impact: one amend into the unpushed fix commit, no rework.
+
+#### What caused friction (user side)
+
+- None.
+  The user's interventions were well-placed: confirming the bug reproduced ("Do we agree we have a bug?"), then delegating the standard flow.
+  No mechanical oversight was required.
+
+### Diagnostic details
+
+- **Model-performance correlation** — both subagents (`tidy-first-assessor`, `pre-completion-reviewer`) ran on `anthropic/claude-sonnet-5`, appropriate for read-only judgment work; the reviewer's WARN finding confirms the model was capable of the self-consistency check.
+  No mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the longest same-target loop was the deliberate 3-cycle poll of the release PR's in-progress check, which is correct protocol, not an escalation delay.
+- **Unused-tool detection** — none missed. `grep`/`Read` were the right tools for a single-symbol trace (`rejectNonPathToken`, `^\/+$`); a semantic `colgrep` would have added noise.
+- **Feedback-loop gap analysis** — verification was incremental: RED confirmed before GREEN, affected-file tests during the cycle, then full `test`/`check`/`lint`/`fallow` after.
+  No end-only batching.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0583-bare-slash-root-external-directory.md`.
+2. No `AGENTS.md` or `.pi/prompts/` changes — the operator confirmed retro-file-only; both friction points were one-retry, no-rework, and already absorbed by existing safety nets (the `external_directory` gate and the pre-completion reviewer).
