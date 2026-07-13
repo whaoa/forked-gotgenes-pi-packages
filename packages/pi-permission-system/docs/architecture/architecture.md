@@ -288,8 +288,8 @@ flowchart LR
 
 The priority ordering of candidates is preserved.
 The evaluation function is unchanged - MCP just calls it multiple times with different values.
-MCP target derivation helpers live in `src/mcp-targets.ts`.
-Input normalization for all surfaces lives in `src/input-normalizer.ts`.
+MCP target derivation helpers live in `src/access-intent/mcp-targets.ts`.
+Input normalization for all surfaces lives in `src/access-intent/input-normalizer.ts`.
 
 ### Path-bearing tool normalization
 
@@ -724,8 +724,6 @@ src/
 ├── normalize.ts              Config → Ruleset normalization (flat format)
 ├── synthesize.ts             Universal default + MCP baseline → Ruleset
 ├── wildcard-matcher.ts       Compiled glob matching
-├── mcp-targets.ts            MCP multi-name target derivation
-├── input-normalizer.ts       Surface-specific input normalization → NormalizedInput
 ├── pattern-suggest.ts        Per-surface approval pattern suggestions
 ├── bash-arity.ts             Command arity table for bash pattern suggestions
 ├── expand-home.ts            ~/$HOME expansion for patterns and path values
@@ -742,11 +740,15 @@ src/
 │
 ├── permission-session.ts     `PermissionSession` class - state/lifecycle owner: owns context lifecycle, session-rule lifecycle (`reset`/`shutdown`/`reload`), skill entries, agent-name resolution, the config gateway, the Tell-Don't-Ask gate inputs, and `notify(message)` (Tell-Don't-Ask UI warn over the owned context, no-op before activation — dissolves the `index.ts` forward-reference cycle, #363); `implements ToolCallGateInputs` (the pipeline's input contract); the resolve role moved to `PermissionResolver` (#340), the recorder role to `SessionRules`, and the three fig-leaf handler role interfaces (`GateHandlerSession` / `AgentPrepSession` / `SessionLifecycleSession`) were retired — handlers depend on the concrete class + `PermissionResolver` (#341)
 ├── path-normalizer.ts        `PathNormalizer` class - the path-interpretation collaborator constructed once at the session edge with the injected `PathFlavor` (exposed as `readonly flavor`) and session `cwd` baked in (#510, #562); hands raw tokens, returns prepared values: `forPath`/`forLiteral` (build `AccessPath`s), `isAbsolute`/`resolveBase`/`joinBase` (flavor-aware `cd`-fold routing the `BashPathResolver` asks), `isWithinDirectory`/`isOutsideWorkingDirectory` (containment), `comparableValue` (lexical comparison value for skill-prompt matching, [#511]), `isInfrastructureRead` (Pi infra-read containment over an `AccessPath`, [#511]), `forBashToken`/`interpretBashCdTarget`/`isBoundaryOutsideWorkingDirectory` (Git Bash/MSYS bash-token interpretation — safe devices preserved, `/c/…` drive mounts translated, other POSIX absolutes literal-only; the shape comes from `flavor.bashTokenShape`, so no `!== "win32"` guard remains, #533, #562); holds no platform discriminator — every platform question delegates to `flavor` (and the flavor-parameterized `path/path-containment` / `path-normalization` / `path/pi-infrastructure-read` / `AccessPath` primitives), so no consumer reads `process.platform` or threads `cwd`; `usesWindowsSeparators` and the `win32`/`posix` `impl` selection were dissolved onto `PathFlavor` (#562); a facade over those primitives — [#505] dissolved `path-utils.ts` into those cohesive modules, and `isOutsideWorkingDirectory` now canonicalizes its operands here before the pure containment check
-├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473); bash sub-domain completed by Phase 6 Step 3 (#475); `AccessPath` value object added by Phase 6 Step 4 (#476); `AccessIntent` union added by Phase 6 Step 6 (#478); path representation (`path-normalization.ts`) relocated here by Phase 7 Step 4 (#505)
+├── access-intent/           Domain directory seeded by Phase 6 Step 1 (#473); bash sub-domain completed by Phase 6 Step 3 (#475); `AccessPath` value object added by Phase 6 Step 4 (#476); `AccessIntent` union added by Phase 6 Step 6 (#478); path representation (`path-normalization.ts`) relocated here by Phase 7 Step 4 (#505); the four access-intent stragglers (`input-normalizer.ts`, `mcp-targets.ts`, `tool-input-path.ts`, `path-surfaces.ts`) folded in from the flat root by Phase 11 Step 1 (#579)
 │   ├── path-normalization.ts `AccessPath`'s representation backing (relocated from `path-utils.ts`, [#505]): `normalizePathForComparison` (lexical absolute, via `flavor.comparable`), `canonicalNormalizePathForComparison` (symlink-resolved + win32-lowercased via `flavor.fold`, [#382]), `normalizePathPolicyLiteral` (literal cleanup), `getPathPolicyValues` (lexical ∪ relative match set) + `PathPolicyValueOptions`; pure derivation, injected `PathFlavor`, uses `flavor.isWithin` for the cwd-relative alias (#562)
 │   ├── access-intent.ts     `AccessIntent` discriminated union each gate emits: `tool` (raw input the manager normalizes) and `access-path` (an `AccessPath` for every path gate — `path`, `external_directory`, and the per-tool path-bearing surfaces `read`/`write`/`edit`/`grep`/`find`/`ls`, #486, #502); `ResolvedAccessIntent` (`tool | path-values`) is what the manager consumes after the resolver unwraps `access-path` via `matchValues()`, keeping the manager string-based — `path-values` is resolver-internal, not gate-emitted, since #486 (#478, #486)
 │   ├── access-path.ts       `AccessPath` value object: `matchValues(): string[]` (lexical alias union ∪ canonical, the [#418] match set), `boundaryValue(): string` (symlink-resolved + win32-lowercased, [#382]), `value(): string` (lexical absolute display form), `resolvedAlias(): string | undefined` (the canonical form only when distinct from the lexical form, for disclosing a symlink target in a prompt/denial message, #507); the surface-neutral `forPath(pathValue, { cwd, resolveBase?, flavor })` factory composes `getPathPolicyValues` + `normalizePathForComparison` + `canonicalNormalizePathForComparison` (all from `path-normalization.ts`, [#505]) (resolveBase defaults to cwd; `PathFlavor` injected, not read ambiently, #510, #562; serves every path surface, #486), and `forLiteral(literal, matchAliases?)` builds a literal-only path with no canonical for the unknown-base bash case ([#393]); `forDevice(devicePath)` preserves an MSYS device path verbatim across all three representations, and `forLiteral`'s optional `matchAliases` carries a win32 backslash match alias for a Git Bash POSIX absolute so a `/tmp/*` rule matches under separator folding (#533); type-distinct accessors make the lexical/canonical conflation a compile error (#476)
 │   ├── tool-kind.ts        `ToolKind` string-union classification + `classifyToolKind(toolName)` — the single dispatch point deciding what an invocation accesses (bash command / MCP target / skill / path-bearing tool / extension) once at the normalize boundary; imports only `PATH_BEARING_TOOLS` (AccessPath-free, so `permission-manager.ts` may consume it without breaching the ADR-0002 string boundary); the extraction consumers (`input-normalizer`, `tool-input-path`, the tool-call gate pipeline, `permission-manager`'s `deriveSource`) dispatch on it instead of re-deriving `toolName === "bash"`/`"mcp"` (Phase 10 Step 1, #568); also owns `isMcpCheck({ toolName, source })` — the shared MCP-ness predicate (keeps the `source === "mcp"` disjunct) the presentation consumers (`denial-messages`, `permission-prompts`, `tool-preview-formatter`, `deriveDecisionValue`) dispatch on alongside `classifyToolKind`, replacing their re-derived `(source === "mcp" || toolName === "mcp")` checks (Phase 10 Step 2, #569)
+│   ├── input-normalizer.ts   Surface-specific input normalization → NormalizedInput
+│   ├── mcp-targets.ts        MCP multi-name target derivation
+│   ├── tool-input-path.ts    `getToolInputPath` (built-in / MCP / extension path extraction) + `getPathBearingToolPath` (built-in-only) ([#505], dissolved from `path-utils.ts`)
+│   ├── path-surfaces.ts      Static surface/tool lookup sets: `PATH_BEARING_TOOLS`, `READ_ONLY_PATH_BEARING_TOOLS`, `PATH_SURFACES` ([#505], dissolved from `path-utils.ts`)
 │   └── bash/
 │       ├── parser.ts           Lazy tree-sitter-bash parser: `TSNode` interface (exported), `TSParser` interface (private), `initParser` (private), `getParser = memoizeAsyncWithRetry(initParser)` (exported); `warmBashParser()` / `getWarmBashParser(): TSParser | null` / `resetWarmBashParser()` (test-only) expose the resolved parser synchronously after a `before_agent_start` warm-up so the advisory bash path can decompose at gate parity (#309); dropped from `bash-program.ts` (#473)
 │       ├── node-text.ts        Quote-aware AST node-text resolver: `resolveNodeText` (pure; handles `word`, `raw_string`, `string`, `concatenation`, expansions, default fallback), `SKIP_SUBTREE_TYPES` (heredoc/comment sentinel set), `ARG_NODE_TYPES` (argument-value node-type set; peer of `SKIP_SUBTREE_TYPES`); dropped from `bash-program.ts` (#473, #474)
@@ -803,8 +805,6 @@ src/
 ├── permission-merge.ts        Deep-shallow merge for flat permission configs
 ├── async-cache.ts             `memoizeAsyncWithRetry` - memoizes an async factory but drops a rejected result so the next call retries; used by `access-intent/bash/parser.ts` for resilient tree-sitter parser init (#452)
 ├── safe-system-paths.ts       `SAFE_SYSTEM_PATHS` (OS device files: `/dev/null`, `/dev/std{in,out,err}`) + `isSafeSystemPath` ([#505], dissolved from `path-utils.ts`)
-├── tool-input-path.ts         `getToolInputPath` (built-in / MCP / extension path extraction) + `getPathBearingToolPath` (built-in-only) ([#505], dissolved from `path-utils.ts`)
-├── path-surfaces.ts           Static surface/tool lookup sets: `PATH_BEARING_TOOLS`, `READ_ONLY_PATH_BEARING_TOOLS`, `PATH_SURFACES` ([#505], dissolved from `path-utils.ts`)
 ├── path/                     Path-language domain seeded by Phase 10 Step 3 ([#562]): the win32-vs-POSIX decision resolved once, plus the co-rewritten path leaves relocated from the flat root
 │   ├── path-flavor.ts        `PathFlavor` interface + `pathFlavorForPlatform` factory + `win32PathFlavor`/`posixPathFlavor` singletons — the platform's path *language* as one immutable collaborator (`impl`, `matchOptions`, `fold`, `comparable`, `isWithin`, `hasPathSeparator`, `bashTokenShape`), holding the package's only `=== "win32"` comparison; injected once from `index.ts` into `PermissionManager` / `PermissionSession` (→ `PathNormalizer`) / `SubagentDetection` (#562)
 │   ├── canonicalize-path.ts  Best-effort symlink resolution via `realpathSync` — walks up to longest existing ancestor and re-appends non-existent tail; ENOENT/ENOTDIR safe, EACCES/ELOOP fall back to lexical form; takes an injected `PathFlavor` ([#505], relocated #562)
@@ -900,7 +900,7 @@ Recompute commands (run from the repo root):
 
 ### Steps
 
-#### Step 1: Fold the access-intent stragglers into `src/access-intent/` ([#579])
+#### ✅ Step 1: Fold the access-intent stragglers into `src/access-intent/` ([#579])
 
 **Cause:** the access-intent domain is named in the first-principles section and has a directory, but four of its modules still sit in the flat root, hiding the seam the aliasing steps extend.
 
@@ -983,7 +983,7 @@ Release: independent
 
 ```mermaid
 flowchart TD
-    S1["Step 1: Move access-intent stragglers (#579)"]
+    S1["✅ Step 1: Move access-intent stragglers (#579)"]
     S2["Step 2: shellTools alias config model (#580)"]
     S3["Step 3: Bash-stack gating for aliased shell tools (#574)"]
     S4["Step 4: Inline keybind permission dialog (#573)"]

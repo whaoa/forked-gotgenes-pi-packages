@@ -133,7 +133,7 @@ Do not propose module-scoped singletons or Node.js module-cache sharing as a cro
 [earendil-works/pi#5905]: https://github.com/earendil-works/pi/issues/5905
 
 The `path` and `external_directory` gates are path-aware for **all** tools, not just the six built-ins (#352).
-`getToolInputPath` (`src/tool-input-path.ts`) extracts a path for built-ins (`input.path`), MCP (`input.arguments.path`), and extension tools (default `input.path`, or a custom key via a registered extractor); `getPathBearingToolPath` stays built-in-only and now drives the per-tool gate's `AccessPath` (the pipeline builds `normalizer.forPath(getPathBearingToolPath(...))` and emits an `access-path` intent on the tool-name surface, #502), plus the raw decision/log value.
+`getToolInputPath` (`src/access-intent/tool-input-path.ts`) extracts a path for built-ins (`input.path`), MCP (`input.arguments.path`), and extension tools (default `input.path`, or a custom key via a registered extractor); `getPathBearingToolPath` stays built-in-only and now drives the per-tool gate's `AccessPath` (the pipeline builds `normalizer.forPath(getPathBearingToolPath(...))` and emits an `access-path` intent on the tool-name surface, #502), plus the raw decision/log value.
 The `ToolAccessExtractorRegistry` (`src/tool-access-extractor-registry.ts`) mirrors `ToolInputFormatterRegistry`: one instance created in `index.ts`, its lookup threaded into `ToolCallGatePipeline`, its registrar exposed cross-extension via `PermissionsService.registerToolAccessExtractor`.
 Extension/MCP path gating is default-on (no registration needed); per-tool path maps for extension tools (a custom extractor key that supplies the path via a registered `ToolAccessExtractor`) are a deferred follow-up.
 
