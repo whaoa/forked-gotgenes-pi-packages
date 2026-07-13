@@ -44,3 +44,48 @@ Test count 2374 → 2387 (+13); `pnpm run check`, root `pnpm run lint`, and `pnp
   No warnings.
 - **Release:** mid-batch — defer (batch "shell-tool-aliases", tail = `#574`); confirm batching at ship time.
   Next step: `/ship-issue`.
+
+## Stage: Final Retrospective (2026-07-13T17:35:41Z)
+
+### Session summary
+
+Shipped `#580` cleanly across four stages (plan → TDD → ship → retro) in one continuous session: a non-breaking `shellTools` config surface, +13 tests, `PASS` pre-completion review, CI green on `f66beef7`.
+The release was deferred at ship time per the plan's `mid-batch — defer` marker (batch "shell-tool-aliases", tail `#574`), so the issue stays open and the release-please PR is left unmerged.
+
+### Observations
+
+#### What went well
+
+- **Grounded the config design in the real tool before designing it** (Planning) — cloned `@howaboua/pi-codex-conversion` via `fetch_content` and read `src/tools/exec/command-tool.ts` to confirm `exec_command`'s canonical fields (`cmd` required, `workdir` optional) rather than trusting the issue's prose.
+  This is the `missing-context` failure mode pre-empted: the field names and the tool-name-keyed-map shape were verified against source, not assumed.
+- **The `ask_user` merge-semantics gate worked as a genuine design conversation** (Planning) — the operator engaged across three rounds ("walk me through the consequences", "what happens when a project wants to clobber global") rather than picking blindly, and each round added new evidence (real-tool facts, the clobber-vs-disable distinction).
+  The gate surfaced a security-relevant decision (shallow-merge vs. replace) that a silent default could have gotten wrong.
+- **The `fallow dead-code` gate caught the speculative export deterministically** (TDD) — the safety net fired exactly where the plan erred, before push.
+- **Clean incremental feedback loop** (TDD) — ran `pnpm run check` + the affected test file after each of the three cycles, not just at the end; the full-suite/lint/fallow sweep at the end found only the one export issue.
+
+#### What caused friction (agent side)
+
+- `missing-context` (planning-time, self-caught by gate) — the plan (`0580` Design Overview + Module-Level Changes) prescribed exporting **both** `ShellToolAlias` and `ShellToolsConfig` from `config-schema.ts`, but `ShellToolAlias` has no in-scope consumer (its consumer is the deferred `#574`).
+  The `fallow dead-code` gate rejected it during the end-of-TDD sweep, forcing a `refactor:` commit (`e7cc7260`) to remove the export that a `feat:` commit (`cd4f851a`) had just added.
+  Impact: one extra commit and a small feat-adds-then-refactor-removes churn within the same PR; no rework beyond that.
+  The `code-design` skill already carries the rule ("Do not add speculative re-exports; fallow will flag them as dead code"), but it was not applied at **plan** time — the gap is that `/plan-issue` does not prompt to defer an export whose only consumer is a later issue.
+
+#### What caused friction (user side)
+
+- Mis-click on the ship-stage release-coordination `ask_user` (cancelled the flow by accident).
+  I paused rather than guessing the release decision, re-asked in plain text, and the operator confirmed **defer** immediately.
+  Impact: none — no rework, correct outcome; the pause-don't-guess behavior on a high-stakes irreversible gate was the right call.
+
+### Diagnostic details
+
+- **Model-performance correlation** — both subagents (`tidy-first-assessor`, `pre-completion-reviewer`) ran on `anthropic/claude-sonnet-5`, appropriate for read + judgment work; no reasoning-weak-on-judgment or costly-on-mechanical mismatch.
+  The main session ran on `opus-4-8` / `sonnet-5`.
+- **Escalation-delay tracking** — no `rabbit-hole` sequences; no error was retried more than once.
+- **Unused-tool detection** — no gaps; `fetch_content` (repo clone) was the right tool for verifying the external tool's field names, and the subagents covered tidy-first + pre-completion.
+- **Feedback-loop gap analysis** — verification ran incrementally (per-cycle `check` + affected test file), not end-only; the deferred-to-end checks (root `lint`, `fallow dead-code`) are the ones that must run late anyway.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0580-shell-tool-alias-config-model.md`.
+2. No prompt or `AGENTS.md` changes: the one candidate (a `/plan-issue` reminder to defer an export whose only consumer is a later issue) was declined as first-instance over-fitting — the `code-design` skill already carries the underlying "no speculative re-exports" rule.
+  Revisit if the speculative-export-tripping-`fallow` pattern recurs.
