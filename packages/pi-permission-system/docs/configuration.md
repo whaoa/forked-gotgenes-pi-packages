@@ -639,6 +639,107 @@ Avoid arrays, multi-line scalars, and YAML anchors.
 }
 ```
 
+### Read-Only Bash Command Allowlist
+
+The [Read-Only Mode](#read-only-mode) recipe above gates *tools*; this one gates the *bash* surface.
+It allows a curated set of commands whose only effect is to read or report — none can create or modify a file, register, or system state by itself — while every other command falls through to `ask`.
+
+```jsonc
+{
+  "permission": {
+    "*": "ask",
+    "write": "deny",
+    "edit": "deny",
+    "path": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "~/.ssh/*": "deny"
+    },
+    "bash": {
+      "*": "ask",
+
+      // File inspection
+      "cat *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "less *": "allow",
+      "more *": "allow",
+
+      // Listing and metadata
+      "ls *": "allow",
+      "tree *": "allow",
+      "stat *": "allow",
+      "file *": "allow",
+      "wc *": "allow",
+      "du *": "allow",
+      "df *": "allow",
+
+      // Search (find/fd with -exec are auto-floored to ask)
+      "grep *": "allow",
+      "egrep *": "allow",
+      "fgrep *": "allow",
+      "rg *": "allow",
+      "find *": "allow",
+      "fd *": "allow",
+
+      // Comparison and hashing
+      "diff *": "allow",
+      "cmp *": "allow",
+      "comm *": "allow",
+      "md5sum *": "allow",
+      "sha1sum *": "allow",
+      "sha256sum *": "allow",
+      "cksum *": "allow",
+
+      // System info
+      "pwd": "allow",
+      "whoami": "allow",
+      "id": "allow",
+      "hostname": "allow",
+      "uname *": "allow",
+      "date": "allow",
+      "uptime": "allow",
+      "ps *": "allow",
+      "printenv *": "allow",
+      "which *": "allow",
+      "type *": "allow",
+
+      // Git read-only subcommands (never a broad "git *")
+      "git status": "allow",
+      "git diff *": "allow",
+      "git log *": "allow",
+      "git show *": "allow",
+      "git blame *": "allow",
+      "git ls-files *": "allow",
+      "git branch": "allow",
+      "git remote -v": "allow"
+    }
+  }
+}
+```
+
+Four existing behaviors keep this allowlist safe — you do not have to enumerate the destructive commands to block them:
+
+1. **Redirects are gated by the `path` surface, not `bash`.**
+   Allowing `cat *` allows the `cat` command, not a redirect it carries: `cat secret > out.txt` writes `out.txt` through the `path`/`external_directory` gate.
+   That is why this recipe ships with `write` and `edit` denied and a `path` deny block for sensitive files.
+   Keep the `path` surface locked down for anything you would not want an allowed read command to overwrite via `>`.
+2. **`find`/`fd` with an exec flag are floored to `ask`.**
+   A bare `find *` search is read-only, so it is safe to allow; the moment an exec flag appears (`find -exec`/`-execdir`/`-ok`/`-okdir`, `fd -x`/`-X`), the [indirection-wrapper floor](#fail-closed-behavior) clamps the decision back to `ask`.
+   So `find . -type f -exec rm {} +` still prompts even under `find *: allow`.
+3. **Chained commands resolve most-restrictive.**
+   `find . -name '*.log' && rm -f found.log` decomposes into `find …` and `rm …`; `rm` matches only `"*": "ask"`, and the most restrictive result governs the whole invocation, so the chain prompts.
+4. **Wrappers cannot ride the allowlist.**
+   `sudo grep …`, `env X=1 cat …`, `sh -c "…"`, and `eval "…"` are floored to `ask` (the [wrapper floors](#fail-closed-behavior)), so an allowed command cannot be smuggled past through a wrapper.
+
+`git` is enumerated by read subcommand rather than a broad `git *`, because `git` has mutating subcommands (`commit`, `push`, `branch -D`, `remote add`, `config <key> <value>`).
+Exact patterns like `git status` and `git branch` match only their literal form, so `git branch -D feature` falls through to `"*": "ask"`.
+The `*`-suffixed git patterns (`git diff *`, `git log *`) are safe because those subcommands are read-only regardless of their arguments.
+
+Commands that can originate a write are deliberately omitted: `echo` and `printf` are the usual content source for a `>` redirect, `tee` writes its input to a file, and `sort -o`, `sed -i`, and in-place `awk` redirects modify files directly.
+Add them only if you understand that pairing them with `write: deny` and a strict `path` surface is what keeps them from writing.
+
 ### MCP Discovery Only
 
 ```jsonc

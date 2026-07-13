@@ -963,13 +963,15 @@ Direction confirmed 2026-07-12, superseding the earlier 2026-07-10 re-target pro
 
 Release: independent
 
-#### Step 6: Read-only bash allowlist recipe ([#521])
+#### ✅ Step 6: Read-only bash allowlist recipe ([#521])
 
 **Cause:** none (documentation) — answers a standing user question with a config pattern instead of new runtime mechanism, per the package's mechanism-is-forever preference.
 
 - **Smell:** n/a (documentation).
 - **Target:** `docs/configuration.md` (a "read-only command allowlist" recipe enumerating read-only commands as bash allow rules); close [#521] on ship.
 - **Outcome:** documented recipe; issue closed.
+- **Landed:** added the "Read-Only Bash Command Allowlist" recipe to `docs/configuration.md`'s Common Recipes — a conservative curated allowlist (file inspection, listing/metadata, search, comparison/hashing, system info, and enumerated `git` read subcommands) paired with `write`/`edit` deny and a `path` deny block.
+  The prose documents the four safety nets that keep it safe (redirect gating on the `path` surface, the `find`/`fd` exec-flag floor, chain most-restrictive, and the wrapper floors), directly answering [#521]'s `find *` + `-exec` + chains question; `echo`/`printf`/`tee`/`sort`/`sed`/`awk` are omitted with a stated rationale.
 - **Impact 2 / Risk 1 / Priority 10.**
 
 Release: independent
@@ -982,7 +984,7 @@ flowchart TD
     S1 -.->|"soft ordering — shared input-normalizer.ts churn"| S4["✅ Step 4 - Advisory bash decomposition parity (#309)"]
     S3["✅ Step 3 - PathFlavor + src/path/ domain (#562)"]
     S5["✅ Step 5 - Indirection-wrapper floor (#490)"]
-    S6["Step 6 - Read-only allowlist recipe (#521)"]
+    S6["✅ Step 6 - Read-only allowlist recipe (#521)"]
 ```
 
 ### Parallel tracks
