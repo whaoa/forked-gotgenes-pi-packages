@@ -109,6 +109,8 @@ Project overrides global; per-agent YAML frontmatter overrides both.
 
 Within a surface map like `bash` or `mcp`, **last matching rule wins** — put broad catch-alls first and specific overrides after.
 
+The optional `shellTools` field records which non-`bash` tools carry shell semantics (e.g. an `exec_command` tool that replaces native `bash`), so they can be gated through the same enforcement — see [docs/configuration.md](docs/configuration.md#shelltools--gating-aliased-shell-tools).
+
 For the full reference — all surfaces, runtime knobs, per-agent overrides, merge semantics, and common recipes — see [docs/configuration.md](docs/configuration.md).
 
 ## Upgrading

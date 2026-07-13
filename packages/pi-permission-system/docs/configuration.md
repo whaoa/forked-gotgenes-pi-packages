@@ -46,6 +46,11 @@ Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`) use simple replace
   "toolTextSummaryMaxLength": 120,
   "piInfrastructureReadPaths": [],
 
+  // Non-bash tools that carry shell semantics
+  "shellTools": {
+    "exec_command": { "commandField": "cmd", "workdirField": "workdir" }
+  },
+
   // Flat permission policy
   "permission": {
     "*": "ask",                              // universal fallback
@@ -103,6 +108,37 @@ Example — allow reads from a Homebrew-managed Pi install at any version:
   ]
 }
 ```
+
+### `shellTools` — gating aliased shell tools
+
+The native `bash` tool goes through the full bash enforcement stack: command decomposition, wrapper flooring, path and external-directory token gates, and `bash:` rules.
+Some extensions replace `bash` with a differently-named tool — for example [`@howaboua/pi-codex-conversion`](https://github.com/IgorWarzocha/howaboua-pi-stuff) registers `exec_command`, which carries the shell command in a `cmd` field and an optional working directory in `workdir`.
+Without a hint, the permission system cannot tell that such a tool is really a shell, so it gates it as a generic extension tool and the bash rules never apply.
+
+`shellTools` records that hint.
+Each key is a tool name; its value maps the tool's input fields:
+
+```jsonc
+{
+  "shellTools": {
+    "exec_command": { "commandField": "cmd", "workdirField": "workdir" }
+  }
+}
+```
+
+| Field          | Required | Description                                                     |
+| -------------- | -------- | --------------------------------------------------------------- |
+| `commandField` | yes      | The input field holding the shell command string (e.g. `cmd`).  |
+| `workdirField` | no       | The input field holding the working directory (e.g. `workdir`). |
+
+Merge semantics: `shellTools` **shallow-merges by tool name** across global → project.
+A project entry overrides a specific tool's mapping on a key collision but never drops a global entry — so adding a project-scoped alias cannot silently remove enforcement for a tool the global config already covers.
+To change a specific tool's mapping, set that tool's key at the project scope (the alias object is replaced wholesale, not deep-merged).
+
+`shellTools` only ever *tightens* enforcement and is inert when the named tool is not registered in the current session.
+Opting a project out of a shell-aliasing extension is a package-disable concern, not a `shellTools` edit.
+
+> **Note:** `shellTools` records the alias; the enforcement wiring that consumes it is tracked in [#574](https://github.com/gotgenes/pi-packages/issues/574).
 
 ---
 

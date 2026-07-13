@@ -912,7 +912,7 @@ Recompute commands (run from the repo root):
 
 Release: independent
 
-#### Step 2: Shell-tool alias config model (`shellTools`) ([#580])
+#### ✅ Step 2: Shell-tool alias config model (`shellTools`) ([#580])
 
 **Cause:** the access-intent boundary has no way to record that a foreign tool name carries bash semantics — the tool-kind variant set is closed to the tool ecosystem, and the recording belongs in config (design priority: config files are the source of truth; prefer config patterns over new runtime mechanisms).
 
@@ -984,7 +984,7 @@ Release: independent
 ```mermaid
 flowchart TD
     S1["✅ Step 1: Move access-intent stragglers (#579)"]
-    S2["Step 2: shellTools alias config model (#580)"]
+    S2["✅ Step 2: shellTools alias config model (#580)"]
     S3["Step 3: Bash-stack gating for aliased shell tools (#574)"]
     S4["Step 4: Inline keybind permission dialog (#573)"]
     S5["Step 5: Containment unification (#571)"]
