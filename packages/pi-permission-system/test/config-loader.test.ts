@@ -596,32 +596,32 @@ describe("mergeUnifiedConfigs", () => {
 
   it("base shellTools survives when override omits it", () => {
     const merged = mergeUnifiedConfigs(
-      { shellTools: { exec_command: { commandField: "cmd" } } },
+      { shellTools: { exec_command: { commandArgument: "cmd" } } },
       {},
     );
     expect(merged.shellTools).toEqual({
-      exec_command: { commandField: "cmd" },
+      exec_command: { commandArgument: "cmd" },
     });
   });
 
   it("override shellTools survives when base omits it", () => {
     const merged = mergeUnifiedConfigs(
       {},
-      { shellTools: { exec_command: { commandField: "cmd" } } },
+      { shellTools: { exec_command: { commandArgument: "cmd" } } },
     );
     expect(merged.shellTools).toEqual({
-      exec_command: { commandField: "cmd" },
+      exec_command: { commandArgument: "cmd" },
     });
   });
 
   it("shallow-merges shellTools by tool name: override adds without dropping base", () => {
     const merged = mergeUnifiedConfigs(
-      { shellTools: { exec_command: { commandField: "cmd" } } },
-      { shellTools: { run_shell: { commandField: "script" } } },
+      { shellTools: { exec_command: { commandArgument: "cmd" } } },
+      { shellTools: { run_shell: { commandArgument: "script" } } },
     );
     expect(merged.shellTools).toEqual({
-      exec_command: { commandField: "cmd" },
-      run_shell: { commandField: "script" },
+      exec_command: { commandArgument: "cmd" },
+      run_shell: { commandArgument: "script" },
     });
   });
 
@@ -629,13 +629,13 @@ describe("mergeUnifiedConfigs", () => {
     const merged = mergeUnifiedConfigs(
       {
         shellTools: {
-          exec_command: { commandField: "cmd", workdirField: "workdir" },
+          exec_command: { commandArgument: "cmd", workdirArgument: "workdir" },
         },
       },
-      { shellTools: { exec_command: { commandField: "command" } } },
+      { shellTools: { exec_command: { commandArgument: "command" } } },
     );
     expect(merged.shellTools).toEqual({
-      exec_command: { commandField: "command" },
+      exec_command: { commandArgument: "command" },
     });
   });
 

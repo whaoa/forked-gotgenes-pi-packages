@@ -11,7 +11,7 @@
   "piInfrastructureReadPaths": [],
 
   "shellTools": {
-    "exec_command": { "commandField": "cmd", "workdirField": "workdir" }
+    "exec_command": { "commandArgument": "cmd", "workdirArgument": "workdir" }
   },
 
   "permission": {

@@ -138,11 +138,11 @@ describe("normalizePermissionSystemConfig", () => {
   it("includes shellTools when provided", () => {
     const result = normalizePermissionSystemConfig({
       shellTools: {
-        exec_command: { commandField: "cmd", workdirField: "workdir" },
+        exec_command: { commandArgument: "cmd", workdirArgument: "workdir" },
       },
     });
     expect(result.shellTools).toEqual({
-      exec_command: { commandField: "cmd", workdirField: "workdir" },
+      exec_command: { commandArgument: "cmd", workdirArgument: "workdir" },
     });
   });
 

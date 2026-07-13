@@ -917,7 +917,7 @@ Release: independent
 **Cause:** the access-intent boundary has no way to record that a foreign tool name carries bash semantics — the tool-kind variant set is closed to the tool ecosystem, and the recording belongs in config (design priority: config files are the source of truth; prefer config patterns over new runtime mechanisms).
 
 - **Smell:** Category C (OCP at the access-intent boundary) with a Category F flavor (cross-package enforcement gap).
-- **Target:** `src/config-schema.ts` (a `shellTools` map: tool name → `{ commandField, workdirField? }`, with `.meta` descriptions and strict validation), regenerated `schemas/permissions.schema.json`, carry-through in `extension-config.ts` + `mergeUnifiedConfigs()` (the [#332]/[#347] drop class — post-[#356] the compiler flags the gap), `config/config.example.json`, `docs/configuration.md`, `README.md`.
+- **Target:** `src/config-schema.ts` (a `shellTools` map: tool name → `{ commandArgument, workdirArgument? }`, with `.meta` descriptions and strict validation), regenerated `schemas/permissions.schema.json`, carry-through in `extension-config.ts` + `mergeUnifiedConfigs()` (the [#332]/[#347] drop class — post-[#356] the compiler flags the gap), `config/config.example.json`, `docs/configuration.md`, `README.md`.
 - **Outcome:** a validated, merged, documented `shellTools` config surface; no runtime behavior change yet (Step 3 consumes it); `grep -c shellTools src/config-schema.ts` goes 0 → ≥ 1.
 - **Impact 5 / Risk 2 / Priority 20.**
 
@@ -929,7 +929,7 @@ Release: batch "shell-tool-aliases"
 
 - **Smell:** Category C / F.
 - **Target:** `src/access-intent/tool-kind.ts` (alias-aware classification consult, keeping one dispatch point), `src/handlers/gates/tool-call-gate-pipeline.ts` (parse the mapped command field into the shared `BashProgram`; run the bash gates), `src/access-intent/input-normalizer.ts` + `src/access-intent/tool-input-path.ts` (aliased command/workdir extraction), `src/permission-session.ts` (alias lookup exposed via `ToolCallGateInputs`), gate-parity tests.
-- **Outcome:** with `shellTools: { "exec_command": { "commandField": "cmd", "workdirField": "workdir" } }`, an `exec_command` call gets command decomposition, wrapper flooring, bash path + external-directory token gates, and `bash:` rules at parity with native bash (including the `<unparseable-bash-command>` fail-closed sentinel); `workdir` is the effective base for relative tokens and is itself gated by `external_directory` when outside the session cwd; the review log records both the invoked tool name and the effective command.
+- **Outcome:** with `shellTools: { "exec_command": { "commandArgument": "cmd", "workdirArgument": "workdir" } }`, an `exec_command` call gets command decomposition, wrapper flooring, bash path + external-directory token gates, and `bash:` rules at parity with native bash (including the `<unparseable-bash-command>` fail-closed sentinel); `workdir` is the effective base for relative tokens and is itself gated by `external_directory` when outside the session cwd; the review log records both the invoked tool name and the effective command.
 - **Impact 5 / Risk 3 / Priority 15.**
 
 Release: batch "shell-tool-aliases"

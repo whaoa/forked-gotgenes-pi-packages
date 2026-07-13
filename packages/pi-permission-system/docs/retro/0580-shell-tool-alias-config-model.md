@@ -88,4 +88,11 @@ The release was deferred at ship time per the plan's `mid-batch — defer` marke
 
 1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0580-shell-tool-alias-config-model.md`.
 2. No prompt or `AGENTS.md` changes: the one candidate (a `/plan-issue` reminder to defer an export whose only consumer is a later issue) was declined as first-instance over-fitting — the `code-design` skill already carries the underlying "no speculative re-exports" rule.
-  Revisit if the speculative-export-tripping-`fallow` pattern recurs.
+
+   Revisit if the speculative-export-tripping-`fallow` pattern recurs.
+3. **Post-ship rename of the `shellTools` config keys** — the operator noticed "field" is not Pi's vocabulary for tool-call input parts.
+Verified against `~/development/pi/pi/packages/ai/src/types.ts`: Pi uses `Tool.parameters` (declared schema), `ToolCall.arguments` (runtime values), and JSON-Schema **properties** — never "field."
+The term `commandField`/`workdirField` was inherited verbatim from the issue body and never reconciled at plan time (a planning-stage `missing-context`: the field *values* `cmd`/`workdir` were grounded against the real tool, but the meta-term was not).
+Renamed `commandField` → `commandArgument` and `workdirField` → `workdirArgument` (operator-chosen: the value names a key in `ToolCall.arguments`, which is what `#574` reads at gate time) across `src/config-schema.ts` (keys + prose descriptions), regenerated `schemas/permissions.schema.json`, `config/config.example.json`, `docs/configuration.md`, the three test files, `docs/architecture/architecture.md`, and both plan files (`0580` + the not-yet-implemented `0574`).
+Safe to do without a breaking-change footer because `#580` is merged but **unreleased** (mid-batch defer) and `#574` has a plan but no implementation.
+The historical Planning/TDD stage entries above keep the original `commandField`/`workdirField` term as an accurate timeline of what those stages produced.

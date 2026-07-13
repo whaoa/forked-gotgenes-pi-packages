@@ -29,7 +29,7 @@ Consuming it at gate time — routing an aliased invocation through the bash enf
 
 ## Goals
 
-- Add an optional `shellTools` field to `unifiedConfigSchema` mapping a tool name to `{ commandField, workdirField? }`, with `.meta` descriptions and strict fail-closed validation.
+- Add an optional `shellTools` field to `unifiedConfigSchema` mapping a tool name to `{ commandArgument, workdirArgument? }`, with `.meta` descriptions and strict fail-closed validation.
 - Regenerate `schemas/permissions.schema.json` from the zod source via `pnpm run gen:schema` (never hand-edited); keep the parity test green.
 - Carry the field through `PermissionSystemExtensionConfig`, `normalizePermissionSystemConfig`, and `mergeUnifiedConfigs()` so it is not silently dropped before runtime (the [#332]/[#347] class; post-[#356] the compiler flags the gap).
 - Merge `shellTools` **shallowly by tool name** across scopes: project entries add/override per tool name on top of global, never dropping a global entry wholesale.
@@ -78,11 +78,11 @@ Constraints from AGENTS.md / the package skill that apply:
 ```typescript
 // A single aliased shell tool's field mapping.
 const shellToolAliasSchema = z.strictObject({
-  commandField: z.string().min(1).meta({
+  commandArgument: z.string().min(1).meta({
     description:
       "The input field holding the shell command string for this tool (e.g. 'cmd').",
   }),
-  workdirField: z.string().min(1).optional().meta({
+  workdirArgument: z.string().min(1).optional().meta({
     description:
       "Optional input field holding the working directory for this tool (e.g. 'workdir').",
   }),
@@ -100,7 +100,7 @@ const shellToolsSchema = z
     description:
       "Maps non-bash tool names that carry shell semantics to the input fields holding their command and working directory.",
     markdownDescription:
-      "Records which non-`bash` tools carry shell semantics, mapping each tool name to the input field holding its command (and optionally its working directory).\n\nUse this when an extension replaces the native `bash` tool under a different name — e.g. `@howaboua/pi-codex-conversion` registers `exec_command` with a `cmd` field and an optional `workdir`. Recording the alias lets the permission system gate that tool through the same bash enforcement stack as native `bash` (command decomposition, wrapper flooring, path/external-directory token gates, and `bash:` rules).\n\nExample:\n\n```json\n\"shellTools\": {\n  \"exec_command\": { \"commandField\": \"cmd\", \"workdirField\": \"workdir\" }\n}\n```\n\n**Merge order:** shallow-merge by tool name across global → project. A project entry overrides a specific tool's mapping on key collision but never drops a global entry.",
+      "Records which non-`bash` tools carry shell semantics, mapping each tool name to the input field holding its command (and optionally its working directory).\n\nUse this when an extension replaces the native `bash` tool under a different name — e.g. `@howaboua/pi-codex-conversion` registers `exec_command` with a `cmd` field and an optional `workdir`. Recording the alias lets the permission system gate that tool through the same bash enforcement stack as native `bash` (command decomposition, wrapper flooring, path/external-directory token gates, and `bash:` rules).\n\nExample:\n\n```json\n\"shellTools\": {\n  \"exec_command\": { \"commandArgument\": \"cmd\", \"workdirArgument\": \"workdir\" }\n}\n```\n\n**Merge order:** shallow-merge by tool name across global → project. A project entry overrides a specific tool's mapping on key collision but never drops a global entry.",
   });
 
 export type ShellToolAlias = z.infer<typeof shellToolAliasSchema>;
@@ -114,7 +114,7 @@ Design notes:
 - The alias sub-schema is **not** `id`-tagged, so it inlines under `properties.shellTools.additionalProperties` in the generated JSON Schema rather than becoming a fourth `$def`.
   This keeps the parity test's `$defs === ["denyWithReason", "permissionMap", "permissionState"]` assertion unchanged.
 - `strictObject` at the alias level fails closed on an unknown field (e.g. a typo'd `commandFeild`), matching the rest of the config's strict validation.
-- `commandField` is required (a shell alias with no command field is meaningless); `workdirField` is optional (a tool may not project a working directory).
+- `commandArgument` is required (a shell alias with no command field is meaningless); `workdirArgument` is optional (a tool may not project a working directory).
 - Both field names are `.min(1)` non-empty strings.
 
 ### Merge semantics — shallow by tool name
@@ -135,7 +135,7 @@ if (baseShell && overrideShell) {
 }
 ```
 
-The spread replaces a colliding tool's alias object wholesale (no deep-merge of `commandField`/`workdirField`) — a project overriding `exec_command` supplies the full mapping, so it can never end up with a `commandField` and a stale global `workdirField`.
+The spread replaces a colliding tool's alias object wholesale (no deep-merge of `commandArgument`/`workdirArgument`) — a project overriding `exec_command` supplies the full mapping, so it can never end up with a `commandArgument` and a stale global `workdirArgument`.
 This mirrors the `permission` block's structure but one level shallower (a flat tool→alias record, not a nested pattern map).
 
 Decision rationale (confirmed with the operator during planning):
@@ -202,7 +202,7 @@ No earlier phase step's documented `Outcome:` invariant is regressed — this st
 ## TDD Order
 
 1. **Schema surface** (`test: add shellTools schema cases` → `feat(pi-permission-system): add shellTools config schema`).
-   - Red: in `test/config-schema.test.ts`, add cases — accepts a config with `shellTools: { exec_command: { commandField: "cmd", workdirField: "workdir" } }`; accepts an alias with only `commandField`; rejects an alias missing `commandField`; rejects an unknown field inside an alias (`strictObject`); rejects a non-string `commandField`.
+   - Red: in `test/config-schema.test.ts`, add cases — accepts a config with `shellTools: { exec_command: { commandArgument: "cmd", workdirArgument: "workdir" } }`; accepts an alias with only `commandArgument`; rejects an alias missing `commandArgument`; rejects an unknown field inside an alias (`strictObject`); rejects a non-string `commandArgument`.
    - Green: add `shellToolAliasSchema` + `shellToolsSchema` + the optional field + exported types to `config-schema.ts`; run `pnpm run gen:schema` to regenerate the committed JSON (the parity test then passes).
    - Verify: `pnpm run check`, the new + existing config-schema tests, and `$defs` still equals the three entries.
    - Commit the schema source, regenerated `schemas/permissions.schema.json`, and the test together (`feat:`).

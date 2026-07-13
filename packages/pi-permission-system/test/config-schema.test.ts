@@ -114,43 +114,43 @@ describe("unifiedConfigSchema", () => {
     it("accepts a shellTools map with a full alias", () => {
       const result = unifiedConfigSchema.safeParse({
         shellTools: {
-          exec_command: { commandField: "cmd", workdirField: "workdir" },
+          exec_command: { commandArgument: "cmd", workdirArgument: "workdir" },
         },
       });
       expect(result.success).toBe(true);
     });
 
-    it("accepts an alias with only commandField", () => {
+    it("accepts an alias with only commandArgument", () => {
       const result = unifiedConfigSchema.safeParse({
-        shellTools: { exec_command: { commandField: "cmd" } },
+        shellTools: { exec_command: { commandArgument: "cmd" } },
       });
       expect(result.success).toBe(true);
     });
 
-    it("rejects an alias missing commandField", () => {
+    it("rejects an alias missing commandArgument", () => {
       const result = unifiedConfigSchema.safeParse({
-        shellTools: { exec_command: { workdirField: "workdir" } },
+        shellTools: { exec_command: { workdirArgument: "workdir" } },
       });
       expect(result.success).toBe(false);
     });
 
     it("rejects an unknown field inside an alias", () => {
       const result = unifiedConfigSchema.safeParse({
-        shellTools: { exec_command: { commandField: "cmd", extra: "x" } },
+        shellTools: { exec_command: { commandArgument: "cmd", extra: "x" } },
       });
       expect(result.success).toBe(false);
     });
 
-    it("rejects a non-string commandField", () => {
+    it("rejects a non-string commandArgument", () => {
       const result = unifiedConfigSchema.safeParse({
-        shellTools: { exec_command: { commandField: 42 } },
+        shellTools: { exec_command: { commandArgument: 42 } },
       });
       expect(result.success).toBe(false);
     });
 
-    it("rejects an empty-string commandField", () => {
+    it("rejects an empty-string commandArgument", () => {
       const result = unifiedConfigSchema.safeParse({
-        shellTools: { exec_command: { commandField: "" } },
+        shellTools: { exec_command: { commandArgument: "" } },
       });
       expect(result.success).toBe(false);
     });

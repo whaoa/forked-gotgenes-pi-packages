@@ -20,7 +20,7 @@ from a closed set of hardcoded built-in tool names.
 A tool that carries bash semantics under a different name — `@howaboua/pi-codex-conversion` replaces the native `bash` tool with `exec_command` (`cmd` + optional `workdir`) — is classified as a generic extension tool, so it never receives command decomposition, wrapper flooring ([#490]), bash path / external-directory token gates, or `bash:` config rules.
 A user's `bash:` deny rules silently do not apply, and the same shell operation is gated differently depending on which toolset is active — an enforcement gap, not a polish item.
 
-Step 2 ([#580]) delivered the `shellTools` config surface (tool name → `{ commandField, workdirField? }`) with strict validation, cross-scope merge, and docs, but **nothing reads it yet**.
+Step 2 ([#580]) delivered the `shellTools` config surface (tool name → `{ commandArgument, workdirArgument? }`) with strict validation, cross-scope merge, and docs, but **nothing reads it yet**.
 This step consumes it: once the alias is recorded, the dispatch point must route an aliased invocation through the same enforcement the native `bash` tool gets, at parity.
 
 ## Goals
@@ -28,7 +28,7 @@ This step consumes it: once the alias is recorded, the dispatch point must route
 - Consume `shellTools` at gate time so an aliased shell tool (e.g. `exec_command`) is gated at parity with native `bash`: command decomposition, wrapper flooring, the `<unparseable-bash-command>` fail-closed sentinel, bash path + external-directory token gates, and `bash:` config rules.
 - Introduce **one dispatch point** — `resolveShellInvocation(toolName, input, aliases)` in `access-intent/tool-kind.ts` — that decides "does this invocation carry shell semantics, and what is its command + workdir?"
   for native bash and aliased tools alike, so the bash gates stop hardcoding `toolName === "bash"` and `input.command`.
-- Full `workdir` parity: the alias's `workdirField` value becomes the effective resolve base for the aliased command's relative tokens, and `workdir` is itself gated by `external_directory` when it resolves outside the session cwd.
+- Full `workdir` parity: the alias's `workdirArgument` value becomes the effective resolve base for the aliased command's relative tokens, and `workdir` is itself gated by `external_directory` when it resolves outside the session cwd.
 - Preserve the invoked tool's real name in the review log and prompts (`exec_command`, not `bash`) while recording the effective command — a user must see which tool ran what.
 - A session "allow for this session" on an aliased shell command adds a `bash:` session rule (so it applies to native `bash` and the alias alike), not an `exec_command:` rule.
 - Not breaking: with no `shellTools` config, every tool is classified and gated exactly as today; the new behavior is inert until a user records an alias.
@@ -39,7 +39,7 @@ This step consumes it: once the alias is recorded, the dispatch point must route
   `shellTools` shipped in Step 2 ([#580]); this step only consumes it.
   Reintroducing the `ShellToolAlias` export (dropped as a speculative export in [#580]'s `e7cc7260`) happens here as its first real consumer.
 - **No per-tool path-map for the aliased command's non-command fields.**
-  Only `commandField` (the shell command) and `workdirField` (the effective base) are consumed; any other input field on the aliased tool is ignored, matching the Step 2 config contract.
+  Only `commandArgument` (the shell command) and `workdirArgument` (the effective base) are consumed; any other input field on the aliased tool is ignored, matching the Step 2 config contract.
 - **No tool-removal or toolset lever.**
   `shellTools` only ever *tightens* enforcement and is inert when the named tool is unregistered.
   Opting out of a shell-aliasing extension is a package-disable concern Pi owns, not a permission change.
@@ -109,7 +109,7 @@ export function resolveShellInvocation(
 Behavior:
 
 - `toolName === "bash"` → `{ command: getNonEmptyString(input.command) ?? "", workdir: undefined }` (native — reproduces today's extraction).
-- `aliases?.[toolName]` present → read `input[alias.commandField]` as the command and, when `alias.workdirField` is set, `input[alias.workdirField]` as the workdir (both via `getNonEmptyString`, `undefined` when absent/empty).
+- `aliases?.[toolName]` present → read `input[alias.commandArgument]` as the command and, when `alias.workdirArgument` is set, `input[alias.workdirArgument]` as the workdir (both via `getNonEmptyString`, `undefined` when absent/empty).
 - otherwise → `null`.
 
 Design notes:
@@ -256,7 +256,7 @@ No earlier step's documented `Outcome:` invariant is regressed — native bash r
 ## TDD Order
 
 1. **Single dispatch point** (`test: add resolveShellInvocation cases` → `feat(pi-permission-system): add resolveShellInvocation dispatch point`).
-   - Red: unit tests for `resolveShellInvocation` — native bash yields `{ command, workdir: undefined }`; an aliased tool with `{ commandField: "cmd", workdirField: "workdir" }` extracts both; `workdirField` absent → `workdir: undefined`; missing/empty command field → `command: ""`; unknown tool + no alias → `null`; `aliases: undefined` → native-bash-only.
+   - Red: unit tests for `resolveShellInvocation` — native bash yields `{ command, workdir: undefined }`; an aliased tool with `{ commandArgument: "cmd", workdirArgument: "workdir" }` extracts both; `workdirArgument` absent → `workdir: undefined`; missing/empty command field → `command: ""`; unknown tool + no alias → `null`; `aliases: undefined` → native-bash-only.
    - Green: add `ShellInvocation` + `resolveShellInvocation` to `tool-kind.ts` (import `ShellToolsConfig`; reintroduce any needed alias field type).
    - Verify: `pnpm run check`, the new tests, `pnpm fallow dead-code` (the new export has its consumer added in step 3 — if `dead-code` flags it before then, fold step 3's first consumer into this commit, or land steps 1–3 together; see the batch note below).
 
@@ -268,7 +268,7 @@ No earlier step's documented `Outcome:` invariant is regressed — native bash r
    - Note: this is a lift-and-shift enabling step — native bash still supplies the command; step 3 swaps the source to `resolveShellInvocation`.
 
 3. **Pipeline routes aliased tools through the bash stack** (command-surface parity) (`feat(pi-permission-system): gate aliased shell tools through the bash stack`).
-   - Red: pipeline / integration tests — with `shellTools: { exec_command: { commandField: "cmd" } }`, an `exec_command` call with `{ cmd: "npm install" }` evaluates against `bash:` rules (deny/ask honored), decomposes a chained command, floors a `sudo`/`bash -c` wrapper, fails closed on an opaque payload, and gates an absolute-path token via bash path / external-directory — all against the native-bash oracle.
+   - Red: pipeline / integration tests — with `shellTools: { exec_command: { commandArgument: "cmd" } }`, an `exec_command` call with `{ cmd: "npm install" }` evaluates against `bash:` rules (deny/ask honored), decomposes a chained command, floors a `sudo`/`bash -c` wrapper, fails closed on an opaque payload, and gates an absolute-path token via bash path / external-directory — all against the native-bash oracle.
      Assert the review log records `toolName: "exec_command"` with the effective command, and a session "allow" writes a `bash:` rule.
    - Green: add `getShellToolAliases` to `ToolCallGateInputs` + `PermissionSession`; resolve `shell` once in the pipeline and thread `shell?.command` / `shell` into the bash gates, `resolvePerToolCheck`, and the per-tool descriptor; update `describeToolGate` / `deriveSuggestionValue` / `deriveDecisionValue` for the effective `bash` surface + command value while preserving `tcc.toolName` in logs.
      Trace `normalizeInput` callers; make the bash branch alias-aware only if a real consumer needs it (else leave it and note in retro).
