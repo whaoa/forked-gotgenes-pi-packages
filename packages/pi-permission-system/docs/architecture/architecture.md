@@ -900,7 +900,7 @@ Recompute commands (run from the repo root):
 
 ### Steps
 
-#### Step 1: Fold the access-intent stragglers into `src/access-intent/`
+#### Step 1: Fold the access-intent stragglers into `src/access-intent/` ([#579])
 
 **Cause:** the access-intent domain is named in the first-principles section and has a directory, but four of its modules still sit in the flat root, hiding the seam the aliasing steps extend.
 
@@ -912,7 +912,7 @@ Recompute commands (run from the repo root):
 
 Release: independent
 
-#### Step 2: Shell-tool alias config model (`shellTools`)
+#### Step 2: Shell-tool alias config model (`shellTools`) ([#580])
 
 **Cause:** the access-intent boundary has no way to record that a foreign tool name carries bash semantics — the tool-kind variant set is closed to the tool ecosystem, and the recording belongs in config (design priority: config files are the source of truth; prefer config patterns over new runtime mechanisms).
 
@@ -923,7 +923,7 @@ Release: independent
 
 Release: batch "shell-tool-aliases"
 
-#### Step 3: Gate aliased shell invocations through the bash stack
+#### Step 3: Gate aliased shell invocations through the bash stack ([#574])
 
 **Cause:** same cause as Step 2, consumed: once the alias is recorded, the dispatch point must route an aliased invocation through the same enforcement the native bash tool gets — otherwise "what is being accessed" still depends on which toolset is active ([#574]).
 
@@ -934,7 +934,7 @@ Release: batch "shell-tool-aliases"
 
 Release: batch "shell-tool-aliases"
 
-#### Step 4: Inline keybind permission dialog
+#### Step 4: Inline keybind permission dialog ([#573])
 
 **Cause:** elicitation is the highest-frequency human touchpoint of the live-authority layer, and the stock two-select modal spends three keypresses where one would do; the `Authorizer` spine deliberately owns presentation, so this is a pure live-authority change — `evaluate()` and the ruleset are untouched ([#573]).
 
@@ -945,7 +945,7 @@ Release: batch "shell-tool-aliases"
 
 Release: independent
 
-#### Step 5: Unify subagent-context containment onto `PathFlavor.isWithin`
+#### Step 5: Unify subagent-context containment onto `PathFlavor.isWithin` ([#571])
 
 **Cause:** two containment algorithms answer "is this path inside that directory?"
 — the path gates use `PathFlavor.isWithin` (Node `path.relative` geometry) while subagent detection uses a string-prefix check that diverges on `..` segments and prefix-sharing siblings; a must-agree pair with two algorithms is the [#562] connascence class, behavior-affecting where they diverge ([#571]).
@@ -957,7 +957,7 @@ Release: independent
 
 Release: independent
 
-#### Step 6: Survey exec-capable CLI rewrites for indirection-wrapper flooring
+#### Step 6: Survey exec-capable CLI rewrites for indirection-wrapper flooring ([#575])
 
 **Cause:** the [#490] wrapper tables were seeded from a fixed inventory; exec-capable rewrites outside it (`parallel`, `setsid`, `stdbuf`, `watch`, …) can still launder a payload under a permissive `allow` — the fail-safe floor is only as good as the inventory ([#575]).
 
@@ -968,7 +968,7 @@ Release: independent
 
 Release: independent
 
-#### Step 7: Decision record for the case-by-case judge
+#### Step 7: Decision record for the case-by-case judge ([#581])
 
 **Cause:** [#472] has been deferred by name in Phases 9 and 10; the repeat-deferral rule requires a decision this phase, and the [`ModelTriageAuthorizer` design](#discriminating-delegation-a-model-authorizer) is settled enough to commit to paper — deciding the open parameters is what stands between "designed" and "schedulable".
 
@@ -983,13 +983,13 @@ Release: independent
 
 ```mermaid
 flowchart TD
-    S1["Step 1: Move access-intent stragglers"]
-    S2["Step 2: shellTools alias config model"]
-    S3["Step 3: Bash-stack gating for aliased shell tools"]
-    S4["Step 4: Inline keybind permission dialog"]
-    S5["Step 5: Containment unification"]
-    S6["Step 6: Indirection-wrapper survey"]
-    S7["Step 7: Model-judge decision record"]
+    S1["Step 1: Move access-intent stragglers (#579)"]
+    S2["Step 2: shellTools alias config model (#580)"]
+    S3["Step 3: Bash-stack gating for aliased shell tools (#574)"]
+    S4["Step 4: Inline keybind permission dialog (#573)"]
+    S5["Step 5: Containment unification (#571)"]
+    S6["Step 6: Indirection-wrapper survey (#575)"]
+    S7["Step 7: Model-judge decision record (#581)"]
     S1 --> S3
     S2 --> S3
 ```
@@ -1186,4 +1186,7 @@ Six steps ([#568], [#569], [#562], [#309], [#490], [#521]), all closed.
 [#332]: https://github.com/gotgenes/pi-packages/issues/332
 [#347]: https://github.com/gotgenes/pi-packages/issues/347
 [#356]: https://github.com/gotgenes/pi-packages/issues/356
+[#579]: https://github.com/gotgenes/pi-packages/issues/579
+[#580]: https://github.com/gotgenes/pi-packages/issues/580
+[#581]: https://github.com/gotgenes/pi-packages/issues/581
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
