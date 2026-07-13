@@ -196,6 +196,12 @@ A wrapper unit is flagged by the command enumerator with a `wrapperKind` discrim
 The enumerator also strips a leading `variable_assignment` prefix from each command unit so an env-var prefix (`AWS_PROFILE=prod aws …`) cannot defeat a command-pattern rule (#481).
 With `debugLog` on, the boundary writes one `permission.decision` trace per call and a `permission.session_summary` line on shutdown (via `DecisionAudit`); a `toolCalls != allowed + blocked + errors` mismatch logs a warning — a re-opened silent path.
 
+The bash enforcement stack is not limited to the native `bash` tool: the `shellTools` config maps a foreign tool name to `{ commandArgument, workdirArgument? }`, and `resolveShellInvocation` (`src/access-intent/tool-kind.ts`) is the single dispatch point that turns native `bash` *or* an aliased tool (e.g. `@howaboua/pi-codex-conversion`'s `exec_command`) into a `{ command, workdir }` shell invocation — every other tool yields `null` (#574).
+The gate pipeline consults it once, parses the command into a shared `BashProgram` (which owns its source command via `commandText()`, so the two bash gates read it rather than re-deriving `input.command`), and routes the aliased command through the same `resolveBashCommandCheck` + bash path/external-directory gates as native bash — so fail-closed, wrapper flooring, and `bash:` rules apply identically.
+The aliased tool is gated on the `bash` surface (a session "allow" writes a `bash:` rule) while the invoked tool name is preserved in the review log.
+A `workdirArgument` seeds the path-walk's initial base (an implicit leading `cd <workdir>`) so relative tokens resolve against it, and the workdir itself is flagged `external_directory` when outside the session cwd; containment always measures against the session cwd, never the workdir, so an aliased tool cannot widen the sandbox.
+`classifyToolKind` stays config-free — the alias consult is a separate function because it needs config and returns a richer product.
+
 ## Windows and Git Bash
 
 Platform facts verified against Pi core source during #533 planning:
