@@ -96,3 +96,44 @@ The term `commandField`/`workdirField` was inherited verbatim from the issue bod
 Renamed `commandField` → `commandArgument` and `workdirField` → `workdirArgument` (operator-chosen: the value names a key in `ToolCall.arguments`, which is what `#574` reads at gate time) across `src/config-schema.ts` (keys + prose descriptions), regenerated `schemas/permissions.schema.json`, `config/config.example.json`, `docs/configuration.md`, the three test files, `docs/architecture/architecture.md`, and both plan files (`0580` + the not-yet-implemented `0574`).
 Safe to do without a breaking-change footer because `#580` is merged but **unreleased** (mid-batch defer) and `#574` has a plan but no implementation.
 The historical Planning/TDD stage entries above keep the original `commandField`/`workdirField` term as an accurate timeline of what those stages produced.
+
+## Stage: Final Retrospective — Addendum: naming correction (2026-07-13T18:42:03Z)
+
+### Session summary
+
+A short follow-up session in which the operator questioned whether "field" is Pi's term for tool-call input parts.
+Investigation against Pi's source confirmed it is not, and the `shellTools` config keys were renamed `commandField`/`workdirField` → `commandArgument`/`workdirArgument` before release (execution detail recorded in the addendum stage's `### Changes made` item 3 above).
+This addendum captures the reusable lesson behind that rename.
+
+### Observations
+
+#### What went well
+
+- **Verified against the authoritative source instead of asserting** — read `~/development/pi/pi/packages/ai/src/types.ts` and confirmed `Tool.parameters` / `ToolCall.arguments` / JSON-Schema properties are Pi's vocabulary, so the answer to "is 'field' Pi's term?"
+  rested on the actual SDK contract, not memory.
+- **Caught inside the unreleased window** — because `#580` was merged but held under the mid-batch defer, the rename was a clean `refactor:` (no `BREAKING CHANGE:` footer, no consumer to migrate); `#574` had a plan but no implementation, so updating its plan file was the only downstream cost.
+- **`ask_user` on a preference-sensitive naming call** rather than picking a term unilaterally — the operator chose `commandArgument`/`workdirArgument` from four grounded options (`argument`/`parameter`/`key`/keep).
+
+#### What caused friction (agent side)
+
+- `missing-context` (user-caught) — the config keys `commandField`/`workdirField` were inherited verbatim from the issue body and carried into a **public config surface** without reconciling the term against Pi's SDK vocabulary.
+  The planning stage grounded the field *values* (`cmd`/`workdir`) against the real tool's source but never checked the *naming term* itself; neither planning, TDD, pre-completion review, nor the first Final Retrospective caught it.
+  Impact: a post-merge rename touching 11 files plus a CI run — avoided released breakage only because the mid-batch defer left `#580` unreleased.
+
+#### What caused friction (user side)
+
+- The SDK-vocabulary mismatch was **user-caught, not self-identified** — evidence that the existing planning guard for public-surface naming (`plan-issue` step 6, which searches *sibling packages* for conventions) does not prompt a check against the *SDK's* term for the domain concept a config key names.
+- Bidirectional (positive): the operator proactively shared the local Pi source path (`~/development/pi/pi`) after a `find /` probe stalled, unblocking the verification in one turn rather than leaving me to hunt for the checkout.
+
+### Diagnostic details
+
+- **Model-performance correlation** — no subagents dispatched this session; the investigation and rename ran in the main session (`opus-4-8` / `sonnet-5`), appropriate for a source-reading + judgment task.
+- **Unused-tool detection** — one minor detour: a `find /` sweep for Pi's `.d.ts` files was aborted before the operator pointed to `~/development/pi/pi`; a first grep of the known local checkout path would have skipped it.
+  No `Explore`/`colgrep` gap otherwise.
+- **Feedback-loop gap analysis** — verification was incremental and complete: affected-file tests + `pnpm run check` after the rename, root `lint` + full suite (2387) before commit, and CI watched to green post-push.
+
+### Changes made
+
+1. Appended this Addendum stage entry to `packages/pi-permission-system/docs/retro/0580-shell-tool-alias-config-model.md`.
+2. Added an SDK-vocabulary naming guard to `.pi/prompts/plan-issue.md` step 6: a config key or public field naming an SDK/domain concept should use the SDK's own term (verified against SDK types), not a term adopted verbatim from the issue body (Refs #580).
+  The rationale and the 11-file worked example stay here in the retro; the prompt carries only the rule plus a one-clause example.

@@ -54,6 +54,7 @@ Before investigating the issue, load skills relevant to the change:
    Note whether each is implemented yet — your plan must say what it depends on vs. defers.
 5. Open the source files most relevant to the change and skim them before writing.
 6. When the plan introduces a public API pattern (package `exports`, `Symbol.for()` accessor, service interface) or agent-facing message formatting (attribution tags, error prefixes, log labels), use colgrep or grep to search sibling packages for the established convention and follow it unless there is a documented reason to diverge.
+   When a config key or public field names an SDK/domain concept (a tool-call part, event, or content type), use the SDK's own term for it — verify against the SDK types — rather than adopting a term from the issue body verbatim (Refs #580: `commandField` shipped, then needed renaming to `commandArgument` to match `ToolCall.arguments`).
 7. Determine the issue's **release recommendation** from the package's architecture roadmap, if it is part of one.
    Grep `packages/<PKG>/docs/architecture/architecture.md` for the step that references this issue (`(#$1)` / `[#$1]`) and read its `Release:` tag (defined by the `improvement-discovery` skill):
    - `Release: independent` (or no tag, or the issue is not in any roadmap) → **ship independently**.
