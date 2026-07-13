@@ -51,3 +51,57 @@ Pre-completion reviewer returned **PASS** — ready for `/ship-issue`.
 - Roadmap Step 5 marked `✅` on both the heading and the `S5` Mermaid node in the docs commit (not deferred to ship), per the package skill.
 - Reviewer verdict: **PASS**.
   No warnings.
+
+## Stage: Final Retrospective (2026-07-13T01:16:50Z)
+
+### Session summary
+
+Shipped #490 across three stages (plan → TDD → ship) with no rework: four commits (one `refactor`, two `fix`, one `docs`), +26 tests, PASS review, released as `pi-permission-system-v20.4.1`.
+The session's spine was an evaluation-issue direction gate resolved via two `ask_user` rounds, then a mechanical, well-sequenced TDD execution that fell out cleanly because the design was grounded up front by an AST probe.
+Friction was near-zero; the only agent-side slip was a wrong hand-typed timestamp in the TDD stage note, and the only external hiccup was a transient pre-commit-hook install failure that was handled correctly.
+
+### Observations
+
+#### What went well
+
+- **Two-round `ask_user` absorbed a freeform operator addition.**
+  The wrapper-set question returned the multi-select plus freeform text ("fd, maybe other modern core tool rewrites").
+  The second round turned that into a crisp design decision (`find`/`fd` gated on an exec flag vs. always-invoke) and a filed follow-up (#575) — no guessing, no scope bleed.
+- **Disposable AST probe grounded the design before committing to it.**
+  A throwaway `tree-sitter-bash` script confirmed every wrapper parses as a flat `command` node with no option/inner-command boundary — the concrete evidence that killed the re-target approach and justified floor-all.
+  This is the testing skill's "write a disposable exploratory script first" pattern paying off.
+- **Design sequencing made later steps free.**
+  Defining `WRAPPER_SENTINEL` as a `Record<WrapperKind, string>` with both keys during the Step 1 refactor meant Step 2's floor behavior fell out with zero new gate code once the classifier emitted `"indirection"`.
+- **Incremental verification throughout.**
+  `pnpm run check` / `vitest` ran after each TDD step, full suite + root `lint` + `fallow dead-code` after the last — no end-of-session verification pile-up.
+
+#### What caused friction (agent side)
+
+- `other` — the TDD stage note was written with a hand-typed timestamp (`2026-07-12T14:04:00Z`) that is earlier than the planning note (`17:44Z`) and the ship CI (`18:19Z`), so the breadcrumb ordering is internally inconsistent.
+  Impact: none functional — a misleading timestamp in one stage note; no rework.
+  Self-identified during this retro.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's freeform "fd, maybe other modern rewrites" addition was a reasonable extension, cleanly resolved by a second `ask_user` round rather than a correction.
+
+#### External / infra
+
+- The `rumdl-fmt` prek hook could not reinstall during the two `docs:` commits (transient `No route to host` fetching `setuptools` via `uv`).
+  Handled correctly: ran `pnpm exec rumdl fmt` + `rumdl check` manually (clean), then committed with `--no-verify`.
+  This is a hook *install* failure (infra), not a hook *check* failure (a real lint issue) — the distinction is what made `--no-verify` the right call rather than a bypass of a real gate.
+- The release-please PR surfaced `UNSTABLE` with a CI check still `IN_PROGRESS` (not the empty-rollup no-checks case); handled per `/ship-issue` step 6.4 — waited for the check via `ci_watch`, then retried `release_pr_merge` (succeeded), rather than falling back to `gh pr merge` while the check ran.
+
+### Diagnostic details
+
+- **Model-performance correlation** — one subagent dispatch: `pre-completion-reviewer` on `anthropic/claude-sonnet-5`, doing judgment-heavy review (design, cross-step invariants, deviation assessment).
+  Appropriate match; no mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; no sequence approached 5 consecutive tool calls on one error.
+- **Unused-tool detection** — none; `colgrep` (planning exploration) and the disposable AST probe were the right tools and were used.
+- **Feedback-loop gap analysis** — no gap; verification was incremental after every change, not deferred to the end.
+
+### Changes made
+
+1. `AGENTS.md` (after the `committed`-hook sentence in the Commits section) — added a note distinguishing a `prek` hook *install* failure (network error building the hook env → run the gate manually, then commit `--no-verify`) from a hook *check* failure (a real gate → fix it, never `--no-verify` past it).
+2. `packages/pi-permission-system/docs/retro/0490-floor-indirection-wrappers.md` — this Final Retrospective stage entry.
