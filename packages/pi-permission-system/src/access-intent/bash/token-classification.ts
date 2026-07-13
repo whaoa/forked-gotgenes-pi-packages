@@ -9,7 +9,7 @@
  *     which matches an active, specific (non-`*`) `path` deny/ask rule (#509).
  *
  * All three classifiers share the private `rejectNonPathToken` predicate that
- * captures the seven rejection cases common to them (the production clone this
+ * captures the six rejection cases common to them (the production clone this
  * module was extracted to eliminate).
  *
  * Both `classifyTokenAsPathCandidate` and `classifyTokenAsRuleCandidate` recognize
@@ -143,8 +143,11 @@ const REGEX_METACHAR_PATTERN = /\.\*|\.\+|\\\||\\\(|\\\)|\[.*?\]|\^\//;
  * filesystem path, regardless of which classifier is asking.
  *
  * Rejects: empty tokens, flags (leading `-`), env assignments (`FOO=/bar`),
- * URLs, `@scope/package` patterns, bare-slash tokens, and regex metacharacter
- * sequences.
+ * URLs, `@scope/package` patterns, and regex metacharacter sequences.
+ *
+ * A bare `/` (or `//`, `///`) is NOT rejected: it denotes the filesystem root,
+ * a deliberate external-directory access (`find /`, `ls /`), so it must reach
+ * the path surfaces like any other absolute token (#583).
  */
 function rejectNonPathToken(token: string): boolean {
   if (!token) return true;
@@ -162,10 +165,6 @@ function rejectNonPathToken(token: string): boolean {
   // @scope/package patterns (npm scoped packages) — but @/ is allowed through
   // since it looks like an absolute-rooted path, not an npm scope.
   if (token.startsWith("@") && !token.startsWith("@/")) return true;
-
-  // Bare-slash tokens (/, //, ///) resolve to filesystem root and are never
-  // meaningful path arguments in practice.
-  if (/^\/+$/.test(token)) return true;
 
   if (REGEX_METACHAR_PATTERN.test(token)) return true;
 

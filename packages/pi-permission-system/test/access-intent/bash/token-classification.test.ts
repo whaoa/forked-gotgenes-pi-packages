@@ -10,7 +10,7 @@ import { posixPathFlavor, win32PathFlavor } from "#src/path/path-flavor";
 // ── Shared rejection behaviour ─────────────────────────────────────────────
 //
 // Both classifiers delegate to the private `rejectNonPathToken` predicate for
-// the seven shared rejection cases tested below.  Testing via both exports
+// the six shared rejection cases tested below.  Testing via both exports
 // pins that predicate through each caller.
 
 describe("classifyTokenAsPathCandidate", () => {
@@ -58,12 +58,6 @@ describe("classifyTokenAsPathCandidate", () => {
       expect(classifyTokenAsPathCandidate("@/foo/bar")).toBeNull();
     });
 
-    test("bare-slash token → null", () => {
-      expect(classifyTokenAsPathCandidate("/")).toBeNull();
-      expect(classifyTokenAsPathCandidate("//")).toBeNull();
-      expect(classifyTokenAsPathCandidate("///")).toBeNull();
-    });
-
     test("regex metacharacters → null", () => {
       // REGEX_METACHAR_PATTERN: .*, .+, \|, \(, \), [...], ^/
       expect(classifyTokenAsPathCandidate("foo.*")).toBeNull();
@@ -82,6 +76,14 @@ describe("classifyTokenAsPathCandidate", () => {
       expect(classifyTokenAsPathCandidate("/home/user/file.txt")).toBe(
         "/home/user/file.txt",
       );
+    });
+
+    test("bare-slash token (filesystem root) → returned as-is", () => {
+      // `find /` scans the whole filesystem from root — a deliberate
+      // external-directory access the gate must see, not drop (#583).
+      expect(classifyTokenAsPathCandidate("/")).toBe("/");
+      expect(classifyTokenAsPathCandidate("//")).toBe("//");
+      expect(classifyTokenAsPathCandidate("///")).toBe("///");
     });
 
     test("home-relative path (starts with ~/) → returned as-is", () => {
@@ -203,11 +205,6 @@ describe("classifyTokenAsRuleCandidate", () => {
       ).toBeNull();
     });
 
-    test("bare-slash token → null", () => {
-      expect(classifyTokenAsRuleCandidate("/", posixPathFlavor)).toBeNull();
-      expect(classifyTokenAsRuleCandidate("//", posixPathFlavor)).toBeNull();
-    });
-
     test("regex metacharacters → null", () => {
       expect(classifyTokenAsRuleCandidate("foo.*", posixPathFlavor)).toBeNull();
       expect(classifyTokenAsRuleCandidate("bar.+", posixPathFlavor)).toBeNull();
@@ -224,6 +221,13 @@ describe("classifyTokenAsRuleCandidate", () => {
       expect(classifyTokenAsRuleCandidate("/etc/hosts", posixPathFlavor)).toBe(
         "/etc/hosts",
       );
+    });
+
+    test("bare-slash token (filesystem root) → returned as-is", () => {
+      // Root is a path-shaped token via `hasPathSeparator`; a `path` rule for
+      // `/` must be able to match it, same as any other absolute (#583).
+      expect(classifyTokenAsRuleCandidate("/", posixPathFlavor)).toBe("/");
+      expect(classifyTokenAsRuleCandidate("//", posixPathFlavor)).toBe("//");
     });
 
     test("home-relative path (starts with ~/) → returned as-is", () => {

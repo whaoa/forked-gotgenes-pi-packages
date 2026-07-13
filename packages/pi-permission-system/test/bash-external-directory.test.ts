@@ -310,52 +310,51 @@ describe("extractExternalPathsFromBashCommand", () => {
     });
   });
 
-  describe("bare-slash tokens are skipped", () => {
-    test("does not flag // token", async () => {
-      const result = await extractExternalPathsFromBashCommand("echo //", cwd);
-      expect(result).toHaveLength(0);
+  describe("bare-slash tokens resolve to external root", () => {
+    test("find / scans the whole filesystem → flags root (#583)", async () => {
+      const result = await extractExternalPathsFromBashCommand("find /", cwd);
+      expect(result).toEqual(["/"]);
     });
 
-    test("does not flag / token", async () => {
+    test("find / with search predicates → flags root (#583)", async () => {
+      const result = await extractExternalPathsFromBashCommand(
+        'find / -path "*/pi-coding-agent/*.d.ts"',
+        cwd,
+      );
+      expect(result).toContain("/");
+    });
+
+    test("bare / token → flags root", async () => {
       const result = await extractExternalPathsFromBashCommand("echo /", cwd);
-      expect(result).toHaveLength(0);
+      expect(result).toEqual(["/"]);
     });
 
-    test("does not flag /// token", async () => {
+    test("bare // token normalizes to root", async () => {
+      const result = await extractExternalPathsFromBashCommand("echo //", cwd);
+      expect(result).toEqual(["/"]);
+    });
+
+    test("bare /// token normalizes to root", async () => {
       const result = await extractExternalPathsFromBashCommand("echo ///", cwd);
-      expect(result).toHaveLength(0);
+      expect(result).toEqual(["/"]);
     });
 
-    test("does not flag // in echo with other args", async () => {
+    test("bare / among other args → flags root once", async () => {
       const result = await extractExternalPathsFromBashCommand(
         "echo // hello",
         cwd,
       );
-      expect(result).toHaveLength(0);
+      expect(result).toEqual(["/"]);
     });
 
-    test("bare-slash guard is still needed: tree-sitter emits / as a word node", async () => {
-      // tree-sitter parses 'echo /' with '/' as a word argument node.
-      // classifyTokenAsPathCandidate must still reject it.
-      // This test documents that the /^\/+$/ guard remains a necessary
-      // defense-in-depth layer even with tree-sitter as the parser.
-      const result = await extractExternalPathsFromBashCommand("echo /", cwd);
-      expect(result).toHaveLength(0);
-    });
-
-    test("bare double-slash guard with tree-sitter", async () => {
-      // tree-sitter also emits '//' as a word node — guard must reject it.
-      const result = await extractExternalPathsFromBashCommand("echo //", cwd);
-      expect(result).toHaveLength(0);
-    });
-
-    test("still flags real external path alongside //", async () => {
+    test("flags root alongside another external path", async () => {
       const result = await extractExternalPathsFromBashCommand(
         "cat /etc/hosts; echo //",
         cwd,
       );
       expect(result).toContain("/etc/hosts");
-      expect(result).toHaveLength(1);
+      expect(result).toContain("/");
+      expect(result).toHaveLength(2);
     });
   });
 
