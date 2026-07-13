@@ -101,18 +101,55 @@ export class BashPathResolver {
   constructor(
     private readonly normalizer: PathNormalizer,
     private readonly isPromotablePathToken: PathRuleTokenMatcher = NO_PROMOTION,
+    private readonly workdir?: string,
   ) {}
 
   /**
    * Resolve a parsed bash program's path references into its external-path and
    * rule-candidate slices, walking the AST exactly once.
+   *
+   * When a `workdir` is set (an aliased shell tool's working directory, #574),
+   * it seeds the initial effective base — as if the program were prefixed with
+   * `cd <workdir>` — so relative tokens resolve against it, and the `workdir`
+   * itself is added to the external paths when it resolves outside the cwd.
+   * Containment is always measured against the session cwd baked into the
+   * normalizer, so a `workdir` outside the cwd does not widen the sandbox.
    */
   resolve(rootNode: TSNode): ResolvedBashPaths {
-    const candidates = this.collectPathCandidates(rootNode);
+    const initialBase =
+      this.workdir === undefined
+        ? CWD_BASE
+        : this.deriveBaseFromCdTarget(CWD_BASE, this.workdir);
+    const candidates = this.collectPathCandidates(rootNode, initialBase);
     return {
-      externalPaths: this.projectExternalPaths(candidates),
+      externalPaths: this.withWorkdirExternal(
+        this.projectExternalPaths(candidates),
+      ),
       ruleCandidates: this.projectRuleCandidates(candidates),
     };
+  }
+
+  /**
+   * Prepend the `workdir`'s own {@link AccessPath} to the external paths when it
+   * resolves outside the cwd. A real `cd /etc` flags `/etc` via its argument
+   * token; the seeded base carries no such token, so it is added explicitly and
+   * deduplicated against the command's own external tokens (#574).
+   */
+  private withWorkdirExternal(
+    tokenExternals: readonly AccessPath[],
+  ): AccessPath[] {
+    if (this.workdir === undefined) return [...tokenExternals];
+    const wdPath = this.normalizer.forBashToken(this.workdir);
+    const canonical = wdPath.boundaryValue();
+    const isExternal = canonical
+      ? this.normalizer.isBoundaryOutsideWorkingDirectory(canonical)
+      : true;
+    if (!isExternal) return [...tokenExternals];
+    const key = canonical || wdPath.value();
+    const alreadyPresent = tokenExternals.some(
+      (p) => (p.boundaryValue() || p.value()) === key,
+    );
+    return alreadyPresent ? [...tokenExternals] : [wdPath, ...tokenExternals];
   }
 
   // ── AST walk — collect PathCandidates ──────────────────────────────────
@@ -129,9 +166,12 @@ export class BashPathResolver {
    * inherit the enclosing base without folding their own `cd`s (a conservative
    * first tier).
    */
-  private collectPathCandidates(rootNode: TSNode): PathCandidate[] {
+  private collectPathCandidates(
+    rootNode: TSNode,
+    initialBase: EffectiveBase,
+  ): PathCandidate[] {
     const out: PathCandidate[] = [];
-    this.walkForCandidates(rootNode, CWD_BASE, out);
+    this.walkForCandidates(rootNode, initialBase, out);
     return out;
   }
 

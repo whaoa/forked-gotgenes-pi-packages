@@ -832,4 +832,97 @@ describe("BashProgram", () => {
     expect(external).toContain("/etc/hosts");
     expect(external).not.toContain(".env");
   });
+
+  describe("workdir seed (#574)", () => {
+    const cwd = "/projects/my-app";
+    const normalizer = new PathNormalizer(
+      pathFlavorForPlatform(process.platform),
+      cwd,
+    );
+
+    beforeEach(() => {
+      realpathSync.mockReset();
+      realpathSync.mockImplementation((p: string) => p);
+    });
+
+    it("flags an absolute workdir outside cwd as an external path", async () => {
+      const program = await BashProgram.parse(
+        "echo hi",
+        normalizer,
+        undefined,
+        {
+          workdir: "/etc",
+        },
+      );
+      expect(program.externalPaths().map((p) => p.value())).toContain("/etc");
+    });
+
+    it("resolves a relative token against the workdir base", async () => {
+      const program = await BashProgram.parse(
+        "cat ../secret.txt",
+        normalizer,
+        undefined,
+        { workdir: "/etc" },
+      );
+      const external = program.externalPaths().map((p) => p.value());
+      // ../secret.txt resolves against /etc, not cwd.
+      expect(external).toContain("/secret.txt");
+      expect(external).toContain("/etc");
+    });
+
+    it("keeps an absolute token base-independent under a workdir", async () => {
+      const program = await BashProgram.parse(
+        "cat /var/log/syslog",
+        normalizer,
+        undefined,
+        { workdir: "/etc" },
+      );
+      const external = program.externalPaths().map((p) => p.value());
+      expect(external).toContain("/var/log/syslog");
+      expect(external).not.toContain("/etc/var/log/syslog");
+    });
+
+    it("does not flag a workdir inside cwd, and resolves relative tokens under it", async () => {
+      const program = await BashProgram.parse(
+        "cat ../secret.txt",
+        normalizer,
+        undefined,
+        { workdir: "sub" },
+      );
+      // ../secret.txt from cwd/sub resolves back to cwd/secret.txt (internal),
+      // and the workdir sub is inside cwd — nothing is external.
+      expect(program.externalPaths()).toEqual([]);
+    });
+
+    it("resolves a relative path-rule candidate against the workdir base", async () => {
+      const program = await BashProgram.parse(
+        "cat sub/file.txt",
+        normalizer,
+        undefined,
+        { workdir: "/work" },
+      );
+      const candidate = program
+        .pathRuleCandidates()
+        .find(({ token }) => token === "sub/file.txt");
+      expect(candidate?.path.matchValues()).toContain("/work/sub/file.txt");
+    });
+
+    it("reproduces cwd-based resolution when no workdir is given", async () => {
+      const program = await BashProgram.parse("cat ../secret.txt", normalizer);
+      // ../secret.txt from cwd resolves against the parent of cwd.
+      expect(program.externalPaths().map((p) => p.value())).toContain(
+        "/projects/secret.txt",
+      );
+    });
+
+    it("applies Git Bash drive-mount semantics to a win32 workdir", async () => {
+      const win = new PathNormalizer(win32PathFlavor, "C:\\projects\\app");
+      const program = await BashProgram.parse("echo hi", win, undefined, {
+        workdir: "/c/work",
+      });
+      // /c/work is the MSYS mount for C:\work — outside the cwd, so flagged.
+      const external = program.externalPaths().map((p) => p.value());
+      expect(external.some((v) => v.toLowerCase().includes("work"))).toBe(true);
+    });
+  });
 });

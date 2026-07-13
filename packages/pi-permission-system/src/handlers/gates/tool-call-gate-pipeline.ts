@@ -91,13 +91,13 @@ export class ToolCallGatePipeline {
       tcc.input,
       this.inputs.getShellToolAliases(),
     );
-    const command = shell?.command ?? null;
     const normalizer = this.inputs.getPathNormalizer();
-    const bashProgram = command
+    const bashProgram = shell?.command
       ? await BashProgram.parse(
-          command,
+          shell.command,
           normalizer,
           this.inputs.getPromotablePathTokenMatcher(tcc.agentName ?? undefined),
+          { workdir: shell.workdir },
         )
       : null;
 

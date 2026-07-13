@@ -45,11 +45,17 @@ export class BashProgram {
    * specific `path` deny/ask rule (#509). Defaults to promoting nothing, so
    * callers that only read `externalPaths()` (e.g. `bash-path-extractor.ts`)
    * are unaffected.
+   *
+   * `options.workdir`, when supplied (an aliased shell tool's working directory,
+   * #574), seeds the initial effective base — as if the command were prefixed
+   * with `cd <workdir>` — so relative tokens resolve against it, and the workdir
+   * itself is flagged as external when it resolves outside the cwd.
    */
   static async parse(
     command: string,
     normalizer: PathNormalizer,
     isPromotablePathToken?: PathRuleTokenMatcher,
+    options?: { workdir?: string },
   ): Promise<BashProgram> {
     const parser = await getParser();
     const tree = parser.parse(command);
@@ -59,6 +65,7 @@ export class BashProgram {
       const { externalPaths, ruleCandidates } = new BashPathResolver(
         normalizer,
         isPromotablePathToken,
+        options?.workdir,
       ).resolve(tree.rootNode);
       return new BashProgram(
         command,

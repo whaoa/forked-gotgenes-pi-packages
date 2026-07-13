@@ -188,6 +188,7 @@ describe("ToolCallGatePipeline", () => {
         "echo hello",
         expect.any(PathNormalizer),
         expect.any(Function),
+        { workdir: undefined },
       );
     });
 
@@ -227,6 +228,7 @@ describe("ToolCallGatePipeline", () => {
         "cat id_rsa",
         expect.any(PathNormalizer),
         isPromotable,
+        { workdir: undefined },
       );
     });
   });
@@ -264,6 +266,31 @@ describe("ToolCallGatePipeline", () => {
         "npm install",
         expect.any(PathNormalizer),
         expect.any(Function),
+        { workdir: undefined },
+      );
+    });
+
+    it("threads the aliased workdir argument into BashProgram.parse (#574)", async () => {
+      const inputs = makeGateInputs({
+        getShellToolAliases: () => execAliases,
+      });
+      const resolver = makeResolver(makeCheckResult());
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      await pipeline.evaluate(
+        makeTcc({
+          toolName: "exec_command",
+          input: { cmd: "cat file", workdir: "/etc" },
+        }),
+        runner,
+      );
+
+      expect(mockBashProgramParse).toHaveBeenCalledWith(
+        "cat file",
+        expect.any(PathNormalizer),
+        expect.any(Function),
+        { workdir: "/etc" },
       );
     });
 

@@ -11,6 +11,7 @@ import {
   makeBashCommandCheck,
   makeCtx,
   makeHandler,
+  makeSurfaceCheck,
   makeToolCallEvent,
 } from "#test/helpers/handler-fixtures";
 
@@ -95,6 +96,36 @@ describe("shell-tool alias gating (#574)", () => {
     expect(decisions).toContainEqual(
       expect.objectContaining({
         surface: "bash",
+        result: "deny",
+        resolution: "policy_deny",
+      }),
+    );
+  });
+
+  it("gates an aliased tool's workdir and its relative tokens via external_directory", async () => {
+    const { handler, events } = makeHandler({
+      shellTools: execShellTools,
+      tools: ["exec_command"],
+      session: {
+        checkPermission: makeSurfaceCheck(
+          { external_directory: { state: "deny", matchedPattern: "*" } },
+          { state: "allow" },
+        ),
+      },
+    });
+
+    // workdir /etc is outside the cwd; the relative token resolves against it.
+    await handler.handleToolCall(
+      makeToolCallEvent("exec_command", {
+        input: { cmd: "cat ../secret.txt", workdir: "/etc" },
+      }),
+      makeCtx(),
+    );
+
+    const decisions = getDecisionEvents(events);
+    expect(decisions).toContainEqual(
+      expect.objectContaining({
+        surface: "external_directory",
         result: "deny",
         resolution: "policy_deny",
       }),
