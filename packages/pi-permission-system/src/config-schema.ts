@@ -222,9 +222,6 @@ export type PatternValue = z.infer<typeof patternValueSchema>;
 /** The on-disk permission shape inside the `"permission"` key. */
 export type FlatPermissionConfig = z.infer<typeof permissionSchema>;
 
-/** A single shell-aliased tool's field mapping. */
-export type ShellToolAlias = z.infer<typeof shellToolAliasSchema>;
-
 /** The `shellTools` map: tool name → shell-alias field mapping. */
 export type ShellToolsConfig = z.infer<typeof shellToolsSchema>;
 
