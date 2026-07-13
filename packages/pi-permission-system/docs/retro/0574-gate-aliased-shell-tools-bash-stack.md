@@ -37,3 +37,35 @@ Produced a 5-cycle plan (`0574-gate-aliased-shell-tools-bash-stack.md`) routing 
   Traced in step 3; no follow-up filed pre-emptively.
 - **Release:** ship now — batch tail; landing Step 3 cuts the release carrying both the deferred `#580` `feat:` and this step's `feat:` commits.
   Next step: `/tdd-plan` (this plan has test cycles).
+
+## Stage: Implementation — TDD (2026-07-13T18:20:00Z)
+
+### Session summary
+
+Implemented all five planned TDD cycles plus one preparatory refactor, landing the shell-tool aliasing enforcement: `resolveShellInvocation` dispatch point, `BashProgram` owning its source command, pipeline consumption, full `workdir` parity, and docs/roadmap.
+Test count `2387 → 2418` (+31); `pnpm run check`, root `pnpm run lint`, and `pnpm fallow dead-code` all green.
+Pre-completion reviewer: **WARN** (no FAILs) — both warnings addressed with fast-follow commits before shipping.
+
+### Observations
+
+- **Mid-implementation design pivot (operator-prompted): dropped the `command` parameter for `BashProgram.commandText()`.**
+  The plan's step 2 threaded a `command` parameter into the two bash gates.
+  The operator flagged that `command` is redundant state — a projection of the shell invocation that always co-travels with `bashProgram` (the parsed form of the *same* command).
+  The right collaborator is `BashProgram` itself (it is constructed from the command), so it now exposes `commandText()` and the gates read it, dropping the parameter.
+  Since step 2 was unpushed, I `git reset --mixed HEAD~1` to drop it and folded the mechanism into the step-3 feat.
+  Net: the two bash gates kept their original `(tcc, bashProgram, resolver)` signature (no churn, native-bash regression suites unmodified), and the redundant-param smell never shipped.
+- **`workdir` needed almost no rearchitecture** — as the plan predicted, `PathNormalizer` already separates the containment boundary (baked session cwd) from the resolve base (per-token walk offset), so `workdir` is "an implicit leading `cd <workdir>`": seed the walk's initial `EffectiveBase` (reusing the `deriveBaseFromCdTarget` helper the prep refactor extracted from `foldCd`) and add the workdir's own `AccessPath` to the external set when outside cwd.
+  Containment stays measured against the session cwd, so a workdir outside cwd cannot widen the sandbox — pinned by tests asserting both the workdir and a relative token resolve/flag correctly.
+- **Deviations from the plan's Module-Level Changes** (all sound, not gaps):
+  - `input-normalizer.ts` and `tool-input-path.ts` were **not** modified — the open question resolved to "not needed": the enforcement path is the gate pipeline (which consults `resolveShellInvocation` directly), and the advisory service (`bash-advisory-check.ts`) resolves `bash` by explicit command string, so neither sees an aliased `(toolName, input)`.
+  - `helpers.ts` (`deriveDecisionValue`) was **not** modified — `tool.ts`'s `describeToolGate` threads the effective `bash` `gateSurface` into it, so no change was needed there.
+  - `config/config.example.json` was **not** modified — the `shellTools` block already shipped in `#580`.
+  - `ShellToolAlias` was **not** reintroduced (the plan's Non-Goal suggested it) — `resolveShellInvocation` uses indexed access on `ShellToolsConfig`, so a named export would have re-tripped the `#580` speculative-export/`fallow` trap.
+- **Pre-completion WARNs, both addressed before shipping:**
+  1. The plan promised aliased-tool cases for the `#490`/`#481` wrapper-flooring and `#452` fail-closed security invariants, which were missing (they held structurally via shared `resolveBashCommandCheck`).
+     Added two integration tests (`sudo` → `<indirection-bash-wrapper>`, `bash -c` → `<opaque-bash-wrapper>`) through the real parse (`d7d19d2e`), so a future `toolName === "bash"` special-case in the flooring path is caught.
+  2. The package skill was silent on the new dispatch point — added a `shellTools`/`resolveShellInvocation` gate-parity paragraph (`c6881403`).
+- **Parallel-session interaction:** a peer session landed `#583` retro notes on shared `main` between my prep refactor and step 1; my prep refactor rode onto `origin/main` via that push, leaving five unpushed commits.
+  History stayed linear; no conflict.
+- **Release:** ship now — batch "shell-tool-aliases" tail; landing this cuts the release carrying both the deferred `#580` `feat:` and this issue's `feat:` commits.
+  Next step: `/ship-issue`.
