@@ -115,7 +115,7 @@ The native `bash` tool goes through the full bash enforcement stack: command dec
 Some extensions replace `bash` with a differently-named tool — for example [`@howaboua/pi-codex-conversion`](https://github.com/IgorWarzocha/howaboua-pi-stuff) registers `exec_command`, which carries the shell command in a `cmd` argument and an optional working directory in `workdir`.
 Without a hint, the permission system cannot tell that such a tool is really a shell, so it gates it as a generic extension tool and the bash rules never apply.
 
-`shellTools` records that hint.
+`shellTools` records that hint, and an aliased tool is then gated at full parity with native `bash` — command decomposition, wrapper flooring, path and external-directory token gates, and `bash:` rules — with the invoked tool name preserved in the review log.
 Each key is a tool name; its value maps the tool's input arguments (the keys of the tool call's `arguments` object):
 
 ```jsonc
@@ -131,14 +131,14 @@ Each key is a tool name; its value maps the tool's input arguments (the keys of 
 | `commandArgument` | yes      | The tool's input argument holding the shell command string (e.g. `cmd`).  |
 | `workdirArgument` | no       | The tool's input argument holding the working directory (e.g. `workdir`). |
 
+When `workdirArgument` is set, the tool's working directory is the base the command's relative paths resolve against, and the working directory itself is gated by `external_directory` when it falls outside the session's working directory.
+
 Merge semantics: `shellTools` **shallow-merges by tool name** across global → project.
 A project entry overrides a specific tool's mapping on a key collision but never drops a global entry — so adding a project-scoped alias cannot silently remove enforcement for a tool the global config already covers.
 To change a specific tool's mapping, set that tool's key at the project scope (the alias object is replaced wholesale, not deep-merged).
 
 `shellTools` only ever *tightens* enforcement and is inert when the named tool is not registered in the current session.
 Opting a project out of a shell-aliasing extension is a package-disable concern, not a `shellTools` edit.
-
-> **Note:** `shellTools` records the alias; the enforcement wiring that consumes it is tracked in [#574](https://github.com/gotgenes/pi-packages/issues/574).
 
 ---
 

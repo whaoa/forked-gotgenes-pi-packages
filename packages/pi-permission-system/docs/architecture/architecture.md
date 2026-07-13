@@ -923,13 +923,15 @@ Release: independent
 
 Release: batch "shell-tool-aliases"
 
-#### Step 3: Gate aliased shell invocations through the bash stack ([#574])
+#### ✅ Step 3: Gate aliased shell invocations through the bash stack ([#574])
 
 **Cause:** same cause as Step 2, consumed: once the alias is recorded, the dispatch point must route an aliased invocation through the same enforcement the native bash tool gets — otherwise "what is being accessed" still depends on which toolset is active ([#574]).
 
 - **Smell:** Category C / F.
-- **Target:** `src/access-intent/tool-kind.ts` (alias-aware classification consult, keeping one dispatch point), `src/handlers/gates/tool-call-gate-pipeline.ts` (parse the mapped command field into the shared `BashProgram`; run the bash gates), `src/access-intent/input-normalizer.ts` + `src/access-intent/tool-input-path.ts` (aliased command/workdir extraction), `src/permission-session.ts` (alias lookup exposed via `ToolCallGateInputs`), gate-parity tests.
+- **Target:** `src/access-intent/tool-kind.ts` (`resolveShellInvocation` — the single dispatch point deciding "is this a shell, and what is its command + workdir?"
+  for native bash and aliased tools alike), `src/access-intent/bash/program.ts` + `bash-path-resolver.ts` (`BashProgram` owns its source command via `commandText()`; a `workdir` seeds the path-walk base and is flagged external), `src/handlers/gates/tool-call-gate-pipeline.ts` + `bash-path.ts` + `bash-external-directory.ts` (consume the resolved command from `BashProgram`, no re-derived `input.command`), `src/handlers/gates/tool.ts` (bash-surface presentation for aliased tools, tool name preserved in logs), `src/permission-session.ts` (`getShellToolAliases` via `ToolCallGateInputs`), gate-parity + integration tests.
 - **Outcome:** with `shellTools: { "exec_command": { "commandArgument": "cmd", "workdirArgument": "workdir" } }`, an `exec_command` call gets command decomposition, wrapper flooring, bash path + external-directory token gates, and `bash:` rules at parity with native bash (including the `<unparseable-bash-command>` fail-closed sentinel); `workdir` is the effective base for relative tokens and is itself gated by `external_directory` when outside the session cwd; the review log records both the invoked tool name and the effective command.
+- **Landed:** the `command`-vs-`bashProgram` redundancy was collapsed by giving `BashProgram` its source command (`commandText()`) rather than threading a separate `command` parameter; `input-normalizer.ts`/`tool-input-path.ts` were left untouched — the enforcement path is the gate pipeline (which consults `resolveShellInvocation` directly), and the advisory service resolves `bash` by explicit command string, so neither needed alias-awareness.
 - **Impact 5 / Risk 3 / Priority 15.**
 
 Release: batch "shell-tool-aliases"
@@ -985,7 +987,7 @@ Release: independent
 flowchart TD
     S1["✅ Step 1: Move access-intent stragglers (#579)"]
     S2["✅ Step 2: shellTools alias config model (#580)"]
-    S3["Step 3: Bash-stack gating for aliased shell tools (#574)"]
+    S3["✅ Step 3: Bash-stack gating for aliased shell tools (#574)"]
     S4["Step 4: Inline keybind permission dialog (#573)"]
     S5["Step 5: Containment unification (#571)"]
     S6["Step 6: Indirection-wrapper survey (#575)"]
