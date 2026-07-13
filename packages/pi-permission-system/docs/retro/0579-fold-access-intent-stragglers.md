@@ -23,4 +23,19 @@ Produced a two-step plan at `docs/plans/0579-fold-access-intent-stragglers.md` �
 - Release is `independent` (not in the `shell-tool-aliases` batch); as a `refactor:` it auto-batches into the next release rather than cutting one.
 - Next stage is `/build-plan` (code-touching but test-cycle-free — no red cycle, the relocated suites are the regression guard), which brackets with the `tidy-first-assessor` and `pre-completion-reviewer` subagents.
 
+## Stage: Implementation — Build (2026-07-13T12:10:00Z)
+
+### Session summary
+
+Executed both plan steps: Step 1 `git mv`'d the four modules into `src/access-intent/` and their four test files into `test/access-intent/`, rewriting the moved modules' imports, all eleven source importers, and all five test imports in one atomic `refactor:` commit; Step 2 relocated the four entries in the `architecture.md` module-layout tree, updated the two prose lines and the `SKILL.md` path, and marked Phase 11 Step 1 complete (`✅` on the step heading and Mermaid `S1` node) in a `docs:` commit.
+All deterministic checks passed: `tsc` clean, `pnpm run lint` clean, full suite green (120 files / 2374 tests), `fallow dead-code` clean, and the flat `src/` root module count dropped 60 → 56 as planned.
+
+### Observations
+
+- The `tidy-first-assessor` returned "no preparatory tidying warranted" — a pure `git mv` + import-specifier rewrite over a fully enumerated, non-cyclic, barrel-free import graph has no structural friction to prepare for; it explicitly rejected internal-cleanup candidates (stepdown reordering, test splitting, shared-helper extraction) as scope creep.
+- `git` tracked all eight moves as renames (`R`), preserving history/blame; the plan's exhaustive importer enumeration matched reality exactly — no missed importer, no dynamic/string reference.
+- One intentional deviation from the plan (disclosed in the Step 2 commit body): the `access-intent/` directory-header line was also extended to record the four-module relocation for provenance, beyond the plan's literal "descriptions unchanged" tree-relocation scope.
+- All three at-risk invariants held: ADR-0002 string boundary (`permission-manager.ts` `AccessPath`-free), `tool-kind.ts` `AccessPath`-free (sole import `PATH_BEARING_TOOLS` now a `./path-surfaces` sibling), and the interior `process.platform` ban — each still lint- and test-pinned.
+- Pre-completion reviewer: PASS (ready for `/ship-issue`); no WARN findings.
+
 [#559]: https://github.com/gotgenes/pi-packages/issues/559
