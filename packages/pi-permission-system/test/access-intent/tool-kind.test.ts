@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { PATH_BEARING_TOOLS } from "#src/access-intent/path-surfaces";
-import { classifyToolKind, isMcpCheck } from "#src/access-intent/tool-kind";
+import {
+  classifyToolKind,
+  isMcpCheck,
+  resolveShellInvocation,
+} from "#src/access-intent/tool-kind";
+import type { ShellToolsConfig } from "#src/config-schema";
 
 describe("classifyToolKind", () => {
   test("classifies bash", () => {
@@ -62,5 +67,117 @@ describe("isMcpCheck", () => {
   test("is false for a plain tool check", () => {
     expect(isMcpCheck({ toolName: "read", source: "tool" })).toBe(false);
     expect(isMcpCheck({ toolName: "task", source: "default" })).toBe(false);
+  });
+});
+
+describe("resolveShellInvocation", () => {
+  const execAlias: ShellToolsConfig = {
+    exec_command: { commandArgument: "cmd", workdirArgument: "workdir" },
+  };
+
+  describe("native bash", () => {
+    test("extracts the command with no workdir", () => {
+      expect(
+        resolveShellInvocation("bash", { command: "git status" }, undefined),
+      ).toEqual({ command: "git status", workdir: undefined });
+    });
+
+    test("trims the command", () => {
+      expect(
+        resolveShellInvocation(
+          "bash",
+          { command: "  git status  " },
+          undefined,
+        ),
+      ).toEqual({ command: "git status", workdir: undefined });
+    });
+
+    test("yields an empty command when absent or non-string", () => {
+      expect(resolveShellInvocation("bash", {}, undefined)).toEqual({
+        command: "",
+        workdir: undefined,
+      });
+      expect(
+        resolveShellInvocation("bash", { command: 42 }, undefined),
+      ).toEqual({ command: "", workdir: undefined });
+    });
+
+    test("resolves regardless of the shellTools map", () => {
+      expect(
+        resolveShellInvocation("bash", { command: "ls" }, execAlias),
+      ).toEqual({ command: "ls", workdir: undefined });
+    });
+  });
+
+  describe("aliased shell tool", () => {
+    test("extracts command and workdir from the mapped arguments", () => {
+      expect(
+        resolveShellInvocation(
+          "exec_command",
+          { cmd: "npm install", workdir: "/etc" },
+          execAlias,
+        ),
+      ).toEqual({ command: "npm install", workdir: "/etc" });
+    });
+
+    test("omits workdir when the alias declares no workdirArgument", () => {
+      const aliases: ShellToolsConfig = {
+        exec_command: { commandArgument: "cmd" },
+      };
+      expect(
+        resolveShellInvocation(
+          "exec_command",
+          { cmd: "npm install", workdir: "/etc" },
+          aliases,
+        ),
+      ).toEqual({ command: "npm install", workdir: undefined });
+    });
+
+    test("omits workdir when the mapped workdir argument is absent", () => {
+      expect(
+        resolveShellInvocation(
+          "exec_command",
+          { cmd: "npm install" },
+          execAlias,
+        ),
+      ).toEqual({ command: "npm install", workdir: undefined });
+    });
+
+    test("yields an empty command when the mapped command argument is absent", () => {
+      expect(
+        resolveShellInvocation("exec_command", { workdir: "/etc" }, execAlias),
+      ).toEqual({ command: "", workdir: "/etc" });
+    });
+
+    test("trims the extracted command and workdir", () => {
+      expect(
+        resolveShellInvocation(
+          "exec_command",
+          { cmd: "  npm install  ", workdir: "  /etc  " },
+          execAlias,
+        ),
+      ).toEqual({ command: "npm install", workdir: "/etc" });
+    });
+  });
+
+  describe("non-shell tools", () => {
+    test("returns null for an unaliased extension tool", () => {
+      expect(
+        resolveShellInvocation(
+          "exec_command",
+          { cmd: "npm install" },
+          undefined,
+        ),
+      ).toBeNull();
+      expect(
+        resolveShellInvocation("read", { path: "a.txt" }, execAlias),
+      ).toBeNull();
+    });
+
+    test("returns null when the map names a different tool", () => {
+      expect(
+        resolveShellInvocation("other_tool", { cmd: "npm install" }, execAlias),
+      ).toBeNull();
+    });
   });
 });
