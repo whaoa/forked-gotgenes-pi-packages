@@ -78,9 +78,17 @@ For each imported module, note:
 ### 7. Group into issue-sized steps with a dependency graph
 
 Nine steps is a ceiling, not a target — a phase may have one step, or none.
-If discovery surfaced no cause-level finding (Category A–C) and the candidates are polish-only (Category B unit-size, D, E symptoms), say so and present **defer** and **lean phase** as first-class `ask_user` options rather than manufacturing a full phase.
-When the architecture doc's declared target is complete and discovery yields only polish, the fired gate is the improvement process reaching its intended terminal state — report it as success, not as a failure to find work.
-The next phase's trigger is then a new cause (a feature's structural needs, a bug cluster, a newly named concept), not the calendar.
+If discovery surfaced no cause-level finding (Category A–C) and the candidates are polish-only (Category B unit-size, D, E, G symptoms), do not manufacture a full phase — but split the "polish" verdict before defaulting to defer:
+
+- **Scattered trivia** (isolated findings across cold, low-churn files) → **defer**.
+  A phase step is an _area_, not a scattered list; a rename here and a split there is boy-scout-rule work for the implementation prompts (`/tdd-plan`, `/build-plan` via the `tidy-first` skill), not a planned phase.
+- **Concentrated quality/test debt in a hot area** (3+ findings clustered in one churn hotspot or one oversized test file) → a legitimate **craftsmanship lean phase**, whose spine is "pay down concentrated debt in `<area>`."
+  This is Beck/Metz craftsmanship, not filler: a hot file whose test-design or naming debt taxes every change earns a focused phase the same way a coupling flaw does.
+  Present it as a first-class `ask_user` option alongside defer.
+
+The `craftsmanship-scout` inventory drives this split: it flags each cluster **concentrated** vs. **scattered** so the gate is evidence-based, not a guess.
+When the architecture doc's declared target is complete _and_ the scout finds only scattered trivia, the fired gate is the improvement process reaching its intended terminal state — report it as success, not as a failure to find work.
+The next phase's trigger is then a new cause (a feature's structural needs, a bug cluster, a newly named concept, or concentrated craftsmanship debt), not the calendar.
 Before committing any step whose outcome depends on the SDK/type surface, feasibility-probe it — confirm the named type or export exists in the real surface before promising the outcome.
 
 ## Smell taxonomy
@@ -148,6 +156,21 @@ They are ordered from most impactful (structural) to least (cosmetic).
 | Outbound bridge to known consumer | Package reaches out to a specific consumer via bridge module    | Invert: emit events, let consumer hook in                                         |
 | Feature disguised as lifecycle    | Config field claims lifecycle control but only filters post-hoc | Remove the disguise; move the policy to the package that owns enforcement         |
 | Blunt instrument                  | Boolean kills an entire subsystem when granular control exists  | Remove the blunt flag; use the granular system (e.g., per-tool deny vs. no-tools) |
+
+### Category G: Test design (Test-Driven Design)
+
+Category D is about _production_ testability (can the object be constructed and injected).
+Category G is about the _test code itself_ as a first-class design artifact — the London/Chicago-school premise that a test's shape is design feedback, not a chore.
+`fallow` is blind to all of it (a giant test body is just a large function to it); the `craftsmanship-scout` subagent (read, don't grep, the largest test files) is the detector.
+
+| Signal                     | Evidence                                                                             | Typical fix                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Giant test body            | One `it`/`test` arrow spanning 100s of lines                                         | Split into behavior-named cases; one behavior per test           |
+| Test-per-method            | `describe("resolve")` asserting mechanics, not `it("denies …")`                      | Rename around behavior; the contract, not the shape              |
+| Over-mocking               | A test stubs 10+ methods to exercise one, or mocks a real-constructible collaborator | Narrow the production interface (ISP); construct the real object |
+| Assert-on-implementation   | `mock.calls[0]![0]`, private-state reach-through, incidental order                   | `toHaveBeenCalledWith`; assert on the observable outcome         |
+| Unclear arrange/act/assert | Setup, exercise, verification interleaved                                            | One clear AAA per test; extract setup to a fixture               |
+| Missing behavior coverage  | A public behavior untested, or only the happy path                                   | Add edge/boundary/error cases where the risk lives               |
 
 ## Prioritization framework
 

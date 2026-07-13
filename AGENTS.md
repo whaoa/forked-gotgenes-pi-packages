@@ -62,6 +62,7 @@ The standard flow is:
 
 1. `/plan-issue #N` — read the issue, explore the codebase, produce a numbered plan, commit it.
 2. `/tdd-plan` or `/build-plan` — execute the plan (TDD for code changes, build for docs/config).
+   Two fresh-context subagents bracket the implementation: a `tidy-first-assessor` at the **start** (after the green baseline, before the first change) proposes preparatory refactorings that make the change easy (Kent Beck's Tidy First), and a `pre-completion-reviewer` at the **end** runs the quality gate.
 3. Pre-completion review — dispatched automatically at the end of step 2; a fresh-context `pre-completion-reviewer` subagent runs deterministic checks and a judgment checklist before recommending `/ship-issue`.
 4. `/ship-issue #N` — push, verify CI, close the issue, merge the release-please PR.
 5. `/retro` — review the session(s) for workflow improvements, persist retro notes.
@@ -200,6 +201,20 @@ The `pre-completion-reviewer` agent (`.pi/agents/pre-completion-reviewer.md`) is
 It runs as a fresh-context subagent (no implementation bias) and produces a PASS / WARN / FAIL report covering: deterministic checks (`pnpm run check`, `pnpm run lint`, `pnpm run test`, `pnpm fallow dead-code`), acceptance criteria verification, conventional commits, documentation staleness, code design, test artifacts, Mermaid diagrams, cross-step invariant preservation (a later phase step must not regress an earlier step's documented `Outcome:` invariant), and planned follow-up filing (a follow-up the plan names must carry a recorded issue number).
 The `pre-completion` skill (`.pi/skills/pre-completion/SKILL.md`) encodes the dispatch protocol loaded by both templates.
 The agent's `model:` frontmatter must use the `provider/id` alias form the Pi CLI/UI accepts (e.g. `anthropic/claude-sonnet-4-6`); an ID absent from the model registry silently falls back to the parent session's model.
+
+### Craftsmanship subagents
+
+Two read-only subagents carry the micro / craftsmanship lens (SOLID at the method scale, Test-Driven **Design**, self-documenting code) so it is examined systematically rather than left to whoever has spare context:
+
+- `tidy-first-assessor` (`.pi/agents/tidy-first-assessor.md`) — dispatched at the **start** of `/tdd-plan` (and `/build-plan` for code-touching plans) via the `tidy-first` skill (`.pi/skills/tidy-first/SKILL.md`).
+  It reads the files the change will touch and proposes preparatory `refactor:`/`test:` commits that shrink the change (make the change easy, then make the easy change).
+  Advisory; the impl agent triages.
+  Strictly change-scoped — it must not propose tidying code the change will not touch.
+- `craftsmanship-scout` (`.pi/agents/craftsmanship-scout.md`) — dispatched during `/plan-improvements` discovery (Step 5).
+  It **opens** (does not grep) the largest test files and sweeps method-level design, naming, and test-code quality (taxonomy Category G) into a scored debt inventory, flagging each cluster concentrated vs. scattered.
+  The concentrated/scattered split drives the deferral gate: concentrated debt in a hot area is a legitimate craftsmanship lean phase; scattered trivia defers to the `tidy-first` boy-scout path.
+
+Both use the same `provider/id` model-alias rule as the reviewer above.
 
 Use `/retro-note` to capture quick observations mid-session without interrupting the workflow.
 Use `scripts/issue-context.sh <N>` to gather all available context for an issue (plan, retro, commits, branches) when bootstrapping a new session.

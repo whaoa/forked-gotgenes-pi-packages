@@ -84,12 +84,21 @@ Read `packages/$1/src/index.ts` and trace its dependency graph:
 - Note size, exports, fan-out, code smells
 - Pay special attention to: `as any` casts, adapter closure density, forward references, wide parameter lists, mixed responsibilities, anemic domain objects (data classes that a manager reaches into instead of telling), repeated discriminators (the same comparison re-evaluated across modules instead of decided once at a boundary)
 
-### Step 5: Read the tests as evidence of constructibility
+### Step 5: Read the tests as evidence of constructibility — and dispatch the craftsmanship scout
 
 `fallow`'s metrics miss god objects, closure density, and DIP violations.
-Read the largest test files and `test/helpers/`: module-level `vi.mock`, wide `as unknown as` casts, and multi-field fixtures (a `makeX` stubbing 10+ methods, or one mock passed to a constructor several times) mean the production object is hard to construct — a production smell, not a test-tree problem.
+Module-level `vi.mock`, wide `as unknown as` casts, and multi-field fixtures (a `makeX` stubbing 10+ methods, or one mock passed to a constructor several times) mean the production object is hard to construct — a production smell, not a test-tree problem.
 Do not accept the architecture doc's self-justification for a smell at face value; verify the claim against the code and tests.
 When the analysis touches handler wiring or shared interfaces, load the `design-review` skill before writing the plan.
+
+**Do not grade the tests by `grep`.**
+Counting `as unknown as` / `vi.mock` occurrences is not reading them — a documented failure mode of this prompt (an 880-line test body reads as "low cast count" and sails through).
+The micro lens (test-design quality as a first-class artifact — Category G — plus method-level SOLID, naming, stepdown, and comment quality) is expensive in context, so dispatch it to a subagent:
+
+- Dispatch the `craftsmanship-scout` subagent via the `subagent` tool: `subagent_type: "craftsmanship-scout"`, `description: "Craftsmanship scout for <PKG>"`, and a `prompt` naming the package, the largest test files (from the `fallow health` large-functions list), and the churn hotspots.
+- It **opens** the largest test files (not greps) and returns a **scored debt inventory**, flagging each cluster **concentrated** (a hot area worth a step) vs. **scattered** (defer).
+  Fold that inventory into your findings; its concentrated/scattered split drives the Step 8 deferral gate.
+- The scout is read-only and its context stays in the subagent — your context stays clear for the plan.
 
 ### Step 6: Assess file and directory organization against the domain
 
@@ -121,10 +130,16 @@ Nine steps is a **ceiling, not a target** — a phase may have one step, or none
 Identify dependency ordering and parallel tracks.
 
 **Deferral gate.**
-If discovery surfaced no cause-level finding (Category A–C — structural fusion, coupling/boundary flaws, dead subsystems) and the candidate list is polish-only (Category B unit-size, Category D, Category E symptoms), say so plainly and present **"defer"** and **"lean phase"** as first-class `ask_user` options alongside a full phase.
+If discovery surfaced no cause-level finding (Category A–C — structural fusion, coupling/boundary flaws, dead subsystems) and the candidate list is polish-only (Category B unit-size, Category D, Category E, Category G symptoms), do not manufacture a full phase — but split the "polish" verdict before defaulting to defer, using the craftsmanship scout's concentrated/scattered flags:
+
+- **Scattered trivia** (isolated findings across cold, low-churn files) → present **"defer"** as a first-class `ask_user` option.
+  This work belongs to the boy-scout rule in the implementation prompts (the `tidy-first` skill), not a planned phase.
+- **Concentrated quality/test debt in a hot area** (3+ scout findings clustered in one churn hotspot or one oversized test file) → present a **"craftsmanship lean phase"** (spine: "pay down concentrated debt in `<area>`") as a first-class `ask_user` option alongside defer.
+  This is legitimate Beck/Metz craftsmanship, not filler.
+
 This is deliberately **not** a numeric threshold — the priority score ranks findings _within_ a phase, it does not decide _whether_ a phase exists.
-The honest framing ("discovery yielded only polish") is the point; do not manufacture a full phase to fill the ceiling.
-When the architecture doc's declared target is complete and discovery yields only polish, the fired gate is the improvement process reaching its intended terminal state — report it as success, not as a failure to find work; the next phase's trigger is a new cause, not the calendar.
+The honest framing ("discovery yielded only scattered polish" vs. "concentrated debt in a hot file") is the point; do not manufacture a full phase to fill the ceiling, and do not dismiss concentrated craftsmanship debt as unworthy of one.
+When the architecture doc's declared target is complete _and_ the scout finds only scattered trivia, the fired gate is the improvement process reaching its intended terminal state — report it as success, not as a failure to find work; the next phase's trigger is a new cause (including concentrated craftsmanship debt), not the calendar.
 
 **Track composition.**
 When the surviving candidates span multiple independent tracks (a spine plus unrelated parallel work), offer the composition to the user via `ask_user` (a multi-select over the tracks) rather than committing to a fixed set — track selection is preference-sensitive (scope vs. focus), and the user may want to drop or add a track before you draft the steps.

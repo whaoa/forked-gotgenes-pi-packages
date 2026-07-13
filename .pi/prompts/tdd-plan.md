@@ -48,6 +48,7 @@ Before executing the TDD cycle, load skills relevant to the change:
 - Load the `package-<PKG>` skill (e.g., `package-pi-permission-system`) for package-specific architecture, priorities, and testing context.
 - Load the `code-design` skill for design principles, TypeScript conventions, and structural heuristics.
 - Load the `testing` skill for Vitest mock patterns and TDD planning rules.
+- Load the `tidy-first` skill — you will use it after the green baseline to dispatch the Tidy-First assessor before implementing.
 - Load the `pre-completion` skill — you will use it after the final TDD step to dispatch the quality reviewer.
 
 ## Verify green baseline
@@ -62,6 +63,12 @@ Before writing any code, confirm the starting state is clean:
 If a check fails on an issue your change will not touch (e.g. a pre-existing lint warning in an unrelated doc), fix it as a separate cleanup commit (`docs:`, `style:`, or `fix:` as appropriate) to establish a green baseline, then proceed.
 If the failure is non-trivial, or you cannot quickly establish why it is failing, stop and report to the user.
 Do not start TDD cycles from a broken baseline.
+
+## Tidy First
+
+With the baseline green and the plan's target files known, follow the `tidy-first` skill: dispatch the `tidy-first-assessor` subagent over the files the change will touch, then land its **Recommended** preparatory refactorings as separate `refactor:`/`test:` commits **before** the first Red→Green cycle — make the change easy, then make the easy change.
+The assessment runs in a subagent so the many-files read does not consume this session's context.
+Skip when the plan touches no `src/`/`test/` files (the skill's applicability gate).
 
 ## Execute the TDD cycle
 
