@@ -1,7 +1,10 @@
 import type { AccessPath } from "#src/access-intent/access-path";
 import { PATH_BEARING_TOOLS } from "#src/access-intent/path-surfaces";
 import { getPathBearingToolPath } from "#src/access-intent/tool-input-path";
-import { classifyToolKind } from "#src/access-intent/tool-kind";
+import {
+  classifyToolKind,
+  type ShellInvocation,
+} from "#src/access-intent/tool-kind";
 import { suggestSessionPattern } from "#src/pattern-suggest";
 import { formatAskPrompt } from "#src/permission-prompts";
 import { SessionApproval } from "#src/session-approval";
@@ -20,11 +23,11 @@ import type { ToolCallContext } from "./types";
  * others (or a path-bearing tool with no path) → catch-all wildcard.
  */
 function deriveSuggestionValue(
-  tcc: ToolCallContext,
+  toolName: string,
   check: PermissionCheckResult,
   accessPath?: AccessPath,
 ): string {
-  switch (classifyToolKind(tcc.toolName)) {
+  switch (classifyToolKind(toolName)) {
     case "bash":
       return check.command ?? "";
     case "mcp":
@@ -45,7 +48,14 @@ export function describeToolGate(
   check: PermissionCheckResult,
   formatter: ToolPreviewFormatter,
   accessPath?: AccessPath,
+  shell?: ShellInvocation | null,
 ): GateDescriptor {
+  // A shell invocation (native `bash` or an aliased shell tool) is gated on the
+  // `bash` surface — its session rule, decision value, and suggestion are
+  // bash-shaped — while the invoked tool name is preserved in the prompt and
+  // review log so a user sees which tool actually ran (#574).
+  const gateSurface = shell ? "bash" : tcc.toolName;
+
   const permissionLogContext = formatter.getPermissionLogContext(
     check,
     tcc.input,
@@ -54,8 +64,8 @@ export function describeToolGate(
 
   // Compute session approval suggestion for the "for this session" option.
   const suggestion = suggestSessionPattern(
-    tcc.toolName,
-    deriveSuggestionValue(tcc, check, accessPath),
+    gateSurface,
+    deriveSuggestionValue(gateSurface, check, accessPath),
   );
 
   const askMessage = formatAskPrompt(
@@ -66,7 +76,7 @@ export function describeToolGate(
   );
 
   return {
-    surface: tcc.toolName,
+    surface: gateSurface,
     input: tcc.input,
     denialContext: {
       kind: "tool",
@@ -95,9 +105,9 @@ export function describeToolGate(
       ...permissionLogContext,
     },
     decision: {
-      surface: tcc.toolName,
+      surface: gateSurface,
       value: deriveDecisionValue(
-        tcc.toolName,
+        gateSurface,
         check,
         getPathBearingToolPath(tcc.toolName, tcc.input) ?? undefined,
       ),

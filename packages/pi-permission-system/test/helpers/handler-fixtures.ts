@@ -12,7 +12,9 @@ import { vi } from "vitest";
 
 import type { ResolvedAccessIntent } from "#src/access-intent/access-intent";
 import type { AskEscalator } from "#src/authority/authorizer-selection";
+import type { ShellToolsConfig } from "#src/config-schema";
 import { GateDecisionReporter } from "#src/decision-reporter";
+import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import { GateRunner } from "#src/handlers/gates/runner";
 import {
   type SkillInputGateInputs,
@@ -30,6 +32,7 @@ import { SessionRules } from "#src/session-rules";
 import type { ToolRegistry } from "#src/tool-registry";
 import type { PermissionCheckResult, PermissionState } from "#src/types";
 import {
+  makeConfigStore,
   makeRealResolver,
   makeRealSession,
 } from "#test/helpers/session-fixtures";
@@ -230,9 +233,20 @@ export function makeHandler(overrides?: {
   toolRegistry?: Partial<ToolRegistry>;
   /** Sugar: builds the `getAll` mock from a list of tool names. */
   tools?: string[];
+  /** Inject `shellTools` aliases into the session config (#574). */
+  shellTools?: ShellToolsConfig;
 }) {
+  const configStore =
+    overrides?.shellTools !== undefined
+      ? makeConfigStore({
+          current: vi.fn().mockReturnValue({
+            ...DEFAULT_EXTENSION_CONFIG,
+            shellTools: overrides.shellTools,
+          }),
+        })
+      : undefined;
   const { session, permissionManager, sessionRules, forwarding, logger } =
-    makeRealSession();
+    makeRealSession(configStore ? { configStore } : undefined);
   const { resolver } = makeRealResolver(permissionManager, sessionRules);
 
   // Apply session override bag to the real collaborators.

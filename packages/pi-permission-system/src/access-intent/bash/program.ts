@@ -25,6 +25,7 @@ export type { BashCommand, BashPathRuleCandidate };
  */
 export class BashProgram {
   private constructor(
+    private readonly sourceCommand: string,
     private readonly commandUnits: readonly BashCommand[],
     private readonly resolvedExternalPaths: readonly AccessPath[],
     private readonly resolvedRuleCandidates: readonly BashPathRuleCandidate[],
@@ -52,7 +53,7 @@ export class BashProgram {
   ): Promise<BashProgram> {
     const parser = await getParser();
     const tree = parser.parse(command);
-    if (!tree) return new BashProgram([], [], []);
+    if (!tree) return new BashProgram(command, [], [], []);
 
     try {
       const { externalPaths, ruleCandidates } = new BashPathResolver(
@@ -60,6 +61,7 @@ export class BashProgram {
         isPromotablePathToken,
       ).resolve(tree.rootNode);
       return new BashProgram(
+        command,
         collectCommands(tree.rootNode),
         externalPaths,
         ruleCandidates,
@@ -67,6 +69,18 @@ export class BashProgram {
     } finally {
       tree.delete();
     }
+  }
+
+  /**
+   * The source command string this program was parsed from.
+   *
+   * The bash gates read this for prompts, logs, and decision display instead of
+   * receiving the command as a separate parameter — the program is the parsed
+   * command, so it owns its source text (#574). Native `bash` and an aliased
+   * shell tool alike reach the gates through this single collaborator.
+   */
+  commandText(): string {
+    return this.sourceCommand;
   }
 
   /**

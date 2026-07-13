@@ -3,6 +3,7 @@
  */
 import { vi } from "vitest";
 import type { AskEscalator } from "#src/authority/authorizer-selection";
+import type { ShellToolsConfig } from "#src/config-schema";
 import type { DecisionReporter } from "#src/decision-reporter";
 import type { DenialContext } from "#src/denial-messages";
 import type { GateDescriptor } from "#src/handlers/gates/descriptor";
@@ -254,6 +255,7 @@ export function makeGateInputs(
     getPromotablePathTokenMatcher?: (
       agentName?: string,
     ) => PathRuleTokenMatcher;
+    getShellToolAliases?: () => ShellToolsConfig | undefined;
   } = {},
 ): ToolCallGateInputs {
   return {
@@ -281,6 +283,9 @@ export function makeGateInputs(
     getPromotablePathTokenMatcher:
       overrides.getPromotablePathTokenMatcher ??
       vi.fn<(agentName?: string) => PathRuleTokenMatcher>(() => () => false),
+    getShellToolAliases:
+      overrides.getShellToolAliases ??
+      vi.fn<() => ShellToolsConfig | undefined>(() => undefined),
   };
 }
 

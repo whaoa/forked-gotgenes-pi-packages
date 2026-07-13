@@ -32,8 +32,9 @@ vi.mock("node:fs", () => ({
   default: { realpathSync },
 }));
 
-function makeMockBashProgram() {
+function makeMockBashProgram(command = "echo hello") {
   return {
+    commandText: vi.fn(() => command),
     commands: vi.fn<() => []>(() => []),
     pathRuleCandidates: vi.fn<() => []>(() => []),
     externalPaths: vi.fn<() => AccessPath[]>(() => []),
@@ -227,6 +228,117 @@ describe("ToolCallGatePipeline", () => {
         expect.any(PathNormalizer),
         isPromotable,
       );
+    });
+  });
+
+  // ── aliased shell tool (#574) ────────────────────────────────────────────
+
+  describe("evaluate — aliased shell tool (#574)", () => {
+    const execAliases = {
+      exec_command: { commandArgument: "cmd", workdirArgument: "workdir" },
+    };
+
+    function bashProgramWithCommand(text: string) {
+      return {
+        commandText: vi.fn(() => text),
+        commands: vi.fn(() => [{ text }]),
+        pathRuleCandidates: vi.fn<() => []>(() => []),
+        externalPaths: vi.fn<() => AccessPath[]>(() => []),
+      };
+    }
+
+    it("consults getShellToolAliases and parses the aliased command argument", async () => {
+      const getShellToolAliases = vi.fn(() => execAliases);
+      const resolver = makeResolver(makeCheckResult());
+      const inputs = makeGateInputs({ getShellToolAliases });
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      await pipeline.evaluate(
+        makeTcc({ toolName: "exec_command", input: { cmd: "npm install" } }),
+        runner,
+      );
+
+      expect(getShellToolAliases).toHaveBeenCalled();
+      expect(mockBashProgramParse).toHaveBeenCalledWith(
+        "npm install",
+        expect.any(PathNormalizer),
+        expect.any(Function),
+      );
+    });
+
+    it("resolves the aliased per-tool check on the bash surface, never the tool's own", async () => {
+      mockBashProgramParse.mockResolvedValue(
+        bashProgramWithCommand("npm install"),
+      );
+      const resolver = makeResolver(
+        makeCheckResult({ source: "bash", command: "npm install" }),
+      );
+      const inputs = makeGateInputs({
+        getShellToolAliases: () => execAliases,
+      });
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      await pipeline.evaluate(
+        makeTcc({ toolName: "exec_command", input: { cmd: "npm install" } }),
+        runner,
+      );
+
+      const bashCall = resolver.resolve.mock.calls.find(
+        ([intent]) => intent.surface === "bash",
+      );
+      expect(bashCall?.[0]).toMatchObject({
+        surface: "bash",
+        input: { command: "npm install" },
+      });
+      const aliasCall = resolver.resolve.mock.calls.find(
+        ([intent]) => intent.surface === "exec_command",
+      );
+      expect(aliasCall).toBeUndefined();
+    });
+
+    it("blocks an aliased command denied on the bash surface", async () => {
+      mockBashProgramParse.mockResolvedValue(
+        bashProgramWithCommand("npm install"),
+      );
+      const resolver = makeResolver();
+      resolver.resolve.mockImplementation((intent) =>
+        intent.surface === "bash"
+          ? makeCheckResult({
+              state: "deny",
+              source: "bash",
+              command: "npm install",
+              matchedPattern: "npm *",
+            })
+          : makeCheckResult(),
+      );
+      const inputs = makeGateInputs({
+        getShellToolAliases: () => execAliases,
+      });
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      const result = await pipeline.evaluate(
+        makeTcc({ toolName: "exec_command", input: { cmd: "npm install" } }),
+        runner,
+      );
+
+      expect(result).toMatchObject({ action: "block" });
+    });
+
+    it("does not treat an extension tool as a shell without a shellTools alias", async () => {
+      const resolver = makeResolver(makeCheckResult());
+      const inputs = makeGateInputs(); // getShellToolAliases → undefined
+      const { runner } = makeGateRunner();
+      const pipeline = new ToolCallGatePipeline(resolver, inputs);
+
+      await pipeline.evaluate(
+        makeTcc({ toolName: "exec_command", input: { cmd: "npm install" } }),
+        runner,
+      );
+
+      expect(mockBashProgramParse).not.toHaveBeenCalled();
     });
   });
 

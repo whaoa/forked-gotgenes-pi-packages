@@ -5,6 +5,7 @@ import {
   getActiveAgentNameFromSystemPrompt,
 } from "./active-agent";
 import type { AuthorizerSelectionLifecycle } from "./authority/authorizer-selection";
+import type { ShellToolsConfig } from "./config-schema";
 import type { SessionConfigStore } from "./config-store";
 import type { PermissionSystemExtensionConfig } from "./extension-config";
 import type { ExtensionPaths } from "./extension-paths";
@@ -203,6 +204,16 @@ export class PermissionSession implements ToolCallGateInputs {
    */
   getToolPreviewLimits(): ToolPreviewFormatterOptions {
     return resolveToolPreviewLimits(this.config);
+  }
+
+  /**
+   * The configured shell-tool aliases (`shellTools`), mapping a non-`bash` tool
+   * name to the input arguments holding its command and optional working
+   * directory. `undefined` when no aliases are configured. Consumed by the
+   * gate pipeline's {@link resolveShellInvocation} consult (#574).
+   */
+  getShellToolAliases(): ShellToolsConfig | undefined {
+    return this.config.shellTools;
   }
 
   // ── Path normalization ────────────────────────────────────────────────

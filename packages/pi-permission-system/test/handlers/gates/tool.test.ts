@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { ShellInvocation } from "#src/access-intent/tool-kind";
 import { describeToolGate } from "#src/handlers/gates/tool";
 import type { ToolCallContext } from "#src/handlers/gates/types";
 import { posixPathFlavor } from "#src/path/path-flavor";
@@ -86,6 +87,34 @@ describe("describeToolGate", () => {
     expect(desc.surface).toBe("bash");
     expect(desc.decision.surface).toBe("bash");
     expect(desc.decision.value).toBe("git status");
+  });
+
+  it("gates an aliased shell tool on the bash surface while keeping its tool name in logs (#574)", () => {
+    const shell: ShellInvocation = {
+      command: "npm install",
+      workdir: undefined,
+    };
+    const check = makeCheckResult("ask", {
+      toolName: "bash",
+      source: "bash",
+      command: "npm install",
+    });
+    const desc = describeToolGate(
+      makeTcc({ toolName: "exec_command", input: { cmd: "npm install" } }),
+      check,
+      makeFormatter(),
+      undefined,
+      shell,
+    );
+    // Gated as bash: decision, surface, and session rule are bash-shaped.
+    expect(desc.surface).toBe("bash");
+    expect(desc.decision.surface).toBe("bash");
+    expect(desc.decision.value).toBe("npm install");
+    expect(desc.sessionApproval?.surface).toBe("bash");
+    expect(desc.sessionApproval?.representativePattern).toBe("npm install*");
+    // The invoked tool name is preserved for the review log and prompt.
+    expect(desc.logContext.toolName).toBe("exec_command");
+    expect(desc.promptDetails.toolName).toBe("exec_command");
   });
 
   it("returns mcp surface with target in decision.value for MCP tools", () => {

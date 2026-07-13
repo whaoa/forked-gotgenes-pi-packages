@@ -4,7 +4,6 @@ import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { PermissionCheckResult } from "#src/types";
-import { getNonEmptyString, toRecord } from "#src/value-guards";
 import { pickMostRestrictive } from "./candidate-check";
 import type { GateResult } from "./descriptor";
 import { formatPathAskPrompt } from "./path";
@@ -20,22 +19,22 @@ import type { ToolCallContext } from "./types";
  * restrictive result, while prompts, logs, and session approvals use the raw
  * token.
  *
- * Returns `null` when the gate does not apply (tool is not bash, no command,
- * no tokens extracted, or all tokens evaluate to `allow`).
+ * Returns `null` when the gate does not apply (not a shell invocation, no
+ * command, no tokens extracted, or all tokens evaluate to `allow`).
  * Returns a `GateBypass` when all tokens are session-covered.
  * Returns a `GateDescriptor` for the most restrictive token needing a check.
+ *
+ * The shell command (native `bash` or an aliased shell tool) is read from the
+ * injected `BashProgram`, which owns the source text it was parsed from, so
+ * this gate does not re-derive the input field name (#574).
  */
 export function describeBashPathGate(
   tcc: ToolCallContext,
   bashProgram: BashProgram | null,
   resolver: ScopedPermissionResolver,
 ): GateResult {
-  if (tcc.toolName !== "bash") return null;
-
-  const command = getNonEmptyString(toRecord(tcc.input).command);
-  if (!command) return null;
-
   if (!bashProgram) return null;
+  const command = bashProgram.commandText();
 
   const candidates = bashProgram.pathRuleCandidates();
   if (candidates.length === 0) return null;

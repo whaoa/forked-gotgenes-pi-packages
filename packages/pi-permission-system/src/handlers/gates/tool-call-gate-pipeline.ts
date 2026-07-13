@@ -1,7 +1,11 @@
 import type { AccessPath } from "#src/access-intent/access-path";
 import { BashProgram } from "#src/access-intent/bash/program";
 import { getPathBearingToolPath } from "#src/access-intent/tool-input-path";
-import { classifyToolKind } from "#src/access-intent/tool-kind";
+import {
+  resolveShellInvocation,
+  type ShellInvocation,
+} from "#src/access-intent/tool-kind";
+import type { ShellToolsConfig } from "#src/config-schema";
 import type { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
@@ -12,7 +16,6 @@ import {
   type ToolPreviewFormatterOptions,
 } from "#src/tool-preview-formatter";
 import type { PathRuleTokenMatcher, PermissionCheckResult } from "#src/types";
-import { getNonEmptyString, toRecord } from "#src/value-guards";
 import { resolveBashCommandCheck } from "./bash-command";
 import { describeBashExternalDirectoryGate } from "./bash-external-directory";
 import { describeBashPathGate } from "./bash-path";
@@ -44,6 +47,12 @@ export interface ToolCallGateInputs {
   /** The session's path normalizer (platform + cwd baked in). */
   getPathNormalizer(): PathNormalizer;
   /**
+   * The configured shell-tool aliases (`shellTools`), or `undefined` when none
+   * are set. Consulted by {@link resolveShellInvocation} so an aliased shell
+   * tool is gated through the bash stack at parity with native `bash` (#574).
+   */
+  getShellToolAliases(): ShellToolsConfig | undefined;
+  /**
    * Predicate deciding whether a bare bash token should be promoted into the
    * `path` rule-candidate surface (#509), scoped to the given agent.
    */
@@ -73,20 +82,24 @@ export class ToolCallGatePipeline {
     tcc: ToolCallContext,
     runner: GateRunner,
   ): Promise<GateOutcome> {
-    // Parse the bash command exactly once per evaluate; the three bash gates
-    // share this single BashProgram instead of each re-parsing (#308).
-    const command = getNonEmptyString(toRecord(tcc.input).command);
+    // Resolve the shell invocation once: native `bash` and any tool recorded in
+    // `shellTools` both yield a command (+ optional workdir); every other tool
+    // yields null (#574). The three bash gates then share the single BashProgram
+    // parsed from that command instead of each re-parsing (#308).
+    const shell = resolveShellInvocation(
+      tcc.toolName,
+      tcc.input,
+      this.inputs.getShellToolAliases(),
+    );
+    const command = shell?.command ?? null;
     const normalizer = this.inputs.getPathNormalizer();
-    const bashProgram =
-      classifyToolKind(tcc.toolName) === "bash" && command
-        ? await BashProgram.parse(
-            command,
-            normalizer,
-            this.inputs.getPromotablePathTokenMatcher(
-              tcc.agentName ?? undefined,
-            ),
-          )
-        : null;
+    const bashProgram = command
+      ? await BashProgram.parse(
+          command,
+          normalizer,
+          this.inputs.getPromotablePathTokenMatcher(tcc.agentName ?? undefined),
+        )
+      : null;
 
     const formatter = new ToolPreviewFormatter(
       this.inputs.getToolPreviewLimits(),
@@ -115,8 +128,8 @@ export class ToolCallGatePipeline {
       () => {
         const { toolCheck, accessPath } = this.resolvePerToolCheck(
           tcc,
+          shell,
           bashProgram,
-          command,
           normalizer,
         );
         const toolDescriptor = describeToolGate(
@@ -124,6 +137,7 @@ export class ToolCallGatePipeline {
           toolCheck,
           formatter,
           accessPath,
+          shell,
         );
         toolDescriptor.preCheck = toolCheck;
         return toolDescriptor;
@@ -156,18 +170,31 @@ export class ToolCallGatePipeline {
    */
   private resolvePerToolCheck(
     tcc: ToolCallContext,
+    shell: ShellInvocation | null,
     bashProgram: BashProgram | null,
-    command: string | null,
     normalizer: PathNormalizer,
   ): { toolCheck: PermissionCheckResult; accessPath?: AccessPath } {
-    if (classifyToolKind(tcc.toolName) === "bash" && bashProgram) {
+    if (shell) {
+      if (bashProgram) {
+        return {
+          toolCheck: resolveBashCommandCheck(
+            bashProgram.commandText(),
+            bashProgram.commands(),
+            tcc.agentName ?? undefined,
+            this.resolver,
+          ),
+        };
+      }
+      // A shell invocation whose command did not parse (e.g. empty) still
+      // resolves on the `bash` surface, so an aliased tool never falls through
+      // to its own extension-tool surface.
       return {
-        toolCheck: resolveBashCommandCheck(
-          command ?? "",
-          bashProgram.commands(),
-          tcc.agentName ?? undefined,
-          this.resolver,
-        ),
+        toolCheck: this.resolver.resolve({
+          kind: "tool",
+          surface: "bash",
+          input: { command: shell.command },
+          agentName: tcc.agentName ?? undefined,
+        }),
       };
     }
 

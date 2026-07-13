@@ -2,7 +2,6 @@ import type { BashProgram } from "#src/access-intent/bash/program";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
-import { getNonEmptyString, toRecord } from "#src/value-guards";
 import type { GateResult } from "./descriptor";
 import { formatBashExternalDirectoryAskPrompt } from "./external-directory-messages";
 import { selectUncoveredExternalPaths } from "./external-directory-policy";
@@ -13,21 +12,21 @@ import type { ToolCallContext } from "./types";
  *
  * Reads the external paths from the injected `BashProgram` and checks whether
  * any reference directories outside the working directory. Returns `null` when the gate
- * does not apply (tool is not bash, no CWD, or no external paths found).
+ * does not apply (not a shell invocation, no command, or no external paths found).
  * Returns a `GateBypass` when all paths are allowed (by config or session rule).
  * Returns a `GateDescriptor` with multi-pattern sessionApproval for uncovered paths.
+ *
+ * The shell command (native `bash` or an aliased shell tool) is read from the
+ * injected `BashProgram`, which owns the source text it was parsed from, so
+ * this gate does not re-derive the input field name (#574).
  */
 export function describeBashExternalDirectoryGate(
   tcc: ToolCallContext,
   bashProgram: BashProgram | null,
   resolver: ScopedPermissionResolver,
 ): GateResult {
-  if (tcc.toolName !== "bash") return null;
-
-  const command = getNonEmptyString(toRecord(tcc.input).command);
-  if (!command) return null;
-
   if (!bashProgram) return null;
+  const command = bashProgram.commandText();
 
   const externalPaths = bashProgram.externalPaths();
   if (externalPaths.length === 0) return null;
