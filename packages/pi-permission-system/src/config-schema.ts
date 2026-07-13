@@ -110,6 +110,41 @@ const permissionSchema = z
     ],
   });
 
+const shellToolAliasSchema = z
+  .strictObject({
+    commandField: z.string().min(1).meta({
+      description:
+        "The input field holding the shell command string for this tool (e.g. 'cmd').",
+    }),
+    workdirField: z.string().min(1).optional().meta({
+      description:
+        "Optional input field holding the working directory for this tool (e.g. 'workdir').",
+    }),
+  })
+  .meta({
+    description:
+      "Maps one shell-aliased tool to the input fields holding its command and (optionally) its working directory.",
+  });
+
+const shellToolsSchema = z
+  .record(
+    z.string().min(1).meta({
+      description: "A non-bash tool name that carries shell semantics.",
+    }),
+    shellToolAliasSchema,
+  )
+  .meta({
+    description:
+      "Maps non-bash tool names that carry shell semantics to the input fields holding their command and working directory.",
+    markdownDescription:
+      'Records which non-`bash` tools carry shell semantics, mapping each tool name to the input field holding its command (and optionally its working directory).\n\nUse this when an extension replaces the native `bash` tool under a different name — e.g. `@howaboua/pi-codex-conversion` registers `exec_command` with a `cmd` field and an optional `workdir`. Recording the alias lets the permission system gate that tool through the same bash enforcement stack as native `bash` (command decomposition, wrapper flooring, path/external-directory token gates, and `bash:` rules).\n\nExample:\n\n```json\n"shellTools": {\n  "exec_command": { "commandField": "cmd", "workdirField": "workdir" }\n}\n```\n\n**Merge order:** shallow-merge by tool name across global → project. A project entry overrides a specific tool\'s mapping on key collision but never drops a global entry.',
+    examples: [
+      {
+        exec_command: { commandField: "cmd", workdirField: "workdir" },
+      },
+    ],
+  });
+
 /**
  * The on-disk config file shape.
  *
@@ -165,6 +200,7 @@ export const unifiedConfigSchema = z
       default: [],
     }),
     permission: permissionSchema.optional(),
+    shellTools: shellToolsSchema.optional(),
   })
   .meta({
     title: "PI Permission System Configuration",
@@ -185,6 +221,12 @@ export type PatternValue = z.infer<typeof patternValueSchema>;
 
 /** The on-disk permission shape inside the `"permission"` key. */
 export type FlatPermissionConfig = z.infer<typeof permissionSchema>;
+
+/** A single shell-aliased tool's field mapping. */
+export type ShellToolAlias = z.infer<typeof shellToolAliasSchema>;
+
+/** The `shellTools` map: tool name → shell-alias field mapping. */
+export type ShellToolsConfig = z.infer<typeof shellToolsSchema>;
 
 /** The raw config file shape after validation (all fields optional). */
 export type UnifiedPermissionConfig = z.infer<typeof unifiedConfigSchema>;

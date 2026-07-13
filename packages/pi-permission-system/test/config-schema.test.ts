@@ -109,6 +109,52 @@ describe("unifiedConfigSchema", () => {
       expect(result.success).toBe(false);
     });
   });
+
+  describe("shellTools field", () => {
+    it("accepts a shellTools map with a full alias", () => {
+      const result = unifiedConfigSchema.safeParse({
+        shellTools: {
+          exec_command: { commandField: "cmd", workdirField: "workdir" },
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts an alias with only commandField", () => {
+      const result = unifiedConfigSchema.safeParse({
+        shellTools: { exec_command: { commandField: "cmd" } },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects an alias missing commandField", () => {
+      const result = unifiedConfigSchema.safeParse({
+        shellTools: { exec_command: { workdirField: "workdir" } },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects an unknown field inside an alias", () => {
+      const result = unifiedConfigSchema.safeParse({
+        shellTools: { exec_command: { commandField: "cmd", extra: "x" } },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects a non-string commandField", () => {
+      const result = unifiedConfigSchema.safeParse({
+        shellTools: { exec_command: { commandField: 42 } },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects an empty-string commandField", () => {
+      const result = unifiedConfigSchema.safeParse({
+        shellTools: { exec_command: { commandField: "" } },
+      });
+      expect(result.success).toBe(false);
+    });
+  });
 });
 
 describe("inferred types match the hand-written domain types", () => {
