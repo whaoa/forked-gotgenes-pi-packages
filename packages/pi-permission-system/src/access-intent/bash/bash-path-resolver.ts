@@ -330,6 +330,25 @@ export class BashPathResolver {
     if (extractCommandName(commandNode) !== "cd") return base;
     const target = cdLiteralTarget(commandNode);
     if (target === null) return UNKNOWN_BASE;
+    return this.deriveBaseFromCdTarget(base, target);
+  }
+
+  /**
+   * Fold a literal `cd`/working-directory target string into the effective
+   * base, delegating the platform/MSYS interpretation to the
+   * {@link PathNormalizer}. Owns only the base-folding state:
+   *
+   * - `absolute` → a fresh known base (recovers from an earlier unknown base).
+   * - `unknown` → the base becomes conservatively unknown.
+   * - `relative` → join into a known base, or stay unknown if already unknown.
+   *
+   * Shared by {@link foldCd} (inline `cd` commands) and the initial-base seed
+   * (an aliased shell tool's `workdir`, an implicit leading `cd <workdir>`).
+   */
+  private deriveBaseFromCdTarget(
+    base: EffectiveBase,
+    target: string,
+  ): EffectiveBase {
     const interpreted = this.normalizer.interpretBashCdTarget(target);
     switch (interpreted.kind) {
       case "absolute":
