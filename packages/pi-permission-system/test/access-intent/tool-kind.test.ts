@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
+import { PATH_BEARING_TOOLS } from "#src/access-intent/path-surfaces";
 import { classifyToolKind, isMcpCheck } from "#src/access-intent/tool-kind";
-import { PATH_BEARING_TOOLS } from "#src/path-surfaces";
 
 describe("classifyToolKind", () => {
   test("classifies bash", () => {

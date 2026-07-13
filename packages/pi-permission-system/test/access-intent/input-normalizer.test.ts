@@ -20,8 +20,8 @@ vi.mock("node:fs", () => ({
 import {
   buildAccessIntentForSurface,
   normalizeInput,
-} from "#src/input-normalizer";
-import { createMcpPermissionTargets } from "#src/mcp-targets";
+} from "#src/access-intent/input-normalizer";
+import { createMcpPermissionTargets } from "#src/access-intent/mcp-targets";
 import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 

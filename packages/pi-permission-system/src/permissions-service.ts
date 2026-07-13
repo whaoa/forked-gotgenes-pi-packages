@@ -1,6 +1,6 @@
 import type { AccessIntent } from "./access-intent/access-intent";
+import { buildAccessIntentForSurface } from "./access-intent/input-normalizer";
 import { resolveBashAdvisoryCheck } from "./bash-advisory-check";
-import { buildAccessIntentForSurface } from "./input-normalizer";
 import type { PathNormalizer } from "./path-normalizer";
 import type { PermissionsService } from "./service";
 import type {

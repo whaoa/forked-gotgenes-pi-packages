@@ -1,10 +1,10 @@
-import type { AccessIntent } from "./access-intent/access-intent";
-import { classifyToolKind } from "./access-intent/tool-kind";
-import { stripBashCommentLines } from "./bash-arity";
+import { stripBashCommentLines } from "#src/bash-arity";
+import type { PathNormalizer } from "#src/path-normalizer";
+import { getNonEmptyString, toRecord } from "#src/value-guards";
+import type { AccessIntent } from "./access-intent";
 import { createMcpPermissionTargets } from "./mcp-targets";
-import type { PathNormalizer } from "./path-normalizer";
 import { PATH_SURFACES } from "./path-surfaces";
-import { getNonEmptyString, toRecord } from "./value-guards";
+import { classifyToolKind } from "./tool-kind";
 
 /**
  * Build the {@link AccessIntent} an external policy query (the `Symbol.for()`

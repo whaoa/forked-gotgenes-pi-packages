@@ -1,12 +1,12 @@
 import type { AccessPath } from "#src/access-intent/access-path";
 import { BashProgram } from "#src/access-intent/bash/program";
+import { getPathBearingToolPath } from "#src/access-intent/tool-input-path";
 import { classifyToolKind } from "#src/access-intent/tool-kind";
 import type { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
 import type { SkillPromptEntry } from "#src/skill-prompt-sanitizer";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
 import type { ToolInputFormatterLookup } from "#src/tool-input-formatter-registry";
-import { getPathBearingToolPath } from "#src/tool-input-path";
 import {
   ToolPreviewFormatter,
   type ToolPreviewFormatterOptions,

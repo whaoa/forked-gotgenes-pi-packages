@@ -1,6 +1,6 @@
-import { classifyToolKind } from "./access-intent/tool-kind";
-import type { ToolAccessExtractorLookup } from "./tool-access-extractor-registry";
-import { getNonEmptyString, toRecord } from "./value-guards";
+import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
+import { getNonEmptyString, toRecord } from "#src/value-guards";
+import { classifyToolKind } from "./tool-kind";
 
 export function getPathBearingToolPath(
   toolName: string,

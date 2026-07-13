@@ -1,6 +1,6 @@
 import type { PathFlavor } from "#src/path/path-flavor";
 
-import { PATH_SURFACES } from "./path-surfaces";
+import { PATH_SURFACES } from "./access-intent/path-surfaces";
 import type { PermissionState } from "./types";
 import { type WildcardMatchOptions, wildcardMatch } from "./wildcard-matcher";
 

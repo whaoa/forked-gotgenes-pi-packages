@@ -4,7 +4,7 @@ import {
   PATH_BEARING_TOOLS,
   PATH_SURFACES,
   READ_ONLY_PATH_BEARING_TOOLS,
-} from "#src/path-surfaces";
+} from "#src/access-intent/path-surfaces";
 
 describe("PATH_BEARING_TOOLS", () => {
   test("contains the expected tool names", () => {

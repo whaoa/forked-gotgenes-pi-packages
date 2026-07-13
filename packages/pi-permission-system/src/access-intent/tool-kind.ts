@@ -1,4 +1,4 @@
-import { PATH_BEARING_TOOLS } from "#src/path-surfaces";
+import { PATH_BEARING_TOOLS } from "./path-surfaces";
 
 /**
  * What a tool invocation accesses — decided once from the tool name at the

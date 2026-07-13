@@ -1,8 +1,7 @@
 import { join } from "node:path";
-
+import { READ_ONLY_PATH_BEARING_TOOLS } from "#src/access-intent/path-surfaces";
 import { expandHomePath } from "#src/expand-home";
 import type { PathFlavor } from "#src/path/path-flavor";
-import { READ_ONLY_PATH_BEARING_TOOLS } from "#src/path-surfaces";
 import { wildcardMatch } from "#src/wildcard-matcher";
 
 function containsGlobChars(value: string): boolean {

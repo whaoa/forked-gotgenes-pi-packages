@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
+import {
+  getPathBearingToolPath,
+  getToolInputPath,
+} from "#src/access-intent/tool-input-path";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
-import { getPathBearingToolPath, getToolInputPath } from "#src/tool-input-path";
 
 describe("getPathBearingToolPath", () => {
   test("returns path for a path-bearing tool", () => {

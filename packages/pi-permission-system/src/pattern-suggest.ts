@@ -1,5 +1,5 @@
+import { PATH_BEARING_TOOLS } from "./access-intent/path-surfaces";
 import { prefix, stripBashCommentLines } from "./bash-arity";
-import { PATH_BEARING_TOOLS } from "./path-surfaces";
 import { deriveApprovalPattern } from "./session-rules";
 
 /** The suggestion returned for a "Yes, for this session" dialog option. */

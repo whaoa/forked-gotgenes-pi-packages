@@ -3,7 +3,7 @@ import {
   createMcpPermissionTargets,
   McpTargetList,
   parseQualifiedMcpToolName,
-} from "#src/mcp-targets";
+} from "#src/access-intent/mcp-targets";
 
 describe("parseQualifiedMcpToolName", () => {
   it("returns server and tool for a valid qualified name", () => {
