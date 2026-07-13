@@ -100,6 +100,11 @@ The micro lens (test-design quality as a first-class artifact — Category G —
   Fold that inventory into your findings; its concentrated/scattered split drives the Step 8 deferral gate.
 - The scout is read-only and its context stays in the subagent — your context stays clear for the plan.
 
+> **First-live-use checkpoint (added 2026-07-13).**
+> The `craftsmanship-scout` is new and its **concentrated** vs. **scattered** judgment is unproven.
+> On its first runs, open one file it flags **concentrated** and one it flags **scattered** and confirm the calls match your own read before letting the split drive the Step 8 deferral gate — an over-clustering scout invents craftsmanship phases; an under-clustering one hides real debt.
+> Recalibrate `.pi/agents/craftsmanship-scout.md` (Step 3) if the calls are off, and remove this callout once the split has proven reliable.
+
 ### Step 6: Assess file and directory organization against the domain
 
 **Skip this step when domain subdirectories already exist and the `src/` root file count is small** (fewer than 10 top-level files): the deep directory-organization analysis is a scripted no-op on a package that has already been grouped into domains.
