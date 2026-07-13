@@ -52,4 +52,46 @@ No `src/`/`test/` changes.
   This condensation is a materially larger, deliberate phase-close operation (mirrors Phases 7–9) and was intentionally out of the Step 6 recipe scope.
   Filed as tracked follow-up [#577] to avoid the untracked-deferral (`#479`/`#480`) failure mode.
 
-[#577]: https://github.com/gotgenes/pi-packages/issues/577
+## Stage: Final Retrospective (2026-07-13T01:51:49Z)
+
+### Session summary
+
+Shipped issue #521 across three clean stages (plan, build, ship): the read-only bash allowlist recipe landed in `docs/configuration.md`, pi-permission-system released as `v20.4.2`, and the issue closed with a close comment answering both of the reporter's questions.
+The ship session navigated the nuanced release-please `UNSTABLE`-with-running-check merge path correctly, and the pre-completion review's one WARN (Phase 10 phase-close staleness) was already tracked as [#577] before ship.
+
+### Observations
+
+#### What went well
+
+- **Correct handling of the `UNSTABLE` release PR with an in-progress check.**
+  `release_pr_merge` first refused (`merge_state: UNSTABLE`); the `statusCheckRollup` showed a non-empty rollup with `check` still `IN_PROGRESS` (not the empty-rollup `GITHUB_TOKEN` case), so the session polled the rollup to `COMPLETED`/`SUCCESS` and retried `release_pr_merge` rather than falling back to `gh pr merge` mid-check.
+  This is exactly the branch `/ship-issue` step 6.4 warns about, exercised end-to-end without a misstep.
+- **Deterministic release decision up front.**
+  The `**Release:** ship independently` marker was read from the plan before any push, and the stacked-release check correctly reasoned that `docs/configuration.md` is *not* in `exclude-paths` (unlike `docs/architecture`, `docs/plans`, `docs/retro`), so the `docs:` commit cuts a release — confirmed against the actual `release-please-config.json`, not from memory.
+- **Cross-session continuity via the retro breadcrumbs.**
+  The planning and build stage notes carried the third-party framing, the four-safety-net rationale, and the [#577] follow-up forward, so the ship close comment and this retro needed no re-derivation.
+
+#### What caused friction (agent side)
+
+- `other` — phantom SHA-length concern: after `git rev-parse HEAD` returned `6df37113…cab2`, the session claimed the hash "appears to have 41" characters and ran a `wc -c` check to confirm it was 40.
+  Impact: one extra verification tool call, no rework — mildly aligned with the ship prompt's "paste the SHA exactly" caution, but triggered by a miscount rather than a real risk.
+- `missing-context` (user-caught) — completing issue #521 completed the *last* step of Phase 10, which triggers the repo's phase-close (condense the phase into `history/phase-10-*.md`, add the `(complete)` suffix, a phase-table row, bump the "nine completed phases" intro count).
+  That close has a dedicated manual command, `/finish-phase <PKG>` (`.pi/prompts/finish-phase.md`), which is hard-gated on every step issue being closed and does the archive + reconcile in one pass.
+  At build time the pre-completion reviewer flagged the staleness and recommended *filing a follow-up issue*, and the build session did — [#577].
+  That was the wrong mechanism: the phase-close is not tracked as a GitHub issue, it is a manual `/finish-phase` run the agent should **recommend** at the end of `/ship-issue` and `/retro`.
+  The operator caught this during the retro.
+  Impact: one spurious tracking issue ([#577], closed not-planned during this retro); no code rework.
+  Root cause: neither `/ship-issue`, `/retro` step 10, nor the package skill points at `/finish-phase` when a ship completes a phase's last step, so the reviewer's generic "file a follow-up" suggestion filled the vacuum.
+
+### Diagnostic details
+
+- **Model-performance correlation** — the ship session ran entirely in the main session; the only subagent across all stages was the build stage's `pre-completion-reviewer`, appropriately dispatched for fresh-context judgment work.
+- **Escalation-delay tracking** — no `rabbit-hole` points; the longest same-target sequence was the release-PR rollup poll loop (a bounded, intentional wait, not a stuck retry).
+- **Feedback-loop gap analysis** — pre-push `lint` and `fallow dead-code` ran from the repo root before the push, and CI was watched to `success` before closing the issue; verification was correctly ordered, not deferred.
+
+### Changes made
+
+1. Closed [#577] as not-planned (the phase-close is a manual `/finish-phase` run, not a tracked issue) with a comment pointing at `/finish-phase pi-permission-system` as the correct next action.
+2. `.pi/prompts/retro.md` step 10 — when the shipped issue completed the phase's **last** step, recommend `/finish-phase <PKG>` (then `/plan-improvements <PKG>`) instead of a successor `/plan-issue`, and stated the phase-close is never a filed issue.
+3. `.pi/prompts/ship-issue.md` step 7 (final report) — added a bullet to flag phase completion and point at `/finish-phase <PKG>` (run after `/retro`), keeping `/retro` as the single next step.
+4. Corrected this retro's friction entry to record that filing [#577] was the mis-step and `/finish-phase` is the established phase-close mechanism.

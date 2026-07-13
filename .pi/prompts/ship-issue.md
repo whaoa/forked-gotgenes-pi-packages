@@ -121,6 +121,7 @@ Print:
 - The released version, if a release commit just landed (`git tag --points-at HEAD` or read `package.json`).
 - Issue close confirmation.
 - Anything that was skipped and why.
+- If this issue completed the **last** step of a roadmap phase, flag it: the phase-close runs via `/finish-phase <PKG>` (after `/retro`), never as a filed issue.
 - The next step: `/retro <N>` to capture this session's retrospective.
 
 Name `/retro <N>` as the single next step.

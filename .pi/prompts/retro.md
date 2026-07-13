@@ -208,8 +208,9 @@ Every change made during the retro must be recorded before the session ends.
 
 After the retro is committed, surface the next issue to work on so the operator can start it directly.
 Derive it from the shipped issue's roadmap: read the plan's dependency diagram or the package's `docs/architecture/architecture.md` for the step this issue unblocks (e.g. "unblocks #M", the next incomplete numbered step).
-If a successor exists, recommend `/plan-issue #M` (name the step).
-If none is queued or the roadmap phase is complete, say so explicitly.
+If a successor exists in the current phase, recommend `/plan-issue #M` (name the step).
+If this issue completed the phase's **last** step, recommend `/finish-phase <PKG>` instead — it archives the phase to `history/` and reconciles the architecture doc; the phase-close is a manual command, never a filed issue — then `/plan-improvements <PKG>` for the next round.
+If none is queued, say so explicitly.
 
 ## Rules
 
