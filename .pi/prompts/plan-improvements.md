@@ -46,7 +46,10 @@ Determine the next phase number N (last completed phase + 1), then immediately c
 If Phase N−1's full detailed roadmap (numbered steps with `Outcome:` lines and a dependency diagram) is still inline in `architecture.md` rather than condensed to a completion summary linking a `history/phase-(N−1)-<slug>.md` file, stop and tell the user to run `/finish-phase $1` first, then resume `/plan-improvements $1`.
 Archiving the prior phase — with its step-completion gate and doc reconciliation — is `/finish-phase`'s job; do not do it inline here.
 
-If the architecture document already declares a direction for Phase N (e.g. a deferred phase), treat it as a hypothesis, not a commitment — confirm the focus with the user (`ask_user`) before deep-tracing in that direction, and let the discovery findings decide.
+A declared direction for Phase N most often lives **not** in `architecture.md` but in the previous phase's history file — `history/phase-(N−1)-<slug>.md`, whose **Findings** section is where `/finish-phase` records the "leading Phase N candidate."
+Read that history file's Findings before deep-tracing.
+If it (or `architecture.md`) already declares a direction, treat it as a hypothesis, not a commitment — but put the declared candidate in front of the user in your **first** `ask_user`, up front, not a follow-up: a declared candidate surfaced late forces a second round-trip after the composition is already drafted.
+Let the discovery findings decide.
 
 Before touching any tool, write down a **cause hypothesis**: the first-principles structural problem you expect the next phase to dissolve (structural fusion, a coupling/boundary flaw, a dead subsystem), read against the architecture doc's first-principles section.
 The later steps corroborate, refine, or refute it — they do not replace it.
@@ -62,6 +65,7 @@ gh issue list --label "pkg:$1" --state open
 
 Cross-check each open issue against the architecture doc's claims about which issues remain open, and note any that are parked candidates for this phase or already-filed work you must not re-plan.
 Track repeat deferrals: an issue swept as out-of-scope across multiple consecutive phases (check the prior phase retros/roadmaps) gets an explicit decision this phase — schedule it, or recommend closing it as not-planned — never a silent re-defer.
+Surface each repeat-deferral as an explicit `ask_user` decision (schedule / defer-with-recorded-rationale / close as not-planned), not a self-made call — these are preference-sensitive judgments the user should own.
 
 ### Step 3: Run fallow for corroboration and baseline
 
@@ -118,17 +122,22 @@ Identify dependency ordering and parallel tracks.
 
 **Deferral gate.**
 If discovery surfaced no cause-level finding (Category A–C — structural fusion, coupling/boundary flaws, dead subsystems) and the candidate list is polish-only (Category B unit-size, Category D, Category E symptoms), say so plainly and present **"defer"** and **"lean phase"** as first-class `ask_user` options alongside a full phase.
-This is deliberately **not** a numeric threshold — the priority score ranks findings *within* a phase, it does not decide *whether* a phase exists.
+This is deliberately **not** a numeric threshold — the priority score ranks findings _within_ a phase, it does not decide _whether_ a phase exists.
 The honest framing ("discovery yielded only polish") is the point; do not manufacture a full phase to fill the ceiling.
 When the architecture doc's declared target is complete and discovery yields only polish, the fired gate is the improvement process reaching its intended terminal state — report it as success, not as a failure to find work; the next phase's trigger is a new cause, not the calendar.
+
+**Track composition.**
+When the surviving candidates span multiple independent tracks (a spine plus unrelated parallel work), offer the composition to the user via `ask_user` (a multi-select over the tracks) rather than committing to a fixed set — track selection is preference-sensitive (scope vs. focus), and the user may want to drop or add a track before you draft the steps.
 
 **Feasibility probe.**
 Before committing any step whose outcome claim depends on the SDK/type surface (e.g. "remove the file-level `eslint-disable` once the SDK exports usable types"), confirm the named type or export actually exists in the real surface (SDK `.d.ts`, `--help`, schema).
 Do not commit an outcome the surface cannot deliver — this mirrors the AGENTS.md rule that a named remediation in a migration note must be verified against the real surface.
+For an SDK **UI or behavioral** capability (not just "does this method exist"), confirm the behavior in the Pi core source (`~/development/pi/pi`) and a sibling extension that already uses it, not only the exported type — a `.d.ts` says a method exists but not that it behaves the way the step needs (e.g. `ctx.ui.custom` renders inline by default only per the core's `overlay ?? false`, invisible in the type signature).
 
 ## Output
 
-Write the proposed plan as a new section in `packages/$1/docs/architecture/architecture.md`, replacing the existing "Improvement roadmap" section header with the next phase number.
+Write the proposed plan as a new `## Improvement roadmap — Phase N: <title>` section in `packages/$1/docs/architecture/architecture.md`, inserted **above the most recent completed-phase summary**.
+`/finish-phase` has already condensed prior phases into a chain of `## Improvement roadmap — Phase N−1: … (complete)` summaries; insert above them, do not overwrite them.
 
 The section should include:
 
@@ -136,9 +145,11 @@ The section should include:
    Prefer cause-level metrics recomputable by a single command (a `grep -c`, `wc -l`, or fallow field) and record the recompute command with the metric, so `/finish-phase` can verify delivered vs. predicted deterministically.
 2. Numbered steps with:
    - Title
+   - **Cause** — the first-principles structural cause the step dissolves, named explicitly; a fallow signal is cited as the _symptom_ of that cause, never as the step's motivation (a step justified only by a fallow finding is symptom-driven — trace it to a cause or drop it).
    - Target files/functions — when a step extracts or moves code and a domain directory applies (Step 6), name the destination path (e.g. `src/<domain>/<file>.ts`) so directory placement rides along with the change rather than landing flat and being moved later.
    - Smell category addressed
    - Expected measurable outcome
+   - **Impact / Risk / Priority** — the per-step scores (`Priority = Impact × (6 − Risk)`), published on the step so the ranking is auditable in the committed roadmap and at `/plan-issue` time, not left in the session transcript.
    - A `Release:` tag on its own line — `Release: independent` or `Release: batch "<batch-name>"` (see the `improvement-discovery` skill's Output format).
 3. Step dependency diagram (Mermaid flowchart).
 4. Named parallel tracks.
@@ -164,6 +175,7 @@ After the plan is committed, ask whether to file the issues now; if confirmed:
    Use the repo's `## What` / `## Why` / `## Proposed change` / `## Context` sections, referencing cross-step dependencies as "Phase N Step M" prose, not hardcoded numbers (the issue numbers are not known until filed).
 2. Verify each created issue's title matches its body before continuing.
 3. Link the doc back: append `([#N])` to each step heading, add `(#N)` to each Mermaid node, and add reference-link definitions at the end of the file.
+   Then verify every `[#N]` reference in the file resolves to a matching `[#N]:` definition — `rumdl`'s MD053 flags _unused_ definitions but not _missing_ ones, so a dangling reference inherited from a prior phase's summary passes lint silently; add any missing definitions while you are in the file.
 4. Commit with `docs($1): link Phase N roadmap steps to issues #A-#B` and push.
 
 Finally, restate the recommended working sequence: list the issues as `#N — title` lines in dependency order (a topological order of the step diagram), noting which can proceed in parallel and which are blocked until an earlier one lands.
