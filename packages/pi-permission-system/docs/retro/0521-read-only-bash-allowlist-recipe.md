@@ -32,3 +32,24 @@ The plan is a single-commit build (`/build-plan`), landing the recipe and the ro
 - **Model-performance correlation** — planning ran entirely in the main session; no subagents dispatched (docs-only, small surface).
 - **Feedback-loop gap analysis** — an early `Read` on `config.example.json` / `configuration.md` failed on a wrong absolute path (missing the `pi-packages/` segment); corrected on the next call.
   Minor, no rework.
+
+## Stage: Implementation — Build (2026-07-12T00:00:00Z)
+
+### Session summary
+
+Executed the single-step build plan: added the "Read-Only Bash Command Allowlist" recipe to `packages/pi-permission-system/docs/configuration.md` (conservative curated allowlist + four safety-net cross-references) and marked roadmap Phase 10, Step 6 complete in `docs/architecture/architecture.md` (heading `✅`, Mermaid node `✅`, `Landed:` line).
+Landed in one `docs:` commit (`6e9710fb`).
+No `src/`/`test/` changes.
+
+### Observations
+
+- Verified the recipe's JSONC config block parses (comments stripped), the Step 6 Mermaid node renders via `mmdc`, and `rumdl` + package lint are clean.
+- Followed the plan exactly; no deviations to the recipe content or the excluded-command set (`echo`/`printf`/`tee`/`sort`/`sed`/`awk` omitted as planned).
+- Cross-reference anchors used: `#read-only-mode` (the sibling tool-level recipe) and `#fail-closed-behavior` (the wrapper/exec floor section) — both confirmed present.
+- **Pre-completion reviewer: WARN** (1 non-blocking finding).
+  All deterministic checks passed (`check`, `lint`, `test`, `fallow dead-code`).
+- **Reviewer warnings:** Step 6 is the last of Phase 10's six steps, so Phase 10 is now fully `✅` but the doc lacks phase-level completion — missing `(complete)` suffix on the phase heading, stale "nine completed phases" count (should be ten), no `history/phase-10-*.md`, no phase-table row.
+  This condensation is a materially larger, deliberate phase-close operation (mirrors Phases 7–9) and was intentionally out of the Step 6 recipe scope.
+  Filed as tracked follow-up [#577] to avoid the untracked-deferral (`#479`/`#480`) failure mode.
+
+[#577]: https://github.com/gotgenes/pi-packages/issues/577
