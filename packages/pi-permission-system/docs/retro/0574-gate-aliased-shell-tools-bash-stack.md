@@ -69,3 +69,58 @@ Pre-completion reviewer: **WARN** (no FAILs) — both warnings addressed with fa
   History stayed linear; no conflict.
 - **Release:** ship now — batch "shell-tool-aliases" tail; landing this cuts the release carrying both the deferred `#580` `feat:` and this issue's `feat:` commits.
   Next step: `/ship-issue`.
+
+## Stage: Final Retrospective (2026-07-13T23:40:00Z)
+
+### Session summary
+
+Shipped `#574` end-to-end in one continuous session (plan → TDD → ship → retro): `@gotgenes/pi-permission-system` `v20.6.0`, closing the "shell-tool-aliases" batch (Phase 11 Steps 2–3) alongside `#580`.
+An aliased shell tool (`exec_command`) is now gated at full parity with native `bash` — command decomposition, wrapper flooring, fail-closed sentinel, `bash:` rules, and `workdir`-as-base + `external_directory` gating — landed across a prep refactor and six commits, `+31` tests, CI green on `5523df76`.
+Two operator design interventions and the pre-completion gate each improved the result before it shipped.
+
+### Observations
+
+#### What went well
+
+- **A single Socratic operator question produced a strictly better design with zero shipped churn.**
+  Mid-TDD, the operator asked whether the `command` parameter "should instead be some state in an object that would be a good collaborator" — a redirect delivered as a question, not a correction.
+  Because the step-2 commit was unpushed, `git reset --mixed HEAD~1` dropped it and folded `BashProgram.commandText()` into the feat, so the two bash gates kept their **original** `(tcc, bashProgram, resolver)` signature: the redundant param never shipped and the native-bash regression suites needed zero churn.
+  Recovering from a plan-level design miss with no residue is the notable win.
+- **The pre-completion reviewer earned its keep.**
+  Structural-sharing reasoning had rationalized away the aliased-tool wrapper-flooring / fail-closed tests ("they hold because `resolveBashCommandCheck` is shared"), but the plan's own TDD Red list had promised them as the mitigation for two security invariants.
+  The fresh-context gate flagged the gap; two fast-follow commits (`d7d19d2e`, `c6881403`) closed it before ship, so a future `toolName === "bash"` special-case in the flooring path is now caught by a test.
+- **The `workdir`-as-implicit-`cd` read held from plan to code.**
+  Recognizing at plan time that `PathNormalizer` already separates the containment boundary (baked session cwd) from the resolve base (per-token walk offset) meant `workdir` needed no rearchitecture — seed the initial `EffectiveBase` (via the `deriveBaseFromCdTarget` the prep refactor extracted) and add the workdir's own `AccessPath` to the external set.
+  Containment stayed measured against the session cwd, so a workdir outside cwd cannot widen the sandbox.
+
+#### What caused friction (agent side)
+
+- `wrong-abstraction` (user-caught) — the plan's Design Overview threaded three facets of one concept (`shell`, `command`, `bashProgram`) as separate parameters, where `command` is a projection of `bashProgram` (the parsed form of that same command).
+  The right home was `BashProgram` owning its source command.
+  Neither the plan-time `design-review` pass nor the `tidy-first-assessor` flagged it; the operator did.
+  Impact: one `git reset --mixed HEAD~1` plus a reshape of the step-2/step-3 boundary — no shipped churn (caught pre-push), but the redundant design was committed once before the redirect.
+- `scope-drift` (self-identified via the pre-completion gate) — the plan's TDD step-3 Red list explicitly named the aliased-tool wrapper-flooring and fail-closed test cases, but they were skipped during implementation on the rationale that the behavior holds structurally.
+  Impact: two fast-follow commits before ship; no rework beyond that.
+- `instruction-violation` (self-identified) — named a shell-loop variable `status` in the release-PR poll loop; zsh reserves `$status` read-only, so the first poll aborted with `read-only variable: status`.
+  `AGENTS.md` documents this exact rule ("do not name it `status` … use `state`/`rc`").
+  Impact: one re-run (~15 s); fixed to `state` immediately.
+
+#### What caused friction (user side)
+
+- None material — both operator interventions (the `workdir`/cwd questions at plan time, the `command`-redundancy question at TDD time) were strategic redirects framed as questions, which is the ideal intervention style: each steered a cleaner outcome without dictating the mechanism.
+  If anything, the `command`-redundancy insight could have surfaced at the plan-review gate rather than after step 2 committed — but that is an agent-side design-review gap, not a user one.
+
+### Diagnostic details
+
+- **Model-performance correlation** — both subagents (`tidy-first-assessor`, `pre-completion-reviewer`) ran on `anthropic/claude-sonnet-5`, appropriate for read + judgment work; the main session ran on `anthropic/claude-opus-4-8` with a `sonnet-5` stretch.
+  No reasoning-weak-on-judgment or costly-on-mechanical mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` sequences; the zsh `status` error was resolved in one follow-up call, and the release-PR `UNSTABLE`/`IN_PROGRESS` check was handled by the documented wait-then-retry protocol (no premature `gh pr merge` fallback while a check was running).
+- **Unused-tool detection** — no gaps; `colgrep` drove the planning exploration, and the `tidy-first-assessor` / `pre-completion-reviewer` subagents both ran and both produced actionable findings.
+- **Feedback-loop gap analysis** — verification ran incrementally (per-cycle `tsc` + the affected test file, full suite + root `lint` + `fallow dead-code` at each step boundary), not end-only; the pre-completion gate ran after the last step as designed.
+  No gap.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0574-gate-aliased-shell-tools-bash-stack.md`.
+2. Added a **projection parameter** check to `.pi/skills/design-review/SKILL.md` (check #1, Dependency width): flag a parameter derivable from a sibling parameter and give the value to the object that owns it — the `command`/`bashProgram` redundancy the operator caught mid-TDD.
+   Rationale lives here in the retro; the skill carries the rule plus a one-line example with a `Refs #574` pointer.
