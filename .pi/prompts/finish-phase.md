@@ -75,8 +75,11 @@ For each step outcome, verify the code agrees:
 
 Do not copy a doc metric forward — recompute it:
 
-- Run `pnpm fallow:health` and `pnpm fallow:dupes --workspace @gotgenes/$1` for the current health score, LOC, dead code, and duplication.
-  The fallow scripts are root-level and take `--workspace @gotgenes/$1`; the `--filter`/`-C package` forms used elsewhere do **not** apply to them.
+- When the phase findings table records a recompute command for a metric, **use that exact command** — not the `fallow:health` / `fallow:dupes` scripts.
+  The scripts and the recorded commands can disagree: `pnpm fallow:health` expands to `fallow health --score --hotspots --targets`, and the `--hotspots --targets` flags **lower the score** (a package baselined at 88 A with `fallow health --score` alone reports 78 B under the script).
+  Reconcile against the same command the baseline was computed with, or the "delivered" number will spuriously differ from the target.
+- Only when no recorded command exists, fall back to `pnpm fallow health --score --workspace @gotgenes/$1` and `pnpm fallow dupes --workspace @gotgenes/$1` (the two-word forms, matching the doc's recompute convention).
+  The fallow subcommands are root-level and take `--workspace @gotgenes/$1`; the `--filter`/`-C package` forms used elsewhere do **not** apply to them.
 - "Total LOC" / "Source LOC" counts `src/` only (`find packages/$1/src -name '*.ts' | wc -l` for the file count; `… -exec wc -l {} +` for LOC).
   Test counts come from `pnpm --filter @gotgenes/$1 run test`.
 - If a doc metric carries a mid-phase label ("as of Step N", "Phase N Step M"), replace it with the end-of-phase value and drop the label — the archived doc should read as the settled post-phase baseline, not a snapshot.
@@ -97,6 +100,9 @@ Do not impose a new format.
 1. Create `packages/$1/docs/architecture/history/phase-N-<slug>.md` (create the `history/` directory if the package does not have one yet) and move the **full** detailed roadmap — findings table, numbered steps with outcomes, dependency diagram, and tracks — into it.
    Move the prose verbatim, but **rebase link targets**: same-doc anchors become `../architecture.md#…`, and relative paths gain one `../` level (`../decisions/…` → `../../decisions/…`).
    "Verbatim" applies to the words, not the paths — an un-rebased anchor dangles silently.
+   "Verbatim" governs the step *content and wording*, not the heading level: promoting a `##`-rooted roadmap into a standalone doc shifts every heading up one (`##` → `#` title, `###` → `##`, `#### Step` → `### Step`).
+   Matching the archived per-step *layout* (a numbered `1. ✅ **Title.**` list vs. `#### ✅ Step N:` headings) is **not** required — the live roadmap's own format may already differ from older history files, and preserving the live wording wins over reformatting it.
+   Before moving, verify every `[#N]` reference in the block has a matching `[#N]:` definition somewhere in `architecture.md`; a live roadmap can carry a reference whose definition was never added (it renders as literal `[#N]` text on GitHub) — add the missing definitions to the history file when you move the references.
    Mechanics: author the history file fresh with the `Write` tool, then delete the roadmap from `architecture.md` with a scripted start/end-marker replacement (a small `python3` or `sed` block keyed on the section heading and the next `##` heading).
    Do **not** attempt an `Edit` `oldText` match on the roadmap block — it is typically multiple KB and the match is impractical and error-prone.
 2. In `architecture.md`, replace the detailed roadmap section with a concise completion summary that:
@@ -107,15 +113,20 @@ Do not impose a new format.
 3. Update the "Refactoring history" table/section: mark Phase N **Complete**, link the new history file, and add it to any structural-refactoring-issues mapping table the package keeps.
 4. Update the intro/summary line that enumerates completed phases (e.g. "Phases 1–N complete").
 5. Use reference-style issue links (`[#N]` in the body, `[#N]:` definitions at the end of the file) per `markdown-conventions`, and verify every definition has a matching reference (MD053).
+   Removing the roadmap **orphans** any `[#N]:` definition that was referenced only inside the moved block — after the move, re-run the markdown lint and delete each now-orphaned definition from `architecture.md` (its references moved to history), while confirming the history file defines everything *it* now references.
+   `rumdl` flags these as `MD053` "unused link/image reference"; fix them before committing rather than in a follow-up round-trip.
 
 ## Step 5: Verify and commit
 
 1. Run `pnpm run lint` (or at least the markdown lint) to confirm the documents are clean — fix any `rumdl`/MD0xx findings.
-2. Confirm the move is loss-free with deterministic checks against the history file rather than eyeballing:
-   - `grep -c '^### Step' …/history/phase-N-<slug>.md` equals the step count.
+2. Confirm the move is loss-free with deterministic checks against the history file rather than eyeballing.
+   Do **not** hardcode `^### Step` — the step heading shape varies (a `✅` prefix, and the level shifts up one on promotion), so `grep -c '^### Step'` returns 0 against `### ✅ Step N:` and reads as a false "lost every step" alarm.
+   Detect the actual heading first (`grep -nE '^#+ .*Step [0-9]' …`), then:
+   - a tolerant count — `grep -cE '^#+ .*\bStep [0-9]' …/history/phase-N-<slug>.md` — equals the step count.
    - `grep -c '```mermaid' …` accounts for the dependency diagram (and any others moved).
    - the tracks table and findings table are present.
-   - `architecture.md` retains only the concise summary (the `^### Step` count there is now 0).
+   - the archived phase's section in `architecture.md` retains only the concise summary — **scope the count to that section**, not the whole file, since a coexisting roadmap (another open phase) also carries `Step` headings and makes a whole-file count non-zero.
+     Slice from the `## Improvement roadmap — Phase N …` heading to the next `##` and confirm 0 step headings in that slice (e.g. `awk '/^## Improvement roadmap . Phase N/{f=1} f&&/^## /&&!/Phase N/{f=0} f' architecture.md | grep -cE '^#+ .*\bStep [0-9]'`).
      Also confirm the package skill (`.pi/skills/package-$1/SKILL.md`) — note any stale phase-scored numbers it carries (test counts, file/domain counts); flag them in the hand-off but do not necessarily fix them here.
 3. Once checks pass, commit and push automatically:
 
