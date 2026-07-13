@@ -593,6 +593,56 @@ describe("mergeUnifiedConfigs", () => {
     );
     expect(merged.piInfrastructureReadPaths).toEqual([]);
   });
+
+  it("base shellTools survives when override omits it", () => {
+    const merged = mergeUnifiedConfigs(
+      { shellTools: { exec_command: { commandField: "cmd" } } },
+      {},
+    );
+    expect(merged.shellTools).toEqual({
+      exec_command: { commandField: "cmd" },
+    });
+  });
+
+  it("override shellTools survives when base omits it", () => {
+    const merged = mergeUnifiedConfigs(
+      {},
+      { shellTools: { exec_command: { commandField: "cmd" } } },
+    );
+    expect(merged.shellTools).toEqual({
+      exec_command: { commandField: "cmd" },
+    });
+  });
+
+  it("shallow-merges shellTools by tool name: override adds without dropping base", () => {
+    const merged = mergeUnifiedConfigs(
+      { shellTools: { exec_command: { commandField: "cmd" } } },
+      { shellTools: { run_shell: { commandField: "script" } } },
+    );
+    expect(merged.shellTools).toEqual({
+      exec_command: { commandField: "cmd" },
+      run_shell: { commandField: "script" },
+    });
+  });
+
+  it("override shellTools replaces a colliding tool's alias wholesale", () => {
+    const merged = mergeUnifiedConfigs(
+      {
+        shellTools: {
+          exec_command: { commandField: "cmd", workdirField: "workdir" },
+        },
+      },
+      { shellTools: { exec_command: { commandField: "command" } } },
+    );
+    expect(merged.shellTools).toEqual({
+      exec_command: { commandField: "command" },
+    });
+  });
+
+  it("shellTools is absent when both base and override omit it", () => {
+    const merged = mergeUnifiedConfigs({ debugLog: true }, { yoloMode: false });
+    expect(merged).not.toHaveProperty("shellTools");
+  });
 });
 
 describe("loadAndMergeConfigs", () => {

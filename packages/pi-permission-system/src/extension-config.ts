@@ -2,7 +2,10 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { UnifiedPermissionConfig } from "./config-loader";
+import type {
+  ShellToolsConfig,
+  UnifiedPermissionConfig,
+} from "./config-loader";
 
 export const EXTENSION_ID = "pi-permission-system";
 
@@ -16,6 +19,8 @@ export interface PermissionSystemExtensionConfig {
   toolInputPreviewMaxLength?: number;
   /** Max length of inline pattern/path summaries (grep/find/ls) in permission prompts. Defaults to 80. */
   toolTextSummaryMaxLength?: number;
+  /** Non-bash tools that carry shell semantics, keyed by tool name. */
+  shellTools?: ShellToolsConfig;
 }
 
 export const DEFAULT_EXTENSION_CONFIG: PermissionSystemExtensionConfig = {
@@ -62,6 +67,9 @@ export function normalizePermissionSystemConfig(
   }
   if (raw.toolTextSummaryMaxLength !== undefined) {
     result.toolTextSummaryMaxLength = raw.toolTextSummaryMaxLength;
+  }
+  if (raw.shellTools !== undefined) {
+    result.shellTools = raw.shellTools;
   }
   return result;
 }

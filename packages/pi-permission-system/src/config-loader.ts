@@ -9,6 +9,7 @@ import {
   getProjectConfigPath,
 } from "./config-paths";
 import {
+  type ShellToolsConfig,
   type UnifiedPermissionConfig,
   unifiedConfigSchema,
 } from "./config-schema";
@@ -20,7 +21,7 @@ import { isDenyWithReason, isPermissionState } from "./types";
 // the single source of truth) and re-exported so existing importers keep their
 // import path. All fields are optional so partial configs merge before
 // defaults are applied downstream.
-export type { UnifiedPermissionConfig };
+export type { ShellToolsConfig, UnifiedPermissionConfig };
 
 export interface UnifiedConfigLoadResult {
   config: UnifiedPermissionConfig;
@@ -226,6 +227,19 @@ export function mergeUnifiedConfigs(
     override.piInfrastructureReadPaths ?? base.piInfrastructureReadPaths;
   if (piInfrastructureReadPaths !== undefined) {
     merged.piInfrastructureReadPaths = piInfrastructureReadPaths;
+  }
+
+  // shellTools: shallow-merge by tool name so a project entry overrides a
+  // colliding tool's alias but never drops a global entry (a dropped alias is
+  // a silent enforcement regression).
+  const baseShell = base.shellTools;
+  const overrideShell = override.shellTools;
+  if (baseShell && overrideShell) {
+    merged.shellTools = { ...baseShell, ...overrideShell };
+  } else if (baseShell) {
+    merged.shellTools = baseShell;
+  } else if (overrideShell) {
+    merged.shellTools = overrideShell;
   }
 
   // Permission: deep-shallow merge

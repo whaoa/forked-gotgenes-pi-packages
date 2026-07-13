@@ -134,6 +134,22 @@ describe("normalizePermissionSystemConfig", () => {
     const result = normalizePermissionSystemConfig({});
     expect("toolTextSummaryMaxLength" in result).toBe(false);
   });
+
+  it("includes shellTools when provided", () => {
+    const result = normalizePermissionSystemConfig({
+      shellTools: {
+        exec_command: { commandField: "cmd", workdirField: "workdir" },
+      },
+    });
+    expect(result.shellTools).toEqual({
+      exec_command: { commandField: "cmd", workdirField: "workdir" },
+    });
+  });
+
+  it("omits shellTools when absent", () => {
+    const result = normalizePermissionSystemConfig({});
+    expect("shellTools" in result).toBe(false);
+  });
 });
 
 describe("isYoloModeEnabled", () => {
