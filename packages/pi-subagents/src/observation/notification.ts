@@ -55,7 +55,7 @@ export function formatTaskNotification(record: Subagent, resultMaxLen: number): 
       : record.result
     : "No output.";
 
-  const toolCallId = record.notification?.toolCallId;
+  const toolCallId = record.toolCallId;
   const outputFile = record.outputFile;
   return [
     "<task-notification>",

@@ -89,6 +89,23 @@ describe("Subagent — constructor", () => {
 		expect(record.abortController.signal.aborted).toBe(false);
 	});
 
+	it("toolCallId reflects execution.parentSession.toolCallId", () => {
+		const record = makeSubagent({ execution: makeStubExecution({ parentSession: { toolCallId: "tc-42" } }) });
+		expect(record.toolCallId).toBe("tc-42");
+	});
+
+	it("toolCallId is undefined when parentSession.toolCallId is absent", () => {
+		const record = makeSubagent({
+			execution: makeStubExecution({ parentSession: { parentSessionFile: "/sessions/p.jsonl" } }),
+		});
+		expect(record.toolCallId).toBeUndefined();
+	});
+
+	it("toolCallId is undefined when parentSession is absent", () => {
+		const record = makeSubagent();
+		expect(record.toolCallId).toBeUndefined();
+	});
+
 	it("creates NotificationState when execution.parentSession.toolCallId is provided", () => {
 		const record = makeSubagent({ execution: makeStubExecution({ parentSession: { toolCallId: "tc-42" } }) });
 		expect(record.notification).toBeDefined();

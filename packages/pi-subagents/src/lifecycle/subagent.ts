@@ -121,6 +121,11 @@ export class Subagent {
 		return this.subagentSession?.outputFile;
 	}
 
+	/** The tool call ID that spawned this background agent, if any. */
+	get toolCallId(): string | undefined {
+		return this.execution.parentSession?.toolCallId;
+	}
+
 	/** Returns true when a SubagentSession is available (session is ready). */
 	isSessionReady(): boolean {
 		return this.subagentSession != null;
