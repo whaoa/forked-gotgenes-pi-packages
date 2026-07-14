@@ -966,12 +966,15 @@ Characterization tests pin the edge families on both flavors as an equivalence n
 
 Release: independent
 
-#### Step 6: Survey exec-capable CLI rewrites for indirection-wrapper flooring ([#575])
+#### ✅ Step 6: Survey exec-capable CLI rewrites for indirection-wrapper flooring ([#575])
 
 **Cause:** the [#490] wrapper tables were seeded from a fixed inventory; exec-capable rewrites outside it (`parallel`, `setsid`, `stdbuf`, `watch`, …) can still launder a payload under a permissive `allow` — the fail-safe floor is only as good as the inventory ([#575]).
 
 - **Smell:** Category C residue (bash-surface hardening).
 - **Target:** survey, then extend `INDIRECTION_WRAPPER_NAMES` / `EXEC_CONDITIONAL_WRAPPERS` (`src/access-intent/bash/command-enumeration.ts`) with adopted entries plus tests; record rejected candidates in the issue.
+- **Landed:** eight always-invoke wrappers added to `INDIRECTION_WRAPPER_NAMES` — the parallelizers `parallel`/`rust-parallel`/`rush`, the `sudo` rewrite `doas`, and the prefix wrappers `setsid`/`stdbuf`/`watch`/`flock` — each pinned by a `program.test.ts` classifier row.
+  None is exec-flag-conditional (each always invokes its command), so `EXEC_CONDITIONAL_WRAPPERS` was untouched.
+  Rejected as non-exec: `sad` (batch file editor), `fselect` (SQL file search), `runiq` (line dedupe); `gargs` is exec-capable but declined this round (niche).
 - **Outcome:** a documented inventory decision; each adopted wrapper floored to `ask` with a test.
 - **Impact 2 / Risk 1 / Priority 10.**
 
@@ -997,7 +1000,7 @@ flowchart TD
     S3["✅ Step 3: Bash-stack gating for aliased shell tools (#574)"]
     S4["✅ Step 4: Inline keybind permission dialog (#573)"]
     S5["✅ Step 5: Containment unification (#571)"]
-    S6["Step 6: Indirection-wrapper survey (#575)"]
+    S6["✅ Step 6: Indirection-wrapper survey (#575)"]
     S7["Step 7: Model-judge decision record (#581)"]
     S1 --> S3
     S2 --> S3
