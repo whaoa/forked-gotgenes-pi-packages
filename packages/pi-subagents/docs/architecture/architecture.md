@@ -114,7 +114,7 @@ classDiagram
         +toolUses: number
         +lifetimeUsage: LifetimeUsage
         +subagentSession?: SubagentSession
-        +notification?: NotificationState
+        +toolCallId?: string
         +markRunning() delegates
         +markCompleted() delegates
         +run()
@@ -318,8 +318,7 @@ src/
 │
 ├── observation/                    progress tracking and notification
 │   ├── record-observer.ts          session-event stats observer
-│   ├── notification.ts             completion nudges
-│   ├── notification-state.ts       per-agent notification tracking
+│   ├── notification.ts             completion nudges + per-agent consumed-result tracking
 │   ├── renderer.ts                 notification TUI component
 │   ├── composite-subagent-observer.ts fans manager notifications out to multiple observers
 │   └── subagent-events-observer.ts manager lifecycle observer (event emission + persistence + notification)
@@ -941,7 +940,7 @@ Directory organization is healthy (seven domain directories, six root files) —
 
 ### Steps
 
-#### Step 1 — Extract result delivery from `Subagent` ([#535])
+#### ✅ Step 1 — Extract result delivery from `Subagent` ([#535])
 
 Smell: Category C (anemic domain / misplaced state, Law of Demeter, scattered resets) — the result-delivery domain named in the first-principles refinement is still fused into the execution record.
 Target files:
@@ -955,6 +954,9 @@ The `toolCallId` needed by `formatTaskNotification` already travels on `executio
 The pre-await consumption ordering (the "Bug 1" race tests in `test/lifecycle/subagent-manager.test.ts`) is a preserved invariant — consuming before awaiting must still suppress the completion nudge.
 
 Outcome: zero `record.notification?.` reach-throughs in `src/`; `Subagent` carries no notification field; delivery state lives in the observation domain.
+
+Landed: `notification-state.ts` deleted; `Subagent.toolCallId` getter added over `execution.parentSession`; `NotificationManager` owns `consumed: Set<string>` behind one `consume(id)` tell that adds to the set and cancels the pending nudge atomically.
+Collapsing the old two-step reset (`markConsumed()` + `cancelNudge()`) into one atomic operation structurally eliminates the historical "Bug 1" race rather than just reordering it — `consume()` now suppresses the nudge regardless of whether it runs before or after the completion promise resolves, as long as it runs within the 200 ms hold window.
 
 `Release: batch "result-delivery"`
 
@@ -1063,7 +1065,7 @@ Outcome: in-package clone groups 9 → ≤ 5; duplicated lines 81 → ≤ 40.
 
 ```mermaid
 flowchart LR
-    S1["Step 1 (#535)<br/>Result delivery off Subagent"] --> S2["Step 2 (#536)<br/>Decompose get-result-tool"]
+    S1["✅ Step 1 (#535)<br/>Result delivery off Subagent"] --> S2["Step 2 (#536)<br/>Decompose get-result-tool"]
     S1 -.soft.-> S7["Step 7 (#541)<br/>Decompose notification renderer"]
     S3["Step 3 (#537)<br/>Steer returns an outcome"]
     S4["Step 4 (#538)<br/>Type the model boundary"]

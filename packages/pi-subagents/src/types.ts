@@ -108,7 +108,7 @@ export interface ParentSessionInfo {
 	parentSessionFile?: string;
 	/** Session ID of the parent agent (stored in the child session's parentSession header). */
 	parentSessionId?: string;
-	/** Tool call ID for background notification wiring. When set, spawn attaches NotificationState. */
+	/** Tool call ID for background notification wiring. Exposed on the record via Subagent.toolCallId. */
 	toolCallId?: string;
 }
 
