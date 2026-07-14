@@ -23,3 +23,22 @@ Next stage is `/build-plan` (no test cycles).
 - `Release: independent` per the roadmap — docs-only `docs:` commits, no batch, cuts no release on its own.
 - Grep confirmed `ModelTriageAuthorizer` appears only in `architecture.md` — no `src/`/`test/`/README surface references the not-yet-built symbol, so no code or user-doc edits are in scope.
 - Build stage must mark Step 7 `✅` on both the heading and the `S7` Mermaid node, and link the ADR from the `Discriminating delegation` section, in the implementation commit (not deferred to ship).
+
+## Stage: Implementation — Build (2026-07-14T00:00:00Z)
+
+### Session summary
+
+Executed the docs-only plan in three commits: authored `docs/decisions/0007-model-triage-authorizer.md` (the six settled parameters, rejected alternatives, accepted limitations), marked Phase 11 Step 7 `✅` (heading + `S7` Mermaid node) with an ADR link in the `Discriminating delegation` section and a refreshed [#472] deferral reference, then reconciled a stale non-persistence parenthetical the pre-completion reviewer flagged.
+No `src/`/`test/` changes; `pnpm run lint` and `rumdl` green throughout.
+Next stage is `/ship-issue`.
+
+### Observations
+
+- Pre-completion reviewer: **WARN** (1 non-blocking finding), now resolved.
+  Reviewer warning: the architecture doc's `Discriminating delegation` non-persistence bullet still offered `(or is persisted quarantined for human review)`, which ADR 0007 §5 explicitly rejects — fixed in commit `a9831a4a` (`it stays live-only, per ADR 0007`).
+  This was exactly the cross-doc consistency the plan's `Invariants at risk` section named; the parenthetical lived at line 627, outside the section the plan's grep targeted.
+- Deviation from plan scope: **Phase 11 close deferred.**
+  All 7 Phase 11 steps are now `✅`, but the plan scoped this build to marking Step 7 only.
+  Flipping the Phase 11 heading to `(complete)` and extracting its details to a `history/phase-11-*.md` file (the pattern Phases 9–10 follow) is a distinct phase-close activity the plan did not include — now unblocked as a follow-up, best done at `/retro` or a dedicated phase-close pass.
+- Step 3 (comment on [#472] linking the ADR) is deferred to `/ship-issue` per the plan — no code change.
+- Mermaid `S7` node render verified by the reviewer (`mmdc` rendered all 4 diagrams cleanly).
