@@ -1023,7 +1023,7 @@ Tracks B–E are independent of Track A and of each other.
 Phase 10 cleared the two repeated-discriminator families filed as planning input — tool-kind dispatch (`toolName === "bash"`/`"mcp"` re-derivation) and the win32 path flavor (`platform === "win32"` re-derivation) — collapsing both to a single dispatch point (`ToolKind` classification and `PathFlavor`, respectively), plus closed the bash advisory-fidelity gap ([#309]), floored indirection wrappers (`sudo`/`env`/`xargs`/…) to `ask` ([#490]), and documented a read-only bash allowlist recipe ([#521]).
 
 All 6 steps are closed: [#568], [#569], [#562], [#309], [#490], [#521].
-Follow-on issues filed during the phase — [#571] (unify `subagent-context` containment onto `PathFlavor.isWithin`) and [#575] (survey other exec-capable CLI rewrites for indirection-wrapper flooring) — remain open and non-gating.
+Follow-on issues filed during the phase — [#571] (unify `subagent-context` containment onto `PathFlavor.isWithin`) and [#575] (survey other exec-capable CLI rewrites for indirection-wrapper flooring) — were carried into Phase 11 as Steps 5 and 6 respectively; [#571] is now closed.
 Open issues swept and confirmed out of scope during planning: [#561] (superseded by Steps 1–2), [#564] (mislabeled for this package), [#519] (deferred — SDK `UIContext` evolution), [#472] (deferred — `ModelTriageAuthorizer`), [#565] (stays open — non-gating Phase 9 post-ship observation), [#23] (closed as resolved-by-events).
 
 Full findings, step details, dependency diagram, and release batches: [history/phase-10-decide-once-dispatch-bash-surface-hardening.md](history/phase-10-decide-once-dispatch-bash-surface-hardening.md).
