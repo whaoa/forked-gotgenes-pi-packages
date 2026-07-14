@@ -42,4 +42,51 @@ Pre-completion reviewer returned **PASS**.
 - `rust-parallel`'s hyphen matches the set entry verbatim (`basename` splits only on `/`), confirmed green by its classifier row.
 - Pre-completion reviewer: **PASS**, no warnings.
 
+## Stage: Final Retrospective (2026-07-14T21:51:21Z)
+
+### Session summary
+
+Shipped #575 across three stages (plan → TDD → ship) in a single continuous session with zero rework: five commits (one `fix`, three `docs`, one plan), +8 tests, PASS review, released as `pi-permission-system-v20.7.2`.
+The issue was a survey/evaluation follow-up to #490, and its predecessor's retro had already de-risked the design (the floor mechanism was fully wired), so the whole change reduced to eight strings appended to one `Set` plus matching test rows and doc-enumeration syncs.
+Friction was effectively nil; the session is a clean baseline for the "well-scoped follow-up executes mechanically" pattern.
+
+### Observations
+
+#### What went well
+
+- **The #490 retro paid forward directly.**
+  Planning read `docs/retro/0490-floor-indirection-wrappers.md` and lifted two load-bearing facts from it: the floor half needs no code beyond the `Set` edit (the `WRAPPER_SENTINEL` `indirection` key and advisory reuse already exist), and the change is a behavior-tightening `fix:` not a breaking change.
+  Both held exactly, so the plan's "entire production change is 8 strings" prediction was literally true — a cross-session context bridge working as designed.
+- **Grounded the survey with `web_search` before deciding.**
+  Three `web_search` batches classified every candidate by the single criterion "does it run an inner command per input or as a subcommand?"
+  — confirming `sad`/`fselect`/`runiq` are non-exec (reject) and `flock` has a bare-fd form that over-floors (accepted edge), rather than guessing from tool names.
+  The evidence then fed a crisp `ask_user` inventory confirmation.
+- **Smooth handling of the release-PR `UNSTABLE` edge case.**
+  `release_pr_merge` refused on `merge_state: UNSTABLE`; per the ship prompt's step 6.4, checked `statusCheckRollup` (a non-empty rollup with a check `IN_PROGRESS`), waited it out via `ci_watch` (~180s), then retried `release_pr_merge` successfully — never fell back to `gh pr merge` while a check was running.
+
+#### What caused friction (agent side)
+
+- `other` — during the ship stage I ran `git rev-parse HEAD | wc -c` and `git rev-parse abddb7b7 | wc -c` to "verify" a SHA after a false-alarm worry that 41 characters was too long (41 = 40 hex + newline, entirely normal).
+  Impact: two throwaway bash calls, no rework — a momentary over-verification reflex, not a systemic gap.
+  Self-identified.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's single `ask_user` interaction (adopt the 8 wrappers, decline `gargs`, plan-only rejection notes) was a clean, decisive inventory confirmation with no back-and-forth.
+
+### Diagnostic details
+
+- **Model-performance correlation** — two subagent dispatches, both on `anthropic/claude-sonnet-5`: `tidy-first-assessor` (read-only, returned "nothing warranted" in 27.5s) and `pre-completion-reviewer` (judgment-heavy: design, cross-step invariants, Mermaid validation, 119.6s / 27 tool uses).
+  Both appropriate matches; no mismatch.
+  The parent session ran mostly on `claude-opus-4-8` with a brief `claude-sonnet-5` stint — operator's choice, no correlation concern.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the longest same-topic run was the two-call SHA-length check above, well under the 5-call flag.
+- **Unused-tool detection** — none; `web_search` (survey) and the two subagents were the right tools and were used.
+- **Feedback-loop gap analysis** — no gap: `vitest` ran after Red and after Green, and `check`/`lint`/`fallow dead-code` ran after the docs commit — incremental, not end-loaded.
+
+### Changes made
+
+1. `packages/pi-permission-system/docs/retro/0575-survey-exec-capable-wrappers.md` — this Final Retrospective stage entry.
+   No `AGENTS.md` or prompt changes: the session was clean with no actionable friction, and the two candidate rule changes (a tidy-first "trivial change" carve-out; an anti-SHA-re-verification note) were considered and rejected as judgment-creep / one-off noise.
+
 [#490]: https://github.com/gotgenes/pi-packages/issues/490
