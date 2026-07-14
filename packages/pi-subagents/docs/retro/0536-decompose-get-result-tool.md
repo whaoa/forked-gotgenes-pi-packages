@@ -24,4 +24,21 @@ Produced a two-step plan (atomic extract-and-rewire refactor → docs/skill sync
   Moving the terminal consume ahead of `buildReport` is behavior-neutral (consume mutates `notifications`; report building only reads the record).
 - No `ask_user` gate: the issue is the operator's own, refactor-only, and the decomposition is roadmap-specified with no design ambiguity.
 
+## Stage: Implementation — TDD (2026-07-13T23:50:00Z)
+
+### Session summary
+
+Implemented both planned TDD steps: (1) extracted the pure report formatter into `src/tools/get-result-report.ts` (`AgentReport` value object plus `renderStatsParts` / `renderReportBody` / `formatAgentReport`) and rewired `GetResultTool.execute` to gather the report via a new private `buildReport` method and delegate to the formatter, in one atomic commit; (2) synced `docs/architecture/architecture.md` (module tree, Step 2 `✅` heading + `Landed:` bullet, roadmap Mermaid `S2` tick, discovery-finding-4 prose) and `.pi/skills/package-pi-subagents/SKILL.md` (Tools domain row 8 → 9, file total 56 → 57).
+Test count: 62 → 63 files, 946 → 960 tests (14 new formatter unit tests; `test/tools/get-result-tool.test.ts` unchanged, matching the plan's "no structural rewrite" expectation).
+Full monorepo `pnpm run check`, `pnpm run lint`, `pnpm run test`, and `pnpm fallow dead-code` all green; no lockfile changes.
+Pre-completion reviewer: **PASS** on all sections (deterministic checks, code design, docs forward/reverse, test artifacts, Mermaid, cross-step invariants, follow-up issues).
+
+### Observations
+
+- The `tidy-first-assessor` found no preparatory tidying warranted — `execute` was already organized into clearly comment-delimited sections that mapped 1:1 onto the plan's extracted pieces, and the plan's own `fallow dead-code` constraint (formatter must be wired in the same commit it's added) forbids splitting the extraction into two commits, so there was no legitimate tidy-first move available.
+- The extraction landed exactly as planned — no deviations.
+  The plan's code sketches were transcribed near-verbatim; the only judgment call was ordering the terminal `consume()` call before `buildReport()` in the shell (both plan and implementation agree this is behavior-neutral since `buildReport` only reads the record).
+- Confirmed via `fallow health --complexity` that `get-result-tool.execute` no longer appears in the complexity findings, verifying the plan's Goal ("off the fallow high-complexity list") — the monorepo-wide `fallow health` still exits non-zero on pre-existing unrelated findings in other packages (`pi-permission-system`, `pi-autoformat`), which is expected and out of scope.
+- Release remains `ship now — batch "result-delivery" tail`; this issue completes the batch opened by Step 1 (#535), so the batched release-please PR should be merged at ship time.
+
 [#535]: https://github.com/gotgenes/pi-packages/issues/535
