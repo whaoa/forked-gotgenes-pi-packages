@@ -1,3 +1,4 @@
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 import type {
   PermissionPromptDecision,
@@ -100,6 +101,22 @@ describe("presentInlinePermissionPrompt", () => {
     expect(text).toContain("No, provide reason");
     expect(text).toContain("y");
     expect(text).toContain("r");
+  });
+
+  it("clips every rendered line to the terminal width", () => {
+    const { view, captured } = makeFakeView(true);
+    const longMessage = `Run ${"ls -t ~/.pi/agent/sessions/".repeat(20)}`;
+    void presentInlinePermissionPrompt(
+      view,
+      "Permission Required",
+      longMessage,
+    );
+    const width = 40;
+    const lines = captured.component?.render(width) ?? [];
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+    }
   });
 
   describe("double-press to confirm (enabled)", () => {
