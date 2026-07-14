@@ -55,4 +55,44 @@ The plan's `**Release:** ship now — batch "result-delivery" tail (this issue c
 No new findings at this stage — pre-completion review already ran PASS during the TDD stage.
 Branch is about to be rebased onto `origin/main`; no conflicts expected (no other work has landed on `main` touching `packages/pi-subagents/` since this branch's baseline fetch, per the Step 1 (#535) retro's own ship-stage note).
 
+## Stage: Final Retrospective (2026-07-14T18:46:24Z)
+
+### Session summary
+
+Four sessions across the parallel-worktree flow (Planning → TDD → Ship (worktree) → Land) shipped Phase 20 Step 2: `GetResultTool.execute` decomposed into a thin wait/consume shell plus a pure `get-result-report.ts` formatter, released as `pi-subagents-v18.0.2` completing the `result-delivery` batch (#535 + #536).
+The land session (`/land-worktree 536`) ran the flow clean — ff-merge, push, CI PASS, issue close, release-please PR #589 merged by rebase, worktree torn down — with zero rework across all four stages.
+The execution was notably friction-free: pre-completion review PASSed on the first pass, the rebase and ff-merge were clean, and the release bumped only the expected package.
+
+### Observations
+
+#### What went well
+
+- The whole multi-session flow landed with no deviations from the plan and no rework — the plan's code sketches transcribed near-verbatim, the extraction hit its CRAP target, and every gate (pre-completion PASS, clean rebase, clean ff-merge, single-package release) passed first try.
+- The `tidy-first-assessor` correctly recognized there was *no* legitimate preparatory move: `execute` was already comment-delimited into sections mapping 1:1 onto the plan's extracted pieces, and the `fallow dead-code` same-commit-wiring constraint forbade splitting the extraction — so it recommended nothing rather than inventing busywork.
+- The land session's judgment checkpoints were all navigated correctly despite running on a reasoning-weak model (see Diagnostic details): it identified that only #536 was open (checking #535/#443/#470 states), read the plan's `**Release:** ship now` marker, and verified PR #589 bumped only `pi-subagents` before merging.
+
+#### What caused friction (agent side)
+
+- `other` — the land session's issue-range sweep used `grep -oP` (call 17), which fails on macOS BSD `grep` (no `-P`/PCRE support), then self-corrected to `grep -Eo` on the next call (call 18).
+  Impact: one wasted tool call, self-corrected immediately, no rework.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's involvement was routine oversight of an autonomous flow; no earlier context-sharing or redirecting question would have changed the outcome.
+
+### Diagnostic details
+
+- **Model-performance correlation** — stage-to-model assignments were well-matched at the judgment-heavy ends and defensible in the middle: Planning ran on `anthropic/claude-opus-4-8` (design evaluation — procedure-splitting vs. genuine improvement, ISP value-object shape, invariant preservation), TDD + Ship ran on `anthropic/claude-sonnet-5` (implementation + mechanical git), and this Final Retrospective on `anthropic/claude-opus-4-8` (synthesis).
+  The **Land** session ran on `opencode-go/deepseek-v4-flash`, a reasoning-weak model.
+  The land flow is predominantly mechanical (ff-merge, push, CI watch, teardown), but it carries three judgment checkpoints — which issues to close, constructing the close comment, and interpreting the plan's `**Release:**` marker to release-vs-defer — all navigated correctly here.
+  No quality mismatch materialized, but the land flow's judgment content is a latent risk on a weak model; worth watching if a future land involves a deferred-release marker or a multi-issue close.
+- **Feedback-loop gap analysis** — no gap.
+  The TDD session verified incrementally: `pnpm run check` after the interface change (per the `testing` skill's type-check-before-commit rule), the affected test file after each Red/Green, then the full suite + root lint + `fallow dead-code` after the last step — not a single end-of-session batch.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-subagents/docs/retro/0536-decompose-get-result-tool.md`.
+   No `AGENTS.md` or `.pi/prompts/` changes — the session was friction-free and produced no process-change proposals (a single self-corrected `grep -oP` slip and a model-selection observation, neither warranting a rule).
+
 [#535]: https://github.com/gotgenes/pi-packages/issues/535
