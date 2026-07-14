@@ -87,11 +87,11 @@ export class SubagentsServiceAdapter implements SubagentsService {
 
   async steer(id: string, message: string): Promise<boolean> {
     const record = this.manager.getRecord(id);
-    if (record?.status !== "running") {
+    if (!record) {
       return false;
     }
-    await record.steer(message);
-    return true;
+    const outcome = await record.steer(message);
+    return outcome.kind !== "rejected";
   }
 
   async waitForAll(): Promise<void> {

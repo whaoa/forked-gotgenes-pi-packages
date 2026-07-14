@@ -356,10 +356,7 @@ describe("SubagentsServiceAdapter — steer, abort, waitForAll, hasRunning", () 
   describe("steer", () => {
     it("returns false for non-running agent", async () => {
       const mgr = createManagerStub();
-      mgr.getRecord.mockReturnValue({
-        id: "a-1",
-        status: "completed",
-      } as Subagent);
+      mgr.getRecord.mockReturnValue(createTestSubagent({ id: "a-1", status: "completed" }));
       const svc = createSvc(mgr);
       expect(await svc.steer("a-1", "hurry")).toBe(false);
     });

@@ -192,19 +192,32 @@ describe("Subagent — session-encapsulation methods", () => {
 	});
 
 	describe("steer", () => {
-		it("buffers message and returns false when session not ready", async () => {
+		it("rejects with the observed status when the agent is not running", async () => {
 			const agent = makeSubagent();
-			const delivered = await agent.steer("hello");
-			expect(delivered).toBe(false);
+			agent.markCompleted("done");
+			const stub = createSubagentSessionStub();
+			agent.subagentSession = toSubagentSession(stub);
+			const outcome = await agent.steer("hello");
+			expect(outcome).toEqual({ kind: "rejected", status: "completed" });
+			expect(stub.steer).not.toHaveBeenCalled();
+			expect(agent.pendingSteerCount).toBe(0);
+		});
+
+		it("buffers the message and returns a buffered outcome when the session is not ready", async () => {
+			const agent = makeSubagent();
+			agent.markRunning(Date.now());
+			const outcome = await agent.steer("hello");
+			expect(outcome).toEqual({ kind: "buffered" });
 			expect(agent.pendingSteerCount).toBe(1);
 		});
 
-		it("delivers message to session and returns true when session is ready", async () => {
+		it("delivers to the session and returns a delivered outcome when the session is ready", async () => {
 			const agent = makeSubagent();
+			agent.markRunning(Date.now());
 			const stub = createSubagentSessionStub();
 			agent.subagentSession = toSubagentSession(stub);
-			const delivered = await agent.steer("go faster");
-			expect(delivered).toBe(true);
+			const outcome = await agent.steer("go faster");
+			expect(outcome).toEqual({ kind: "delivered" });
 			expect(stub.steer).toHaveBeenCalledWith("go faster");
 			expect(agent.pendingSteerCount).toBe(0);
 		});
@@ -492,6 +505,9 @@ describe("Subagent.run() — happy path", () => {
 
 	it("flushes pending steers when session is created", async () => {
 		const agent = createRunnableAgent();
+		// A steer arriving while the agent is running but the session is not yet
+		// ready buffers; run() flushes it once the session is created.
+		agent.markRunning(Date.now());
 		void agent.steer("hurry up");
 		expect(agent.pendingSteerCount).toBe(1);
 		await agent.run();

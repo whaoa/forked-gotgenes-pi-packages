@@ -7,6 +7,7 @@ import type { AgentSessionEvent, SessionContext as SdkSessionContext } from "@ea
 import type { ModelRegistry } from "#src/session/model-resolver";
 
 
+export type { SteerOutcome } from "#src/lifecycle/subagent";
 export { Subagent } from "#src/lifecycle/subagent";
 export type { AgentSessionEvent, ThinkingLevel };
 

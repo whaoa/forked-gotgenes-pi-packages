@@ -36,6 +36,16 @@ export interface SubagentLifecycleObserver {
 export type { SubagentStatus } from "#src/lifecycle/subagent-state";
 
 /**
+ * The result of a steer attempt. `Subagent.steer` owns the non-running
+ * rejection rule and reports it here, so coordinators switch on the outcome
+ * instead of pre-checking status (tell by id, with outcomes).
+ */
+export type SteerOutcome =
+	| { kind: "delivered" }
+	| { kind: "buffered" }
+	| { kind: "rejected"; status: SubagentStatus };
+
+/**
  * The execution machinery a Subagent needs to run. A single mandatory
  * collaborator: production (SubagentManager.spawn) always supplies it, so run()
  * needs no "not configured" guards. The genuinely-optional behavior knobs stay
@@ -129,16 +139,21 @@ export class Subagent {
 	}
 
 	/**
-	 * Deliver or buffer a steer message.
-	 * Returns true when delivered immediately; false when buffered for later delivery.
+	 * Steer a running agent, owning the non-running rejection rule.
+	 * Returns a `rejected` outcome (with the observed status) when the agent is
+	 * not running, a `buffered` outcome when the session is not yet ready, or a
+	 * `delivered` outcome once the message reaches the session.
 	 */
-	async steer(message: string): Promise<boolean> {
+	async steer(message: string): Promise<SteerOutcome> {
+		if (this.status !== "running") {
+			return { kind: "rejected", status: this.status };
+		}
 		if (!this.subagentSession) {
 			this.queueSteer(message);
-			return false;
+			return { kind: "buffered" };
 		}
 		await this.subagentSession.steer(message);
-		return true;
+		return { kind: "delivered" };
 	}
 
 	/** Return the session conversation as formatted text, or undefined if no session. */
