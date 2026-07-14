@@ -334,6 +334,7 @@ src/
 │   ├── foreground-runner.ts        foreground execution loop
 │   ├── background-spawner.ts       background spawn setup
 │   ├── get-result-tool.ts          get_subagent_result tool
+│   ├── get-result-report.ts        pure get_subagent_result report formatter
 │   ├── steer-tool.ts               steer_subagent tool
 │   └── helpers.ts                  shared tool utilities
 │
@@ -918,7 +919,7 @@ Discovery findings (fallow + entry-point trace + test-constructibility audit, 20
 1. `NotificationState` (`toolCallId`, `resultConsumed`) still lives on `Subagent`; `get-result-tool` reaches through `record.notification?.markConsumed()` twice, always paired with `notifications.cancelNudge(id)` — the doc's own "homeless field" (result-delivery domain) plus a scattered two-step reset.
 2. Both `steer-tool` and `service-adapter` pre-check `status !== "running"` before calling `record.steer()` — ask-then-tell, contradicting the target's "tell by id, with outcomes" rule.
 3. Five file-level eslint-disable headers (`agent-tool` disables 6 rules; `spawn-config` and `agent-widget` 4 each; `model-resolver` 2; `index` 1) and `model: unknown`/`Model<any>`/`any` threading through 8 files mark the SDK type boundary as the largest remaining `any` surface.
-4. Three src functions carry HIGH CRAP scores (notification renderer arrow 79.4, `service-adapter.spawn` 71.3, `get-result-tool.execute` 63.6); `subagents-settings.handle` (13 cyclomatic, 24 cognitive) is three copy-pasted select→input→validate→apply branches; `service-adapter.ts` is the sole accelerating churn file.
+4. Three src functions carry HIGH CRAP scores (notification renderer arrow 79.4, `service-adapter.spawn` 71.3, `get-result-tool.execute` 63.6 — resolved by Step 2); `subagents-settings.handle` (13 cyclomatic, 24 cognitive) is three copy-pasted select→input→validate→apply branches; `service-adapter.ts` is the sole accelerating churn file.
 5. `createTestSubagent` is the most complex function in the workspace (19 cyclomatic, 25 cognitive) because `SubagentStateInit` accepts only transition fields, forcing mutation loops to seed metrics — a Category D "shared factory complexity" signal pointing at the production init surface.
 6. Test duplication sits at 9 in-package clone groups (81 lines), at the ≤ 10 target but with two consolidatable clone families.
 
@@ -960,7 +961,7 @@ Collapsing the old two-step reset (`markConsumed()` + `cancelNudge()`) into one 
 
 `Release: batch "result-delivery"`
 
-#### Step 2 — Decompose `get-result-tool.execute` ([#536])
+#### ✅ Step 2 — Decompose `get-result-tool.execute` ([#536])
 
 Smell: Category B (oversized function) — 61 lines, 15 cyclomatic, CRAP 63.6; mixes wait/consume policy, stats formatting, and output assembly.
 Target files:
@@ -969,6 +970,10 @@ Target files:
 - `test/tools/get-result-tool.test.ts` — unit-test the pure formatter directly.
 
 Outcome: `execute` ≤ 30 lines with cyclomatic < 10; off the fallow high-complexity list.
+
+Landed: `src/tools/get-result-report.ts` added — `AgentReport` value object plus `renderStatsParts` / `renderReportBody` / `formatAgentReport` pure functions, unit-tested directly in `test/tools/get-result-report.test.ts`.
+`GetResultTool.execute` now owns only record lookup and the wait/consume policy (13 lines), delegating report assembly to a private `buildReport` + `formatAgentReport`; output is byte-identical.
+`get-result-tool.execute` is off the HIGH-CRAP list (3 → 2 remaining: `service-adapter.spawn`, the notification renderer arrow).
 
 `Release: batch "result-delivery"`
 
@@ -1065,7 +1070,7 @@ Outcome: in-package clone groups 9 → ≤ 5; duplicated lines 81 → ≤ 40.
 
 ```mermaid
 flowchart LR
-    S1["✅ Step 1 (#535)<br/>Result delivery off Subagent"] --> S2["Step 2 (#536)<br/>Decompose get-result-tool"]
+    S1["✅ Step 1 (#535)<br/>Result delivery off Subagent"] --> S2["✅ Step 2 (#536)<br/>Decompose get-result-tool"]
     S1 -.soft.-> S7["Step 7 (#541)<br/>Decompose notification renderer"]
     S3["Step 3 (#537)<br/>Steer returns an outcome"]
     S4["Step 4 (#538)<br/>Type the model boundary"]
