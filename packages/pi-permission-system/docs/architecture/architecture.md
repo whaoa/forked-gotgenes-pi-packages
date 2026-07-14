@@ -624,7 +624,7 @@ Where yolo rewrites every `ask` to `allow`, the model resolves only the asks it 
 Three properties keep it reviewable and fail-closed:
 
 - **Audited** — a model grant is tagged `origin: "authorizer:model"` (with model version and the structured intent) so the review log distinguishes it from a human, policy, or yolo allow, mirroring how yolo grants carry `origin: "yolo"`.
-- **Non-persistent** — unlike a human's "for this session" ruling, a model verdict does *not* silently become recorded authority; it stays live-only (or is persisted quarantined for human review), so a probabilistic judgment never hardens into durable config.
+- **Non-persistent** — unlike a human's "for this session" ruling, a model verdict does *not* silently become recorded authority; it stays live-only, per ADR 0007 (`docs/decisions/0007-model-triage-authorizer.md`), so a probabilistic judgment never hardens into durable config.
 - **Fail-closed** — model unreachable, timeout, or low confidence delegates to `inner` (the human, the `ParentAuthorizer`, or `DenyingAuthorizer`), never an auto-allow; bounded delegation (which surfaces the model may auto-allow) is itself ruleset-expressible, with `external_directory` and secret-shaped `path` rules excluded so they always reach the human.
 
 This is the principled successor to the per-command argument-position work deferred from [#509].
