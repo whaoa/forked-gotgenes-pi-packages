@@ -602,6 +602,8 @@ It is not built, and it would be requested by name, never conflated with yolo.
 
 ### Discriminating delegation: a model `Authorizer`
 
+The design below is recorded as a decision in ADR 0007 (`docs/decisions/0007-model-triage-authorizer.md`); implementation is tracked in [#472].
+
 Nothing constrains an `Authorizer` to be deterministic.
 `LocalUserAuthorizer` is already a non-deterministic oracle — the human — and the determinism principle governs *recorded* authority (`evaluate()`), never the live-authority layer.
 A model (e.g. Claude Haiku) can hold the `Authorizer` role on the same terms: it is live authority, so it never touches `evaluate()` or the deterministic core.
@@ -896,7 +898,7 @@ Recompute commands (run from the repo root):
 - [#573] — scheduled as Step 4.
 - [#571] — scheduled as Step 5.
 - [#575] — scheduled as Step 6.
-- [#472] — two-phase repeat deferral resolved by decision: Step 7 writes its decision record this phase; implementation remains future work gated on that ADR.
+- [#472] — two-phase repeat deferral resolved by decision: Step 7 recorded the decision (ADR 0007, `docs/decisions/0007-model-triage-authorizer.md`); implementation remains future work gated on that ADR.
 - [#519] — stays open by decision (not a silent sweep): blocked on Pi SDK UIContext evolution; Step 4's select-fallback constraint keeps frontend-driven flows working meanwhile.
 - [#565] — stays open, non-gating: the designated post-ship observation of the Phase 9 serving decisions, and now also the evidence-gathering input for the Phase 12 cross-session intent spine.
 
@@ -980,7 +982,7 @@ Release: independent
 
 Release: independent
 
-#### Step 7: Decision record for the case-by-case judge ([#581])
+#### ✅ Step 7: Decision record for the case-by-case judge ([#581])
 
 **Cause:** [#472] has been deferred by name in Phases 9 and 10; the repeat-deferral rule requires a decision this phase, and the [`ModelTriageAuthorizer` design](#discriminating-delegation-a-model-authorizer) is settled enough to commit to paper — deciding the open parameters is what stands between "designed" and "schedulable".
 
@@ -1001,7 +1003,7 @@ flowchart TD
     S4["✅ Step 4: Inline keybind permission dialog (#573)"]
     S5["✅ Step 5: Containment unification (#571)"]
     S6["✅ Step 6: Indirection-wrapper survey (#575)"]
-    S7["Step 7: Model-judge decision record (#581)"]
+    S7["✅ Step 7: Model-judge decision record (#581)"]
     S1 --> S3
     S2 --> S3
 ```
