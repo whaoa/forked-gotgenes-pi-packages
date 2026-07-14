@@ -1,6 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { AgentConfigLookup } from "#src/config/agent-types";
+import { type AgentReport, formatAgentReport } from "#src/tools/get-result-report";
 import { formatLifetimeTokens, textResult } from "#src/tools/helpers";
 import type { Subagent } from "#src/types";
 import { formatDuration, getDisplayName } from "#src/ui/display";
@@ -45,41 +46,29 @@ export class GetResultTool {
 			await record.promise;
 		}
 
-		const displayName = getDisplayName(record.type, this.registry);
-		const duration = formatDuration(record.startedAt, record.completedAt);
-		const tokens = formatLifetimeTokens(record);
-		const contextPercent = record.getContextPercent();
-		const statsParts = [`Tool uses: ${record.toolUses}`];
-		if (tokens) statsParts.push(tokens);
-		if (contextPercent !== null) statsParts.push(`Context: ${Math.round(contextPercent)}%`);
-		if (record.compactionCount) statsParts.push(`Compactions: ${record.compactionCount}`);
-		statsParts.push(`Duration: ${duration}`);
-
-		let output =
-			`Agent: ${record.id}\n` +
-			`Type: ${displayName} | Status: ${record.status} | ${statsParts.join(" | ")}\n` +
-			`Description: ${record.description}\n\n`;
-
-		if (record.status === "running") {
-			output += "Agent is still running. Use wait: true or check back later.";
-		} else if (record.status === "error") {
-			output += `Error: ${record.error}`;
-		} else {
-			output += record.result?.trim() ?? "No output.";
-		}
-
-		// Consume the result — suppresses the completion notification
+		// Consume the settled result — suppresses the completion notification.
 		if (record.status !== "running" && record.status !== "queued") {
 			this.notifications.consume(params.agent_id);
 		}
 
-		// Verbose: include full conversation
-		const conversation = params.verbose ? record.getConversation() : undefined;
-		if (conversation) {
-			output += `\n\n--- Agent Conversation ---\n${conversation}`;
-		}
+		return textResult(formatAgentReport(this.buildReport(record, params.verbose)));
+	}
 
-		return textResult(output);
+	private buildReport(record: Subagent, verbose?: boolean): AgentReport {
+		return {
+			id: record.id,
+			displayName: getDisplayName(record.type, this.registry),
+			status: record.status,
+			toolUses: record.toolUses,
+			tokens: formatLifetimeTokens(record),
+			contextPercent: record.getContextPercent(),
+			compactionCount: record.compactionCount,
+			duration: formatDuration(record.startedAt, record.completedAt),
+			description: record.description,
+			result: record.result,
+			error: record.error,
+			conversation: verbose ? record.getConversation() : undefined,
+		};
 	}
 
 	toToolDefinition() {
