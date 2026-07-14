@@ -80,7 +80,6 @@ describe("Subagent — constructor", () => {
 		expect(record.completedAt).toBeUndefined();
 		expect(record.promise).toBeUndefined();
 		expect(record.subagentSession).toBeUndefined();
-		expect(record.notification).toBeUndefined();
 	});
 
 	it("always creates its own AbortController", () => {
@@ -106,23 +105,6 @@ describe("Subagent — constructor", () => {
 		expect(record.toolCallId).toBeUndefined();
 	});
 
-	it("creates NotificationState when execution.parentSession.toolCallId is provided", () => {
-		const record = makeSubagent({ execution: makeStubExecution({ parentSession: { toolCallId: "tc-42" } }) });
-		expect(record.notification).toBeDefined();
-		expect(record.notification!.toolCallId).toBe("tc-42");
-	});
-
-	it("does not create NotificationState when toolCallId is absent", () => {
-		const record = makeSubagent({
-			execution: makeStubExecution({ parentSession: { parentSessionFile: "/sessions/p.jsonl" } }),
-		});
-		expect(record.notification).toBeUndefined();
-	});
-
-	it("does not create NotificationState when parentSession is absent", () => {
-		const record = makeSubagent();
-		expect(record.notification).toBeUndefined();
-	});
 });
 
 describe("convenience getters", () => {

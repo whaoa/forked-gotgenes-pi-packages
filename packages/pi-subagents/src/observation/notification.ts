@@ -123,15 +123,21 @@ export function buildEventData(record: Subagent) {
 // ---- Notification system factory ----
 
 export interface NotificationSystem {
-  cancelNudge: (key: string) => void;
   sendCompletion: (record: Subagent) => void;
   dispose: () => void;
 }
 
+/** Delivery-consumption operation: get-result-tool's dependency on NotificationManager. */
+export interface ResultDelivery {
+  /** Record the parent consumed this agent's result: suppress its completion nudge. */
+  consume: (id: string) => void;
+}
+
 const NUDGE_HOLD_MS = 200;
 
-export class NotificationManager implements NotificationSystem {
+export class NotificationManager implements NotificationSystem, ResultDelivery {
   private pendingNudges = new Map<string, ReturnType<typeof setTimeout>>();
+  private consumed = new Set<string>();
 
   constructor(
     private sendMessage: (
@@ -140,21 +146,28 @@ export class NotificationManager implements NotificationSystem {
     ) => void,
   ) {}
 
-  cancelNudge(key: string): void {
-    const timer = this.pendingNudges.get(key);
-    if (timer != null) {
-      clearTimeout(timer);
-      this.pendingNudges.delete(key);
-    }
+  consume(id: string): void {
+    this.consumed.add(id);
+    this.cancelNudge(id);
   }
 
   sendCompletion(record: Subagent): void {
+    if (this.consumed.has(record.id)) return;
     this.scheduleNudge(record.id, () => this.emitIndividualNudge(record));
   }
 
   dispose(): void {
     for (const timer of this.pendingNudges.values()) clearTimeout(timer);
     this.pendingNudges.clear();
+    this.consumed.clear();
+  }
+
+  private cancelNudge(key: string): void {
+    const timer = this.pendingNudges.get(key);
+    if (timer != null) {
+      clearTimeout(timer);
+      this.pendingNudges.delete(key);
+    }
   }
 
   private scheduleNudge(key: string, send: () => void, delay = NUDGE_HOLD_MS): void {
@@ -173,7 +186,7 @@ export class NotificationManager implements NotificationSystem {
   }
 
   private emitIndividualNudge(record: Subagent): void {
-    if (record.notification?.resultConsumed) return;
+    if (this.consumed.has(record.id)) return;
 
     const notification = formatTaskNotification(record, 500);
     const outputFile = record.outputFile;

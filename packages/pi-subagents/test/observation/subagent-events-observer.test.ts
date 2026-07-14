@@ -6,7 +6,6 @@ import { createTestSubagent } from "#test/helpers/make-subagent";
 
 function makeNotifications(): NotificationSystem {
 	return {
-		cancelNudge: vi.fn(),
 		sendCompletion: vi.fn(),
 		dispose: vi.fn(),
 	};
@@ -107,7 +106,7 @@ describe("SubagentEventsObserver", () => {
 			});
 		});
 
-		it("calls notifications.sendCompletion when result is not consumed", () => {
+		it("calls notifications.sendCompletion unconditionally — the manager decides whether to nudge", () => {
 			const notifications = makeNotifications();
 			const { observer } = makeObserver({ notifications });
 			const record = createTestSubagent({ status: "completed" });
@@ -115,17 +114,6 @@ describe("SubagentEventsObserver", () => {
 			observer.onSubagentCompleted(record);
 
 			expect(notifications.sendCompletion).toHaveBeenCalledExactlyOnceWith(record);
-		});
-
-		it("does not call sendCompletion when result is already consumed", () => {
-			const notifications = makeNotifications();
-			const { observer } = makeObserver({ notifications });
-			const record = createTestSubagent({ status: "completed", toolCallId: "tc-1" });
-			record.notification!.markConsumed();
-
-			observer.onSubagentCompleted(record);
-
-			expect(notifications.sendCompletion).not.toHaveBeenCalled();
 		});
 
 		it("emits exactly once and appends exactly once per call", () => {

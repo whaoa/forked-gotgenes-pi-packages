@@ -17,7 +17,6 @@ import { SubagentState, type SubagentStatus } from "#src/lifecycle/subagent-stat
 import type { LifetimeUsage } from "#src/lifecycle/usage";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
 import { WorkspaceBracket } from "#src/lifecycle/workspace-bracket";
-import { NotificationState } from "#src/observation/notification-state";
 import { subscribeSubagentObserver } from "#src/observation/record-observer";
 import type { RunConfig } from "#src/runtime";
 import type { AgentInvocation, CompactionInfo, ParentSessionInfo, SessionMessage, SubagentType, ThinkingLevel } from "#src/types";
@@ -108,8 +107,6 @@ export class Subagent {
 	private readonly workspaceBracket: WorkspaceBracket;
 
 	subagentSession?: SubagentSession;
-	private _notification?: NotificationState;
-	get notification(): NotificationState | undefined { return this._notification; }
 
 	// Steer buffer — messages queued before the session is ready
 	private _pendingSteers: string[] = [];
@@ -197,12 +194,6 @@ export class Subagent {
 		this.workspaceBracket = new WorkspaceBracket(
 			this.execution.getWorkspaceProvider ?? (() => undefined),
 		);
-
-		// Notification state — created from parentSession.toolCallId if present
-		const toolCallId = init.execution.parentSession?.toolCallId;
-		if (toolCallId) {
-			this._notification = new NotificationState(toolCallId);
-		}
 	}
 
 	/**

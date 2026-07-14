@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConcurrencyLimiter } from "#src/lifecycle/concurrency-limiter";
 import type { CreateSubagentSessionParams } from "#src/lifecycle/create-subagent-session";
 import { SubagentManager, type SubagentManagerObserver } from "#src/lifecycle/subagent-manager";
 import type { SubagentSession } from "#src/lifecycle/subagent-session";
 import type { WorkspaceProvider } from "#src/lifecycle/workspace";
-import { NotificationState } from "#src/observation/notification-state";
+import { NotificationManager } from "#src/observation/notification";
 import type { RunConfig } from "#src/runtime";
 import type { Subagent } from "#src/types";
 import { createBlockingFactory, createSessionFactory } from "#test/helpers/manager-stubs";
@@ -83,63 +83,64 @@ function arrangeQueuedPair() {
 }
 
 /**
- * Arrange a manager whose onSubagentCompleted observer records the record's
- * resultConsumed flag, with one background agent spawned via a tool call.
- * The act (when markConsumed is called relative to awaiting) stays in each test.
+ * Arrange a manager whose onSubagentCompleted observer forwards to a real
+ * NotificationManager (mirroring SubagentEventsObserver's unconditional
+ * sendCompletion delegation), with one background agent spawned via a tool
+ * call. The act (when consume() is called relative to awaiting) stays in
+ * each test.
  */
-function seedResultConsumedObserver() {
-  let seenConsumed: boolean | undefined;
+function seedNotificationScenario() {
+  const sendMessage = vi.fn();
+  const notifications = new NotificationManager(sendMessage);
   const { manager } = createManager({
-    observer: { onSubagentCompleted: (r) => { seenConsumed = r.notification?.resultConsumed; } },
+    observer: { onSubagentCompleted: (r) => notifications.sendCompletion(r) },
   });
   const id = spawnBgWithToolCall(manager, "tc-1");
   const record = manager.getRecord(id)!;
-  return { manager, record, getSeenConsumed: () => seenConsumed };
+  return { manager, record, notifications, sendMessage };
 }
 
-describe("SubagentManager — Bug 1 race condition (notification.resultConsumed vs onComplete)", () => {
+describe("SubagentManager — Bug 1 race condition (consumed state vs onComplete)", () => {
   let manager: SubagentManager;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
 
   afterEach(() => {
     manager.dispose();
+    vi.useRealTimers();
   });
 
-  it("reproduces bug: onComplete fires with resultConsumed=false when markConsumed called after await", async () => {
-    const seeded = seedResultConsumedObserver();
+  it("consume() called after awaiting still suppresses the nudge — the atomic consume() operation", async () => {
+    const seeded = seedNotificationScenario();
     manager = seeded.manager;
-    const { record } = seeded;
+    const { record, notifications, sendMessage } = seeded;
 
-    // Simulate the buggy get_subagent_result: await THEN mark consumed
+    // onSubagentCompleted already scheduled the nudge by the time this await
+    // resumes (it fires synchronously inside record.promise's resolution
+    // chain, as the original Bug 1 comment noted). consume() still cancels
+    // it because it always cancels the pending timer as part of one atomic
+    // tell — unlike the old markConsumed()-only flag, which needed a
+    // separately paired cancelNudge() call to actually kill the timer.
     await record.promise;
-    record.notification!.markConsumed(); // too late — onComplete already fired
+    notifications.consume(record.id);
 
-    // onComplete saw resultConsumed as false — would queue a notification (the bug)
-    expect(seeded.getSeenConsumed()).toBeFalsy();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  it("fix: onComplete sees resultConsumed=true when markConsumed called before await", async () => {
-    const seeded = seedResultConsumedObserver();
+  it("fix: nudge is suppressed when consume() is called before await", async () => {
+    const seeded = seedNotificationScenario();
     manager = seeded.manager;
-    const { record } = seeded;
+    const { record, notifications, sendMessage } = seeded;
 
-    // The fix: pre-mark BEFORE awaiting
-    record.notification!.markConsumed();
+    // The fix: consume BEFORE awaiting
+    notifications.consume(record.id);
     await record.promise;
 
-    expect(seeded.getSeenConsumed()).toBe(true);
-  });
-
-  it("normal case: onComplete fires with no notification when agent was not spawned via tool", async () => {
-    let completedRecord: Subagent | undefined;
-    ({ manager } = createManager({ observer: { onSubagentCompleted: (r) => {
-      completedRecord = r;
-    } } }));
-
-    const id = spawnBg(manager);
-    await manager.getRecord(id)!.promise;
-
-    expect(completedRecord).toBeDefined();
-    expect(completedRecord!.notification).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 
   it("onComplete is not called for foreground agents", async () => {
@@ -751,19 +752,17 @@ describe("SubagentManager — toolCallId notification wiring", () => {
     manager.dispose();
   });
 
-  it("wires NotificationState on spawn when toolCallId is provided", () => {
+  it("wires toolCallId on spawn when provided", () => {
     ({ manager } = createManager());
 
     const id = spawnBgWithToolCall(manager, "tc-42", "test", "bg");
     const record = manager.getRecord(id)!;
 
-    expect(record.notification).toBeInstanceOf(NotificationState);
-    expect(record.notification!.toolCallId).toBe("tc-42");
-    expect(record.notification!.resultConsumed).toBe(false);
+    expect(record.toolCallId).toBe("tc-42");
     manager.abort(id);
   });
 
-  it("does not wire NotificationState when toolCallId is absent", () => {
+  it("toolCallId is undefined when absent", () => {
     ({ manager } = createManager());
 
     const id = manager.spawn(STUB_SNAPSHOT, "general-purpose", "test", {
@@ -772,7 +771,7 @@ describe("SubagentManager — toolCallId notification wiring", () => {
     });
     const record = manager.getRecord(id)!;
 
-    expect(record.notification).toBeUndefined();
+    expect(record.toolCallId).toBeUndefined();
     manager.abort(id);
   });
 });

@@ -68,13 +68,11 @@ describe("formatTaskNotification", () => {
     expect(xml).toContain("No output.");
   });
 
-  it("includes toolCallId from record.notification when present", () => {
+  it("includes toolCallId from record.toolCallId when present", () => {
     const record = createTestSubagent({ toolCallId: "tc-123" });
     const xml = formatTaskNotification(record, 500);
     expect(xml).toContain("<tool-use-id>tc-123</tool-use-id>");
   });
-
-
 
   it("excludes toolCallId when absent", () => {
     const xml = formatTaskNotification(baseRecord, 500);
@@ -189,15 +187,6 @@ describe("NotificationManager", () => {
     lifetimeUsage: { input: 100, output: 200, cacheWrite: 0 },
   });
 
-  it("cancelNudge prevents a scheduled nudge from firing", () => {
-    const args = makeArgs();
-    const system = makeManager(args);
-    system.sendCompletion(baseRecord);
-    system.cancelNudge("agent-1");
-    vi.advanceTimersByTime(300);
-    expect(args.sendMessage).not.toHaveBeenCalled();
-  });
-
   it("sendCompletion schedules a nudge after the hold delay", () => {
     const args = makeArgs();
     const system = makeManager(args);
@@ -206,12 +195,20 @@ describe("NotificationManager", () => {
     expect(args.sendMessage).toHaveBeenCalledOnce();
   });
 
-  it("sendCompletion skips nudge when notification.resultConsumed is true", () => {
+  it("sendCompletion skips nudge when the record was already consumed", () => {
     const args = makeArgs();
     const system = makeManager(args);
-    const record = createTestSubagent({ toolCallId: "tc-1" });
-    record.notification!.markConsumed();
-    system.sendCompletion(record);
+    system.consume(baseRecord.id);
+    system.sendCompletion(baseRecord);
+    vi.advanceTimersByTime(300);
+    expect(args.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("consume cancels an already-scheduled nudge", () => {
+    const args = makeArgs();
+    const system = makeManager(args);
+    system.sendCompletion(baseRecord);
+    system.consume(baseRecord.id);
     vi.advanceTimersByTime(300);
     expect(args.sendMessage).not.toHaveBeenCalled();
   });
@@ -223,5 +220,17 @@ describe("NotificationManager", () => {
     system.dispose();
     vi.advanceTimersByTime(300);
     expect(args.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("dispose clears consumed state", () => {
+    const args = makeArgs();
+    const system = makeManager(args);
+    system.consume(baseRecord.id);
+    system.dispose();
+    // After dispose, a fresh sendCompletion for the same id is no longer
+    // suppressed — consumed state does not leak across sessions.
+    system.sendCompletion(baseRecord);
+    vi.advanceTimersByTime(300);
+    expect(args.sendMessage).toHaveBeenCalledOnce();
   });
 });

@@ -27,7 +27,7 @@ export interface TestSubagentOptions {
 	description?: string;
 	invocation?: AgentInvocation;
 	execution?: SubagentExecution;
-	/** Shorthand to wire a NotificationState via the constructor path. Ignored when execution is supplied. */
+	/** Shorthand to set execution.parentSession.toolCallId. Ignored when execution is supplied. */
 	toolCallId?: string;
 	/** Passive lifecycle state shorthands. */
 	status?: SubagentStatus;

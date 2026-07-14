@@ -64,9 +64,7 @@ export class SubagentEventsObserver implements SubagentManagerObserver {
 			completedAt: record.completedAt,
 		});
 
-		// Skip notification if result was already consumed via get_subagent_result.
-		if (record.notification?.resultConsumed) return;
-
+		// The manager decides whether to nudge (it owns the consumed-result state).
 		this.notifications.sendCompletion(record);
 	}
 

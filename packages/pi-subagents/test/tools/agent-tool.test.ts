@@ -156,7 +156,7 @@ describe("AgentTool — background execution", () => {
 		expect(result.content[0].text).toContain("background");
 	});
 
-	it("passes parentSession.toolCallId to manager.spawn so the manager wires NotificationState", async () => {
+	it("passes parentSession.toolCallId to manager.spawn", async () => {
 		const deps = createToolDeps();
 		deps.manager.getRecord = vi.fn().mockReturnValue(createTestSubagent({ status: "running" }));
 		await execute(deps, {

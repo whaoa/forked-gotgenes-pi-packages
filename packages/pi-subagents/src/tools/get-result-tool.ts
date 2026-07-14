@@ -12,7 +12,7 @@ export interface GetResultToolManager {
 }
 
 export interface GetResultToolNotifications {
-	cancelNudge(key: string): void;
+	consume(id: string): void;
 }
 
 // ---- Class ----
@@ -37,14 +37,11 @@ export class GetResultTool {
 		}
 
 		// Wait for completion if requested.
-		// Pre-mark resultConsumed BEFORE awaiting: onComplete fires inside .then()
-		// (attached earlier at spawn time) and always runs before this await resumes.
-		// Setting the flag here prevents a redundant follow-up notification.
+		// Consume BEFORE awaiting: onComplete fires inside .then() (attached
+		// earlier at spawn time) and always runs before this await resumes.
+		// Consuming here prevents a redundant follow-up notification.
 		if (params.wait && record.status === "running" && record.promise) {
-			// Pre-mark consumed BEFORE awaiting — onComplete fires inside .then() and
-			// always runs before this await resumes. Prevents a redundant notification.
-			record.notification?.markConsumed();
-			this.notifications.cancelNudge(params.agent_id);
+			this.notifications.consume(params.agent_id);
 			await record.promise;
 		}
 
@@ -71,10 +68,9 @@ export class GetResultTool {
 			output += record.result?.trim() ?? "No output.";
 		}
 
-		// Mark result as consumed — suppresses the completion notification
+		// Consume the result — suppresses the completion notification
 		if (record.status !== "running" && record.status !== "queued") {
-			record.notification?.markConsumed();
-			this.notifications.cancelNudge(params.agent_id);
+			this.notifications.consume(params.agent_id);
 		}
 
 		// Verbose: include full conversation
