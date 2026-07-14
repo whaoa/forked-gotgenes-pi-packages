@@ -41,4 +41,18 @@ Pre-completion reviewer: **PASS** on all sections (deterministic checks, code de
 - Confirmed via `fallow health --complexity` that `get-result-tool.execute` no longer appears in the complexity findings, verifying the plan's Goal ("off the fallow high-complexity list") — the monorepo-wide `fallow health` still exits non-zero on pre-existing unrelated findings in other packages (`pi-permission-system`, `pi-autoformat`), which is expected and out of scope.
 - Release remains `ship now — batch "result-delivery" tail`; this issue completes the batch opened by Step 1 (#535), so the batched release-please PR should be merged at ship time.
 
+## Stage: Ship (worktree) (2026-07-14T03:35:00Z)
+
+### Session summary
+
+Pre-push checks passed clean: `pnpm run lint` (root) and `pnpm fallow dead-code` (root) both succeeded with no findings.
+The plan's `**Release:** ship now — batch "result-delivery" tail (this issue completes the batch)` marker still applies — this step completes the batch opened by Step 1 (#535), so the batched release-please PR should be merged at land/ship time, not deferred further.
+
+**Peer session transcript:** `/Users/chris/.pi/agent/sessions/--Users-chris-development-pi-pi-packages-worktrees-issue-536--/2026-07-14T03-30-27-749Z_019f5ead-0f25-7fe6-87b8-9f59f0c7834a.jsonl` — read with `read_session_file({ path: "<path>" })` for message-level verification at land/retro time.
+
+### Observations
+
+No new findings at this stage — pre-completion review already ran PASS during the TDD stage.
+Branch is about to be rebased onto `origin/main`; no conflicts expected (no other work has landed on `main` touching `packages/pi-subagents/` since this branch's baseline fetch, per the Step 1 (#535) retro's own ship-stage note).
+
 [#535]: https://github.com/gotgenes/pi-packages/issues/535
