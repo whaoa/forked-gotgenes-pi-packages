@@ -21,24 +21,6 @@ export function normalizeFilesystemPath(
   return flavor.fold(flavor.impl.normalize(pathValue));
 }
 
-function isPathWithinDirectoryForSubagent(
-  pathValue: string,
-  directory: string,
-  flavor: PathFlavor,
-): boolean {
-  if (!pathValue || !directory) {
-    return false;
-  }
-
-  if (pathValue === directory) {
-    return true;
-  }
-
-  const sep = flavor.impl.sep;
-  const prefix = directory.endsWith(sep) ? directory : `${directory}${sep}`;
-  return pathValue.startsWith(prefix);
-}
-
 /**
  * Return `true` when `ctx` belongs to an in-process subagent child registered
  * in `registry` by its session id.
@@ -101,9 +83,5 @@ export function isSubagentExecutionContext(
     subagentSessionsDir,
     flavor,
   );
-  return isPathWithinDirectoryForSubagent(
-    normalizedSessionDir,
-    normalizedSubagentRoot,
-    flavor,
-  );
+  return flavor.isWithin(normalizedSessionDir, normalizedSubagentRoot);
 }

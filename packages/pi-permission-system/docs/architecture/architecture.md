@@ -951,10 +951,13 @@ Release: batch "shell-tool-aliases"
 
 Release: independent
 
-#### Step 5: Unify subagent-context containment onto `PathFlavor.isWithin` ([#571])
+#### ✅ Step 5: Unify subagent-context containment onto `PathFlavor.isWithin` ([#571])
 
 **Cause:** two containment algorithms answer "is this path inside that directory?"
 — the path gates use `PathFlavor.isWithin` (Node `path.relative` geometry) while subagent detection uses a string-prefix check that diverges on `..` segments and prefix-sharing siblings; a must-agree pair with two algorithms is the [#562] connascence class, behavior-affecting where they diverge ([#571]).
+
+**Landed:** the swap is a one-line call replacement plus deletion of the 13-line private helper; behavior is preserved for every realistic input, because `isSubagentExecutionContext` normalizes both operands through `normalizeFilesystemPath` first — `..` collapses and the trailing-separator prefix already rejected sibling-prefix dirs, so the two algorithms agree on all normalized-absolute session paths (session dirs are always absolute).
+Characterization tests pin the edge families on both flavors as an equivalence net rather than a behavior change.
 
 - **Smell:** Category C (must-agree duplicate algorithm).
 - **Target:** `src/authority/subagent-context.ts` (replace the prefix check with `flavor.isWithin`), pinned edge-case tests (`..` in a session dir, sibling directory sharing a prefix, cross-root), delete the private helper.
@@ -993,7 +996,7 @@ flowchart TD
     S2["✅ Step 2: shellTools alias config model (#580)"]
     S3["✅ Step 3: Bash-stack gating for aliased shell tools (#574)"]
     S4["✅ Step 4: Inline keybind permission dialog (#573)"]
-    S5["Step 5: Containment unification (#571)"]
+    S5["✅ Step 5: Containment unification (#571)"]
     S6["Step 6: Indirection-wrapper survey (#575)"]
     S7["Step 7: Model-judge decision record (#581)"]
     S1 --> S3
