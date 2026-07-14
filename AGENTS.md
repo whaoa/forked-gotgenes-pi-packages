@@ -46,6 +46,11 @@ It is informational — not a turn boundary.
 Continue the current step (e.g. Red→Green→Commit) until it is complete.
 It also reflows what you just wrote (line wrapping, quote style), so an `oldText` built from the layout you emitted can fail to match — re-read a region you just edited before editing it again.
 
+### Stale prompt-template expansion
+
+A slash command's expanded body is a snapshot from when the Pi process loaded it — so after this session edits a `.pi/prompts/*.md` template, a later same-process invocation of that command can run the **pre-edit** copy.
+When the pasted prompt body contradicts the on-disk file (e.g. you just changed `/ship-issue` and its steps read stale), treat the **on-disk file as authoritative** and follow it, not the injected text (Refs #586).
+
 ### Edit tool batches
 
 A multi-edit `Edit` call is atomic: if one `oldText` fails to match, the whole batch is rejected and nothing is applied.

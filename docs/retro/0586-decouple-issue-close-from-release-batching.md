@@ -38,3 +38,44 @@ Single `docs:` commit, no deviations from the plan.
 - Pre-completion reviewer verdict: **PASS**.
   Verified all four planned edits landed verbatim, confirmed no other doc references the old coupled behavior (reverse check), and confirmed both named "Invariants at risk" (the step-4 CI-failure gate and the unchanged "Release coordination" defer ask) hold by inspection.
 - All steps completed; nothing remains for this issue before `/ship-issue`.
+
+## Stage: Final Retrospective (2026-07-13T00:00:00Z)
+
+### Session summary
+
+Shipped #586 cleanly across three stages (plan → build → ship) in one continuous session: decoupled the issue close from the release-batch decision in `.pi/prompts/ship-issue.md` steps 4b/5/6, bringing the trunk flow into parity with `/land-worktree`'s already-correct contract.
+One notable meta-event: the `/ship-issue` invocation expanded a **stale** copy of `ship-issue.md` — the pre-edit version, before this same session's commit `0265e995` — and the agent self-detected the divergence and followed the on-disk file instead.
+No rework, no rabbit holes, no instruction violations; pre-completion reviewer returned PASS.
+
+### Observations
+
+#### What went well
+
+- **Stale-prompt-template self-detection (novel).**
+  At `/ship-issue` (turn 38), the pasted template body was the pre-edit `ship-issue.md` (old step 4b: "stop here — leave the issue open and skip steps 5–6").
+  The agent noticed the mismatch, ran `grep -n "issue \*\*always\*\*"` against the on-disk file, confirmed commit `0265e995` had landed the decoupling, and followed the on-disk version — all in 2 tool calls, self-identified, zero harm.
+  This is the first observed instance of a session editing the very prompt template a later same-process invocation then runs.
+- **Planning found the `/land-worktree` precedent before designing.**
+  Turn 6–7 read `land-worktree.md` and discovered it already implements Fix 1 (decoupled close/release), which reframed the whole change as "bring the trunk flow into parity" rather than "invent a contract" — and dissolved Fix 1's stated downside (both flows already cite `Implemented in <sha>`, never a version).
+- **`ask_user` gate used correctly for a genuine fork.**
+  The issue laid out two candidate fixes; the agent surfaced the Fix 1 vs Fix 2 choice with the `/land-worktree` precedent as context rather than silently picking one.
+
+#### What caused friction (agent side)
+
+- None material.
+  The stale-template event (above) added ~2 tool calls of verification but caused no rework, and for this issue's `release now` decision the stale and fresh templates would have produced the same outcome (both close the issue) — the divergence only bites on a `mid-batch — defer` decision.
+
+#### What caused friction (user side)
+
+- None.
+  The three stage prompts drove the flow; no correction or redirection was needed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — planning ran on `claude-opus-4-8` (judgment-heavy: design fork, precedent discovery), build + ship on `claude-sonnet-5` (mechanical: single edit, deterministic ship steps), retro on `claude-opus-4-8`.
+  The `pre-completion-reviewer` subagent (turn 32) ran under sonnet-5 for a docs-only verification — appropriate scope, no mismatch.
+- **Escalation-delay / unused-tool / feedback-loop lenses** — nothing notable: no `rabbit-hole` or `missing-context` friction points; `pnpm run lint` and `rumdl` were run after the edit and again at ship pre-push, not batched to the end.
+
+### Changes made
+
+1. `AGENTS.md` — added a "Stale prompt-template expansion" subsection under "Tool-injected messages": a later same-process invocation of a just-edited `.pi/prompts/*.md` template can run the pre-edit copy, so treat the on-disk file as authoritative when the pasted body diverges (Refs #586).
