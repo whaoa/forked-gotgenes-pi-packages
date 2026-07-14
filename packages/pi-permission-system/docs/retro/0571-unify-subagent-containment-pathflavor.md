@@ -25,4 +25,26 @@ The roadmap (`docs/architecture/architecture.md` Step 5) already scoped the work
   Historical helper mentions in older plans/retros are dated records, left as-is.
 - **No follow-ups filed** — the change is fully self-contained.
 
+## Stage: Implementation — TDD (2026-07-13T23:35:00Z)
+
+### Session summary
+
+Executed the two-step plan: added 8 characterization tests pinning subagent-context containment edge cases (`..` escape/re-entry, cross-root, sibling-prefix) on both `posixPathFlavor` and `win32PathFlavor`, then swapped `isSubagentExecutionContext`'s branch-3 call onto `flavor.isWithin(...)` and deleted the 13-line private `isPathWithinDirectoryForSubagent` helper.
+Suite went 2456 → 2464 tests (+8); `grep -c 'startsWith(prefix)' src/authority/subagent-context.ts` is now 0.
+
+### Observations
+
+- **Behavior parity held exactly as planned.**
+  The characterization tests passed green against the old prefix helper and stayed green after the swap — confirming the plan's finding that both algorithms agree on all normalized-absolute session paths (both operands are `normalizeFilesystemPath`'d first, collapsing `..` and folding win32 case/separators).
+  No red→green; this was cover-then-refactor under green throughout.
+- **Tidy-First assessor: no required prep.**
+  It flagged one optional `describe.each` parameterization of the session-dir block but declined to recommend it, on the grounds that rewriting the existing posix tests (the equivalence anchors) adds churn to the safety net; I skipped it, keeping discrete tests legible as a literal before/after record.
+- **Pre-completion reviewer: WARN** (1 non-blocking finding) — the Phase 10 summary line still listed [#571] as "remain open and non-gating."
+  Fixed in a follow-up `docs:` commit noting it was carried into Phase 11 Step 5 and is now closed.
+  All deterministic gates (check/lint/test/fallow) PASS.
+- **Doc marking landed in the refactor commit** (not deferred to ship): Step 5 `✅` on the heading and Mermaid `S5` node, plus a `Landed:` note recording the parity finding.
+  The health-metric row already targeted 0, so no value edit was needed.
+- No deviations from the plan's Module-Level Changes; no follow-up issues warranted.
+
 [#562]: https://github.com/gotgenes/pi-packages/issues/562
+[#571]: https://github.com/gotgenes/pi-packages/issues/571
