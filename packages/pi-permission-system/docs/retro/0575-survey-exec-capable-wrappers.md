@@ -25,4 +25,21 @@ Plan filed at `docs/plans/0575-survey-exec-capable-wrappers.md`; two TDD cycles 
   Surfaces using a `…` ellipsis (`README.md`, `bash-command.ts`, `program.ts`, `architecture.md` lines 756/761) stay accurate without edits.
 - Release: **ship independently** (Step 6 is `Release: independent`; not a member of the "shell-tool-aliases" batch).
 
+## Stage: Implementation — TDD (2026-07-14T21:35:00Z)
+
+### Session summary
+
+Implemented the single planned TDD cycle plus the docs commit: added 8 always-invoke wrappers (`parallel`/`rust-parallel`/`rush`/`doas`/`setsid`/`stdbuf`/`watch`/`flock`) to `INDIRECTION_WRAPPER_NAMES` in `command-enumeration.ts`, pinned by 8 new `program.test.ts` classifier rows, then synced the `configuration.md` and package-skill enumerations and marked Phase 11 Step 6 `✅`.
+Test count went 2464 → 2472 (+8); `check`, root `lint`, and `fallow dead-code` all green; no lockfile changes.
+Pre-completion reviewer returned **PASS**.
+
+### Observations
+
+- The change fell out exactly as planned — as the [#490] retro predicted, the floor half needed zero code beyond the `Set` edit (the `WRAPPER_SENTINEL` `indirection` key and advisory reuse were already in place), so the whole production change was 8 strings.
+- Tidy-First assessor recommended nothing: both target files were already shaped for a straight append (the `Set` literal carries an "extend this set" doc comment; the `it.each` table has an established tuple form).
+- No deviations from the plan.
+  All five Module-Level Changes files were touched; the plan's "deliberately not edited" ellipsis surfaces (`README.md`, `bash-command.ts`, `program.ts`, `architecture.md` 756/761) were confirmed still accurate and left alone.
+- `rust-parallel`'s hyphen matches the set entry verbatim (`basename` splits only on `/`), confirmed green by its classifier row.
+- Pre-completion reviewer: **PASS**, no warnings.
+
 [#490]: https://github.com/gotgenes/pi-packages/issues/490
