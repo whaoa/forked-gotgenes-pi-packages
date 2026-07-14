@@ -22,3 +22,19 @@ The plan is a single-file docs change to `.pi/prompts/ship-issue.md`; next step 
 - Grep confirmed the coupling lives in exactly one line (`ship-issue.md:70`); `AGENTS.md` release-batching prose describes only the release decision and stays accurate, so no `AGENTS.md` edit is planned.
 - Ships independently — a `docs:` change under `.pi/prompts/` is attributed to no package and cuts no release on its own.
 - No follow-up issues identified; no open questions.
+
+## Stage: Implementation — Build (2026-07-13T00:00:00Z)
+
+### Session summary
+
+Executed the plan's single step: edited `.pi/prompts/ship-issue.md` steps 4b, 5, and 6 to decouple the issue close from the release-batch decision, matching `/land-worktree`'s already-correct contract.
+Step 4b now always continues to step 5 (close) regardless of the release decision, and skips only step 6 (release) on defer; step 5's close-comment bullet list and stacked-issue-scan note were updated accordingly; step 6 gained an explicit skip-on-defer lead sentence.
+Single `docs:` commit, no deviations from the plan.
+
+### Observations
+
+- No code, tests, or `AGENTS.md` changes were needed — the plan's grep in the Planning stage correctly scoped this to one file.
+- `pnpm run lint` and `pnpm exec rumdl check .pi/prompts/ship-issue.md` were clean on first pass; no auto-fix needed.
+- Pre-completion reviewer verdict: **PASS**.
+  Verified all four planned edits landed verbatim, confirmed no other doc references the old coupled behavior (reverse check), and confirmed both named "Invariants at risk" (the step-4 CI-failure gate and the unchanged "Release coordination" defer ask) hold by inspection.
+- All steps completed; nothing remains for this issue before `/ship-issue`.
