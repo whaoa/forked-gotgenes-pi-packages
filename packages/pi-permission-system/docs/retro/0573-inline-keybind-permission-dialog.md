@@ -45,3 +45,59 @@ Test count grew from 2418 to 2455 (+37); full suite, `pnpm run check`, root lint
 - **Pre-completion reviewer: WARN** — one non-blocking finding: the plan asked to bump the `Inline prompt component files` health-metric row `0 → 1`.
   Deliberately **not** done: that column is the dated `Baseline (2026-07-12)` snapshot, and the already-landed Phase 11 steps 1–3 left their achieved rows' baselines untouched too (the table is recomputed at phase close, not per-step).
   Editing only this row would make the baseline column internally inconsistent; the `✅` step heading + Mermaid node are the completion markers.
+
+## Stage: Final Retrospective (2026-07-14T01:30:00Z)
+
+### Session summary
+
+One continuous session carried #573 from `/plan-issue` through `/tdd-plan`, `/ship-issue`, and this retro: an inline keybind permission dialog for TUI sessions, released as `pi-permission-system` `20.7.0`.
+Five TDD cycles landed with zero rework commits and no test failures (+37 tests, 2418 → 2455); the whole plan→ship arc was clean.
+
+### Observations
+
+#### What went well
+
+- **Test-Driven Design paid off.**
+  Splitting the branch-heavy interaction logic into a pure `reducePrompt` model (no SDK/TUI imports) and a thin `ctx.ui.custom` adapter made every decision path (double-press arming, reason validation, scope step, esc transitions) unit-testable without a live terminal.
+  A throwaway `matchesKey`-on-raw-strings probe confirmed the pi-ask fake-`tui`/`plainTheme`/`done` harness would work before committing to it.
+- **The `ask-user` gate surfaced real scope.**
+  The raw third-party issue asked only for `y`/`n`/`tab`/reason keybinds; three planning `ask-user` rounds drew out the operator's double-press-to-confirm affordance (default-on toggle) and the mandatory-reason rule — substantial behavior the issue never stated.
+  The operator explicitly appended "I also want to improve the flow" to an answer, which the interactive flow invited.
+- **An implementation-time design refinement improved on the plan.**
+  The plan's "widen `PermissionDecisionUi` + dispatcher in `permission-dialog.ts`" would have created a `permission-dialog.ts` ↔ component import cycle; catching it during TDD and refining to a narrow `PermissionDecisionUi` + a `Pick`-based `PermissionPromptUi` (ISP) left `permission-dialog.ts` untouched and shrank the diff.
+- **The ship `UNSTABLE` guidance worked as written.** `release_pr_merge` refused with `merge_state: UNSTABLE`; the `statusCheckRollup` check was `IN_PROGRESS` (not the empty-rollup `GITHUB_TOKEN` case), so waiting two polls for it to finish and then retrying `release_pr_merge` was exactly the prompt's prescribed path — no premature `gh pr merge` fallback.
+
+#### What caused friction (agent side)
+
+- `missing-context` — the plan's Module-Level Changes instructed "update the health-metric row from `0` to `1`," but that column is the dated `Baseline (2026-07-12)` snapshot, recomputed at phase close, not a per-step live value (the already-landed Phase 11 Steps 1–3 left their achieved rows' baselines untouched).
+  Following the instruction would have made the baseline column internally inconsistent.
+  Impact: one pre-completion-reviewer WARN and a judgment call to decline the edit; no rework, but the plan (self-authored) committed to a doc edit without checking the table's own convention.
+- `other` (path slip) — a `README.md` `Edit` used the absolute path `/Users/chris/development/pi/pi-permission-system/README.md`, dropping the `pi-packages/packages` segment, and returned `ENOENT`.
+  Impact: one wasted tool call, self-corrected immediately with the relative path.
+
+#### What caused friction (user side)
+
+- None.
+  The operator's extended requirements emerged naturally through the planning `ask-user` rounds — the right place for a third-party issue where the operator's own preferences (double-press, mandatory reason) are not in the issue body.
+
+### Diagnostic details
+
+- **Model-performance correlation** — both subagent dispatches (`tidy-first-assessor`, `pre-completion-reviewer`) ran on `anthropic/claude-sonnet-5`, appropriate for their judgment-heavy work (preparatory-refactor assessment, quality review); no reasoning-weak-on-judgment or high-cost-on-mechanical mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the longest same-error sequence was 1 retry (the `README.md` path slip).
+- **Feedback-loop gap analysis** — verification ran incrementally: each TDD step ran its affected test file (red→green), `pnpm run check` after every shared-interface/config change, and the full suite + root lint + `pnpm fallow dead-code` after the last step.
+  No end-only verification gap.
+
+### Follow-up: orphaned mid-batch issue #580
+
+During this retro the operator noticed #580 (Phase 11 Step 2, `shellTools` config model) was still **open** despite being released in `pi-permission-system-v20.5.0`.
+It was not #573's responsibility to close it — the two issues are unrelated and #580's commits predate #573's `v20.6.0` ship baseline.
+Root cause: #580 was a **mid-batch** member of the "shell-tool-aliases" batch (tail #574); `/ship-issue` step 4b couples the issue **close** to the release **defer** decision ("leave the issue open and skip steps 5–6"), and the batch-tail (#574) ship's stacked-issue check only scans `<pkg-tag>..HEAD`, which excludes a sibling already released below the tag.
+So the issue orphaned.
+Closed #580 manually with a summary; filed #586 to fix the ship-flow gap (two candidate fixes: decouple close from release in step 4b, or have the batch-tail ship enumerate and close its batch siblings).
+
+### Changes made
+
+1. `.pi/skills/package-pi-permission-system/SKILL.md` — clarified that a dated `Baseline (<date>)` health-metric column is a fixed phase-open snapshot recomputed at phase close, not a per-step value (resolves the pre-completion WARN's root cause; `Refs #573`).
+2. Closed #580 (orphaned mid-batch issue) with an implemented-in/released-in summary.
+3. Filed #586 — the `/ship-issue` mid-batch-close gap that orphaned #580.
+4. `packages/pi-permission-system/docs/retro/0573-inline-keybind-permission-dialog.md` — this Final Retrospective stage entry.

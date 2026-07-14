@@ -20,6 +20,7 @@ Pre-monorepo plans from the upstream fork live in `docs/plans/archive/` — issu
 When a plan touches that roadmap, enumerate the whole phase: search dependents too (`gh issue list --search "#N"`), not just the issues the current one references.
 When the implementation completes a numbered roadmap step, mark it complete in `docs/architecture/architecture.md` in the implementation doc-update commit (`/tdd-plan` step 7 / `/build-plan`), not a deferred `/ship-issue` commit — `✅` on both the step heading and its Mermaid diagram node, plus any stale health-metric/target rows in the same commit.
 Deferring the marker to ship splits it from the work and risks it falling through entirely (Refs #479, #480).
+A dated `Baseline (<date>)` column is a fixed phase-open snapshot recomputed at phase close, not a per-step value — do not edit it as work lands (Refs #573).
 
 ## Implementation Priorities
 
