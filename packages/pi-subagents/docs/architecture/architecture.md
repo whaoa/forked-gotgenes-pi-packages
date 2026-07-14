@@ -120,7 +120,7 @@ classDiagram
         +run()
         +resume(prompt, signal)
         +abort(): boolean
-        +steer(message): Promise~boolean~
+        +steer(message): Promise~SteerOutcome~
         +isSessionReady(): boolean
         +getConversation(): string | undefined
         +getContextPercent(): number | null
@@ -977,7 +977,7 @@ Landed: `src/tools/get-result-report.ts` added — `AgentReport` value object pl
 
 `Release: batch "result-delivery"`
 
-#### Step 3 — `Subagent.steer` returns an outcome ([#537])
+#### ✅ Step 3 — `Subagent.steer` returns an outcome ([#537])
 
 Smell: Category C (ask-then-tell) — coordinators pre-check status before telling.
 Target files:
@@ -986,6 +986,10 @@ Target files:
 - `src/tools/steer-tool.ts`, `src/service/service-adapter.ts` — drop the status pre-checks and switch on the outcome; the adapter maps the outcome to the public `SubagentsService.steer` boolean, so the published contract is unchanged.
 
 Outcome: zero steer status pre-checks outside `Subagent.steer`; `steer-tool.execute` cyclomatic drops below 10.
+
+Landed: `Subagent.steer` returns a discriminated `SteerOutcome` (`delivered` / `buffered` / `rejected` with the observed status) and owns the non-running rejection as its first guard; `SteerOutcome` is exported from `subagent.ts` and re-exported via `types.ts`.
+`SteerTool.execute` and `SubagentsServiceAdapter.steer` dropped their `status !== "running"` pre-checks and switch on the outcome — the adapter maps `outcome.kind !== "rejected"` to the unchanged public boolean, and the tool's delivered-path stats moved into a private `renderDelivered` helper.
+Zero steer status pre-checks remain outside `Subagent.steer`.
 
 `Release: independent`
 
@@ -1072,7 +1076,7 @@ Outcome: in-package clone groups 9 → ≤ 5; duplicated lines 81 → ≤ 40.
 flowchart LR
     S1["✅ Step 1 (#535)<br/>Result delivery off Subagent"] --> S2["✅ Step 2 (#536)<br/>Decompose get-result-tool"]
     S1 -.soft.-> S7["Step 7 (#541)<br/>Decompose notification renderer"]
-    S3["Step 3 (#537)<br/>Steer returns an outcome"]
+    S3["✅ Step 3 (#537)<br/>Steer returns an outcome"]
     S4["Step 4 (#538)<br/>Type the model boundary"]
     S5["Step 5 (#539)<br/>Narrow tui/theme interfaces"]
     S6["Step 6 (#540)<br/>Table-driven settings handler"]
