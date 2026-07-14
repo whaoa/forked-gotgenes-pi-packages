@@ -67,9 +67,10 @@ Files outside the package tree (`.pi/skills/`, root `AGENTS.md`/`README.md`) are
 Say so in the final report and skip the batch-vs-release question.
 
 Then apply the decision recorded in the early "Release coordination" section.
-If that decision was to defer/batch: stop here — the push and CI are done; leave the issue open and skip steps 5–6.
+The issue **always** closes in step 5, regardless of this decision — closing records that the work is on `main`; releasing is a separate, batched concern (matches `/land-worktree`'s decoupled close/release contract).
+If the decision was to defer/batch: continue to step 5, then skip step 6 (the release lands later with the batch tail).
 Note the deferral in the final report.
-Otherwise continue.
+Otherwise continue to step 5 and step 6.
 
 ## 5. Close the issue
 
@@ -90,13 +91,17 @@ The comment should include:
 - One sentence on user-visible behavior change.
 - A note flagging any breaking change (matches `feat!:` commits).
 - If the change unblocks or partially addresses other issues, mention them.
+- If the release was deferred (mid-batch), note that the fix is on `main` and releases with the batch — do not cite a released version.
 
 Then use `issue_close` with issue number `$1` and the summary as the comment.
 
 Then check whether this push shipped work for **other** issues (a stacked refactor/enabler, other `(#M)` commit refs, or sibling `docs/plans/`/`docs/retro/` files in the `<pkg-tag>..HEAD` range).
+A mid-batch sibling that shipped on its own `/ship-issue` is already closed by that ship — this scan is for stacked work that never had a ship of its own.
 Close each with its own short summary — release-please omits `refactor:` commits from the changelog, so a stacked refactor issue leaves no reminder.
 
 ## 6. Merge release-please PR (if present)
+
+Skip this step entirely if step 4b recorded a defer/batch decision — the release lands later with the batch tail.
 
 1. Use `release_pr_find` to locate an open release-please PR.
 2. If none is found (timeout), skip to step 7.
