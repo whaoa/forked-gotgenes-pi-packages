@@ -13,10 +13,13 @@ For plans with red→green test cycles, use `/tdd-plan` instead.
 
 Before locating or reading the plan, make sure the working tree is up to date with the remote:
 
-1. Run `git pull --ff-only`.
-2. If it fails for **any** reason — uncommitted changes, divergent history, merge conflict, network error, detached HEAD — stop immediately and report the failure to the user.
+1. Determine the branch: `git branch --show-current`.
+2. **Worktree branch** (an `issue-*` branch): run `git fetch origin` and proceed.
+   A diverged `origin/main` (a sibling peer landed first) is expected here — do **not** `git pull --ff-only` and stop; the worktree ship flow (`/ship-worktree`) owns rebasing onto `origin/main`.
+3. **Trunk** (`main`): run `git pull --ff-only`.
+   If it fails for **any** reason — uncommitted changes, divergent history, merge conflict, network error, detached HEAD — stop immediately and report the failure to the user.
    Do not attempt to stash, rebase, force, or otherwise resolve.
-3. Only proceed once the pull reports a clean fast-forward (or `Already up to date.`).
+   Only proceed once the pull reports a clean fast-forward (or `Already up to date.`).
 
 ## Locate the plan
 
