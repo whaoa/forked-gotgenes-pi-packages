@@ -46,5 +46,56 @@ Suite went 2456 → 2464 tests (+8); `grep -c 'startsWith(prefix)' src/authority
   The health-metric row already targeted 0, so no value edit was needed.
 - No deviations from the plan's Module-Level Changes; no follow-up issues warranted.
 
+## Stage: Final Retrospective (2026-07-14T18:30:08Z)
+
+### Session summary
+
+Planned, implemented (TDD), shipped, and retro'd Phase 11 Step 5 in one continuous session: unified `subagent-context` filesystem containment onto the shared `PathFlavor.isWithin`, deleting the private `isPathWithinDirectoryForSubagent` prefix helper.
+A behavior-preserving refactor landed as `test:` + `refactor:` + two `docs:` commits, closed clean, auto-batched for release (no releasing commit types).
+The run was friction-free: no rework, no user corrections, one self-recovered shell-quoting slip.
+
+### Observations
+
+#### What went well
+
+- **Empirical parity verification before classifying the change.**
+  At planning (transcript turn 12) a throwaway `node -e` script compared the prefix check against `path.relative`-based `isWithin` across seven normalized inputs, proving they agree.
+  This turned the issue's and [#562]'s "behavior-affecting" hypothesis into a verified "behavior-preserving" finding, which then shaped the entire TDD approach (characterization tests, cover-then-refactor under green rather than red→green).
+  This is the `testing` skill's "write a disposable exploratory script first" rule applied proactively at plan time — a good pattern to repeat for any "is this refactor really behavior-preserving?"
+  question.
+- **Cover-then-refactor executed cleanly.**
+  The 8 characterization tests passed green against the old helper and stayed green after the swap — the safety net worked as designed for a behavior-preserving refactor.
+- **Pre-completion reviewer earned its dispatch.**
+  It caught a real stale-doc reference (the Phase 10 summary still listing [#571] as "remain open and non-gating") that no `src/`/`test/` grep would have surfaced; fixed in a one-line follow-up `docs:` commit.
+
+#### What caused friction (agent side)
+
+- `other` (shell-quoting slip) — at ship (transcript turn 53) the model ran `grep -A1 '**Release:**'`, which errored (`repetition-operator operand invalid`: a leading `*` is an invalid BRE repetition operator).
+  Recovered on the next call with `grep -F`.
+  Impact: one wasted tool call, no rework.
+  The `/ship-issue` prompt names the `**Release:**` marker to read but gives no command, so the model improvised a fragile pattern.
+
+#### What caused friction (user side)
+
+- None.
+  The issue was precisely pre-scoped by the architecture roadmap (Step 5 named the target, the edge cases, and the outcome metric), so the session ran autonomously with no strategic input needed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — Planning + TDD ran on `anthropic/claude-opus-4-8` (judgment-heavy: parity analysis, test design, refactor); ship ran on `opencode-go/deepseek-v4-flash` (mechanical: git/CI/close).
+  Both assignments were appropriate to task weight.
+  Two subagent dispatches: `tidy-first-assessor` correctly found no prep warranted; `pre-completion-reviewer` caught the stale-doc WARN.
+  The one ship-side slip (the `grep '**'` error) is generic shell fragility, not a reasoning-quality mismatch.
+- **Escalation-delay tracking** — no rabbit-holes; the single grep error resolved on the next tool call (1 retry, well under the 5-call flag).
+- **Unused-tool detection** — `colgrep` was not used, but planning relied on targeted `grep` against a roadmap that already named the symbols; semantic search would have added nothing.
+  No gap.
+- **Feedback-loop gap analysis** — verification ran incrementally: `pnpm run check` right after the interface-touching swap (turn 31), the affected test file after each step (turns 28, 31), full suite + root lint + `fallow dead-code` at the end (turns 37–38).
+  No end-loaded verification.
+
+### Changes made
+
+1. Added this Final Retrospective stage entry to `packages/pi-permission-system/docs/retro/0571-unify-subagent-containment-pathflavor.md`.
+2. `.pi/prompts/ship-issue.md` — gave the `**Release:**` marker read an explicit `grep -F` command so the deterministic ship step no longer improvises a BRE-fragile `**` pattern.
+
 [#562]: https://github.com/gotgenes/pi-packages/issues/562
 [#571]: https://github.com/gotgenes/pi-packages/issues/571

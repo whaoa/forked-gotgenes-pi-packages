@@ -14,7 +14,7 @@ Gather the release decision up front, from a deterministic source, **before** an
 A decision presented early from the plan is far less likely to be reversed than one inferred from prose at the cancel point.
 
 1. Locate the plan for this issue: `grep -rl "^issue: $1$" docs/plans packages/*/docs/plans`.
-2. If a plan is found, read its `**Release:**` marker (written by `/plan-issue`):
+2. If a plan is found, read its `**Release:**` marker (written by `/plan-issue`) with `grep -F '**Release:**' <plan-file>` (fixed-string — a leading `*` is an invalid regex/BRE operator):
    - A marker containing `mid-batch — defer` → ask the operator **now**: defer the release (batch until the sequence completes), or release anyway?
      Record the decision.
    - Any other `**Release:**` value (`ship independently` or `ship now — batch "<name>" tail`) → record "release now"; note the recommendation in the final report; do **not** ask.
