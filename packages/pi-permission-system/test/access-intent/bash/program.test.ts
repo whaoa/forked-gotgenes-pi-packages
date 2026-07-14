@@ -762,6 +762,15 @@ describe("BashProgram", () => {
         ["timeout 10 aws s3 ls", "timeout 10 aws s3 ls"],
         ["nice -n 10 aws s3 ls", "nice -n 10 aws s3 ls"],
         ["/usr/bin/sudo aws s3 ls", "/usr/bin/sudo aws s3 ls"],
+        // Exec-capable rewrites and prefix wrappers (#575).
+        ["parallel rm ::: x", "parallel rm ::: x"],
+        ["rust-parallel echo", "rust-parallel echo"],
+        ["rush echo", "rush echo"],
+        ["doas aws s3 ls", "doas aws s3 ls"],
+        ["setsid aws s3 ls", "setsid aws s3 ls"],
+        ["stdbuf -oL aws s3 ls", "stdbuf -oL aws s3 ls"],
+        ["watch ls", "watch ls"],
+        ["flock /tmp/lock aws s3 ls", "flock /tmp/lock aws s3 ls"],
       ])("flags %s as an indirection wrapper", async (command, text) => {
         const program = await BashProgram.parse(command, normalizer);
         expect(program.commands()).toEqual([

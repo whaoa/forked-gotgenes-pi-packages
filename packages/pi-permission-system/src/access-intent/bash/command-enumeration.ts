@@ -166,6 +166,17 @@ const INDIRECTION_WRAPPER_NAMES = new Set([
   "nohup",
   "timeout",
   "nice",
+  // Exec-capable rewrites and prefix wrappers surveyed in #575: parallelizers
+  // (parallel/rust-parallel/rush), a sudo rewrite (doas), and prefix wrappers
+  // (setsid/stdbuf/watch/flock) that all always invoke a following command.
+  "parallel",
+  "rust-parallel",
+  "rush",
+  "doas",
+  "setsid",
+  "stdbuf",
+  "watch",
+  "flock",
 ]);
 
 /**
