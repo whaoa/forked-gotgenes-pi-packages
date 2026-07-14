@@ -825,8 +825,10 @@ src/
 ├── active-agent.ts            Agent name detection from session/system prompt
 ├── authority/                 Subagent detection, the Authorizer spine, and forwarded-permission escalation (seeded #529; forwarding subsystem relocated here #530; Authorizer spine landed #555; migration completed #559)
 │   ├── authorizer.ts          `Authorizer` interface (`authorize(details): Promise<PermissionPromptDecision>`) + `AuthorizerSelectionDeps` + `selectAuthorizer(ctx, deps)` - the once-per-activation hasUI/isSubagent/deny dispatch, replacing its re-derivation across the former `PromptingGateway`/`PermissionPrompter`/`ApprovalEscalator` (#555)
-│   ├── local-user-authorizer.ts `LocalUserAuthorizer` class - Authorizer for a session with UI and the single `permissions:ui_prompt` emit site: renders a forwarded ask's provenance (`details.forwarding`) as a non-degraded broadcast + `(Subagent)` title, then shows the dialog (#555, #557)
-│   ├── permission-dialog.ts   Dialog options (once / session / deny); relocated from `src/permission-dialog.ts` (#559)
+│   ├── local-user-authorizer.ts `LocalUserAuthorizer` class - Authorizer for a session with UI and the single `permissions:ui_prompt` emit site: renders a forwarded ask's provenance (`details.forwarding`) as a non-degraded broadcast + `(Subagent)` title, then dispatches to the inline keybind dialog (TUI) or the `select`/`input` fallback via a live `doublePressToConfirm` getter (#555, #557, #573)
+│   ├── permission-dialog.ts   Dialog option semantics + `requestPermissionDecisionFromUi` (`select`/`input` fallback); the mode dispatch lives in `permission-prompt-component.ts` (#559, #573)
+│   ├── permission-prompt-decision.ts Pure decision model (`reducePrompt` + `PromptModelConfig`/`PromptViewState`) for the inline keybind dialog - hotkey arming (double-press), step transitions, reason validation; no SDK/TUI imports (#573)
+│   ├── permission-prompt-component.ts Inline `ctx.ui.custom<PermissionPromptDecision>` keybind dialog (TUI) driven by the decision model + the `requestPermissionDecision` mode dispatcher (tui → inline, else fallback) (#573)
 │   ├── denying-authorizer.ts  `DenyingAuthorizer` class - least-privilege Authorizer for a session with no reachable authority; denies with the `confirmationUnavailable` marker so the ask path derives the `confirmation_unavailable` resolution (#555, #556)
 │   ├── authorizer-selection.ts `AuthorizerSelection` class - context-owning `AskEscalator` implementation (`escalate(details)`); selects the `Authorizer` once per activation and delegates to it via `PermissionPrompter`; rewrite of `PromptingGateway`; `canConfirm()` dissolved (#555, #556)
 │   ├── permission-prompter.ts `PermissionPrompter` class (`PermissionPrompterApi`) - review-log bracketing (waiting → approved/denied) around `authorizer.authorize(details)`; `PromptPermissionDetails` type; relocated from `src/permission-prompter.ts`, drops per-call `ctx` threading (#555)
@@ -936,9 +938,11 @@ Release: batch "shell-tool-aliases"
 
 Release: batch "shell-tool-aliases"
 
-#### Step 4: Inline keybind permission dialog ([#573])
+#### ✅ Step 4: Inline keybind permission dialog ([#573])
 
 **Cause:** elicitation is the highest-frequency human touchpoint of the live-authority layer, and the stock two-select modal spends three keypresses where one would do; the `Authorizer` spine deliberately owns presentation, so this is a pure live-authority change — `evaluate()` and the ruleset are untouched ([#573]).
+
+**Landed:** the mode dispatch lives in `permission-prompt-component.ts` (`requestPermissionDecision`), not `permission-dialog.ts`, to avoid a dialog↔component import cycle; `PermissionDecisionUi` stays narrow (`select`/`input`) and the inline view's wider `custom`-capable UI is a separate `PermissionPromptUi` type (ISP); the double-press affordance is a config toggle (`doublePressToConfirm`, default on) read live at prompt time; deny-with-reason requires a non-empty reason.
 
 - **Smell:** none — user-requested feature on the authority spine, scheduled per the no-starvation rule.
 - **Target:** `src/authority/permission-dialog.ts` (mode dispatch + option semantics stay the single entry), new `src/authority/permission-prompt-component.ts` (inline `ctx.ui.custom<PermissionPromptDecision>` component modeled on the pi-ask flow: a pure input-command decision layer; `y` approve, `s` approve-for-session, `n` deny, `r` deny-with-reason hotkeys shown beside each option label; arrow/j/k navigation; enter confirm; esc deny; the forwarded-ask grant-scope select becomes an in-component second step with back-navigation), `src/authority/local-user-authorizer.ts` / `src/authority/authorizer.ts` (thread the widened UI view).
@@ -988,7 +992,7 @@ flowchart TD
     S1["✅ Step 1: Move access-intent stragglers (#579)"]
     S2["✅ Step 2: shellTools alias config model (#580)"]
     S3["✅ Step 3: Bash-stack gating for aliased shell tools (#574)"]
-    S4["Step 4: Inline keybind permission dialog (#573)"]
+    S4["✅ Step 4: Inline keybind permission dialog (#573)"]
     S5["Step 5: Containment unification (#571)"]
     S6["Step 6: Indirection-wrapper survey (#575)"]
     S7["Step 7: Model-judge decision record (#581)"]
