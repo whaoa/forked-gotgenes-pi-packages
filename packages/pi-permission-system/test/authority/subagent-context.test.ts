@@ -345,6 +345,41 @@ describe("isSubagentExecutionContext — session dir detection", () => {
     ).toBe(false);
   });
 
+  test("returns false when a `..` segment escapes the subagent root", () => {
+    // Normalizes to /home/user/.pi/agent/sessions/evil/session-abc — outside.
+    const sessionDir = `${subagentRoot}/../evil/session-abc`;
+    expect(
+      isSubagentExecutionContext(
+        makeCtx(sessionDir),
+        subagentRoot,
+        posixPathFlavor,
+      ),
+    ).toBe(false);
+  });
+
+  test("returns true when a `..` segment resolves back inside the root", () => {
+    // Normalizes to /home/user/.pi/agent/sessions/subagents/session-abc — inside.
+    const sessionDir = `${subagentRoot}/nested/../session-abc`;
+    expect(
+      isSubagentExecutionContext(
+        makeCtx(sessionDir),
+        subagentRoot,
+        posixPathFlavor,
+      ),
+    ).toBe(true);
+  });
+
+  test("returns false when session dir is under a different root", () => {
+    const sessionDir = "/var/other/subagents/session-abc";
+    expect(
+      isSubagentExecutionContext(
+        makeCtx(sessionDir),
+        subagentRoot,
+        posixPathFlavor,
+      ),
+    ).toBe(false);
+  });
+
   test("returns false when getSessionDir returns null", () => {
     expect(
       isSubagentExecutionContext(makeCtx(null), subagentRoot, posixPathFlavor),
@@ -354,6 +389,65 @@ describe("isSubagentExecutionContext — session dir detection", () => {
   test("returns false when getSessionDir returns empty string", () => {
     expect(
       isSubagentExecutionContext(makeCtx(""), subagentRoot, posixPathFlavor),
+    ).toBe(false);
+  });
+});
+
+describe("isSubagentExecutionContext — session dir detection (win32 flavor)", () => {
+  const subagentRoot = "C:\\Users\\dev\\.pi\\agent\\sessions\\subagents";
+
+  test("returns true when session dir is within subagent root", () => {
+    const sessionDir = `${subagentRoot}\\session-abc`;
+    expect(
+      isSubagentExecutionContext(
+        makeCtx(sessionDir),
+        subagentRoot,
+        win32PathFlavor,
+      ),
+    ).toBe(true);
+  });
+
+  test("returns true when session dir equals subagent root (case-insensitive)", () => {
+    expect(
+      isSubagentExecutionContext(
+        makeCtx(subagentRoot.toUpperCase()),
+        subagentRoot,
+        win32PathFlavor,
+      ),
+    ).toBe(true);
+  });
+
+  test("returns false when session dir is a sibling with shared prefix", () => {
+    const sessionDir = `${subagentRoot}-extra\\session-abc`;
+    expect(
+      isSubagentExecutionContext(
+        makeCtx(sessionDir),
+        subagentRoot,
+        win32PathFlavor,
+      ),
+    ).toBe(false);
+  });
+
+  test("returns false when a `..` segment escapes the subagent root", () => {
+    const sessionDir = `${subagentRoot}\\..\\evil\\session-abc`;
+    expect(
+      isSubagentExecutionContext(
+        makeCtx(sessionDir),
+        subagentRoot,
+        win32PathFlavor,
+      ),
+    ).toBe(false);
+  });
+
+  test("returns false when session dir is on a different drive", () => {
+    const sessionDir =
+      "D:\\Users\\dev\\.pi\\agent\\sessions\\subagents\\session-abc";
+    expect(
+      isSubagentExecutionContext(
+        makeCtx(sessionDir),
+        subagentRoot,
+        win32PathFlavor,
+      ),
     ).toBe(false);
   });
 });
