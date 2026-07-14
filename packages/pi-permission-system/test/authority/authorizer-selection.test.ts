@@ -72,8 +72,11 @@ function makeDeps(overrides: Partial<SelectionDeps> = {}): SelectionDeps {
       emit: vi.fn(),
       on: vi.fn().mockReturnValue(() => undefined),
     },
-    requestPermissionDecisionFromUi:
-      overrides.requestPermissionDecisionFromUi ??
+    getPromptPreferences:
+      overrides.getPromptPreferences ??
+      (() => ({ doublePressToConfirm: true })),
+    requestPermissionDecision:
+      overrides.requestPermissionDecision ??
       vi.fn().mockResolvedValue({ approved: true, state: "approved" }),
     forwardingDir: overrides.forwardingDir ?? "/tmp/forwarding",
     registry: overrides.registry,

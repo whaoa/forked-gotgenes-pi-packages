@@ -6,6 +6,7 @@ import type {
 import {
   type PermissionPromptView,
   presentInlinePermissionPrompt,
+  requestPermissionDecision,
 } from "#src/authority/permission-prompt-component";
 
 // ── Fake TUI view harness ────────────────────────────────────────────────────
@@ -208,6 +209,33 @@ describe("presentInlinePermissionPrompt", () => {
         approved: false,
         state: "denied",
       });
+    });
+  });
+
+  describe("requestPermissionDecision dispatch", () => {
+    it("renders the inline dialog in TUI mode", async () => {
+      const { view, captured } = makeFakeView(true);
+      const promise = requestPermissionDecision(view, "Title", "Message");
+      expect(captured.component).toBeDefined();
+      captured.component?.handleInput("y");
+      captured.component?.handleInput("y");
+      expect(await promise).toEqual({ approved: true, state: "approved" });
+    });
+
+    it("falls back to the select flow outside TUI mode", async () => {
+      const custom = vi.fn();
+      const select = vi.fn().mockResolvedValue("Yes");
+      const view = {
+        mode: "rpc",
+        doublePressToConfirm: true,
+        ui: { select, input: vi.fn(), custom },
+      } as unknown as PermissionPromptView;
+
+      const decision = await requestPermissionDecision(view, "Title", "Msg");
+
+      expect(custom).not.toHaveBeenCalled();
+      expect(select).toHaveBeenCalledTimes(1);
+      expect(decision).toEqual({ approved: true, state: "approved" });
     });
   });
 

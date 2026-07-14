@@ -114,6 +114,14 @@ function buildSettingItems(
       currentValue: toOnOff(config.debugLog),
       values: ON_OFF,
     },
+    {
+      id: "doublePressToConfirm",
+      label: "Double-press to confirm",
+      description:
+        "Require a confirming second press of a decision hotkey in the inline TUI permission dialog",
+      currentValue: toOnOff(config.doublePressToConfirm),
+      values: ON_OFF,
+    },
   ];
 }
 
@@ -129,6 +137,8 @@ function applySetting(
       return { ...config, permissionReviewLog: value === "on" };
     case "debugLog":
       return { ...config, debugLog: value === "on" };
+    case "doublePressToConfirm":
+      return { ...config, doublePressToConfirm: value === "on" };
     default:
       return config;
   }
@@ -144,6 +154,10 @@ function syncSettingValues(
     toOnOff(config.permissionReviewLog),
   );
   settingsList.updateValue("debugLog", toOnOff(config.debugLog));
+  settingsList.updateValue(
+    "doublePressToConfirm",
+    toOnOff(config.doublePressToConfirm),
+  );
 }
 
 function getArgumentCompletions(

@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { LocalUserAuthorizer } from "#src/authority/local-user-authorizer";
-import type {
-  PermissionPromptDecision,
-  requestPermissionDecisionFromUi,
-} from "#src/authority/permission-dialog";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
+import type { requestPermissionDecision } from "#src/authority/permission-prompt-component";
 import type { PromptPermissionDetails } from "#src/authority/permission-prompter";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -23,21 +21,27 @@ function makeDetails(
 
 function makeDeps(
   overrides: {
-    requestPermissionDecisionFromUi?: typeof requestPermissionDecisionFromUi;
+    requestPermissionDecision?: typeof requestPermissionDecision;
   } = {},
 ) {
   const events = {
     emit: vi.fn(),
     on: vi.fn().mockReturnValue(() => undefined),
   };
-  const ui = { select: vi.fn(), input: vi.fn() };
+  const ui = { select: vi.fn(), input: vi.fn(), custom: vi.fn() };
   const decisionFn =
-    overrides.requestPermissionDecisionFromUi ??
+    overrides.requestPermissionDecision ??
     vi
-      .fn<typeof requestPermissionDecisionFromUi>()
+      .fn<typeof requestPermissionDecision>()
       .mockResolvedValue({ approved: true, state: "approved" });
   return {
-    deps: { ui, events, requestPermissionDecisionFromUi: decisionFn },
+    deps: {
+      ui,
+      mode: "tui" as const,
+      events,
+      getPromptPreferences: () => ({ doublePressToConfirm: true }),
+      requestPermissionDecision: decisionFn,
+    },
     events,
     ui,
     decisionFn,
@@ -93,14 +97,14 @@ describe("LocalUserAuthorizer", () => {
     });
   });
 
-  it("calls requestPermissionDecisionFromUi with the dialog title and message", async () => {
+  it("calls requestPermissionDecision with the threaded view, title, and message", async () => {
     const { deps, ui, decisionFn } = makeDeps();
     const authorizer = new LocalUserAuthorizer(deps);
 
     await authorizer.authorize(makeDetails());
 
     expect(decisionFn).toHaveBeenCalledWith(
-      ui,
+      { mode: "tui", ui, doublePressToConfirm: true },
       "Permission Required",
       "Allow read?",
       undefined,
@@ -123,7 +127,7 @@ describe("LocalUserAuthorizer", () => {
     );
   });
 
-  it("emits the UI event before calling requestPermissionDecisionFromUi", async () => {
+  it("emits the UI event before calling requestPermissionDecision", async () => {
     const calls: string[] = [];
     const events = {
       emit: vi.fn(() => {
@@ -131,15 +135,17 @@ describe("LocalUserAuthorizer", () => {
       }),
       on: vi.fn().mockReturnValue(() => undefined),
     };
-    const ui = { select: vi.fn(), input: vi.fn() };
-    const decisionFn = vi.fn<typeof requestPermissionDecisionFromUi>(() => {
+    const ui = { select: vi.fn(), input: vi.fn(), custom: vi.fn() };
+    const decisionFn = vi.fn<typeof requestPermissionDecision>(() => {
       calls.push("dialog");
       return Promise.resolve({ approved: true, state: "approved" });
     });
     const authorizer = new LocalUserAuthorizer({
       ui,
+      mode: "tui",
       events,
-      requestPermissionDecisionFromUi: decisionFn,
+      getPromptPreferences: () => ({ doublePressToConfirm: true }),
+      requestPermissionDecision: decisionFn,
     });
 
     await authorizer.authorize(makeDetails());
@@ -195,7 +201,7 @@ describe("LocalUserAuthorizer", () => {
       );
 
       expect(decisionFn).toHaveBeenCalledWith(
-        ui,
+        { mode: "tui", ui, doublePressToConfirm: true },
         "Permission Required (Subagent)",
         "Allow read?",
         undefined,
@@ -254,14 +260,14 @@ describe("LocalUserAuthorizer", () => {
     });
   });
 
-  it("returns the decision from requestPermissionDecisionFromUi", async () => {
+  it("returns the decision from requestPermissionDecision", async () => {
     const decision: PermissionPromptDecision = {
       approved: false,
       state: "denied",
     };
     const { deps } = makeDeps({
-      requestPermissionDecisionFromUi: vi
-        .fn<typeof requestPermissionDecisionFromUi>()
+      requestPermissionDecision: vi
+        .fn<typeof requestPermissionDecision>()
         .mockResolvedValue(decision),
     });
     const authorizer = new LocalUserAuthorizer(deps);

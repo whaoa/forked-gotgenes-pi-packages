@@ -14,7 +14,8 @@ import type { SubagentDetector } from "#src/authority/subagent-detection";
 function makeCtx(hasUI: boolean): ExtensionContext {
   return {
     hasUI,
-    ui: { select: vi.fn(), input: vi.fn() },
+    mode: "tui",
+    ui: { select: vi.fn(), input: vi.fn(), custom: vi.fn() },
     sessionManager: {
       getSessionId: vi.fn().mockReturnValue("session-1"),
       getSessionDir: vi.fn().mockReturnValue("/sessions/session-1"),
@@ -36,8 +37,11 @@ function makeDeps(
       emit: vi.fn(),
       on: vi.fn().mockReturnValue(() => undefined),
     },
-    requestPermissionDecisionFromUi:
-      overrides.requestPermissionDecisionFromUi ??
+    getPromptPreferences:
+      overrides.getPromptPreferences ??
+      (() => ({ doublePressToConfirm: true })),
+    requestPermissionDecision:
+      overrides.requestPermissionDecision ??
       vi.fn().mockResolvedValue({ approved: true, state: "approved" }),
     forwardingDir: overrides.forwardingDir ?? "/tmp/forwarding",
     registry: overrides.registry,

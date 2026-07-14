@@ -1,8 +1,9 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 import type {
-  PermissionPromptDecision,
-  requestPermissionDecisionFromUi,
-} from "#src/authority/permission-dialog";
+  PromptPreferences,
+  requestPermissionDecision,
+} from "#src/authority/permission-prompt-component";
 import type { SubagentSessionRegistry } from "#src/authority/subagent-registry";
 import type { PermissionEventBus } from "#src/permission-events";
 import type { DebugReviewLogger } from "#src/session-logger";
@@ -33,8 +34,10 @@ export interface AuthorizerSelectionDeps {
   detection: SubagentDetector;
   /** Event bus used by `LocalUserAuthorizer` for the `permissions:ui_prompt` broadcast. */
   events: PermissionEventBus;
+  /** Read live at prompt time; threaded into `LocalUserAuthorizer`. */
+  getPromptPreferences: () => PromptPreferences;
   /** Injected for testability; production callers pass the real function. */
-  requestPermissionDecisionFromUi: typeof requestPermissionDecisionFromUi;
+  requestPermissionDecision: typeof requestPermissionDecision;
   /** Forwarding directory `ParentAuthorizer` reads/writes request and response files under. */
   forwardingDir: string;
   /** In-process subagent session registry for forwarding target resolution. */
@@ -57,8 +60,10 @@ export function selectAuthorizer(
   if (ctx.hasUI) {
     return new LocalUserAuthorizer({
       ui: ctx.ui,
+      mode: ctx.mode,
       events: deps.events,
-      requestPermissionDecisionFromUi: deps.requestPermissionDecisionFromUi,
+      getPromptPreferences: deps.getPromptPreferences,
+      requestPermissionDecision: deps.requestPermissionDecision,
     });
   }
   if (deps.detection.isSubagent(ctx)) {

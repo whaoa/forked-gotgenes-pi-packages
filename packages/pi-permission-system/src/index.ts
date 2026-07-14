@@ -8,7 +8,7 @@ import {
   type ServingPolicy,
 } from "./authority/forwarded-request-server";
 import { ForwardingManager } from "./authority/forwarding-manager";
-import { requestPermissionDecisionFromUi } from "./authority/permission-dialog";
+import { requestPermissionDecision } from "./authority/permission-prompt-component";
 import { PermissionPrompter } from "./authority/permission-prompter";
 import { SubagentDetection } from "./authority/subagent-detection";
 import { subscribeSubagentLifecycle } from "./authority/subagent-lifecycle-events";
@@ -100,7 +100,10 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   const authorizerSelection = new AuthorizerSelection({
     detection: subagentDetection,
     events: pi.events,
-    requestPermissionDecisionFromUi,
+    getPromptPreferences: () => ({
+      doublePressToConfirm: configStore.current().doublePressToConfirm,
+    }),
+    requestPermissionDecision,
     forwardingDir: paths.forwardingDir,
     registry: subagentRegistry,
     logger,

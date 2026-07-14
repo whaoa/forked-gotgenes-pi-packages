@@ -1,9 +1,13 @@
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type {
-  PermissionDecisionUi,
   PermissionPromptDecision,
   RequestPermissionOptions,
-  requestPermissionDecisionFromUi,
 } from "#src/authority/permission-dialog";
+import type {
+  PermissionPromptUi,
+  PromptPreferences,
+  requestPermissionDecision,
+} from "#src/authority/permission-prompt-component";
 import { buildForwardedScopeLabels } from "#src/pattern-suggest";
 import {
   emitUiPromptEvent,
@@ -15,12 +19,16 @@ import type { PromptPermissionDetails } from "./permission-prompter";
 
 /** Dependencies required by {@link LocalUserAuthorizer}. */
 export interface LocalUserAuthorizerDeps {
-  /** The active session's UI surface. */
-  ui: PermissionDecisionUi;
+  /** The active session's UI surface (select/input plus the inline `custom` dialog). */
+  ui: PermissionPromptUi;
+  /** The session run mode; the dispatcher renders the inline dialog only in `"tui"`. */
+  mode: ExtensionContext["mode"];
   /** Event bus used for the `permissions:ui_prompt` broadcast. */
   events: PermissionEventBus;
+  /** Read live at prompt time so a settings-modal toggle takes effect on the next prompt. */
+  getPromptPreferences: () => PromptPreferences;
   /** Injected for testability; production callers pass the real function. */
-  requestPermissionDecisionFromUi: typeof requestPermissionDecisionFromUi;
+  requestPermissionDecision: typeof requestPermissionDecision;
 }
 
 /**
@@ -41,8 +49,13 @@ export class LocalUserAuthorizer implements Authorizer {
   ): Promise<PermissionPromptDecision> {
     const uiPrompt = buildUiPrompt(details);
     emitUiPromptEvent(this.deps.events, uiPrompt);
-    return this.deps.requestPermissionDecisionFromUi(
-      this.deps.ui,
+    return this.deps.requestPermissionDecision(
+      {
+        mode: this.deps.mode,
+        ui: this.deps.ui,
+        doublePressToConfirm:
+          this.deps.getPromptPreferences().doublePressToConfirm,
+      },
       details.forwarding
         ? "Permission Required (Subagent)"
         : "Permission Required",

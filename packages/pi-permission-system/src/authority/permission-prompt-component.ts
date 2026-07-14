@@ -3,9 +3,10 @@ import type {
   ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, matchesKey } from "@earendil-works/pi-tui";
-import type {
-  PermissionPromptDecision,
-  RequestPermissionOptions,
+import {
+  type PermissionPromptDecision,
+  type RequestPermissionOptions,
+  requestPermissionDecisionFromUi,
 } from "#src/authority/permission-dialog";
 import {
   initialPromptState,
@@ -37,6 +38,30 @@ export interface PermissionPromptView {
   mode: ExtensionContext["mode"];
   ui: PermissionPromptUi;
   doublePressToConfirm: boolean;
+}
+
+/** Live prompt-behavior preferences read at prompt time (see `doublePressToConfirm`). */
+export interface PromptPreferences {
+  doublePressToConfirm: boolean;
+}
+
+/**
+ * Route a permission ask to the inline keybind dialog in TUI mode, or the
+ * `select()`/`input()` flow otherwise (RPC / frontend — the #519 constraint).
+ *
+ * The single entry the `LocalUserAuthorizer` calls; keeps the mode dispatch in
+ * one place so the fallback and the inline component never both render.
+ */
+export function requestPermissionDecision(
+  view: PermissionPromptView,
+  title: string,
+  message: string,
+  options?: RequestPermissionOptions,
+): Promise<PermissionPromptDecision> {
+  if (view.mode === "tui") {
+    return presentInlinePermissionPrompt(view, title, message, options);
+  }
+  return requestPermissionDecisionFromUi(view.ui, title, message, options);
 }
 
 /** Minimal theme surface the dialog uses; satisfied by the real SDK theme. */
