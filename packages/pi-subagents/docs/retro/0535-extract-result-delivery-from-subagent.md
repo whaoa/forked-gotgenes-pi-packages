@@ -43,4 +43,18 @@ Pre-completion reviewer: **PASS**.
 - Session started with a `git pull --rebase` (not `--ff-only`) because a sibling worktree session was concurrently landing `pi-permission-system` work — confirmed with the operator before rebasing; the rebase was clean (2 local commits replayed onto new `origin/main`).
 - Release remains `mid-batch — defer (batch "result-delivery")` per the plan; the release-please PR should stay open until Step 2 (#536) lands.
 
+## Stage: Ship (worktree) (2026-07-14T03:11:43Z)
+
+### Session summary
+
+Pre-push checks passed clean: `pnpm run lint` (root) and `pnpm fallow dead-code` both succeeded with no findings; working tree had no lockfile drift.
+The root will land via `/land-worktree 535`; the plan's `**Release:** mid-batch — defer (batch "result-delivery")` marker still applies — do not merge the release-please PR until Step 2 ([#536]) lands.
+
+**Peer session transcript:** `/Users/chris/.pi/agent/sessions/--Users-chris-development-pi-pi-packages-worktrees-issue-535--/2026-07-14T01-13-22-838Z_019f5e2f-8e96-7cf5-b4b9-052ee1d0a14e.jsonl` — read with `read_session_file({ path: "<path>" })` for message-level verification at land/retro time.
+
+### Observations
+
+No new findings at this stage — pre-completion review already ran PASS during the TDD stage.
+Branch is about to be rebased onto `origin/main`; no conflicts expected (no other work has landed on `main` touching `packages/pi-subagents/` since this branch's baseline pull).
+
 [#536]: https://github.com/gotgenes/pi-packages/issues/536
