@@ -4,6 +4,7 @@
   "debugLog": false,
   "permissionReviewLog": true,
   "yoloMode": false,
+  "doublePressToConfirm": true,
 
   "toolInputPreviewMaxLength": 400,
   "toolTextSummaryMaxLength": 120,

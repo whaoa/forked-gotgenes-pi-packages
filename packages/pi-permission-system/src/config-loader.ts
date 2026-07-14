@@ -197,6 +197,9 @@ function formatConfigIssues(error: ZodError): string[] {
  * - Array fields (piInfrastructureReadPaths) replace the base when present in
  *   the override (override-wins, same as scalars).
  */
+// Scalar knobs merged by override-replaces-base; keep in sync with
+// PermissionSystemExtensionConfig booleans (debugLog, permissionReviewLog,
+// yoloMode, doublePressToConfirm).
 export function mergeUnifiedConfigs(
   base: UnifiedPermissionConfig,
   override: UnifiedPermissionConfig,
@@ -204,7 +207,12 @@ export function mergeUnifiedConfigs(
   const merged: UnifiedPermissionConfig = {};
 
   // Boolean scalars: override replaces base when defined
-  for (const key of ["debugLog", "permissionReviewLog", "yoloMode"] as const) {
+  for (const key of [
+    "debugLog",
+    "permissionReviewLog",
+    "yoloMode",
+    "doublePressToConfirm",
+  ] as const) {
     const value = override[key] ?? base[key];
     if (value !== undefined) {
       merged[key] = value;

@@ -30,7 +30,7 @@ Project config overrides global config; per-agent frontmatter overrides both.
 4. Project agent frontmatter
 
 The `permission` object uses deep-shallow merge: string-vs-string replaces; both-object shallow-merges pattern maps; string-vs-object the override wins entirely.
-Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`) use simple replacement.
+Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`, `doublePressToConfirm`) use simple replacement.
 
 ## Full Example
 
@@ -42,6 +42,7 @@ Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`) use simple replace
   "debugLog": false,
   "permissionReviewLog": true,
   "yoloMode": false,
+  "doublePressToConfirm": true,
   "toolInputPreviewMaxLength": 400,
   "toolTextSummaryMaxLength": 120,
   "piInfrastructureReadPaths": [],
@@ -85,12 +86,30 @@ Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`) use simple replace
 | `debugLog`                  | `false` | Enables verbose diagnostic logging to `logs/pi-permission-system-debug.jsonl`                                                                        |
 | `permissionReviewLog`       | `true`  | Enables the permission request/denial review log at `logs/pi-permission-system-permission-review.jsonl`                                              |
 | `yoloMode`                  | `false` | Auto-approves `ask` results instead of prompting when yolo mode is enabled                                                                           |
+| `doublePressToConfirm`      | `true`  | Requires a confirming second press of a decision hotkey in the inline TUI dialog (see below). TUI sessions only; set to `false` for single-press.    |
 | `toolInputPreviewMaxLength` | `200`   | Max characters of inline JSON shown in permission prompts for tool inputs. Omit to use the default. Set to a large value to disable truncation.      |
 | `toolTextSummaryMaxLength`  | `80`    | Max characters of inline pattern/path summaries (grep patterns, find globs, ls paths) in permission prompts. Omit to use the default.                |
 | `piInfrastructureReadPaths` | `[]`    | Extra directories to auto-allow for reads, bypassing the `external_directory` gate. Supports `~`/`$HOME` expansion and wildcard patterns (`*`, `?`). |
 
 Both logs write to `~/.pi/agent/extensions/pi-permission-system/logs/`.
 No debug output is printed to the terminal.
+
+### Inline permission dialog (TUI)
+
+In an interactive **TUI** session, an `ask` decision opens an inline keybind dialog with one-key shortcuts:
+
+| Key | Action                                                            |
+| --- | ----------------------------------------------------------------- |
+| `y` | Approve once                                                      |
+| `s` | Approve for this session                                          |
+| `n` | Deny                                                              |
+| `r` | Deny with a reason (opens an inline editor; a reason is required) |
+
+Arrow keys / `j`/`k` move the highlight, `enter` confirms the highlighted option, and `esc` denies.
+With `doublePressToConfirm` enabled (the default), a letter hotkey **arms** its action and shows a `Press y again to approve.` hint; press the same key again to commit.
+Set `doublePressToConfirm` to `false` to commit on the first press.
+
+Non-TUI contexts (RPC / frontend-driven sessions) keep the single-select prompt and are unaffected by `doublePressToConfirm`.
 
 ### `piInfrastructureReadPaths` patterns
 

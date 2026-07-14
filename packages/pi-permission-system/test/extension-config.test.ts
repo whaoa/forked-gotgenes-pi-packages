@@ -93,6 +93,7 @@ describe("normalizePermissionSystemConfig", () => {
       debugLog: true,
       permissionReviewLog: false,
       yoloMode: true,
+      doublePressToConfirm: true,
     });
   });
 
@@ -109,6 +110,18 @@ describe("normalizePermissionSystemConfig", () => {
   it("defaults yoloMode to false when missing", () => {
     const result = normalizePermissionSystemConfig({});
     expect(result.yoloMode).toBe(false);
+  });
+
+  it("defaults doublePressToConfirm to true when missing", () => {
+    const result = normalizePermissionSystemConfig({});
+    expect(result.doublePressToConfirm).toBe(true);
+  });
+
+  it("sets doublePressToConfirm false when explicitly disabled", () => {
+    const result = normalizePermissionSystemConfig({
+      doublePressToConfirm: false,
+    });
+    expect(result.doublePressToConfirm).toBe(false);
   });
 
   it("includes toolInputPreviewMaxLength when a valid positive integer is provided", () => {

@@ -483,13 +483,19 @@ describe("mergeUnifiedConfigs", () => {
 
   it("replaces scalar runtime knobs (project wins)", () => {
     const merged = mergeUnifiedConfigs(
-      { debugLog: true, permissionReviewLog: true, yoloMode: false },
-      { debugLog: false, yoloMode: true },
+      {
+        debugLog: true,
+        permissionReviewLog: true,
+        yoloMode: false,
+        doublePressToConfirm: true,
+      },
+      { debugLog: false, yoloMode: true, doublePressToConfirm: false },
     );
 
     expect(merged.debugLog).toBe(false);
     expect(merged.permissionReviewLog).toBe(true);
     expect(merged.yoloMode).toBe(true);
+    expect(merged.doublePressToConfirm).toBe(false);
   });
 
   it("returns base unchanged when override is empty", () => {
