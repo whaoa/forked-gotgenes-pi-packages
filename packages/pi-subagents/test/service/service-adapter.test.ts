@@ -109,7 +109,7 @@ function makeStubCtx(): SessionContext {
   return {
     cwd: "/tmp",
     model: undefined,
-    modelRegistry: { find: () => null, getAll: () => [] },
+    modelRegistry: { find: () => undefined, getAll: () => [] },
     getSystemPrompt: () => "test prompt",
     sessionManager: {
       getSessionFile: () => undefined,
@@ -221,7 +221,7 @@ describe("SubagentsServiceAdapter — spawn", () => {
 
   it("resolves string model names via resolveModel", () => {
     const resolveModel = vi.fn(() => makeModel({ id: "claude-sonnet", provider: "anthropic" }));
-    const registry = { find: () => null, getAll: () => [] };
+    const registry = { find: () => undefined, getAll: () => [] };
     const svc = new SubagentsServiceAdapter(
       createManagerStub(),
       resolveModel,

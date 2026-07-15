@@ -216,9 +216,9 @@ describe("resolveInvocationModel", () => {
       expect(result.error).toBeUndefined();
     });
 
-    it("falls back to null parent when config-specified model fails", () => {
-      const result = resolveInvocationModel(null, "nonexistent-model", false, makeRegistry());
-      expect(result).toEqual({ model: null });
+    it("falls back to undefined parent when config-specified model fails", () => {
+      const result = resolveInvocationModel(undefined, "nonexistent-model", false, makeRegistry());
+      expect(result).toEqual({ model: undefined });
       expect(result.error).toBeUndefined();
     });
   });
@@ -270,10 +270,23 @@ describe("resolveInvocationModel", () => {
       expect(result.error).toBeUndefined();
     });
 
-    it("propagates null parent model when modelInput is undefined", () => {
-      const result = resolveInvocationModel(null, undefined, false, makeRegistry());
-      expect(result).toEqual({ model: null });
+    it("propagates undefined parent model when modelInput is undefined", () => {
+      const result = resolveInvocationModel(undefined, undefined, false, makeRegistry());
+      expect(result).toEqual({ model: undefined });
       expect(result.error).toBeUndefined();
+    });
+  });
+
+  describe("no model registry available", () => {
+    it("returns an error when modelInput is set but registry is undefined", () => {
+      const result = resolveInvocationModel(parentModel, "haiku", true, undefined);
+      expect(result.model).toBeUndefined();
+      expect(result.error).toBe("No model registry available.");
+    });
+
+    it("does not require a registry when modelInput is unset", () => {
+      const result = resolveInvocationModel(parentModel, undefined, false, undefined);
+      expect(result).toEqual({ model: parentModel });
     });
   });
 });

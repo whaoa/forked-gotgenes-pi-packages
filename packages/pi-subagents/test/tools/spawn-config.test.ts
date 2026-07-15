@@ -30,8 +30,8 @@ const testRegistry = new AgentTypeRegistry(() => new Map());
 /** Shorthand for building ModelInfo. */
 function makeModelInfo(overrides: Partial<Parameters<typeof resolveSpawnConfig>[2]> = {}) {
   return {
-    parentModel: makeModel({ id: "claude-sonnet", name: "Claude Sonnet" }) as { id: string; name?: string } | undefined,
-    modelRegistry: { getAll: () => [], getAvailable: () => [] } as unknown,
+    parentModel: makeModel({ id: "claude-sonnet", name: "Claude Sonnet" }),
+    modelRegistry: { find: () => undefined, getAll: () => [], getAvailable: () => [] },
     ...overrides,
   };
 }
@@ -136,7 +136,7 @@ describe("resolveSpawnConfig — model resolution", () => {
     const result = resolveSpawnConfig(
       { subagent_type: "general-purpose", prompt: "test", description: "d", model: "nonexistent-xyz" },
       testRegistry,
-      makeModelInfo({ modelRegistry: { getAll: () => [], getAvailable: () => [] } }),
+      makeModelInfo({ modelRegistry: { find: () => undefined, getAll: () => [], getAvailable: () => [] } }),
       defaultSettings,
     );
     expect("error" in result && result.error).toBeTruthy();

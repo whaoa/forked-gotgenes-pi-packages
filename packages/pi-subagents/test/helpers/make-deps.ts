@@ -6,6 +6,7 @@ import {
 	type AgentToolRuntime,
 	type AgentToolSettings,
 } from "#src/tools/agent-tool";
+import { makeModel } from "./make-model";
 import { createTestSubagent } from "./make-subagent";
 import { STUB_SNAPSHOT } from "./stub-ctx";
 
@@ -39,8 +40,8 @@ export function createToolDeps(overrides: Partial<AgentToolFixture> = {}): Agent
 	const runtime: AgentToolRuntime = {
 		buildSnapshot: vi.fn((_inheritContext: boolean): ParentSnapshot => STUB_SNAPSHOT),
 		getModelInfo: vi.fn(() => ({
-			parentModel: { id: "claude-sonnet", name: "Claude Sonnet" },
-			modelRegistry: { getAll: () => [], getAvailable: () => [] },
+			parentModel: makeModel({ id: "claude-sonnet", name: "Claude Sonnet" }),
+			modelRegistry: { find: () => undefined, getAll: () => [], getAvailable: () => [] },
 		})),
 		getSessionInfo: vi.fn(() => ({
 			parentSessionFile: "/sessions/parent.jsonl",
