@@ -4,7 +4,10 @@
   "description": "Permission enforcement extension for the Pi coding agent.",
   "type": "module",
   "exports": {
-    ".": "./src/service.ts"
+    ".": {
+      "types": "./dist/public.d.ts",
+      "default": "./src/service.ts"
+    }
   },
   "imports": {
     "#src/*": "./src/*",
@@ -12,6 +15,7 @@
   },
   "files": [
     "src",
+    "dist",
     "config/config.example.json",
     "schemas/permissions.schema.json",
     "docs/*.md",
