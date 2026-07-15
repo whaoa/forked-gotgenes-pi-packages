@@ -39,6 +39,9 @@ Consumers call `getPermissionsService()` to retrieve it — even though their `i
 An in-process subagent child does not publish its own service; inside a child, `getPermissionsService()` resolves the parent's service.
 A consumer reacting to the `permissions:ready` broadcast (also emitted at `session_start`, after the publish) can resolve the service immediately.
 
+All types below are directly importable and type-check with `tsc` out of the box.
+`@gotgenes/pi-permission-system`'s published `exports` resolve `import type { … }` to a self-contained, bundled declaration file with no internal module references, so a downstream `tsconfig.json` needs no special path configuration.
+
 ### API
 
 The `PermissionsService` interface:
