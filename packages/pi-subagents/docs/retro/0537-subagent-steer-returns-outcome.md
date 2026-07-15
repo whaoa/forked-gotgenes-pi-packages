@@ -39,3 +39,17 @@ Test count went 960 → 961 (+1 for the new `rejected` case); the Tidy-First ass
 - Complexity target met: `steer-tool.ts` dropped off the `fallow health --targets` refactoring list (health score 4.9); `execute` cyclomatic is ~5.
 - All gates green (`check`, root `lint`, full `test`, `fallow dead-code`); lockfile untouched.
 - Pre-completion reviewer: PASS — no warnings; Step 1 (#535) notification/`toolCallId` invariant confirmed orthogonal and unregressed.
+
+## Stage: Ship (worktree) (2026-07-15T00:05:00Z)
+
+### Session summary
+
+Pre-push checks pass clean on the worktree branch `issue-537-pi-subagents-phase-20-step-3-subagent-st`: `pnpm run lint` and `pnpm fallow dead-code` both green with no fixes needed.
+Release marker is `ship independently` (refactor-only, no batch coordination required at land time); no follow-up work was deferred.
+
+**Peer session transcript:** `/Users/chris/.pi/agent/sessions/--Users-chris-development-pi-pi-packages-worktrees-issue-537--/2026-07-14T22-54-31-689Z_019f62d6-cb09-781f-97a7-8174288a56e9.jsonl` — read with `read_session_file({ path: "<path>" })` for message-level verification at land/retro time.
+
+### Observations
+
+No new observations beyond the TDD stage — this is a clean handoff.
+The branch is about to be rebased onto `origin/main`; the final `/retro 537` runs at the root after `/land-worktree 537`.
