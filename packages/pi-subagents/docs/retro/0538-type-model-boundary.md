@@ -26,3 +26,27 @@ Produced a two-refactor-commit + one-docs-commit plan and committed it.
   Left as a Non-Goal, not filed (roadmap does not name it; nothing speculative filed).
 - **Architecture-doc convention**: prior Phase 20 steps append a `Landed:` note per step and leave the Phase-19-end discovery/health-metrics snapshot untouched; the plan follows this.
   The path is release-excluded, so the `docs:` landing commit does not cut a release.
+
+## Stage: Implementation — TDD (2026-07-14T21:20:00Z)
+
+### Session summary
+
+Executed the plan in 5 commits: 2 tidy-first preparatory commits (a `makeModel` fixture builder migrating three test files off partial model literals; an untyped extraction of `findBestFuzzyMatch` from `resolveModel`), 2 refactor commits (typing `model-resolver.ts`/`spawn-config.ts`/`runtime.ts` against `Model<any>` as one coupled change; typing `service-adapter.spawn` via an extracted `resolveModelOption` helper), and 1 `docs:` commit marking Phase 20 Step 4 landed in the architecture doc.
+Test count went from 961 to 965 (4 new: 2 `make-model.test.ts` cases, 2 `resolveInvocationModel` no-registry-guard cases).
+Pre-completion reviewer: **PASS**.
+
+### Observations
+
+- **Tidy-first assessor delivered as advertised**: both of its Recommended preparatory commits (fixture migration, complexity extraction) were taken as-is and genuinely isolated the two "real" typing commits into pure signature diffs, matching its stated rationale.
+  Its Optional suggestion (pre-extracting `resolveModelOption` untyped) was skipped — the branch was small enough that the plan's single-commit bundling in TDD step 2 was reasonable without it.
+- **`null` → `undefined` test fixture deviation** (anticipated in planning, confirmed necessary in implementation): retyping `resolveInvocationModel`'s `parentModel` to `Model<any> | undefined` broke two existing tests that passed `parentModel: null`.
+  Fixed in the same commit (7c8ddefe) by changing both the input and the expected `{ model: ... }` result symmetrically — the function body (`return { model: parentModel }`) is an unchanged passthrough, so this is a type-forced fixture update, not a behavior change.
+  Verified by the pre-completion reviewer as legitimate.
+- **Unplanned deviation — `test/helpers/make-deps.ts`**: not listed in the plan's Module-Level Changes, but its `getModelInfo` stub also constructed a partial `ModelInfo`-shaped object (`{id, name}` parentModel, `modelRegistry` missing `find()`) that broke under the widened types.
+  Fixed in the same commit as the type change (mechanical, forced by the shared type — the same class of fallout the plan's Test Impact Analysis anticipated for the three explicitly-named test files, just one file the initial file grep missed).
+- **Unplanned addition — `test/helpers/make-model.test.ts`**: not explicitly named in the plan, but added to match this package's established convention (every `test/helpers/*.ts` file has a paired `*.test.ts`) — confirmed by checking sibling helpers before writing it.
+- **TS narrowing surprise**: after typing `model: Model<any> | undefined` in `spawn-config.ts`, eslint's `no-unnecessary-condition` flagged `model?.name ?? effectiveModelId` as fully unreachable — the type checker narrows `model` to non-undefined inside the ternary branch guarded by `effectiveModelId && ...` (since `effectiveModelId` is itself derived from `model?.id`).
+  Simplified to `model.name` directly; `tsc --noEmit` confirmed the narrowing holds with no cast needed.
+- **CRAP-threshold verification**: used `fallow health --complexity --format json` (not the human-readable grep) to confirm `severity` dropped from `"high"` to `"moderate"` for `service-adapter.spawn`, matching the testing skill's Refs #537 guidance to verify quantitative targets against structured output.
+- **Commit-message self-correction**: the first refactor commit's message initially claimed `service-adapter.spawn` was already off the HIGH-CRAP list — caught before it left this session (still unpushed) and fixed via `git commit --amend`, since that outcome only lands in commit 2.
+- **Amend safety check**: before amending, confirmed via `git log -1 --format=%H` that HEAD was this session's own just-made commit (per AGENTS.md guidance) before running `--amend`.
