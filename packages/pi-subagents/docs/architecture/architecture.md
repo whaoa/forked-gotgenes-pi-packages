@@ -993,7 +993,7 @@ Zero steer status pre-checks remain outside `Subagent.steer`.
 
 `Release: independent`
 
-#### Step 4 — Type the model boundary ([#538])
+#### ✅ Step 4 — Type the model boundary ([#538])
 
 Smell: Category C (platform type threading) — `ModelRegistry.find/getAll/getAvailable` return `any`, forcing `any`/`unknown` model threading through `model-resolver`, `spawn-config`, `service-adapter`, and `parent-snapshot`.
 Target files:
@@ -1003,6 +1003,11 @@ Target files:
 - `src/tools/spawn-config.ts` — shrink the 4-rule file-level disable to line-level or remove it.
 
 Outcome: `model-resolver.ts` file-level eslint-disable removed; `service-adapter.spawn` off the HIGH CRAP list; `any` model returns eliminated from the resolver.
+
+Landed: `ModelRegistry.find/getAll/getAvailable` and `resolveModel`'s return are typed against `Model<any>` from `@earendil-works/pi-ai`; the file-level eslint-disable headers on `model-resolver.ts` (2 rules) and `spawn-config.ts` (4 rules) are both removed — running disable-header tally 5 → 3 (`agent-tool` 6, `agent-widget` 4, `index` 1 remain, all Step 5 scope).
+`resolveModel`'s fuzzy-scoring loop was extracted to a private `findBestFuzzyMatch` helper, dropping `resolveModel` off the complexity list entirely.
+`service-adapter.spawn`'s model-resolution branch was extracted to a private `resolveModelOption`, dropping `spawn` from 16 cyclomatic / CRAP 71.3 (HIGH) to 13 cyclomatic / CRAP 49.5 (moderate) — off the HIGH-CRAP list; running HIGH-CRAP tally 2 → 1 remaining (the notification renderer arrow, untouched — Step 7 scope).
+`resolveInvocationModel` gained a `registry: ModelRegistry | undefined` guard (typed error instead of a crash when a model override is requested with no registry present); the residual `unknown` thread through `ParentSnapshot.model` / `SessionContext.model` is a separate SDK-boundary gap, deferred.
 
 `Release: independent`
 
@@ -1077,7 +1082,7 @@ flowchart LR
     S1["✅ Step 1 (#535)<br/>Result delivery off Subagent"] --> S2["✅ Step 2 (#536)<br/>Decompose get-result-tool"]
     S1 -.soft.-> S7["Step 7 (#541)<br/>Decompose notification renderer"]
     S3["✅ Step 3 (#537)<br/>Steer returns an outcome"]
-    S4["Step 4 (#538)<br/>Type the model boundary"]
+    S4["✅ Step 4 (#538)<br/>Type the model boundary"]
     S5["Step 5 (#539)<br/>Narrow tui/theme interfaces"]
     S6["Step 6 (#540)<br/>Table-driven settings handler"]
     S8["Step 8 (#542)<br/>Full-value SubagentStateInit"] --> S9["Step 9 (#543)<br/>Consolidate test clones"]
