@@ -21,6 +21,8 @@ catalog:
   "vitest": "^4.1.8"
   "@types/node": "^22.15.3"
   fallow: "^3.2.0"
+  rollup: "^4.62.2"
+  "rollup-plugin-dts": "^6.4.1"
 
 allowBuilds:
   "@google/genai": true
