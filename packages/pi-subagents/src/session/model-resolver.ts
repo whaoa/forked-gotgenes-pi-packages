@@ -79,9 +79,26 @@ export function resolveModel(
   }
 
   // 2. Fuzzy match against available models
-  const query = input.toLowerCase();
+  const bestMatch = findBestFuzzyMatch(all, input.toLowerCase());
+  if (bestMatch) {
+    const found = registry.find(bestMatch.provider, bestMatch.id);
+    if (found) return found;
+  }
 
-  // Score each model: prefer exact id match > id contains > name contains > provider+id contains
+  // 3. No match — list available models
+  const modelList = all
+    .map(m => `  ${m.provider}/${m.id}`)
+    .sort()
+    .join("\n");
+  return `Model not found: "${input}".\n\nAvailable models:\n${modelList}`;
+}
+
+/**
+ * Score each candidate model — prefer exact id match > id contains > name
+ * contains > provider+id contains — and return the best match at or above
+ * the acceptance threshold (20), or undefined if nothing scores high enough.
+ */
+function findBestFuzzyMatch(all: ModelEntry[], query: string): ModelEntry | undefined {
   let bestMatch: ModelEntry | undefined;
   let bestScore = 0;
 
@@ -107,15 +124,5 @@ export function resolveModel(
     }
   }
 
-  if (bestMatch && bestScore >= 20) {
-    const found = registry.find(bestMatch.provider, bestMatch.id);
-    if (found) return found;
-  }
-
-  // 3. No match — list available models
-  const modelList = all
-    .map(m => `  ${m.provider}/${m.id}`)
-    .sort()
-    .join("\n");
-  return `Model not found: "${input}".\n\nAvailable models:\n${modelList}`;
+  return bestScore >= 20 ? bestMatch : undefined;
 }
