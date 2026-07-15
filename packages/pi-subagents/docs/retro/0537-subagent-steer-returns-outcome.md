@@ -53,3 +53,43 @@ Release marker is `ship independently` (refactor-only, no batch coordination req
 
 No new observations beyond the TDD stage — this is a clean handoff.
 The branch is about to be rebased onto `origin/main`; the final `/retro 537` runs at the root after `/land-worktree 537`.
+
+## Stage: Final Retrospective (2026-07-15T00:18:24Z)
+
+### Session summary
+
+Issue #537 shipped as a single-cycle Tell-Don't-Ask refactor across four sessions (plan → TDD → ship-worktree → land), all low-friction.
+The land session ff-merged the peer branch onto `main`, CI passed on `0d45d4b9`, the issue was closed, no release was cut (refactor-only, hidden changelog type — auto-batches), and the worktree was torn down cleanly.
+
+### Observations
+
+#### What went well
+
+- The plan's edge-case analysis predicted both TDD deviations exactly: the `steer-tool.test.ts` no-touch (its `toContain` assertions already exercised all four outcome paths through the real `Subagent.steer`) and the `subagent.test.ts` "flushes pending steers" test needing `markRunning` before steering (the new first-guard rejects non-running steers).
+  A plan that anticipates its own test deviations is a strong signal the design was validated against the real test surface at plan time, not just the source.
+- The `tidy-first-assessor` correctly found no preparatory refactoring warranted on a genuinely small change — the applicability gate held rather than manufacturing busywork.
+- The parallel-worktree ship flow ran end-to-end with zero cross-session friction: the peer's ship-stage breadcrumb carried the `**Release:**` marker and transcript path, and the root land needed no peer re-rebase (no sibling landed first).
+
+#### What caused friction (agent side)
+
+- `missing-context` — during the TDD "After the last TDD step" gates, the agent verified the plan's `steer-tool.execute` complexity target by probing three non-existent `fallow` subcommands (`fallow complexity`, `fallow refactor`, `fallow audit`) before landing on the documented `fallow health --targets` (peer TDD session, steps 60–63; 4 consecutive calls).
+  The `fallow` skill already documents `health --targets` and even the exact "confirm a file dropped off the list" JSON caveat (skill line 88), but the `/tdd-plan` prompt only mandates loading the `fallow` skill on a dead-code gate *failure*, not when a plan names a quantitative complexity target to verify — so the skill was never loaded and the command was rediscovered by trial.
+  Impact: 3 wasted tool calls, no rework, self-corrected within the same step.
+
+#### What caused friction (user side)
+
+- None — every stage ran autonomously to completion with no user correction or redirect needed.
+
+### Diagnostic details
+
+- **Model-performance correlation** — Planning and TDD ran on `claude-opus-4-8` (judgment-heavy: design decisions, discriminated-union refactor, test authoring) — appropriate.
+  Ship (worktree) ran on `claude-sonnet-5` (mechanical lint/dead-code gates + rebase) — appropriate, no over-provisioning.
+  No quality mismatch on any turn.
+- **Escalation-delay tracking** — The only same-target run was the `fallow` command probing (4 calls, under the 5-call dispatch threshold); no true rabbit-hole.
+- **Feedback-loop gap analysis** — TDD verification ran incrementally: `pnpm run check` fired right after the shared-type (`SteerOutcome`) change (peer TDD step 49) before the commit, not deferred to end-of-session — exactly the plan's guidance for a shared-type change.
+  No gap.
+
+### Changes made
+
+1. `.pi/prompts/tdd-plan.md` — appended one sentence to the fallow dead-code gate step ("After the last TDD step" section): when a plan names a quantitative target (complexity/CRAP score, clone count, refactoring-target drop-off), load the `fallow` skill and confirm a file left the targets list with `fallow health --targets --format json` (empty `targets` array), not by grepping the human-readable output.
+   Prevents the trial-and-error subcommand probing seen in the peer TDD session (steps 60–63).
