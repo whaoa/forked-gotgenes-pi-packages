@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentTool } from "#src/tools/agent-tool";
-import { createToolDeps } from "#test/helpers/make-deps";
+import { createToolDeps, createToolDepsWithDisabledBuiltInAgents } from "#test/helpers/make-deps";
 import { createTestSubagent } from "#test/helpers/make-subagent";
 import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 
@@ -48,6 +48,12 @@ describe("AgentTool", () => {
 		// testRegistry loads default agents: general-purpose, Explore, Plan
 		expect(def.description).toContain("- general-purpose: General-purpose agent");
 		expect(def.description).toContain("- Explore: Fast codebase exploration agent");
+	});
+
+	it.for(['Explore', 'Plan', 'general-purpose'])("exclude the description of default %s when it is disabled", (name) => {
+		const def = makeTool(createToolDepsWithDisabledBuiltInAgents(name)).toToolDefinition();
+		expect(def.description).not.toContain(`- ${name} :`);
+		expect(def.description).not.toContain(`- Use ${name} for `);
 	});
 
 	it("calls registry.reload() on each execute", async () => {

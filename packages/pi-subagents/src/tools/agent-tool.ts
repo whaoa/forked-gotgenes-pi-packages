@@ -128,6 +128,12 @@ export class AgentTool {
 		const agentDir = this.agentDir;
 		const registry = this.registry;
 
+		const agentSpecificGuidelines = [
+			registry.isValidType("Explore") &&  "- Use Explore for codebase searches and code understanding.",
+			registry.isValidType("Plan") &&  "- Use Plan for architecture and implementation planning.",
+			registry.isValidType("general-purpose") && "- Use general-purpose for complex tasks that need file editing.",
+		].filter((line): line is string => typeof line === "string");
+
 		return defineTool({
 			name: "subagent" as const,
 			label: "Subagent",
@@ -140,10 +146,8 @@ Available agent types:
 ${typeListText}
 
 Guidelines:
+${agentSpecificGuidelines.join("\n")}
 - For parallel work, use run_in_background: true on each agent. Foreground calls run sequentially — only one executes at a time.
-- Use Explore for codebase searches and code understanding.
-- Use Plan for architecture and implementation planning.
-- Use general-purpose for complex tasks that need file editing.
 - Provide clear, detailed prompts so the agent can work autonomously.
 - Subagent results are returned as text — summarize them for the user.
 - Use run_in_background for work you don't need immediately. You will be notified when it completes.

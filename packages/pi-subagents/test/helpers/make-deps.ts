@@ -63,3 +63,21 @@ export function createToolDeps(overrides: Partial<AgentToolFixture> = {}): Agent
 		...overrides,
 	};
 }
+
+export function createToolDepsWithDisabledBuiltInAgents(...names: string[]) {
+	const registry = new AgentTypeRegistry(() => new Map(
+		names.map((name) => [
+			name,
+			{
+				name,
+				description: 'disabled built-in agent',
+				promptMode: "append",
+				systemPrompt: "",
+				isDefault: true,
+				enabled: false,
+			},
+		]),
+	));
+
+	return createToolDeps({ registry });
+}

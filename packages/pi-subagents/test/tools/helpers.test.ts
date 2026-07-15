@@ -125,6 +125,15 @@ describe("buildTypeListText", () => {
     expect(result).not.toContain("Plan");
   });
 
+  it('excludes Default agents section when no default agents exist', () => {
+    const registry = makeRegistry({
+      users: ["my-agent"],
+      resolve: () => ({ description: "My custom agent", model: undefined }),
+    });
+    const result = buildTypeListText(registry, "/home/.pi");
+    expect(result).not.toContain("Default agents:");
+  });
+
   it("excludes disabled agents from the custom agents list", () => {
     const registry = makeRegistry({
       defaults: ["general-purpose"],
