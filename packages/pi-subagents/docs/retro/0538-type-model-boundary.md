@@ -50,3 +50,46 @@ Pre-completion reviewer: **PASS**.
 - **CRAP-threshold verification**: used `fallow health --complexity --format json` (not the human-readable grep) to confirm `severity` dropped from `"high"` to `"moderate"` for `service-adapter.spawn`, matching the testing skill's Refs #537 guidance to verify quantitative targets against structured output.
 - **Commit-message self-correction**: the first refactor commit's message initially claimed `service-adapter.spawn` was already off the HIGH-CRAP list — caught before it left this session (still unpushed) and fixed via `git commit --amend`, since that outcome only lands in commit 2.
 - **Amend safety check**: before amending, confirmed via `git log -1 --format=%H` that HEAD was this session's own just-made commit (per AGENTS.md guidance) before running `--amend`.
+
+## Stage: Final Retrospective (2026-07-14T22:00:00Z)
+
+### Session summary
+
+One continuous session carried #538 through planning → TDD → ship: an internal type-safety refactor typing the `pi-subagents` model boundary against `Model<any>`, removing two file-level `eslint-disable` headers and dropping `resolveModel` and `service-adapter.spawn` off fallow's complexity list.
+Eight commits landed (plan + planning retro + 2 tidy-first prep + 2 refactor + landed-docs + TDD retro), CI passed on `89471018`, and the issue closed with no release (all `refactor:`/`test:`/`docs:` commits auto-batch into the next `feat:`/`fix:` release).
+The pre-completion reviewer returned PASS on the first pass; no rework cycles occurred.
+
+### Observations
+
+#### What went well
+
+- **Tidy-first prep commits paid off concretely** — the `tidy-first-assessor`'s two Recommended commits (the `makeModel` fixture migration and the untyped `findBestFuzzyMatch` extraction) were landed as-is and left the two "real" typing commits (`7c8ddefe`, `b0480c6d`) as pure signature diffs.
+  This is the first session where that workflow's isolation benefit was visibly realized end-to-end (the agent's own skill still carries a "first-live-use checkpoint").
+- **The Red step exercised behavior, not just a signature** — the no-registry-guard test failed with a real `TypeError` crash before Green, confirming it drove the new total-function contract rather than coincidentally passing the old runtime path (the exact hollow-red trap the testing skill warns about).
+- **Planning anticipated the two hardest deviations** — the `null` → `undefined` fixture change and the forced single-commit coupling of `model-resolver` + `spawn-config` + `runtime` were both called out in the plan's stage notes before implementation, so neither caused a stall.
+
+#### What caused friction (agent side)
+
+- `other` (premature outcome claim) — the first refactor commit's message (`7c8ddefe`) initially claimed `service-adapter.spawn` was "off the HIGH-CRAP list," but that outcome only lands in the *next* commit (`b0480c6d`).
+  Self-identified before push and fixed via `git commit --amend` (with the AGENTS.md HEAD-ownership check first).
+  Impact: one amend, no rework, nothing pushed — a documentation-of-work slip, not a code slip.
+- `missing-context` (structural-mock grep gap) — the plan's Test Impact Analysis named three test files but missed `test/helpers/make-deps.ts`, whose `getModelInfo` stub builds a `ModelInfo`-shaped object *inline* without naming the `ModelInfo` type, so the planning-time type-name grep did not surface it.
+  Impact: none beyond one extra file in the same commit — `tsc --noEmit` caught it immediately after the coupled type change.
+
+#### What caused friction (user side)
+
+- None.
+  No corrections, redirections, or clarifications were needed across the three stages; operator involvement was model selection only.
+
+### Diagnostic details
+
+- **Model-performance correlation** — both subagent dispatches (`tidy-first-assessor`, `pre-completion-reviewer`) ran on `anthropic/claude-sonnet-5`, appropriate for judgment-heavy read-only work; no reasoning-weak-model-on-hard-task or costly-model-on-mechanical-task mismatch.
+- **Escalation-delay tracking** — no `rabbit-hole` friction; the longest same-error sequence was the eslint `no-unnecessary-condition` flag on the `model?.name` ternary, resolved in one edit plus one `tsc` verify (well under the 5-call flag).
+- **Feedback-loop gap analysis** — verification was incremental, not end-loaded: `tsc --noEmit` was run immediately after the coupled type change specifically to surface the planned `spawn-config` break, `vitest run <file>` after each Red/Green, and the full `check`/`lint`/`test`/`fallow` gate plus JSON-based CRAP verification at the end.
+  No gap to flag.
+
+### Changes made
+
+1. Appended this Final Retrospective stage entry to `packages/pi-subagents/docs/retro/0538-type-model-boundary.md`.
+   No `AGENTS.md` or prompt changes: both friction points were self-identified, zero-rework, and already covered by existing guardrails (`tsc` for the structural-mock miss; commit-scope convention for the outcome-timing slip).
+   Operator confirmed "land retro only."
