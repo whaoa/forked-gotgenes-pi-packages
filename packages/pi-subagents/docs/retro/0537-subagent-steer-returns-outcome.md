@@ -75,6 +75,10 @@ The land session ff-merged the peer branch onto `main`, CI passed on `0d45d4b9`,
 - `missing-context` — during the TDD "After the last TDD step" gates, the agent verified the plan's `steer-tool.execute` complexity target by probing three non-existent `fallow` subcommands (`fallow complexity`, `fallow refactor`, `fallow audit`) before landing on the documented `fallow health --targets` (peer TDD session, steps 60–63; 4 consecutive calls).
   The `fallow` skill already documents `health --targets` and even the exact "confirm a file dropped off the list" JSON caveat (skill line 88), but the `/tdd-plan` prompt only mandates loading the `fallow` skill on a dead-code gate *failure*, not when a plan names a quantitative complexity target to verify — so the skill was never loaded and the command was rediscovered by trial.
   Impact: 3 wasted tool calls, no rework, self-corrected within the same step.
+- `instruction-violation` (self-identified) — during this retro session, the `docs(retro)` commit (`f0232403`) swept in an unrelated staged deletion of `packages/pi-permission-system/docs/decisions/0007-model-triage-authorizer.md` (a live ADR from issue #581), even though only the two retro/prompt files were `git add`-ed.
+  AGENTS.md warns about exactly this: "Staged deletions from `git rm` ride along with the next `git commit` even when you `git add` only unrelated paths — commit with an explicit pathspec or check `git status` first."
+  Caught immediately from the commit's file-stat output; restored the ADR in a follow-up commit (`919354f9`) using an explicit pathspec.
+  Impact: one extra restore commit; no data lost (the deletion never reached anyone, both commits pushed together).
 
 #### What caused friction (user side)
 
@@ -93,3 +97,4 @@ The land session ff-merged the peer branch onto `main`, CI passed on `0d45d4b9`,
 
 1. `.pi/prompts/tdd-plan.md` — appended one sentence to the fallow dead-code gate step ("After the last TDD step" section): when a plan names a quantitative target (complexity/CRAP score, clone count, refactoring-target drop-off), load the `fallow` skill and confirm a file left the targets list with `fallow health --targets --format json` (empty `targets` array), not by grepping the human-readable output.
    Prevents the trial-and-error subcommand probing seen in the peer TDD session (steps 60–63).
+2. `packages/pi-permission-system/docs/decisions/0007-model-triage-authorizer.md` — restored (commit `919354f9`) after it was unintentionally swept into the retro commit as a pre-staged deletion; recommitted with an explicit pathspec to avoid re-including other unstaged working-tree changes.
