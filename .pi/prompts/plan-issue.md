@@ -98,6 +98,10 @@ When the issue is in an unfamiliar domain (a platform, protocol, or tool you hav
 When the proposal also has design ambiguities, fold those into the same `ask-user` call.
 Let the operator's answers — not the issue body — drive the plan's Goals and Design Overview.
 
+If the issue is a decision-record or ADR issue (its deliverable is a decision, not code), do **not** skip the `ask-user` gate even when a design is already written down.
+The deliberation is the deliverable: existing architecture-doc prose is an input to put to the operator, not a settled spec to transcribe.
+Surface the open parameters (and any the prose treats as closed but the issue's own motivation reopens) for the operator's confirmation before planning (Refs #581).
+
 ## Write the plan
 
 File: `packages/<PKG>/docs/plans/NNNN-<short-slug>.md` (single-package) or `docs/plans/NNNN-<short-slug>.md` (cross-package).
