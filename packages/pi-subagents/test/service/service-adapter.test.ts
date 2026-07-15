@@ -176,7 +176,7 @@ describe("SubagentsServiceAdapter — getRecord and listAgents", () => {
     manager.listAgents.mockImplementation(() => [...records].sort((a, b) => b.startedAt - a.startedAt));
     return new SubagentsServiceAdapter(
       manager,
-      () => ({ id: "test" }),
+      () => makeModel({ id: "test" }),
       makeRuntimeStub(),
     );
   }
