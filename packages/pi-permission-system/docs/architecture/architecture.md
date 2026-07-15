@@ -602,8 +602,6 @@ It is not built, and it would be requested by name, never conflated with yolo.
 
 ### Discriminating delegation: a model `Authorizer`
 
-The design below is recorded as a decision in ADR 0007 (`docs/decisions/0007-model-triage-authorizer.md`); implementation is tracked in [#472].
-
 Nothing constrains an `Authorizer` to be deterministic.
 `LocalUserAuthorizer` is already a non-deterministic oracle — the human — and the determinism principle governs *recorded* authority (`evaluate()`), never the live-authority layer.
 A model (e.g. Claude Haiku) can hold the `Authorizer` role on the same terms: it is live authority, so it never touches `evaluate()` or the deterministic core.
@@ -624,7 +622,7 @@ Where yolo rewrites every `ask` to `allow`, the model resolves only the asks it 
 Three properties keep it reviewable and fail-closed:
 
 - **Audited** — a model grant is tagged `origin: "authorizer:model"` (with model version and the structured intent) so the review log distinguishes it from a human, policy, or yolo allow, mirroring how yolo grants carry `origin: "yolo"`.
-- **Non-persistent** — unlike a human's "for this session" ruling, a model verdict does *not* silently become recorded authority; it stays live-only, per ADR 0007 (`docs/decisions/0007-model-triage-authorizer.md`), so a probabilistic judgment never hardens into durable config.
+- **Non-persistent** — unlike a human's "for this session" ruling, a model verdict does *not* silently become recorded authority; it stays live-only (or is persisted quarantined for human review), so a probabilistic judgment never hardens into durable config.
 - **Fail-closed** — model unreachable, timeout, or low confidence delegates to `inner` (the human, the `ParentAuthorizer`, or `DenyingAuthorizer`), never an auto-allow; bounded delegation (which surfaces the model may auto-allow) is itself ruleset-expressible, with `external_directory` and secret-shaped `path` rules excluded so they always reach the human.
 
 This is the principled successor to the per-command argument-position work deferred from [#509].
@@ -898,7 +896,7 @@ Recompute commands (run from the repo root):
 - [#573] — scheduled as Step 4.
 - [#571] — scheduled as Step 5.
 - [#575] — scheduled as Step 6.
-- [#472] — two-phase repeat deferral resolved by decision: Step 7 recorded the decision (ADR 0007, `docs/decisions/0007-model-triage-authorizer.md`); implementation remains future work gated on that ADR.
+- [#472] — two-phase repeat deferral: [#581] attempted the decision record but the mechanical ADR was found premature and reverted; the real design (two concrete use cases, a tool-augmented model reviewer) moved to [#591], which supersedes [#581] and is the design gate for [#472].
 - [#519] — stays open by decision (not a silent sweep): blocked on Pi SDK UIContext evolution; Step 4's select-fallback constraint keeps frontend-driven flows working meanwhile.
 - [#565] — stays open, non-gating: the designated post-ship observation of the Phase 9 serving decisions, and now also the evidence-gathering input for the Phase 12 cross-session intent spine.
 
@@ -982,7 +980,7 @@ Release: independent
 
 Release: independent
 
-#### ✅ Step 7: Decision record for the case-by-case judge ([#581])
+#### Step 7: Decision record for the case-by-case judge ([#581] → superseded by [#591])
 
 **Cause:** [#472] has been deferred by name in Phases 9 and 10; the repeat-deferral rule requires a decision this phase, and the [`ModelTriageAuthorizer` design](#discriminating-delegation-a-model-authorizer) is settled enough to commit to paper — deciding the open parameters is what stands between "designed" and "schedulable".
 
@@ -1003,7 +1001,7 @@ flowchart TD
     S4["✅ Step 4: Inline keybind permission dialog (#573)"]
     S5["✅ Step 5: Containment unification (#571)"]
     S6["✅ Step 6: Indirection-wrapper survey (#575)"]
-    S7["✅ Step 7: Model-judge decision record (#581)"]
+    S7["Step 7: Model-judge decision record (#581 → #591)"]
     S1 --> S3
     S2 --> S3
 ```
@@ -1203,4 +1201,5 @@ Six steps ([#568], [#569], [#562], [#309], [#490], [#521]), all closed.
 [#579]: https://github.com/gotgenes/pi-packages/issues/579
 [#580]: https://github.com/gotgenes/pi-packages/issues/580
 [#581]: https://github.com/gotgenes/pi-packages/issues/581
+[#591]: https://github.com/gotgenes/pi-packages/issues/591
 [ADR-0002]: https://github.com/gotgenes/pi-packages/blob/main/packages/pi-subagents/docs/decisions/0002-extensions-on-a-minimal-core.md
