@@ -4,14 +4,15 @@ import {
   resolveInvocationModel,
   resolveModel,
 } from "#src/session/model-resolver";
+import { makeModel } from "#test/helpers/make-model";
 
 // Mock model entries matching typical pi model registry shape
 const MODELS = [
-  { id: "claude-opus-4-6", name: "Claude Opus 4.6", provider: "anthropic" },
-  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "anthropic" },
-  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "anthropic" },
-  { id: "gpt-4o", name: "GPT-4o", provider: "openai" },
-  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", provider: "google" },
+  makeModel({ id: "claude-opus-4-6", name: "Claude Opus 4.6", provider: "anthropic" }),
+  makeModel({ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "anthropic" }),
+  makeModel({ id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "anthropic" }),
+  makeModel({ id: "gpt-4o", name: "GPT-4o", provider: "openai" }),
+  makeModel({ id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", provider: "google" }),
 ];
 
 function makeRegistry(models = MODELS, available?: typeof MODELS): ModelRegistry {
@@ -174,9 +175,9 @@ describe("resolveModel", () => {
 
   describe("ambiguous matches", () => {
     const SIMILAR_MODELS = [
-      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "anthropic" },
-      { id: "claude-sonnet-4-5-20241022", name: "Claude Sonnet 4.5", provider: "anthropic" },
-      { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "anthropic" },
+      makeModel({ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "anthropic" }),
+      makeModel({ id: "claude-sonnet-4-5-20241022", name: "Claude Sonnet 4.5", provider: "anthropic" }),
+      makeModel({ id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "anthropic" }),
     ];
 
     it("'sonnet' prefers tighter id match (shorter id)", () => {
@@ -206,7 +207,7 @@ describe("resolveModel", () => {
 });
 
 describe("resolveInvocationModel", () => {
-  const parentModel = { id: "claude-opus-4-6", provider: "anthropic" };
+  const parentModel = makeModel({ id: "claude-opus-4-6", provider: "anthropic" });
 
   describe("config-specified model silent fallback (modelFromParams false)", () => {
     it("returns parent model when config-specified model fails to resolve", () => {

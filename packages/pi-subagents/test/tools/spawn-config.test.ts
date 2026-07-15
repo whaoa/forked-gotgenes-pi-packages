@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AgentTypeRegistry } from "#src/config/agent-types";
 import { resolveSpawnConfig } from "#src/tools/spawn-config";
 import type { AgentConfig } from "#src/types";
+import { makeModel } from "#test/helpers/make-model";
 
 function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
@@ -29,7 +30,7 @@ const testRegistry = new AgentTypeRegistry(() => new Map());
 /** Shorthand for building ModelInfo. */
 function makeModelInfo(overrides: Partial<Parameters<typeof resolveSpawnConfig>[2]> = {}) {
   return {
-    parentModel: { id: "claude-sonnet", name: "Claude Sonnet" } as { id: string; name?: string } | undefined,
+    parentModel: makeModel({ id: "claude-sonnet", name: "Claude Sonnet" }) as { id: string; name?: string } | undefined,
     modelRegistry: { getAll: () => [], getAvailable: () => [] } as unknown,
     ...overrides,
   };
@@ -118,7 +119,7 @@ describe("resolveSpawnConfig — type resolution", () => {
 
 describe("resolveSpawnConfig — model resolution", () => {
   it("inherits parent model when no model specified", () => {
-    const parentModel = { id: "claude-sonnet", name: "Claude Sonnet" };
+    const parentModel = makeModel({ id: "claude-sonnet", name: "Claude Sonnet" });
     const result = resolveSpawnConfig(
       { subagent_type: "general-purpose", prompt: "test", description: "d" },
       testRegistry,

@@ -5,6 +5,7 @@ import type { SubagentsService } from "#src/service/service";
 import type { ServiceRuntimeLike, SubagentManagerLike } from "#src/service/service-adapter";
 import { SubagentsServiceAdapter, toSubagentRecord } from "#src/service/service-adapter";
 import type { SessionContext, Subagent } from "#src/types";
+import { makeModel } from "#test/helpers/make-model";
 import { createTestSubagent } from "#test/helpers/make-subagent";
 import { createMockSession, createSubagentSessionStub, toSubagentSession } from "#test/helpers/mock-session";
 import { STUB_SNAPSHOT } from "#test/helpers/stub-ctx";
@@ -219,7 +220,7 @@ describe("SubagentsServiceAdapter — spawn", () => {
   });
 
   it("resolves string model names via resolveModel", () => {
-    const resolveModel = vi.fn(() => ({ id: "claude-sonnet", provider: "anthropic" }));
+    const resolveModel = vi.fn(() => makeModel({ id: "claude-sonnet", provider: "anthropic" }));
     const registry = { find: () => null, getAll: () => [] };
     const svc = new SubagentsServiceAdapter(
       createManagerStub(),
@@ -242,7 +243,7 @@ describe("SubagentsServiceAdapter — spawn", () => {
   });
 
   it("delegates to manager.spawn with resolved model", () => {
-    const resolvedModel = { id: "claude-sonnet", provider: "anthropic" };
+    const resolvedModel = makeModel({ id: "claude-sonnet", provider: "anthropic" });
     const mgr = createManagerStub();
     const svc = new SubagentsServiceAdapter(
       mgr,
